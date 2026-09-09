@@ -67,7 +67,7 @@ Deploy your personal Listening Index in under 5 minutes without having to manage
 ### Step 1: 1-Click Deploy
 Click the button below. Vercel will prompt you to clone the repository to your personal GitHub account and create the project:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FBlairqiao%2Flistening-index&env=DATABASE_URL,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,SPOTIFY_REFRESH_TOKEN,CRON_SECRET&envDescription=Credentials%20for%20Spotify%20API%20and%20Database&project-name=listening-index)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FBlairqiao%2Flistening_index&env=DATABASE_URL,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,SPOTIFY_REFRESH_TOKEN,CRON_SECRET&envDescription=Credentials%20for%20Spotify%20API%20and%20Database&project-name=listening-index)
 
 > 💡 **Tip for your initial deploy:** Vercel will prompt you to fill in environment variables (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, etc.). **Leave them blank for now** and click **Continue / Deploy**. Your site will immediately deploy in **Demo Mode** using sample fixtures! We will connect your real database and Spotify credentials in Steps 2–5.
 
