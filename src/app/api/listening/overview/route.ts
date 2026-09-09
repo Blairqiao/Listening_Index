@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOverviewData, RangeKey } from "@/lib/db/queries";
 import { getCachedOverview, setCachedOverview } from "@/lib/db/server-cache";
+import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +24,8 @@ export async function GET(request: NextRequest) {
 
     const range = rangeParam as RangeKey;
     
-    // Zero-config preview fallback when DATABASE_URL is not configured
-    if (!process.env.DATABASE_URL) {
+    // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
+    if (!isDbConfigured()) {
       return NextResponse.json(MOCK_DATA.overview[range], {
         status: 200,
         headers: {

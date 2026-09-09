@@ -4,6 +4,8 @@
  * Implements server-to-server OAuth token refresh and recently played tracks ingestion.
  */
 
+import { isConfigured } from "@/lib/db";
+
 export interface SpotifyApiErrorDetails {
   status: number;
   message: string;
@@ -95,10 +97,14 @@ export async function getAccessToken(): Promise<string> {
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
 
-  if (!clientId || !clientSecret || !refreshToken) {
+  if (
+    !isConfigured(clientId) ||
+    !isConfigured(clientSecret) ||
+    !isConfigured(refreshToken)
+  ) {
     throw new Error(
-      "Missing Spotify credentials. Ensure SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, " +
-        "and SPOTIFY_REFRESH_TOKEN are defined in your environment."
+      "Spotify credentials are not configured yet (currently set to 'todo' or empty). Ensure SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, " +
+        "and SPOTIFY_REFRESH_TOKEN are updated in your environment."
     );
   }
 

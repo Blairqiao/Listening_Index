@@ -198,14 +198,18 @@ export async function ensureTablesExist(): Promise<void> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL
     );
+  `;
 
+  await sql`
     CREATE TABLE IF NOT EXISTS albums (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       image_url TEXT,
       artist_id TEXT REFERENCES artists(id)
     );
+  `;
 
+  await sql`
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -213,7 +217,9 @@ export async function ensureTablesExist(): Promise<void> {
       album_id TEXT REFERENCES albums(id),
       duration_ms INTEGER NOT NULL
     );
+  `;
 
+  await sql`
     CREATE TABLE IF NOT EXISTS plays (
       id BIGSERIAL PRIMARY KEY,
       played_at TIMESTAMPTZ NOT NULL,
@@ -221,10 +227,17 @@ export async function ensureTablesExist(): Promise<void> {
       ms_played INTEGER NOT NULL,
       CONSTRAINT plays_played_at_track_id_key UNIQUE (played_at, track_id)
     );
+  `;
 
+  await sql`
     CREATE INDEX IF NOT EXISTS idx_plays_played_at ON plays(played_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_plays_track_id ON plays(track_id);
+  `;
 
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_plays_track_id ON plays(track_id);
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS sync_state (
       key TEXT PRIMARY KEY,
       synced_at TIMESTAMPTZ NOT NULL

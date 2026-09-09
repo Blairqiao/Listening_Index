@@ -67,15 +67,15 @@ Deploy your personal Listening Index in under 5 minutes without having to manage
 ### Step 1: 1-Click Deploy
 Click the button below. Vercel will prompt you to clone the repository to your personal GitHub account and create the project:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FBlairqiao%2Flistening_index&env=DATABASE_URL,SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,SPOTIFY_REFRESH_TOKEN,CRON_SECRET&envDescription=Credentials%20for%20Spotify%20API%20and%20Database&project-name=listening-index)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FBlairqiao%2Flistening_index&env=SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,SPOTIFY_REFRESH_TOKEN,CRON_SECRET&envDefaults=%7B%22SPOTIFY_CLIENT_ID%22%3A%22todo%22%2C%22SPOTIFY_CLIENT_SECRET%22%3A%22todo%22%2C%22SPOTIFY_REFRESH_TOKEN%22%3A%22todo%22%2C%22CRON_SECRET%22%3A%22todo%22%7D&envDescription=Credentials%20for%20Spotify%20API%20and%20Database&project-name=listening-index)
 
-> 💡 **Tip for your initial deploy:** Vercel will prompt you to fill in environment variables (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, etc.). **Leave them blank for now** and click **Continue / Deploy**. Your site will immediately deploy in **Demo Mode** using sample fixtures! We will connect your real database and Spotify credentials in Steps 2–5.
+> 💡 **Tip for your initial deploy:** All environment variables are automatically pre-filled with `"todo"`. Simply click **Deploy** without editing anything! The application will immediately build and deploy into **Demo Mode** with sample data. You can then connect your real database and Spotify credentials in Steps 2–5.
 
 ---
 
 ### Step 2: Connect Neon Database
 1. On your Vercel Project Dashboard, navigate to the **Storage** tab.
-2. Select **Connect Database → Neon Postgres** (or create a free project at [neon.tech](https://neon.tech)).
+2. Select **Connect Database → Neon Postgres**.
 3. Vercel will automatically provision the database and configure the `DATABASE_URL` environment variable.
 4. *No tables need to be created manually* - the application self-heals and bootstraps all tables and indexes on its first sync.
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStreamLog } from "@/lib/db/queries";
 import { getCachedStreamLog, setCachedStreamLog } from "@/lib/db/server-cache";
+import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +12,8 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 100) : 50;
 
-    // Zero-config preview fallback when DATABASE_URL is not configured
-    if (!process.env.DATABASE_URL) {
+    // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
+    if (!isDbConfigured()) {
       return NextResponse.json(MOCK_DATA.streamLog, {
         status: 200,
         headers: {

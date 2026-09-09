@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/db/queries";
 import { getCachedSession, setCachedSession } from "@/lib/db/server-cache";
+import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    // Zero-config preview fallback when DATABASE_URL is not configured
-    if (!process.env.DATABASE_URL) {
+    // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
+    if (!isDbConfigured()) {
       return NextResponse.json(MOCK_DATA.session, {
         status: 200,
         headers: {

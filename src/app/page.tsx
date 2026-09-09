@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ListeningView } from "@/components/ListeningView";
 import { MOCK_DATA } from "@/lib/mock-data";
 import { getInitialMusicData } from "@/lib/db/queries";
+import { isDbConfigured } from "@/lib/db";
 import { siteConfig } from "@/config";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +13,9 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const isDbConfigured = Boolean(process.env.DATABASE_URL);
+  const isConfigured = isDbConfigured();
 
-  const initialData = isDbConfigured 
+  const initialData = isConfigured 
     ? await getInitialMusicData()
     : { overview: MOCK_DATA.overview, streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session };
 

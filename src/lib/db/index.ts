@@ -13,11 +13,34 @@ import { neon, Pool, NeonQueryFunction } from "@neondatabase/serverless";
 let cachedSql: NeonQueryFunction<false, false> | null = null;
 let cachedPool: Pool | null = null;
 
+/**
+ * Checks whether an environment variable or setting is populated with a real value
+ * (i.e. not empty, and not an uninitialized placeholder like "todo").
+ */
+export function isConfigured(value?: string | null): value is string {
+  if (!value) return false;
+  const trimmed = value.trim().toLowerCase();
+  return (
+    trimmed !== "" &&
+    trimmed !== "todo" &&
+    trimmed !== "placeholder" &&
+    !trimmed.startsWith("todo") &&
+    !trimmed.startsWith("placeholder")
+  );
+}
+
+/**
+ * Convenience helper to verify if a real PostgreSQL DATABASE_URL is present.
+ */
+export function isDbConfigured(): boolean {
+  return isConfigured(process.env.DATABASE_URL) || isConfigured(process.env.POSTGRES_URL);
+}
+
 export function getDatabaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!isDbConfigured() || !url) {
     throw new Error(
-      "DATABASE_URL environment variable is missing. " +
+      "DATABASE_URL (or POSTGRES_URL) is not configured. " +
         "Ensure DATABASE_URL is defined in .env.local (development) or your deployment environment variables."
     );
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncSpotify } from "../../../../scripts/sync-spotify";
 import { clearServerCache } from "@/lib/db/server-cache";
+import { isConfigured, isDbConfigured } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
@@ -26,11 +27,11 @@ function isAuthorized(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
 
   // In local development, bypass check if CRON_SECRET is not yet configured
-  if (!cronSecret) {
+  if (!isConfigured(cronSecret)) {
     if (process.env.NODE_ENV === "development") {
       return true;
     }
-    console.error("[AUTH ERROR · /api/sync] CRON_SECRET environment variable is missing on server.");
+    console.error("[AUTH ERROR · /api/sync] CRON_SECRET environment variable is missing or unconfigured.");
     return false;
   }
 
@@ -55,6 +56,17 @@ async function handleSync(request: NextRequest) {
     return NextResponse.json(
       { error: "Unauthorized. Provide valid Bearer token or ?key= query parameter." },
       { status: 401 }
+    );
+  }
+
+  // Gracefully handle unconfigured credentials/database when deployed in demo mode
+  if (!isDbConfigured() || !isConfigured(process.env.SPOTIFY_REFRESH_TOKEN)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: "Sync not executed: DATABASE_URL or SPOTIFY_REFRESH_TOKEN is not configured yet (currently set to 'todo'). Connect your database and configure Spotify credentials to enable real ingestion.",
+      },
+      { status: 200 }
     );
   }
 
