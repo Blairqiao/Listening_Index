@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "sync": "tsx scripts/sync-spotify.ts",
+    "sync:spotify": "tsx scripts/sync-spotify.ts",
     "auth:spotify": "tsx scripts/get-spotify-token.ts",
     "generate:cron": "tsx scripts/generate-cron-secret.ts"
   },

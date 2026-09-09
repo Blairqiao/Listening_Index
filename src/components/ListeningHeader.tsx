@@ -9,7 +9,9 @@ export const ListeningHeader: React.FC = () => {
     <header className="flex items-baseline justify-between select-none pt-3 pb-2 sm:pt-6 md:pt-7 sm:pb-3 md:pb-4">
       <div className="flex items-baseline gap-3">
         <a
-          href="/"
+          href={siteConfig.githubUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="group flex items-baseline gap-3 focus:outline-none cursor-pointer bg-transparent border-0 p-0 text-left no-underline"
         >
           <h1 className="font-sans text-[32px] sm:text-[42px] font-medium tracking-[-0.035em] text-[#EDEDE8] leading-none">

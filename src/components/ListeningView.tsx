@@ -505,7 +505,7 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
       : currentSessionMetrics;
 
   const sessionTagTime =
-    activeSitting?.tagTime || sessionData.tagTime || (isSessionOpen ? "22:15 CDT" : "--");
+    activeSitting?.tagTime || sessionData.tagTime || (isSessionOpen ? "LIVE" : "--");
   const isSystemLive = isSessionOpen;
 
   return (

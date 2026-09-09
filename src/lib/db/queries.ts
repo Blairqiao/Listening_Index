@@ -20,6 +20,8 @@ import {
   ActivityDay,
 } from "@/lib/mock-listening-data";
 
+import { siteConfig } from "@/config";
+
 export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay };
 
 export interface OverviewData {
@@ -71,10 +73,14 @@ function formatDurationHoursMinutes(ms: number): string {
   return `${m}m`;
 }
 
-function formatTimeChicago(date: Date): string {
+export function getTimezone(): string {
+  return siteConfig.timezone || "America/Chicago";
+}
+
+function formatTimeTz(date: Date, tz = getTimezone()): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone: tz,
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
@@ -82,17 +88,17 @@ function formatTimeChicago(date: Date): string {
     }).formatToParts(date);
     const hour = parts.find((p) => p.type === "hour")?.value || "00";
     const minute = parts.find((p) => p.type === "minute")?.value || "00";
-    const tz = parts.find((p) => p.type === "timeZoneName")?.value || "CDT";
-    return `${hour}:${minute} ${tz}`;
+    const tzName = parts.find((p) => p.type === "timeZoneName")?.value || "";
+    return tzName ? `${hour}:${minute} ${tzName}` : `${hour}:${minute}`;
   } catch {
     return date.toISOString().slice(11, 16);
   }
 }
 
-function formatHHmmChicago(date: Date): string {
+function formatHHmmTz(date: Date, tz = getTimezone()): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone: tz,
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
@@ -105,10 +111,10 @@ function formatHHmmChicago(date: Date): string {
   }
 }
 
-function formatDayGroupChicago(date: Date): string {
+function formatDayGroupTz(date: Date, tz = getTimezone()): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone: tz,
       day: "2-digit",
       month: "short",
     }).formatToParts(date);
@@ -120,10 +126,10 @@ function formatDayGroupChicago(date: Date): string {
   }
 }
 
-function formatLogStartDate(date: Date): string {
+function formatLogStartDate(date: Date, tz = getTimezone()): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone: tz,
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -136,6 +142,10 @@ function formatLogStartDate(date: Date): string {
     return date.toISOString().slice(0, 10).toUpperCase();
   }
 }
+
+const formatTimeChicago = formatTimeTz;
+const formatHHmmChicago = formatHHmmTz;
+const formatDayGroupChicago = formatDayGroupTz;
 
 function formatSittingAge(ageMs: number): string {
   const ageMins = Math.max(1, Math.round(ageMs / 60000));
@@ -1005,6 +1015,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
   // 6. Activity: Cadence across time ranges (24 hourly buckets for 1d; days/weeks/months for others)
   let clockBuckets: number[] | undefined = undefined;
   let activityCadence: ActivityDay[] = [];
+  const tz = getTimezone();
 
   if (range === "1d") {
     interface ClockRow {
@@ -1013,7 +1024,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     }
     const clockRows: ClockRow[] = ((await sql`
       SELECT 
-          TO_CHAR(p.played_at AT TIME ZONE 'America/Chicago', 'YYYY-MM-DD HH24') AS hour_key,
+          TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM-DD HH24') AS hour_key,
           COUNT(*)::int AS count
       FROM plays p
       WHERE p.played_at >= NOW() - INTERVAL '24 hours'
@@ -1028,7 +1039,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     for (let i = 23; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 3600000);
       const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
+        timeZone: tz,
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
@@ -1051,8 +1062,8 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     if (range === "1w") {
       const rows = ((await sql`
         SELECT 
-            (p.played_at AT TIME ZONE 'America/Chicago')::date::text AS day,
-            FLOOR(EXTRACT(HOUR FROM p.played_at AT TIME ZONE 'America/Chicago') / 6)::int AS block,
+            (p.played_at AT TIME ZONE ${tz})::date::text AS day,
+            FLOOR(EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${tz}) / 6)::int AS block,
             COUNT(*)::int AS count
         FROM plays p
         WHERE p.played_at >= NOW() - INTERVAL '8 days'
@@ -1072,12 +1083,12 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
       for (let i = 6; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 86400000);
         const dayKey = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "America/Chicago",
+          timeZone: tz,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
         }).format(d);
-        const dayLabel = formatDayGroupChicago(new Date(dayKey + "T12:00:00"));
+        const dayLabel = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
         const dayNumber = dayLabel.split(" ")[0];
 
         for (let b = 0; b < 4; b++) {
@@ -1093,7 +1104,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     } else if (range === "1m") {
       const rows = ((await sql`
         SELECT 
-            (p.played_at AT TIME ZONE 'America/Chicago')::date::text AS day,
+            (p.played_at AT TIME ZONE ${tz})::date::text AS day,
             COUNT(*)::int AS count
         FROM plays p
         WHERE p.played_at >= NOW() - INTERVAL '30 days'
@@ -1104,12 +1115,12 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
       for (let i = 29; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 86400000);
         const dayKey = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "America/Chicago",
+          timeZone: tz,
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
         }).format(d);
-        const label = formatDayGroupChicago(new Date(dayKey + "T12:00:00"));
+        const label = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
         const idx = 29 - i;
         const isMarker = idx === 0 || idx === 7 || idx === 14 || idx === 21 || idx === 29;
         activityCadence.push({
@@ -1122,7 +1133,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     } else if (range === "6m") {
       const rows = ((await sql`
         SELECT 
-            (p.played_at AT TIME ZONE 'America/Chicago')::date::text AS day,
+            (p.played_at AT TIME ZONE ${tz})::date::text AS day,
             COUNT(*)::int AS count
         FROM plays p
         WHERE p.played_at >= NOW() - INTERVAL '182 days'
@@ -1138,7 +1149,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
           const totalDaysAgo = w * 7 + dayOffset;
           const d = new Date(now.getTime() - totalDaysAgo * 86400000);
           const dayKey = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "America/Chicago",
+            timeZone: tz,
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
@@ -1148,7 +1159,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
         }
 
         const monthAbbr = new Intl.DateTimeFormat("en-US", {
-          timeZone: "America/Chicago",
+          timeZone: tz,
           month: "short",
         }).format(new Date(weekStartKey + "T12:00:00")).toUpperCase();
 
@@ -1165,7 +1176,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
     } else if (range === "1y") {
       const rows = ((await sql`
         SELECT 
-            TO_CHAR(p.played_at AT TIME ZONE 'America/Chicago', 'YYYY-MM') AS ym,
+            TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym,
             COUNT(*)::int AS count
         FROM plays p
         WHERE p.played_at >= NOW() - INTERVAL '365 days'
@@ -1177,6 +1188,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
         const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
         const ymKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         const monthAbbr = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
           month: "short",
         }).format(d).toUpperCase();
 
@@ -1189,7 +1201,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
       // "all": Display monthly cadence across all lifetime plays (minimum 12 months)
       const rows = ((await sql`
         SELECT 
-            TO_CHAR(p.played_at AT TIME ZONE 'America/Chicago', 'YYYY-MM') AS ym,
+            TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym,
             COUNT(*)::int AS count
         FROM plays p
         GROUP BY ym;
@@ -1200,6 +1212,7 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
         const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
         const ymKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         const monthAbbr = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
           month: "short",
         }).format(d).toUpperCase();
 
@@ -1246,9 +1259,10 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
   const loggedHoursStr = `${Number(totalsRow?.logged_hours || 0)}h`;
   const uniqueArtistsStr = Number(totalsRow?.unique_artists || 0).toLocaleString();
 
+  const tz = getTimezone();
   // Streak calculation
   const dateRows = ((await sql`
-    SELECT DISTINCT (played_at AT TIME ZONE 'America/Chicago')::date AS play_date
+    SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
     FROM plays
     ORDER BY play_date DESC;
   `) as any);
@@ -1262,15 +1276,15 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
       })
     );
 
-    const nowChicago = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Chicago",
+    const nowTz = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     }).format(new Date());
 
-    const checkDate = new Date(nowChicago + "T12:00:00Z");
-    let checkDateStr = nowChicago;
+    const checkDate = new Date(nowTz + "T12:00:00Z");
+    let checkDateStr = nowTz;
 
     if (!playDateStrs.has(checkDateStr)) {
       checkDate.setUTCDate(checkDate.getUTCDate() - 1);
@@ -1406,7 +1420,7 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
   for (let i = 0; i < streamRows.length; i++) {
     const row = streamRows[i];
     const playDate = new Date(row.played_at);
-    const dayGroup = formatDayGroupChicago(playDate);
+    const dayGroup = formatDayGroupTz(playDate, tz);
     const isNewDay = dayGroup !== lastDayGroup;
     lastDayGroup = dayGroup;
 
@@ -1418,7 +1432,7 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
       artistId: row.artist_id,
       albumId: row.album_id,
       albumImageUrl: row.album_image_url || null,
-      timeStr: formatHHmmChicago(playDate),
+      timeStr: formatHHmmTz(playDate, tz),
       title: row.title,
       artist: row.artist,
       album: row.album,
@@ -1534,10 +1548,11 @@ export async function getCurrentSession(): Promise<SessionData> {
   }
 
   // Construct complete SittingSession[] objects
+  const tz = getTimezone();
   const sittings: SittingSession[] = sittingsPlays.slice(0, 20).map((sittingPlays, k) => {
     const sittingLatest = sittingPlays[0];
     const sittingOldest = sittingPlays[sittingPlays.length - 1];
-    const dateStr = formatDayGroupChicago(new Date(sittingLatest.played_at));
+    const dateStr = formatDayGroupTz(new Date(sittingLatest.played_at), tz);
 
     let sRuntimeMs =
       new Date(sittingLatest.played_at).getTime() -
@@ -1549,7 +1564,7 @@ export async function getCurrentSession(): Promise<SessionData> {
     const runtimeMinutes = Math.max(1, Math.round(sRuntimeMs / 60000));
     const trackCount = sittingPlays.length;
     const uniqueArtistsCount = new Set(sittingPlays.map((p) => p.artist)).size;
-    const startTime = formatHHmmChicago(new Date(sittingOldest.played_at));
+    const startTime = formatHHmmTz(new Date(sittingOldest.played_at), tz);
 
     const isThisOpen =
       k === 0 &&
@@ -1557,7 +1572,7 @@ export async function getCurrentSession(): Promise<SessionData> {
 
     let tagTime = "--";
     if (k === 0 && isThisOpen) {
-      tagTime = formatTimeChicago(new Date(sittingLatest.played_at));
+      tagTime = formatTimeTz(new Date(sittingLatest.played_at), tz);
     } else {
       const ageMs = Math.max(0, Date.now() - new Date(sittingLatest.played_at).getTime());
       tagTime = formatSittingAge(ageMs);
@@ -1568,7 +1583,7 @@ export async function getCurrentSession(): Promise<SessionData> {
       artistId: p.artist_id,
       albumId: p.album_id,
       albumImageUrl: p.album_image_url || null,
-      timestamp: formatHHmmChicago(new Date(p.played_at)),
+      timestamp: formatHHmmTz(new Date(p.played_at), tz),
       title: p.title,
       artist: p.artist,
       album: p.album,
