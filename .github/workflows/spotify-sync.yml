@@ -1,0 +1,35 @@
+name: Spotify Listening Index Sync
+
+on:
+  # schedule:
+  #   # Runs every 30 minutes (Migrated to cron-job.org)
+  #   - cron: "13,43 * * * *"
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  
+
+jobs:
+  sync:
+    name: Sync Spotify Listening Data
+    runs-on: ubuntu-latest
+    environment: Production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Execute Spotify Ingestion ETL
+        run: npm run sync:spotify
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}

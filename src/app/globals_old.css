@@ -1,16 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500&display=swap');
-@import "tailwindcss";
-
-@theme {
-  --font-sans: var(--font-space-grotesk), "Space Grotesk", "PingFang SC", "Noto Sans SC", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
-
-  --color-music-accent: var(--music-accent);
-}
 
 :root {
   --background: #080808;
   --foreground: #EDEDE8;
+  --music-accent: #FF5F1F;
 }
 
 * {
@@ -41,10 +34,7 @@ body {
 }
 
 ::selection {
-  background-color: var(--music-accent);
-  @supports (color: color-mix(in srgb, red, red)) {
-    background-color: color-mix(in srgb, var(--music-accent) 20%, transparent);
-  }
+  background-color: color-mix(in srgb, var(--music-accent) 20%, transparent);
   color: var(--music-accent);
 }
 
@@ -56,3 +46,4 @@ body {
 .scrollbar-hidden::-webkit-scrollbar {
   display: none;
 }
+
