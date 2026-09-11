@@ -10,7 +10,7 @@ import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
 import { CustomizationModal } from "@/components/CustomizationModal";
-import { ConfigProvider, useConfig } from "@/context/ConfigContext";
+import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import {
   Mode,
   RangeKey,
@@ -24,6 +24,8 @@ interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
   initialSession?: SessionData | null;
+  initialConfig?: SiteConfigState | null;
+  isDbConfigured?: boolean;
 }
 
 const ListeningViewInner: React.FC<ListeningViewProps> = ({
@@ -630,9 +632,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   );
 };
 
-export const ListeningView: React.FC<ListeningViewProps> = (props) => {
+export const ListeningView: React.FC<ListeningViewProps> = ({
+  initialConfig,
+  isDbConfigured = true,
+  ...props
+}) => {
   return (
-    <ConfigProvider>
+    <ConfigProvider initialConfig={initialConfig || undefined} isDbConfigured={isDbConfigured}>
       <ListeningViewInner {...props} />
     </ConfigProvider>
   );

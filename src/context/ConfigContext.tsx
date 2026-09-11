@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { siteConfig } from "@/config";
-import { normalizeHex } from "@/lib/color-utils";
+import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
 
 export interface SiteConfigState {
   title: string;
@@ -20,6 +20,7 @@ interface ConfigContextType {
   applyAccentColorLive: (color: string) => void;
   generateConfigTsCode: () => string;
   isCustomized: boolean;
+  isDbConfigured: boolean;
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
@@ -40,64 +41,115 @@ const ConfigContext = createContext<ConfigContextType | null>(null);
 
 export const ConfigProvider: React.FC<{
   children: React.ReactNode;
+  initialConfig?: SiteConfigState;
+  isDbConfigured?: boolean;
   onConfigChange?: (newConfig: SiteConfigState, prevConfig: SiteConfigState) => void;
-}> = ({ children, onConfigChange }) => {
-  const [config, setConfig] = useState<SiteConfigState>(DEFAULT_CONFIG);
-  const [isCustomized, setIsCustomized] = useState<boolean>(false);
+}> = ({ children, initialConfig, isDbConfigured: propIsDbConfigured = true, onConfigChange }) => {
+  const [isDb, setIsDb] = useState<boolean>(propIsDbConfigured);
+
+  // Initialize config once from initialConfig or localStorage or defaults
+  const [config, setConfig] = useState<SiteConfigState>(() => {
+    if (initialConfig) {
+      return {
+        ...initialConfig,
+        accentColor: normalizeHex(initialConfig.accentColor),
+      };
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
+          return {
+            title: parsed.title || DEFAULT_CONFIG.title,
+            ownerName: parsed.ownerName || DEFAULT_CONFIG.ownerName,
+            accentColor: normalizeHex(parsed.accentColor || DEFAULT_CONFIG.accentColor),
+            siteUrl: parsed.siteUrl || DEFAULT_CONFIG.siteUrl,
+            githubUrl: parsed.githubUrl || DEFAULT_CONFIG.githubUrl,
+            timezone: parsed.timezone || DEFAULT_CONFIG.timezone,
+          };
+        }
+      } catch (e) {
+        console.warn("[CONFIG] Could not load persisted configuration:", e);
+      }
+    }
+    return DEFAULT_CONFIG;
+  });
+
+  const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  // Apply accent color to document root CSS variable
+  // Apply accent color to document root CSS variable & high-priority style tag
   const applyAccentColorLive = useCallback((color: string) => {
-    if (typeof document !== "undefined") {
-      const normalized = normalizeHex(color);
-      document.documentElement.style.setProperty("--music-accent", normalized);
-    }
+    applyAccentColorToDom(color);
   }, []);
 
   // Sync document title and timezone cookie
   const syncSideEffects = useCallback((cfg: SiteConfigState) => {
     if (typeof document !== "undefined") {
       document.title = `${cfg.title} | ${cfg.ownerName}`;
-      applyAccentColorLive(cfg.accentColor);
+      applyAccentColorToDom(cfg.accentColor);
       // Persist timezone in cookie for server-side requests
       document.cookie = `listening_timezone=${encodeURIComponent(cfg.timezone)}; path=/; max-age=31536000; SameSite=Lax`;
     }
-  }, [applyAccentColorLive]);
+  }, []);
 
-  // Read saved configuration from localStorage on mount
+  // Guarantee immediate DOM accent recoloring whenever config.accentColor changes
+  useEffect(() => {
+    applyAccentColorToDom(config.accentColor);
+  }, [config.accentColor]);
+
+  // Run once on mount to initialize side effects and probe database status
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
-        const merged: SiteConfigState = {
-          title: parsed.title || DEFAULT_CONFIG.title,
-          ownerName: parsed.ownerName || DEFAULT_CONFIG.ownerName,
-          accentColor: normalizeHex(parsed.accentColor || DEFAULT_CONFIG.accentColor),
-          siteUrl: parsed.siteUrl || DEFAULT_CONFIG.siteUrl,
-          githubUrl: parsed.githubUrl || DEFAULT_CONFIG.githubUrl,
-          timezone: parsed.timezone || DEFAULT_CONFIG.timezone,
-        };
-        setConfig(merged);
-        setIsCustomized(true);
-        syncSideEffects(merged);
-      } else {
-        // Apply default accent on clean load
-        applyAccentColorLive(DEFAULT_CONFIG.accentColor);
-      }
-    } catch (e) {
-      console.warn("[CONFIG] Could not load persisted configuration:", e);
+
+    // In demo mode (when no database is configured), check browser localStorage
+    if (!propIsDbConfigured) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
+          const merged: SiteConfigState = {
+            title: parsed.title || initialConfig?.title || DEFAULT_CONFIG.title,
+            ownerName: parsed.ownerName || initialConfig?.ownerName || DEFAULT_CONFIG.ownerName,
+            accentColor: normalizeHex(parsed.accentColor || initialConfig?.accentColor || DEFAULT_CONFIG.accentColor),
+            siteUrl: parsed.siteUrl || initialConfig?.siteUrl || DEFAULT_CONFIG.siteUrl,
+            githubUrl: parsed.githubUrl || initialConfig?.githubUrl || DEFAULT_CONFIG.githubUrl,
+            timezone: parsed.timezone || initialConfig?.timezone || DEFAULT_CONFIG.timezone,
+          };
+          setConfig(merged);
+          setIsCustomized(true);
+          syncSideEffects(merged);
+          return;
+        }
+      } catch {}
     }
-  }, [applyAccentColorLive, syncSideEffects]);
+
+    syncSideEffects(config);
+
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.isDbConfigured === "boolean") {
+          setIsDb(data.isDbConfigured);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateConfig = useCallback(
     (patch: Partial<SiteConfigState>) => {
+      const normalizedAccent = patch.accentColor ? normalizeHex(patch.accentColor) : undefined;
+      if (normalizedAccent) {
+        applyAccentColorToDom(normalizedAccent);
+      }
+
       setConfig((prev) => {
         const next: SiteConfigState = {
           ...prev,
           ...patch,
-          accentColor: patch.accentColor ? normalizeHex(patch.accentColor) : prev.accentColor,
+          accentColor: normalizedAccent || prev.accentColor,
         };
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -122,6 +174,7 @@ export const ConfigProvider: React.FC<{
     } catch (e) {
       console.warn("[CONFIG] Failed to remove configuration from localStorage:", e);
     }
+    applyAccentColorToDom(DEFAULT_CONFIG.accentColor);
     const prev = config;
     setConfig(DEFAULT_CONFIG);
     syncSideEffects(DEFAULT_CONFIG);
@@ -154,6 +207,7 @@ export const ConfigProvider: React.FC<{
         applyAccentColorLive,
         generateConfigTsCode,
         isCustomized,
+        isDbConfigured: isDb,
         isModalOpen,
         openModal,
         closeModal,

@@ -61,6 +61,43 @@ export function normalizeHex(hex: string, fallback = "#76FF49"): string {
 }
 
 /**
+ * Applies an accent color directly to all CSS variables and active style tags in the DOM.
+ * Guarantees immediate repaint for Tailwind v4 utilities (--color-music-accent, text-music-accent, etc.)
+ */
+export function applyAccentColorToDom(color: string): void {
+  if (typeof document === "undefined") return;
+  const hex = normalizeHex(color);
+
+  // 1. Set on documentElement inline style with 'important' priority
+  // Inline styles with 'important' have the highest possible cascade priority in CSS.
+  document.documentElement.style.setProperty("--music-accent", hex, "important");
+  document.documentElement.style.setProperty("--color-music-accent", hex, "important");
+
+  // 2. Set on body inline style with 'important' priority
+  if (document.body) {
+    document.body.style.setProperty("--music-accent", hex, "important");
+    document.body.style.setProperty("--color-music-accent", hex, "important");
+  }
+
+  // 3. Update or create the dynamic style tag with highest specificity
+  let styleTag = document.getElementById("active-theme-accent") as HTMLStyleElement | null;
+  if (!styleTag) {
+    styleTag = document.createElement("style");
+    styleTag.id = "active-theme-accent";
+    document.head.appendChild(styleTag);
+  }
+  styleTag.textContent = `:root, html, body { --music-accent: ${hex} !important; --color-music-accent: ${hex} !important; }`;
+
+  // 5. Update localStorage for instant cache hydration
+  try {
+    const stored = localStorage.getItem("listening_index_config");
+    const parsed = stored ? JSON.parse(stored) : {};
+    parsed.accentColor = hex;
+    localStorage.setItem("listening_index_config", JSON.stringify(parsed));
+  } catch {}
+}
+
+/**
  * Converts HSV (0-360, 0-100, 0-100) to RGB (0-255).
  */
 export function hsvToRgb(h: number, s: number, v: number): RGB {

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { X, Check, Copy, RotateCcw, Clock, ExternalLink, Search, ChevronDown } from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
-import { normalizeHex } from "@/lib/color-utils";
+import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
 import { siteConfig as originalConfig } from "@/config";
 
 // Major timezones fallback if Intl.supportedValuesOf is unavailable
@@ -45,6 +45,7 @@ export const CustomizationModal: React.FC = () => {
     config,
     updateConfig,
     resetToDefaults,
+    isDbConfigured,
     isModalOpen,
     closeModal,
   } = useConfig();
@@ -80,13 +81,15 @@ export const CustomizationModal: React.FC = () => {
   }, [isModalOpen]);
 
   // Sync draft state whenever modal is opened
+  const prevIsOpenRef = useRef(isModalOpen);
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen && !prevIsOpenRef.current) {
       setDraft(config);
       setCopiedCode(false);
       setTzSearch("");
       setIsTzOpen(false);
     }
+    prevIsOpenRef.current = isModalOpen;
   }, [isModalOpen, config]);
 
   // Click-outside listener to collapse timezone dropdown
@@ -149,8 +152,10 @@ export const CustomizationModal: React.FC = () => {
 
   // Close modal without applying uncommitted changes
   const handleCancel = useCallback(() => {
+    applyAccentColorToDom(config.accentColor);
+    setDraft(config);
     closeModal();
-  }, [closeModal]);
+  }, [closeModal, config]);
 
   // Keyboard Escape listener
   useEffect(() => {
@@ -172,8 +177,36 @@ export const CustomizationModal: React.FC = () => {
     setDraft((prev) => ({ ...prev, accentColor: normalized }));
   };
 
-  // Save and apply changes to site
-  const handleSave = () => {
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const hasUnsavedChanges = useMemo(() => {
+    return (
+      draft.title !== config.title ||
+      draft.ownerName !== config.ownerName ||
+      normalizeHex(draft.accentColor) !== normalizeHex(config.accentColor) ||
+      draft.siteUrl !== config.siteUrl ||
+      draft.githubUrl !== config.githubUrl ||
+      draft.timezone !== (config.timezone || "America/Chicago")
+    );
+  }, [draft, config]);
+
+  // Clear save error when new unsaved edits occur
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      setSaveError(null);
+    }
+  }, [hasUnsavedChanges]);
+
+  // Save and apply changes to site (persists to Neon DB if connected, or local fallback)
+  const handleSave = async () => {
+    if (!hasUnsavedChanges && !isSaving) return;
+
+    setSaveError(null);
+
+    // 1. Immediately apply draft accent color to DOM so all site elements repaint in 0ms!
+    applyAccentColorToDom(draft.accentColor);
+
     const isFactory =
       draft.title === originalConfig.title &&
       draft.ownerName === originalConfig.ownerName &&
@@ -182,12 +215,31 @@ export const CustomizationModal: React.FC = () => {
       draft.githubUrl === originalConfig.githubUrl &&
       draft.timezone === (originalConfig.timezone || "America/Chicago");
 
+    // 2. Immediately update client config context so title, owner, timezone repaint in 0ms
     if (isFactory) {
       resetToDefaults();
     } else {
       updateConfig(draft);
     }
-    closeModal();
+
+    // 3. Persist to Neon DB in the background
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isFactory ? { ...originalConfig, resetToDefault: true } : draft),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setSaveError(data.error || "Save failed");
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Network error";
+      setSaveError(msg);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Reset draft form to original defaults (does not apply to site until Save & Apply is clicked)
@@ -201,6 +253,7 @@ export const CustomizationModal: React.FC = () => {
       timezone: originalConfig.timezone || "America/Chicago",
     };
     setDraft(defaultDraft);
+    setSaveError(null);
   };
 
   // Copy code snippet for src/config.ts
@@ -252,7 +305,7 @@ export const CustomizationModal: React.FC = () => {
               id="customization-modal-title"
               className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase"
             >
-              [ SYSTEM CONFIGURATION ]
+              [ ACTIVE CONFIGURATION ]
             </h2>
           </div>
           <button
@@ -272,6 +325,9 @@ export const CustomizationModal: React.FC = () => {
             <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
               <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
                 [ 01 · IDENTITY ]
+              </span>
+              <span className="font-mono text-[9px] text-[#6A6A64]">
+                DEFAULT: src/config.ts
               </span>
             </div>
 
@@ -480,13 +536,13 @@ export const CustomizationModal: React.FC = () => {
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 px-5 py-3.5 border-t border-[#26261F] bg-[#121211] select-none">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-t border-[#26261F] bg-[#121211] select-none overflow-x-auto scrollbar-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={handleReset}
               title="Revert all settings to defaults from src/config.ts"
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
             >
               <RotateCcw className="w-3 h-3" />
               <span>RESET DEFAULTS</span>
@@ -496,7 +552,7 @@ export const CustomizationModal: React.FC = () => {
               type="button"
               onClick={handleCopyCode}
               title="Copy code snippet to paste into src/config.ts"
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
             >
               {copiedCode ? (
                 <>
@@ -512,21 +568,37 @@ export const CustomizationModal: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="font-mono text-[11px] tracking-[0.08em] px-3 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors"
-            >
-              CANCEL
-            </button>
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
 
             <button
               type="button"
               onClick={handleSave}
-              className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer transition-colors font-medium"
+              disabled={isSaving || !hasUnsavedChanges}
+              className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+                isSaving
+                  ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
+                  : saveError
+                  ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
+                  : hasUnsavedChanges
+                  ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
+                  : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
+              }`}
             >
-              SAVE & APPLY
+              {isSaving ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-music-accent animate-pulse" />
+                  <span>DEPLOYING...</span>
+                </>
+              ) : saveError ? (
+                <span>SAVE FAILED · RETRY</span>
+              ) : hasUnsavedChanges ? (
+                <span>SAVE & APPLY</span>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5 text-music-accent" />
+                  <span>{isDbConfigured ? "DEPLOYED TO DATABASE" : "SAVED TO CONFIG.TS"}</span>
+                </>
+              )}
             </button>
           </div>
         </div>

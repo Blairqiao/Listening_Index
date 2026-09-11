@@ -177,7 +177,7 @@ Because Spotify's API only retains your **last 50 played tracks**, syncing regul
 4. Click **Create Cronjob**:
    - **Title**: `Listening Index Sync`
    - **URL**: `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET`
-   - **Schedule**: Every 15 or 30 minutes (30 min recommended, 15 min for more real-time logs)
+   - **Schedule**: Every 30 minutes
    - **Request Method**: `GET`
 5. Save the job. Your listening history is now synced continuously in the background!
 
@@ -258,28 +258,47 @@ npm run dev
 
 ## Customization
 
-You can personalize the entire application in two easy ways:
+Listening Index uses both a local config file `src/config.ts` and a remote db `site_settings` to store config.
 
-### Method 1: In-App Interactive Customizer (Recommended)
-Press <kbd>C</kbd> anywhere on the dashboard (or click the **`[ C · CONFIG ]`** tab in the top navigation) to launch the built-in configuration modal:
-- **Interactive 2D Color Picker**: Visually pick your accent color with saturation/brightness 2D field, hue slider, hex input, and instant preset swatches. The entire UI recolors live.
-- **Searchable Timezone Selector**: Choose from 30+ world timezones with a real-time local clock preview to ensure your daily activity cadence matches your local time.
+### Active Configuration (Neon PostgreSQL)
+
+- Stored in the `site_settings` database table
+- Can be edited via the in-app GUI
+- Saved to the cloud and reflected for all visitors
+
+### Default Configuration (`src/config.ts`)
+
+- Provides defaults when no database is connected
+- Re-synced whenever you click [RESET DEFAULTS] in the GUI
+- Can be edited directly in the file
+
+
+### 1. In-App Customizer (Active Config)
+Press <kbd>C</kbd> anywhere on the dashboard (or click the **`[ C · CONFIG ]`** tab in the top navigation) to launch the configuration modal:
 - **Identity & Profiles**: Edit your display title, owner name, Spotify profile link, and GitHub repository URL.
-- **1-Click Code Export**: Click **`Copy Config.ts`** to copy the generated TypeScript configuration straight to your clipboard, or click **`Save & Apply`** to persist your theme in browser `localStorage`.
+- **Interactive 2D Color Picker**: Visually pick your accent color. The entire UI recolors live.
+- **Searchable Timezone Selector**: Choose from 30+ world timezones with a real-time local clock preview.
+- **Saving & Persistence**:
+  - **On Vercel (with Neon connected)**: Clicking **`Save & Apply`** saves your settings directly into your Neon PostgreSQL database.
+  - **In Local Development**: Saves to both your Neon database and [`src/config.ts`](src/config.ts).
+  - **In Demo Mode**: Saves to browser cache (`localStorage`).
+- **Reset to Defaults**: Click **`[RESET DEFAULTS]`** at any time to discard database customizations and restore the default values from [`src/config.ts`](src/config.ts).
 
-### Method 2: Static Configuration File (`src/config.ts`)
-You can also permanently bake your settings directly into [`src/config.ts`](src/config.ts):
+### 2. Static Default Configuration (`src/config.ts`)
+[`src/config.ts`](src/config.ts) defines the factory defaults used when the database is empty or offline:
 
 ```typescript
 export const siteConfig = {
   title: "Listening Index",                                        // Header brand title
   ownerName: "YOUR NAME",                                          // Display name shown in top-right
-  accentColor: "#76ff49ff",                                        // Theme accent color (hex with optional alpha)
-  siteUrl: "https://open.spotify.com/user/your_user_id",          // Top-right profile destination
+  accentColor: "#76ff49ff",                                        // Default accent color
+  siteUrl: "https://open.spotify.com/",                           // Top-right profile destination
   githubUrl: "https://github.com/Blairqiao/listening_index",       // Header title destination
-  timezone: "America/Chicago",                                     // Timezone for daily cadence (e.g. America/New_York)
+  timezone: "America/Chicago",                                     // Default timezone for daily cadence
 };
 ```
+
+> 💡 **Tip:** If you clone the repository or change `src/config.ts` in your code editor, clicking **`[RESET DEFAULTS]`** in the in-app modal will instantly push your updated `src/config.ts` settings into your Neon database.
 
 ---
 
