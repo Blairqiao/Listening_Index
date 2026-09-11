@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
@@ -9,6 +9,8 @@ import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
+import { CustomizationModal } from "@/components/CustomizationModal";
+import { ConfigProvider, useConfig } from "@/context/ConfigContext";
 import {
   Mode,
   RangeKey,
@@ -24,11 +26,13 @@ interface ListeningViewProps {
   initialSession?: SessionData | null;
 }
 
-export const ListeningView: React.FC<ListeningViewProps> = ({
+const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialOverview,
   initialStreamLog,
   initialSession,
 }) => {
+  const { config, openModal, closeModal, isModalOpen } = useConfig();
+  const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session
   const [activeMode, setActiveMode] = useState<Mode>(0);
 
@@ -44,7 +48,6 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
       if ("1d" in initialOverview || "1w" in initialOverview) {
         return { ...(initialOverview as Record<RangeKey, OverviewData>) };
       }
-      initial["1d"] = initialOverview as OverviewData;
       initial["1w"] = initialOverview as OverviewData;
     }
     return initial;
@@ -143,13 +146,18 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
       if (sit) {
         setSelectedSittingId(sit);
       }
+      const configParam = params.get("config");
+      if (configParam === "true" || configParam === "1") {
+        openModal();
+      }
     }
-  }, []);
+  }, [openModal]);
 
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
     try {
-      const url = `/api/listening/overview?range=${rangeToFetch}`;
+      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const url = `/api/listening/overview?range=${rangeToFetch}${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
@@ -181,7 +189,8 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
   // Fetch Stream Log from server (cached on server, reset on sync)
   const fetchStreamLog = useCallback(async () => {
     try {
-      const url = "/api/listening/stream-log?limit=50";
+      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const url = `/api/listening/stream-log?limit=50${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
@@ -204,7 +213,8 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
   // Fetch Current Session from server (cached on server, reset on sync)
   const fetchSession = useCallback(async () => {
     try {
-      const url = "/api/listening/session";
+      const tzQuery = tzRef.current ? `?tz=${encodeURIComponent(tzRef.current)}` : "";
+      const url = `/api/listening/session${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
@@ -224,6 +234,17 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
       console.error("[API FETCH] Session query error:", err);
     }
   }, []);
+
+  // When config.timezone is modified, invalidate cache and reload telemetry for the new timezone
+  useEffect(() => {
+    if (tzRef.current !== config.timezone) {
+      tzRef.current = config.timezone;
+      setOverviewCache({});
+      fetchOverview(activeRangeRef.current);
+      fetchStreamLog();
+      fetchSession();
+    }
+  }, [config.timezone, fetchOverview, fetchStreamLog, fetchSession]);
 
   // Initial load: fetch all endpoints in background if not already available
   useEffect(() => {
@@ -436,6 +457,18 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
         }
       }
 
+      // Key C: Open / Toggle config panel
+      if (e.key === "c" || e.key === "C") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (isModalOpen) {
+          closeModal();
+        } else {
+          openModal();
+        }
+        return;
+      }
+
       // Key S: Toggle session active/closed
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
@@ -446,7 +479,7 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activeMode, activeRange, handleSelectMode, handleSelectRange, handleToggleSession, isSyncing]);
+  }, [activeMode, activeRange, handleSelectMode, handleSelectRange, handleToggleSession, isSyncing, isModalOpen, openModal, closeModal]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const currentOverview: OverviewData =
@@ -590,6 +623,18 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
           onTriggerSync={handleTriggerSync}
         />
       </main>
+
+      {/* 7. In-App Customization Settings Modal */}
+      <CustomizationModal />
     </div>
   );
 };
+
+export const ListeningView: React.FC<ListeningViewProps> = (props) => {
+  return (
+    <ConfigProvider>
+      <ListeningViewInner {...props} />
+    </ConfigProvider>
+  );
+};
+

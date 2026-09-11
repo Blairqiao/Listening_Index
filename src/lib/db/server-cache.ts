@@ -8,9 +8,9 @@ interface CacheEntry<T> {
 }
 
 interface ServerListeningCache {
-  overview: Map<RangeKey, CacheEntry<OverviewData>>;
-  streamLog: Map<number, CacheEntry<StreamLogData>>;
-  session: CacheEntry<SessionData> | null;
+  overview: Map<string, CacheEntry<OverviewData>>;
+  streamLog: Map<string, CacheEntry<StreamLogData>>;
+  session: Map<string, CacheEntry<SessionData>>;
 }
 
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds
@@ -23,58 +23,64 @@ if (!globalForCache.__serverListeningCache) {
   globalForCache.__serverListeningCache = {
     overview: new Map(),
     streamLog: new Map(),
-    session: null,
+    session: new Map(),
   };
 }
 
 const cacheStore: ServerListeningCache = globalForCache.__serverListeningCache;
 
-export function getCachedOverview(range: RangeKey): OverviewData | undefined {
-  const entry = cacheStore.overview.get(range);
+export function getCachedOverview(range: RangeKey, tz = ""): OverviewData | undefined {
+  const key = `${range}:${tz}`;
+  const entry = cacheStore.overview.get(key);
   if (!entry) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    cacheStore.overview.delete(range);
+    cacheStore.overview.delete(key);
     return undefined;
   }
   return entry.data;
 }
 
-export function setCachedOverview(range: RangeKey, data: OverviewData): void {
-  cacheStore.overview.set(range, { data, timestamp: Date.now() });
+export function setCachedOverview(range: RangeKey, data: OverviewData, tz = ""): void {
+  const key = `${range}:${tz}`;
+  cacheStore.overview.set(key, { data, timestamp: Date.now() });
 }
 
-export function getCachedStreamLog(limit: number): StreamLogData | undefined {
-  const entry = cacheStore.streamLog.get(limit);
+export function getCachedStreamLog(limit: number, tz = ""): StreamLogData | undefined {
+  const key = `${limit}:${tz}`;
+  const entry = cacheStore.streamLog.get(key);
   if (!entry) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    cacheStore.streamLog.delete(limit);
+    cacheStore.streamLog.delete(key);
     return undefined;
   }
   return entry.data;
 }
 
-export function setCachedStreamLog(limit: number, data: StreamLogData): void {
-  cacheStore.streamLog.set(limit, { data, timestamp: Date.now() });
+export function setCachedStreamLog(limit: number, data: StreamLogData, tz = ""): void {
+  const key = `${limit}:${tz}`;
+  cacheStore.streamLog.set(key, { data, timestamp: Date.now() });
 }
 
-export function getCachedSession(): SessionData | null {
-  const entry = cacheStore.session;
+export function getCachedSession(tz = ""): SessionData | null {
+  const key = tz || "default";
+  const entry = cacheStore.session.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
-    cacheStore.session = null;
+    cacheStore.session.delete(key);
     return null;
   }
   return entry.data;
 }
 
-export function setCachedSession(data: SessionData): void {
-  cacheStore.session = { data, timestamp: Date.now() };
+export function setCachedSession(data: SessionData, tz = ""): void {
+  const key = tz || "default";
+  cacheStore.session.set(key, { data, timestamp: Date.now() });
 }
 
 export function clearServerCache(): void {
   cacheStore.overview.clear();
   cacheStore.streamLog.clear();
-  cacheStore.session = null;
+  cacheStore.session.clear();
   console.log("[SERVER CACHE] All server listening caches purged.");
 
   try {
@@ -83,3 +89,4 @@ export function clearServerCache(): void {
     // Graceful fallback if called outside Next.js request context
   }
 }
+

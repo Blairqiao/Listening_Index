@@ -13,17 +13,18 @@ Designed for music enthusiasts, developers, and data hoarders who want a permane
 ## Table of Contents
 
 - [Features](#features)
-- [Demo](#demo)
+- [Demo & Screenshots](#demo--screenshots)
 - [Prerequisites](#prerequisites)
 - [Quickstart: Deploy to Vercel (Recommended)](#quickstart-deploy-to-vercel-recommended)
   - [Step 1: 1-Click Deploy](#step-1-1-click-deploy)
   - [Step 2: Connect Neon Database](#step-2-connect-neon-database)
   - [Step 3: Get Spotify API Credentials](#step-3-get-spotify-api-credentials)
   - [Step 4: Get Your Spotify Refresh Token](#step-4-get-your-spotify-refresh-token)
-  - [Step 5: Set Up Scheduled Sync](#step-5-set-up-scheduled-sync)
+  - [Step 5: Set Up Scheduled Sync (cron-job.org)](#step-5-set-up-scheduled-sync-cron-joborg)
   - [Step 6: Trigger Initial Sync & Verify](#step-6-trigger-initial-sync--verify)
 - [Local Development](#local-development)
 - [Customization](#customization)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Environment Variables Reference](#environment-variables-reference)
 - [CLI Utilities](#cli-utilities)
 - [Architecture & Tech Stack](#architecture--tech-stack)
@@ -38,15 +39,35 @@ Designed for music enthusiasts, developers, and data hoarders who want a permane
   - **Stream Log**: Chronological stream ledger tracking every track played with playback gaps and sitting markers.
   - **Current Session**: Real-time sitting detection, first-play markers, session duration, and album distribution.
 - **Zero-Config Demo Mode**: Clone the repo and run `npm run dev`—the entire UI immediately renders on rich fixture data without needing database or API keys.
-- **Dynamic Customization**: Customize your name, accent color, site title, and links in 10 seconds via `src/config.ts`.
+- **In-App & Code Customization**: Real-time interactive color picker, timezone selector, and instant config generation (`[ C · CONFIG ]` or press `C`).
 - **Self-Healing Database**: No manual migrations or SQL console tabs required. Tables and indexes auto-bootstrap on the first sync.
 - **Automated Sync**: Cron-friendly sync endpoint (`/api/sync`) with idempotency and deduplication for continuous ingestion.
 
 ---
 
-## Demo
+## Demo & Screenshots
 
-[Live Demo](https://blairqiao.com/music)
+Explore the [Live Demo](https://blairqiao.com/music) or [run it locally](#local-development) to test all features with rich mock data:
+
+### 1. Overview Mode
+*All-time and range metrics (listening minutes, track counts, daily cadence), rank drift indicators (`+1`, `-2`, `NEW`), top tracks with album covers, top artists, and activity histograms across 6 time ranges (1D, 1W, 1M, 6M, 1Y, ALL).*
+
+![Overview Mode](public/screenshots/overview.png)
+
+### 2. Stream Log Mode
+*Chronological playback ledger documenting every song streamed, precise timestamps, play duration, album releases, and continuous listening streaks.*
+
+![Stream Log Mode](public/screenshots/stream-log.png)
+
+### 3. Sessions Mode
+*Intelligent listening session aggregator clustering continuous playbacks, calculating first-play milestones, session durations, and 20-session history cadences.*
+
+![Sessions Mode](public/screenshots/sessions.png)
+
+### 4. In-App Customization Modal
+*Interactive GUI to dynamically adjust your accent color, identity, timezone, and links with instant live preview and 1-click `config.ts` code export.*
+
+![Customization Modal](public/screenshots/config-modal.png)
 
 ---
 
@@ -237,20 +258,44 @@ npm run dev
 
 ## Customization
 
-Personalize the entire application in seconds by editing [`src/config.ts`](src/config.ts):
+You can personalize the entire application in two easy ways:
+
+### Method 1: In-App Interactive Customizer (Recommended)
+Press <kbd>C</kbd> anywhere on the dashboard (or click the **`[ C · CONFIG ]`** tab in the top navigation) to launch the built-in configuration modal:
+- **Interactive 2D Color Picker**: Visually pick your accent color with saturation/brightness 2D field, hue slider, hex input, and instant preset swatches. The entire UI recolors live.
+- **Searchable Timezone Selector**: Choose from 30+ world timezones with a real-time local clock preview to ensure your daily activity cadence matches your local time.
+- **Identity & Profiles**: Edit your display title, owner name, Spotify profile link, and GitHub repository URL.
+- **1-Click Code Export**: Click **`Copy Config.ts`** to copy the generated TypeScript configuration straight to your clipboard, or click **`Save & Apply`** to persist your theme in browser `localStorage`.
+
+### Method 2: Static Configuration File (`src/config.ts`)
+You can also permanently bake your settings directly into [`src/config.ts`](src/config.ts):
 
 ```typescript
 export const siteConfig = {
-  title: "Listening Index",                                        // Header title
-  ownerName: "Blair Qiao",                                         // Display name
-  accentColor: "#FF5F1F",                                          // Theme accent (hex, rgb, etc.)
-  siteUrl: "https://open.spotify.com/user/your_user_id",          // Top-right profile link
-  githubUrl: "https://github.com/your-username/listening-index",   // GitHub link, or leave as default(this repo)
+  title: "Listening Index",                                        // Header brand title
+  ownerName: "YOUR NAME",                                          // Display name shown in top-right
+  accentColor: "#76ff49ff",                                        // Theme accent color (hex with optional alpha)
+  siteUrl: "https://open.spotify.com/user/your_user_id",          // Top-right profile destination
+  githubUrl: "https://github.com/Blairqiao/listening_index",       // Header title destination
   timezone: "America/Chicago",                                     // Timezone for daily cadence (e.g. America/New_York)
 };
 ```
 
-Any changes to `accentColor` dynamically recolor the active tabs, highlights, borders, and dots throughout the entire interface.
+---
+
+## Keyboard Shortcuts
+
+The dashboard is engineered for high-efficiency terminal-style keyboard navigation:
+
+| Key | Action |
+| :--- | :--- |
+| <kbd>1</kbd> | Switch to **Overview** |
+| <kbd>2</kbd> | Switch to **Stream Log** |
+| <kbd>3</kbd> | Switch to **Sessions** |
+| <kbd>←</kbd> / <kbd>→</kbd> | Cycle time ranges (`1D` → `1W` → `1M` → `6M` → `1Y` → `ALL`) |
+| <kbd>S</kbd> | Toggle session state (active vs closed) |
+| <kbd>C</kbd> | Toggle **Configuration & Customization Modal** |
+| <kbd>Esc</kbd> | Close configuration modal |
 
 ---
 

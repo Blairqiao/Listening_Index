@@ -323,6 +323,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     const isHot = ratio > 0.8;
                     const heightPercent = Math.max(Math.round(ratio * 100), 4);
 
+                    const isMarkerBar =
+                      range === "1w"
+                        ? (item.isMarker !== undefined ? item.isMarker : i % 4 === 0)
+                        : Boolean(item.isMarker);
+
                     return (
                       <div
                         key={i}
@@ -330,7 +335,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         className={`flex-1 rounded-none select-none transition-none cursor-default ${
                           isHot
                             ? "bg-music-accent"
-                            : item.isMarker
+                            : isMarkerBar
                             ? "bg-[#2A2A26] hover:bg-[#3E3E38]"
                             : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"
                         }`}
@@ -354,14 +359,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
               {range === "1w" && (
                 <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
-                  {(activityCadence.some((item) => item.markerLabel)
-                    ? activityCadence.filter((item) => item.markerLabel)
-                    : activityCadence
-                  ).map((item, i) => (
-                    <span key={i} className="text-center flex-1 truncate">
-                      {item.markerLabel || item.date.split(" ")[0]}
-                    </span>
-                  ))}
+                  {activityCadence
+                    .filter((item, idx) =>
+                      item.isMarker !== undefined ? item.isMarker : idx % 4 === 0
+                    )
+                    .map((item, i) => (
+                      <span key={i} className="text-center flex-1 truncate">
+                        {item.markerLabel || item.date.split(" ")[0]}
+                      </span>
+                    ))}
                 </div>
               )}
 

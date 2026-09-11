@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
+
     // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
     if (!isDbConfigured()) {
       return NextResponse.json(MOCK_DATA.session, {
@@ -21,10 +24,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Check server cache first
-    let sessionData = getCachedSession();
+    let sessionData = getCachedSession(tzParam || "");
     if (!sessionData) {
-      sessionData = await getCurrentSession();
-      setCachedSession(sessionData);
+      sessionData = await getCurrentSession(tzParam);
+      setCachedSession(sessionData, tzParam || "");
     }
 
     return NextResponse.json(sessionData, {

@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 100) : 50;
+    const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
 
     // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
     if (!isDbConfigured()) {
@@ -25,10 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Check server cache first
-    let data = getCachedStreamLog(limit);
+    let data = getCachedStreamLog(limit, tzParam || "");
     if (!data) {
-      data = await getStreamLog(limit);
-      setCachedStreamLog(limit, data);
+      data = await getStreamLog(limit, tzParam);
+      setCachedStreamLog(limit, data, tzParam || "");
     }
 
     return NextResponse.json(data, {

@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     const range = rangeParam as RangeKey;
+    const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
     
     // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
     if (!isDbConfigured()) {
@@ -37,10 +38,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Check server cache first
-    let overviewData = getCachedOverview(range);
+    let overviewData = getCachedOverview(range, tzParam || "");
     if (!overviewData) {
-      overviewData = await getOverviewData(range);
-      setCachedOverview(range, overviewData);
+      overviewData = await getOverviewData(range, tzParam);
+      setCachedOverview(range, overviewData, tzParam || "");
     }
 
     return NextResponse.json(overviewData, {

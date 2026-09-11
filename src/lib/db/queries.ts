@@ -432,15 +432,16 @@ export async function getLastSync(key: string = "spotify"): Promise<string | und
 /**
  * Mode 1: Computes Overview statistics and rankings for a given range.
  */
-export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
+export async function getOverviewData(range: RangeKey, tzOverride?: string): Promise<OverviewData> {
   const sql = getDb();
+  const tz = tzOverride || getTimezone();
 
   // 1. Log start date
   const [minDateRow] = ((await sql`
     SELECT MIN(played_at) AS log_start_date FROM plays;
   `) as any);
   const logStartDate = minDateRow?.log_start_date
-    ? formatLogStartDate(new Date(minDateRow.log_start_date))
+    ? formatLogStartDate(new Date(minDateRow.log_start_date), tz)
     : "--";
 
   // 2. Metrics Ribbon
@@ -1028,7 +1029,6 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
   // 6. Activity: Cadence across time ranges (24 hourly buckets for 1d; days/weeks/months for others)
   let clockBuckets: number[] | undefined = undefined;
   let activityCadence: ActivityDay[] = [];
-  const tz = getTimezone();
 
   if (range === "1d") {
     interface ClockRow {
@@ -1254,9 +1254,10 @@ export async function getOverviewData(range: RangeKey): Promise<OverviewData> {
 /**
  * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
  */
-export async function getStreamLog(limit = 50): Promise<StreamLogData> {
+export async function getStreamLog(limit = 50, tzOverride?: string): Promise<StreamLogData> {
   const sql = getDb();
   const clampedLimit = Math.min(Math.max(1, limit), 100);
+  const tz = tzOverride || getTimezone();
 
   // 1. Lifetime metrics
   const [totalsRow] = ((await sql`
@@ -1272,7 +1273,6 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
   const loggedHoursStr = `${Number(totalsRow?.logged_hours || 0)}h`;
   const uniqueArtistsStr = Number(totalsRow?.unique_artists || 0).toLocaleString();
 
-  const tz = getTimezone();
   // Streak calculation
   const dateRows = ((await sql`
     SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
@@ -1470,8 +1470,9 @@ export async function getStreamLog(limit = 50): Promise<StreamLogData> {
 /**
  * Mode 3: Retrieves current listening session data and historical sittings bounded by 30-minute gap.
  */
-export async function getCurrentSession(): Promise<SessionData> {
+export async function getCurrentSession(tzOverride?: string): Promise<SessionData> {
   const sql = getDb();
+  const tz = tzOverride || getTimezone();
 
   interface SessionPlayRow {
     id: string;
@@ -1561,7 +1562,6 @@ export async function getCurrentSession(): Promise<SessionData> {
   }
 
   // Construct complete SittingSession[] objects
-  const tz = getTimezone();
   const sittings: SittingSession[] = sittingsPlays.slice(0, 20).map((sittingPlays, k) => {
     const sittingLatest = sittingPlays[0];
     const sittingOldest = sittingPlays[sittingPlays.length - 1];
@@ -1749,10 +1749,10 @@ export async function getInitialMusicData(): Promise<{
   session: SessionData | null;
 }> {
   try {
-    let overview = getCachedOverview("1d");
+    let overview = getCachedOverview("1w");
     if (!overview) {
-      overview = await getOverviewData("1d");
-      setCachedOverview("1d", overview);
+      overview = await getOverviewData("1w");
+      setCachedOverview("1w", overview);
     }
 
     let streamLog = getCachedStreamLog(50);
