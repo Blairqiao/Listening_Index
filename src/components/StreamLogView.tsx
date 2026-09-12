@@ -12,12 +12,12 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({ entries }) => {
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}
-      <div className="grid grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 pb-2 border-b border-[#1C1C1A] text-[#5A5A55] font-mono text-[11px] tracking-[0.14em]">
+      <div className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.75fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 pb-2 border-b border-[#1C1C1A] text-[#5A5A55] font-mono text-[11px] tracking-[0.14em]">
         <span>TIME</span>
-        <span></span>
         <span>TITLE</span>
+        <span></span>
         <span>ARTIST</span>
-        <span>ALBUM</span>
+        <span className="hidden md:inline">ALBUM</span>
         <span className="text-right">DUR</span>
       </div>
 
@@ -30,13 +30,13 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({ entries }) => {
           Array.from({ length: 9 }).map((_, idx) => (
             <div
               key={idx}
-              className="grid grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 py-2 border-b border-[#191917] items-center animate-pulse"
+              className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 py-2 border-b border-[#191917] items-center animate-pulse"
             >
               <div className="h-3 bg-[#191917] rounded w-10" />
               <div className="w-[38px] h-[38px] rounded bg-[#141413]" />
               <div className="h-3.5 bg-[#191917] rounded w-32 max-w-[80%]" />
               <div className="h-3 bg-[#141413] rounded w-20 max-w-[75%]" />
-              <div className="h-3 bg-[#141413] rounded w-24 max-w-[75%]" />
+              <div className="h-3 bg-[#141413] rounded w-24 max-w-[75%] hidden md:block" />
               <div className="h-3 bg-[#191917] rounded w-8 ml-auto" />
             </div>
           ))
@@ -79,7 +79,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({ entries }) => {
                     "noopener,noreferrer"
                   )
                 }
-                className={`group grid grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 h-[54px] items-center hover:bg-[#111110] transition-none cursor-pointer ${
+                className={`group grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 h-[54px] items-center hover:bg-[#111110] transition-none cursor-pointer ${
                   isLast ? "" : "border-b border-[#191917]"
                 }`}
               >
@@ -128,7 +128,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({ entries }) => {
                 </div>
 
                 {/* ALBUM (1fr, mono 11px) */}
-                <div className="min-w-0 truncate">
+                <div className="min-w-0 truncate hidden md:block">
                   {entry.albumId ? (
                     <a
                       href={`https://open.spotify.com/album/${entry.albumId}`}

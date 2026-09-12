@@ -3,6 +3,7 @@
 import React from "react";
 import { Mode } from "@/lib/mock-listening-data";
 import { useConfig } from "@/context/ConfigContext";
+import { Menu } from "lucide-react";
 
 interface ModeTabsProps {
   activeMode: Mode;
@@ -12,9 +13,9 @@ interface ModeTabsProps {
 }
 
 const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
-  { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVR ]" },
+  { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVERVIEW ]" },
   { id: 1, label: "[ 2 · STREAM LOG ]", abbrev: "[ LOG ]" },
-  { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SES ]" },
+  { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SESSIONS ]" },
 ];
 
 export const ModeTabs: React.FC<ModeTabsProps> = ({
@@ -45,13 +46,11 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                 e.currentTarget.blur();
                 if (!isSyncing) onSelectMode(m.id);
               }}
-              className={`font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b focus:outline-none focus-visible:outline-none whitespace-nowrap ${
-                isSyncing ? "cursor-wait" : "cursor-pointer"
-              } ${
-                isActive
+              className={`font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b focus:outline-none focus-visible:outline-none whitespace-nowrap ${isSyncing ? "cursor-wait" : "cursor-pointer"
+                } ${isActive
                   ? "text-music-accent border-music-accent"
                   : "text-[#5A5A55] border-transparent hover:text-[#EDEDE8]"
-              }`}
+                }`}
             >
               {isSmallScreen ? m.abbrev : m.label}
             </button>
@@ -65,7 +64,15 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
         title="Open Customization GUI (Accent color, title, timezone, links)"
         className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
       >
-        {isSmallScreen ? <span>[ CONFIG ]</span> : <span>[ C · CONFIG ]</span>}
+        {isSmallScreen ? (
+          <span className="inline-flex items-center gap-1">
+            <span>[</span>
+            <Menu className="w-3 h-3 transition-transform duration-200 group-hover:rotate-45" />
+            <span>]</span>
+          </span>
+        ) : (
+          <span>[ C · CONFIG ]</span>
+        )}
       </button>
     </nav>
   );
