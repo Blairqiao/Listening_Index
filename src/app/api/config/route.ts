@@ -9,22 +9,10 @@ import {
   SiteConfigState,
 } from "@/lib/db/queries";
 import { siteConfig } from "@/config";
+import { isSameOriginRequest } from "@/lib/auth-utils";
+import { generateConfigTsCode, normalizeSiteConfig } from "@/lib/config-utils";
 
 export const dynamic = "force-dynamic";
-
-function isAuthorizedOrigin(request: NextRequest): boolean {
-  if (process.env.NODE_ENV === "development") return true;
-  const secFetchSite = request.headers.get("sec-fetch-site");
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-  const host = request.headers.get("host") || request.nextUrl.host;
-
-  return (
-    secFetchSite === "same-origin" ||
-    Boolean(origin && host && origin.includes(host)) ||
-    Boolean(referer && host && referer.includes(host))
-  );
-}
 
 export async function GET() {
   const activeConfig = await getActiveSiteConfig();
@@ -37,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAuthorizedOrigin(request)) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json(
       { success: false, error: "Unauthorized: Cross-origin request not permitted" },
       { status: 403 }
@@ -53,14 +41,7 @@ export async function POST(request: NextRequest) {
     if (isReset) {
       targetConfig = await resetActiveSiteConfig();
     } else {
-      targetConfig = {
-        title: String(body.title || siteConfig.title).trim(),
-        ownerName: String(body.ownerName || siteConfig.ownerName).trim(),
-        accentColor: String(body.accentColor || siteConfig.accentColor).trim(),
-        siteUrl: String(body.siteUrl || siteConfig.siteUrl).trim(),
-        githubUrl: String(body.githubUrl || siteConfig.githubUrl).trim(),
-        timezone: String(body.timezone || siteConfig.timezone || "America/Chicago").trim(),
-      };
+      targetConfig = normalizeSiteConfig(body, siteConfig);
 
       if (isDbConfigured()) {
         await saveActiveSiteConfig(targetConfig);
@@ -72,15 +53,7 @@ export async function POST(request: NextRequest) {
     let wroteToFile = false;
     if (!isDbConfigured()) {
       try {
-        const fileContent = `export const siteConfig = {
-  title: ${JSON.stringify(targetConfig.title)},
-  ownerName: ${JSON.stringify(targetConfig.ownerName)},
-  accentColor: ${JSON.stringify(targetConfig.accentColor)},
-  siteUrl: ${JSON.stringify(targetConfig.siteUrl)},
-  githubUrl: ${JSON.stringify(targetConfig.githubUrl)},
-  timezone: ${JSON.stringify(targetConfig.timezone)},
-};
-`;
+        const fileContent = generateConfigTsCode(targetConfig);
         const configPath = path.join(process.cwd(), "src", "config.ts");
         await fs.writeFile(configPath, fileContent, "utf-8");
         wroteToFile = true;

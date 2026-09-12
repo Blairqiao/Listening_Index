@@ -5,7 +5,11 @@ import { X, Check, Copy, RotateCcw, Clock, ExternalLink, Search, ChevronDown } f
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
 import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
-import { siteConfig as originalConfig } from "@/config";
+import {
+  areSiteConfigsEqual,
+  DEFAULT_SITE_CONFIG,
+  generateConfigTsCode,
+} from "@/lib/config-utils";
 
 // Major timezones fallback if Intl.supportedValuesOf is unavailable
 const POPULAR_TIMEZONES = [
@@ -181,14 +185,7 @@ export const CustomizationModal: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const hasUnsavedChanges = useMemo(() => {
-    return (
-      draft.title !== config.title ||
-      draft.ownerName !== config.ownerName ||
-      normalizeHex(draft.accentColor) !== normalizeHex(config.accentColor) ||
-      draft.siteUrl !== config.siteUrl ||
-      draft.githubUrl !== config.githubUrl ||
-      draft.timezone !== (config.timezone || "America/Chicago")
-    );
+    return !areSiteConfigsEqual(draft, config);
   }, [draft, config]);
 
   // Clear save error when new unsaved edits occur
@@ -207,13 +204,7 @@ export const CustomizationModal: React.FC = () => {
     // 1. Immediately apply draft accent color to DOM so all site elements repaint in 0ms!
     applyAccentColorToDom(draft.accentColor);
 
-    const isFactory =
-      draft.title === originalConfig.title &&
-      draft.ownerName === originalConfig.ownerName &&
-      normalizeHex(draft.accentColor) === normalizeHex(originalConfig.accentColor) &&
-      draft.siteUrl === originalConfig.siteUrl &&
-      draft.githubUrl === originalConfig.githubUrl &&
-      draft.timezone === (originalConfig.timezone || "America/Chicago");
+    const isFactory = areSiteConfigsEqual(draft, DEFAULT_SITE_CONFIG);
 
     // 2. Immediately update client config context so title, owner, timezone repaint in 0ms
     if (isFactory) {
@@ -228,7 +219,7 @@ export const CustomizationModal: React.FC = () => {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isFactory ? { ...originalConfig, resetToDefault: true } : draft),
+        body: JSON.stringify(isFactory ? { ...DEFAULT_SITE_CONFIG, resetToDefault: true } : draft),
       });
       const data = await res.json();
       if (!data.success) {
@@ -242,31 +233,15 @@ export const CustomizationModal: React.FC = () => {
     }
   };
 
-  // Reset draft form to original defaults (does not apply to site until Save & Apply is clicked)
+  // Reset draft form to factory defaults (does not apply to site until Save & Apply is clicked)
   const handleReset = () => {
-    const defaultDraft: SiteConfigState = {
-      title: originalConfig.title,
-      ownerName: originalConfig.ownerName,
-      accentColor: normalizeHex(originalConfig.accentColor),
-      siteUrl: originalConfig.siteUrl,
-      githubUrl: originalConfig.githubUrl,
-      timezone: originalConfig.timezone || "America/Chicago",
-    };
-    setDraft(defaultDraft);
+    setDraft({ ...DEFAULT_SITE_CONFIG });
     setSaveError(null);
   };
 
   // Copy code snippet for src/config.ts
   const handleCopyCode = async () => {
-    const snippet = `export const siteConfig = {
-  title: ${JSON.stringify(draft.title)},
-  ownerName: ${JSON.stringify(draft.ownerName)},
-  accentColor: ${JSON.stringify(draft.accentColor)},
-  siteUrl: ${JSON.stringify(draft.siteUrl)},
-  githubUrl: ${JSON.stringify(draft.githubUrl)},
-  timezone: ${JSON.stringify(draft.timezone)},
-};
-`;
+    const snippet = generateConfigTsCode(draft);
     try {
       await navigator.clipboard.writeText(snippet);
       setCopiedCode(true);

@@ -1,17 +1,15 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { siteConfig } from "@/config";
-import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
+import { applyAccentColorToDom, normalizeHex } from "@/lib/color-utils";
+import {
+  SiteConfigState,
+  DEFAULT_SITE_CONFIG,
+  normalizeSiteConfig,
+  generateConfigTsCode as buildConfigTsCode,
+} from "@/lib/config-utils";
 
-export interface SiteConfigState {
-  title: string;
-  ownerName: string;
-  accentColor: string;
-  siteUrl: string;
-  githubUrl: string;
-  timezone: string;
-}
+export type { SiteConfigState };
 
 interface ConfigContextType {
   config: SiteConfigState;
@@ -28,14 +26,7 @@ interface ConfigContextType {
 
 const STORAGE_KEY = "listening_index_config";
 
-const DEFAULT_CONFIG: SiteConfigState = {
-  title: siteConfig.title,
-  ownerName: siteConfig.ownerName,
-  accentColor: normalizeHex(siteConfig.accentColor),
-  siteUrl: siteConfig.siteUrl,
-  githubUrl: siteConfig.githubUrl,
-  timezone: siteConfig.timezone || "America/Chicago",
-};
+const DEFAULT_CONFIG: SiteConfigState = DEFAULT_SITE_CONFIG;
 
 const ConfigContext = createContext<ConfigContextType | null>(null);
 
@@ -60,14 +51,7 @@ export const ConfigProvider: React.FC<{
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
-          return {
-            title: parsed.title || DEFAULT_CONFIG.title,
-            ownerName: parsed.ownerName || DEFAULT_CONFIG.ownerName,
-            accentColor: normalizeHex(parsed.accentColor || DEFAULT_CONFIG.accentColor),
-            siteUrl: parsed.siteUrl || DEFAULT_CONFIG.siteUrl,
-            githubUrl: parsed.githubUrl || DEFAULT_CONFIG.githubUrl,
-            timezone: parsed.timezone || DEFAULT_CONFIG.timezone,
-          };
+          return normalizeSiteConfig(parsed, DEFAULT_CONFIG);
         }
       } catch (e) {
         console.warn("[CONFIG] Could not load persisted configuration:", e);
@@ -184,15 +168,7 @@ export const ConfigProvider: React.FC<{
   }, [config, syncSideEffects, onConfigChange]);
 
   const generateConfigTsCode = useCallback((): string => {
-    return `export const siteConfig = {
-  title: ${JSON.stringify(config.title)},
-  ownerName: ${JSON.stringify(config.ownerName)},
-  accentColor: ${JSON.stringify(config.accentColor)},
-  siteUrl: ${JSON.stringify(config.siteUrl)},
-  githubUrl: ${JSON.stringify(config.githubUrl)},
-  timezone: ${JSON.stringify(config.timezone)},
-};
-`;
+    return buildConfigTsCode(config);
   }, [config]);
 
   const openModal = useCallback(() => setIsModalOpen(true), []);

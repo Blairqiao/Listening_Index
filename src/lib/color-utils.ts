@@ -87,14 +87,6 @@ export function applyAccentColorToDom(color: string): void {
     document.head.appendChild(styleTag);
   }
   styleTag.textContent = `:root, html, body { --music-accent: ${hex} !important; --color-music-accent: ${hex} !important; }`;
-
-  // 5. Update localStorage for instant cache hydration
-  try {
-    const stored = localStorage.getItem("listening_index_config");
-    const parsed = stored ? JSON.parse(stored) : {};
-    parsed.accentColor = hex;
-    localStorage.setItem("listening_index_config", JSON.stringify(parsed));
-  } catch {}
 }
 
 /**

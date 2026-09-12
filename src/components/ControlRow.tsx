@@ -11,7 +11,6 @@ interface ControlRowProps {
   logStartDate: string;
   isSessionOpen: boolean;
   sessionTagTime: string;
-  onToggleSession?: () => void;
   isSyncing?: boolean;
   isSmallScreen?: boolean;
   onTriggerSync?: () => void;
@@ -33,24 +32,27 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   logStartDate,
   isSessionOpen,
   sessionTagTime,
-  onToggleSession,
   isSyncing = false,
   isSmallScreen = false,
   onTriggerSync,
 }) => {
+  const getScopeLabel = () => {
+    switch (mode) {
+      case 0:
+        return isSmallScreen
+          ? `[ SINCE ${compactDate(logStartDate)} ]`
+          : `[ RANGE · LOG SINCE ${logStartDate} ]`;
+      case 1:
+        return "[ SCOPE ]";
+      case 2:
+        return isSmallScreen ? "[ SES ]" : "[ SESSION ]";
+    }
+  };
 
-  return (
-    <div className="flex justify-between items-center my-4 md:my-5 h-[28px] select-none">
-      {/* Left Slot: Scope Label */}
-      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap mr-4">
-        {mode === 0 && (isSmallScreen ? `[ SINCE ${compactDate(logStartDate)} ]` : `[ RANGE · LOG SINCE ${logStartDate} ]`)}
-        {mode === 1 && "[ SCOPE ]"}
-        {mode === 2 && (isSmallScreen ? "[ SES ]" : "[ SESSION ]")}
-      </span>
-
-      {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
-      <div className="flex items-center overflow-x-auto scrollbar-hidden">
-        {mode === 0 && (
+  const renderControls = () => {
+    switch (mode) {
+      case 0:
+        return (
           <div className="flex gap-1.5" role="group" aria-label="Time range filters">
             {RANGES.map((r) => {
               const isActive = range === r.key;
@@ -77,20 +79,20 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               );
             })}
           </div>
-        )}
-
-        {mode === 1 && (
+        );
+      case 1:
+        return (
           <span className="font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
             [ LAST 50 PLAYS ]
           </span>
-        )}
-
-        {mode === 2 && (
+        );
+      case 2:
+        return (
           <button
             type="button"
-            onClick={onTriggerSync || onToggleSession}
+            onClick={onTriggerSync}
             disabled={isSyncing}
-            title="Click to trigger manual sync (or press 'S' to toggle state)"
+            title="Click to trigger manual sync"
             className={`font-mono text-[11px] tracking-[0.08em] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
               isSyncing
                 ? "text-music-accent cursor-wait"
@@ -105,7 +107,20 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
               : `[ CLOSED ${sessionTagTime} AGO ]`}
           </button>
-        )}
+        );
+    }
+  };
+
+  return (
+    <div className="flex justify-between items-center my-4 md:my-5 h-[28px] select-none">
+      {/* Left Slot: Scope Label */}
+      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap mr-4">
+        {getScopeLabel()}
+      </span>
+
+      {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
+      <div className="flex items-center overflow-x-auto scrollbar-hidden">
+        {renderControls()}
       </div>
     </div>
   );
