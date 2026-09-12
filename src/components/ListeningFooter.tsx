@@ -8,6 +8,7 @@ interface ListeningFooterProps {
   isLive: boolean;
   syncedAgo: string;
   isSyncing?: boolean;
+  isSmallScreen?: boolean;
   onTriggerSync?: () => void;
 }
 
@@ -16,13 +17,14 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
   isLive,
   syncedAgo,
   isSyncing = false,
+  isSmallScreen = false,
   onTriggerSync,
 }) => {
   return (
     <footer className="h-10 sm:h-11 md:h-12 flex items-center justify-between border-t border-[#1C1C1A] bg-[#080808] select-none mt-4 md:mt-3">
       {/* Keyboard Shortcuts Hint */}
       <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-        {mode === 0 ? "KEYS [1-3] VIEW / [←→] RANGE" : "KEYS [1-3] VIEW"}
+        {!isSmallScreen && (mode === 0 ? "KEYS [1-3] VIEW / [←→] RANGE" : "KEYS [1-3] VIEW")}
       </span>
 
       {/* System Telemetry Status (Clickable manual sync on [ SYNCED X AGO ]) */}
@@ -44,7 +46,7 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
           {isSyncing ? (
             <span className="tracking-[0.08em]">[ SYNCING... ]</span>
           ) : isLive ? (
-            <span className="tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
+            <span className="tracking-[0.08em] uppercase">{isSmallScreen ? "[ ▪ LIVE ]" : `[ ▪ LIVE · SYNCED ${syncedAgo} ]`}</span>
           ) : (
             <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
           )}
