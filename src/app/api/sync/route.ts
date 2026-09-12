@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncSpotify } from "../../../../scripts/sync-spotify";
 import { clearServerCache } from "@/lib/db/server-cache";
 import { isConfigured, isDbConfigured } from "@/lib/db";
+import { isSameOriginRequest } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
@@ -10,17 +11,7 @@ let isSyncInProgress = false;
 
 function isAuthorized(request: NextRequest): boolean {
   // 1. Allow same-origin requests from our own application UI
-  const secFetchSite = request.headers.get("sec-fetch-site");
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-  const host = request.headers.get("host") || request.nextUrl.host;
-
-  const isSameOrigin =
-    secFetchSite === "same-origin" ||
-    (origin && host && origin.includes(host)) ||
-    (referer && host && referer.includes(host));
-
-  if (isSameOrigin && request.method === "POST") {
+  if (isSameOriginRequest(request) && request.method === "POST") {
     return true;
   }
 

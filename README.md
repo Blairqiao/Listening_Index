@@ -135,19 +135,19 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
    - Title: `Listening Index Sync`
    - URL: `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET`
    - Schedule: Every 30 minutes
-   - Request method: `GET`
 4. Save the job.
 
 ---
 
 ### Step 6: Run your first sync
 
-1. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
-2. The endpoint returns a JSON confirmation when complete:
+1. Redeploy Vercel to ensure all env variables are updated.
+2. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
+3. The endpoint returns a JSON confirmation when complete:
    ```json
    { "success": true, "processed": 50 }
    ```
-3. Open your homepage. Your live Spotify data will appear.
+4. Open your homepage. Your live Spotify data will appear.
 
 ---
 
@@ -166,8 +166,9 @@ Open `http://localhost:3000`.
 
 ### Connect real data locally
 
-1. Create a free database at [neon.tech](https://neon.tech).
-2. Copy your connection string and add it to `.env.local`:
+0. Use your Vercel database connection string (go to **Storage** tab in Vercel dashboard and copy connection string).
+1. Or, create a free database at [neon.tech](https://neon.tech).
+2. Add it to `.env.local`:
    ```bash
    echo 'DATABASE_URL="postgresql://user:password@endpoint.neon.tech/neondb?sslmode=require"' >> .env.local
    ```
@@ -213,7 +214,6 @@ export const siteConfig = {
 | `2` | Switch to stream log |
 | `3` | Switch to sessions |
 | `←` / `→` | Change time range |
-| `S` | Toggle session state |
 | `C` | Open customization menu |
 | `Esc` | Close modal |
 

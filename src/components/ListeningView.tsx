@@ -91,12 +91,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
 
-  // Session state: true = active, false = closed
-  const [isSessionOpen, setIsSessionOpen] = useState<boolean>(() => {
-    if (initialSession?.isOpen !== undefined) return initialSession.isOpen;
-    return false;
-  });
-
   // Dynamic sync telemetry tracking
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(() => {
     const syncTime =
@@ -154,12 +148,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         setActiveRange(r as RangeKey);
         setDisplayedRange(r as RangeKey);
         activeRangeRef.current = r as RangeKey;
-      }
-      const o = params.get("open");
-      if (o === "false") {
-        setIsSessionOpen(false);
-      } else if (o === "true") {
-        setIsSessionOpen(true);
       }
       const sit = params.get("sitting");
       if (sit) {
@@ -242,7 +230,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         const data = (await res.json()) as SessionData;
         if (data && (data.sittingTracks || data.previousSittings)) {
           setSessionState(data);
-          setIsSessionOpen(data.isOpen);
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -417,14 +404,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     [isSyncing, overviewCache, fetchOverview]
   );
 
-  const handleToggleSession = useCallback(() => {
-    setIsSessionOpen((prev) => !prev);
-  }, []);
-
   // Keyboard navigation
   // Keys 1-3: Switch modes
   // ArrowLeft / ArrowRight: Step range in Mode 0 (clamped at 1D and ALL, no wrap)
-  // Key S: Toggle session active / closed (developer affordance)
+  // Key C: Open / Toggle config panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Suppress if syncing or inside input, textarea, or contentEditable
@@ -487,18 +470,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         }
         return;
       }
-
-      // Key S: Toggle session active/closed
-      if (e.key === "s" || e.key === "S") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        handleToggleSession();
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activeMode, activeRange, handleSelectMode, handleSelectRange, handleToggleSession, isSyncing, isModalOpen, openModal, closeModal]);
+  }, [activeMode, activeRange, handleSelectMode, handleSelectRange, isSyncing, isModalOpen, openModal, closeModal]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const currentOverview: OverviewData =
@@ -519,7 +495,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const sessionData: SessionData =
     sessionState || {
-      isOpen: isSessionOpen,
+      isOpen: initialSession?.isOpen ?? false,
       tagTime: "--",
       metrics: ["--", "--", "--", "--"],
       sittingTracks: [],
@@ -549,16 +525,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [activeSitting, sessionData.metrics]);
 
   // Active metrics per mode
-  const currentMetrics: [string, string, string, string] =
-    activeMode === 0
-      ? currentOverview.metrics
-      : activeMode === 1
-      ? streamLogData.metrics
-      : currentSessionMetrics;
+  const metricByMode: Record<Mode, [string, string, string, string]> = {
+    0: currentOverview.metrics,
+    1: streamLogData.metrics,
+    2: currentSessionMetrics,
+  };
+  const currentMetrics = metricByMode[activeMode];
 
   const sessionTagTime =
-    activeSitting?.tagTime || sessionData.tagTime || (isSessionOpen ? "LIVE" : "--");
-  const isSystemLive = isSessionOpen;
+    activeSitting?.tagTime || sessionData.tagTime || (sessionData.isOpen ? "LIVE" : "--");
+  const isSystemLive = sessionData.isOpen;
 
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative">
@@ -588,9 +564,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             range={activeRange}
             onSelectRange={handleSelectRange}
             logStartDate={currentOverview.logStartDate}
-            isSessionOpen={isSessionOpen}
+            isSessionOpen={sessionData.isOpen}
             sessionTagTime={sessionTagTime}
-            onToggleSession={handleToggleSession}
             isSyncing={isSyncing}
             isSmallScreen={isSmallScreen}
             onTriggerSync={handleTriggerSync}
@@ -623,7 +598,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
             {activeMode === 2 && (
               <SessionView
-                isOpen={isSessionOpen}
+                isOpen={sessionData.isOpen}
                 sittingTracks={sessionData.sittingTracks}
                 previousSittings={sessionData.previousSittings}
                 sittings={sessionData.sittings}
