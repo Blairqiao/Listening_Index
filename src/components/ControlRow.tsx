@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Mode, RangeKey } from "@/lib/mock-listening-data";
+import { compactDate } from "@/lib/resize-utils";
 
 interface ControlRowProps {
   mode: Mode;
@@ -12,6 +13,7 @@ interface ControlRowProps {
   sessionTagTime: string;
   onToggleSession?: () => void;
   isSyncing?: boolean;
+  isSmallScreen?: boolean;
   onTriggerSync?: () => void;
 }
 
@@ -33,19 +35,21 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   sessionTagTime,
   onToggleSession,
   isSyncing = false,
+  isSmallScreen = false,
   onTriggerSync,
 }) => {
+
   return (
     <div className="flex justify-between items-center my-4 md:my-5 h-[28px] select-none">
       {/* Left Slot: Scope Label */}
-      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-        {mode === 0 && `[ RANGE · LOG SINCE ${logStartDate} ]`}
+      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap mr-4">
+        {mode === 0 && (isSmallScreen ? `[ SINCE ${compactDate(logStartDate)} ]` : `[ RANGE · LOG SINCE ${logStartDate} ]`)}
         {mode === 1 && "[ SCOPE ]"}
-        {mode === 2 && "[ SESSION ]"}
+        {mode === 2 && (isSmallScreen ? "[ SES ]" : "[ SESSION ]")}
       </span>
 
       {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
-      <div className="flex items-center">
+      <div className="flex items-center overflow-x-auto scrollbar-hidden">
         {mode === 0 && (
           <div className="flex gap-1.5" role="group" aria-label="Time range filters">
             {RANGES.map((r) => {

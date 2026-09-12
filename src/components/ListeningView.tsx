@@ -17,6 +17,7 @@ import {
   SittingSession,
 } from "@/lib/mock-listening-data";
 import { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
+import { isScreenSmall } from "@/lib/resize-utils";
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
@@ -33,6 +34,22 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialStreamLog,
   initialSession,
 }) => {
+
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(isScreenSmall(window));
+    };
+
+    handleResize(); // Initial check
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   const { config, openModal, closeModal, isModalOpen } = useConfig();
   const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session
@@ -562,6 +579,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             activeMode={activeMode}
             onSelectMode={handleSelectMode}
             isSyncing={isSyncing}
+            isSmallScreen={isSmallScreen}
           />
 
           {/* 3. Fixed-Height Control Row (h-[26px], never shifts) */}
@@ -574,6 +592,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             sessionTagTime={sessionTagTime}
             onToggleSession={handleToggleSession}
             isSyncing={isSyncing}
+            isSmallScreen={isSmallScreen}
             onTriggerSync={handleTriggerSync}
           />
 
@@ -622,6 +641,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           isLive={isSystemLive}
           syncedAgo={syncedAgoStr}
           isSyncing={isSyncing}
+          isSmallScreen={isSmallScreen}
           onTriggerSync={handleTriggerSync}
         />
       </main>
