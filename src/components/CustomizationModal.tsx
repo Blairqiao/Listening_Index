@@ -545,7 +545,8 @@ export const CustomizationModal: React.FC = () => {
               className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
             >
               <RotateCcw className="w-3 h-3" />
-              <span>RESET DEFAULTS</span>
+              <span className="sm:hidden">RESET</span>
+              <span className="hidden sm:inline">RESET DEFAULTS</span>
             </button>
 
             <button
@@ -562,7 +563,8 @@ export const CustomizationModal: React.FC = () => {
               ) : (
                 <>
                   <Copy className="w-3 h-3" />
-                  <span>COPY CONFIG.TS</span>
+                  <span className="sm:hidden">COPY</span>
+                  <span className="hidden sm:inline">COPY CONFIG.TS</span>
                 </>
               )}
             </button>
