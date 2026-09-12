@@ -47,7 +47,7 @@ Designed for music enthusiasts, developers, and data hoarders who want a permane
 
 ## Demo & Screenshots
 
-Explore the [Live Demo](https://blairqiao.com/music) or [run it locally](#local-development) to test all features with rich mock data:
+Explore the [Live Demo](https://listening-index.vercel.app/), my [personal site](https://blairqiao.com), or [run it locally](#local-development) to test all features:
 
 ### 1. Overview Mode
 *All-time and range metrics (listening minutes, track counts, daily cadence), rank drift indicators (`+1`, `-2`, `NEW`), top tracks with album covers, top artists, and activity histograms across 6 time ranges (1D, 1W, 1M, 6M, 1Y, ALL).*
