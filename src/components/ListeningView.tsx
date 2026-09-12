@@ -552,7 +552,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           isDataReady ? "opacity-0" : "opacity-100"
         }`}
       />
-      <main className="max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] md:h-[100dvh] md:max-h-[100dvh] md:overflow-hidden flex flex-col justify-between">
+      <main className="max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] md:h-[100dvh] md:max-h-[100dvh] md:overflow-scroll flex flex-col justify-between">
         <div className="flex-1">
           {/* 1. Header Row */}
           <ListeningHeader />
