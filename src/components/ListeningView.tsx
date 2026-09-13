@@ -21,6 +21,34 @@ import { isScreenSmall } from "@/lib/resize-utils";
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
+const STREAM_LOG_DEPTH_KEY = "stream_log_depth";
+const STREAM_LOG_DEPTH_TTL_MS = 20 * 60 * 1000; // 20 minutes
+
+function getCachedStreamLogDepth(): number {
+  if (typeof window === "undefined") return 50;
+  try {
+    const raw = localStorage.getItem(STREAM_LOG_DEPTH_KEY);
+    if (!raw) return 50;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.count === "number" && typeof parsed.timestamp === "number") {
+      if (Date.now() - parsed.timestamp < STREAM_LOG_DEPTH_TTL_MS) {
+        return Math.max(50, parsed.count);
+      }
+    }
+  } catch {}
+  return 50;
+}
+
+function setCachedStreamLogDepth(count: number) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      STREAM_LOG_DEPTH_KEY,
+      JSON.stringify({ count, timestamp: Date.now() })
+    );
+  } catch {}
+}
+
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
@@ -85,6 +113,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [streamLogState, setStreamLogState] = useState<StreamLogData | null>(() => {
     return initialStreamLog || null;
   });
+  const [loadedPlaysCount, setLoadedPlaysCount] = useState<number>(() => {
+    return initialStreamLog?.entries?.length || 50;
+  });
+  const loadedPlaysCountRef = useRef<number>(loadedPlaysCount);
+  useEffect(() => {
+    loadedPlaysCountRef.current = loadedPlaysCount;
+  }, [loadedPlaysCount]);
+
+  const [isLoadingMorePlays, setIsLoadingMorePlays] = useState<boolean>(false);
+
   const [sessionState, setSessionState] = useState<SessionData | null>(() => {
     return initialSession || null;
   });
@@ -194,10 +232,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, []);
 
   // Fetch Stream Log from server (cached on server, reset on sync)
-  const fetchStreamLog = useCallback(async () => {
+  const fetchStreamLog = useCallback(async (countToFetch?: number) => {
     try {
+      const depth = countToFetch || loadedPlaysCountRef.current || 50;
       const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
-      const url = `/api/listening/stream-log?limit=50${tzQuery}`;
+      const url = `/api/listening/stream-log?limit=${depth}${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
@@ -206,6 +245,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         const data = (await res.json()) as StreamLogData;
         if (data && data.entries) {
           setStreamLogState(data);
+          setLoadedPlaysCount(data.entries.length);
+          setCachedStreamLogDepth(data.entries.length);
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -216,6 +257,84 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       console.error("[API FETCH] Stream log query error:", err);
     }
   }, []);
+
+  // Restore cached stream log depth on initial client mount if > 50 and within TTL
+  useEffect(() => {
+    const cachedDepth = getCachedStreamLogDepth();
+    if (cachedDepth > 50) {
+      fetchStreamLog(cachedDepth);
+    }
+  }, [fetchStreamLog]);
+
+  // Load next 50 plays incrementally using keyset cursor pagination
+  const handleLoadMoreStreamLog = useCallback(async () => {
+    if (
+      isLoadingMorePlays ||
+      !streamLogState ||
+      streamLogState.hasMore === false ||
+      !streamLogState.nextCursor
+    ) {
+      return;
+    }
+    setIsLoadingMorePlays(true);
+    try {
+      const cursor = streamLogState.nextCursor;
+      const cursorId = streamLogState.nextCursorId || "";
+      const lastEntry = streamLogState.entries[streamLogState.entries.length - 1];
+      const prevPlayedAt = lastEntry?.playedAt || "";
+
+      // Find the dayGroup of the last entry by scanning backward
+      let prevDayGroup = "";
+      for (let i = streamLogState.entries.length - 1; i >= 0; i--) {
+        if (streamLogState.entries[i].dayGroup) {
+          prevDayGroup = streamLogState.entries[i].dayGroup!;
+          break;
+        }
+      }
+
+      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const params = new URLSearchParams({
+        limit: "50",
+        cursor,
+        cursorId,
+        prevPlayedAt,
+        prevDayGroup,
+      });
+
+      const url = `/api/listening/stream-log?${params.toString()}${tzQuery}`;
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as StreamLogData;
+        if (data && data.entries) {
+          setStreamLogState((prev) => {
+            if (!prev) return data;
+            return {
+              ...prev,
+              entries: [...prev.entries, ...data.entries],
+              nextCursor: data.nextCursor,
+              nextCursorId: data.nextCursorId,
+              hasMore: data.hasMore,
+              lastSyncedAt: data.lastSyncedAt || prev.lastSyncedAt,
+            };
+          });
+
+          setLoadedPlaysCount((prev) => {
+            const nextCount = prev + data.entries.length;
+            setCachedStreamLogDepth(nextCount);
+            return nextCount;
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[API FETCH] Stream log load more error:", err);
+    } finally {
+      setIsLoadingMorePlays(false);
+    }
+  }, [isLoadingMorePlays, streamLogState]);
 
   // Fetch Current Session from server (cached on server, reset on sync)
   const fetchSession = useCallback(async () => {
@@ -569,6 +688,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSyncing={isSyncing}
             isSmallScreen={isSmallScreen}
             onTriggerSync={handleTriggerSync}
+            streamLogCount={streamLogData.entries.length || loadedPlaysCount}
+            totalPlays={streamLogData.metrics[0]}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
@@ -593,7 +714,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             )}
 
             {activeMode === 1 && (
-              <StreamLogView entries={streamLogData.entries} />
+              <StreamLogView
+                entries={streamLogData.entries}
+                onLoadMore={handleLoadMoreStreamLog}
+                isLoadingMore={isLoadingMorePlays}
+                hasMore={streamLogState?.hasMore ?? (streamLogData.entries.length >= 50)}
+                totalPlays={streamLogData.metrics[0]}
+              />
             )}
 
             {activeMode === 2 && (

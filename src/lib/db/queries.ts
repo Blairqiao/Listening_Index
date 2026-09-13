@@ -38,6 +38,9 @@ export interface OverviewData {
 export interface StreamLogData {
   metrics: [string, string, string, string]; // Total Plays, Logged Time, Unique Artists, Current Streak
   entries: StreamLogItem[];
+  nextCursor?: string | null;
+  nextCursorId?: string | null;
+  hasMore?: boolean;
   lastSyncedAt?: string;
 }
 
@@ -1430,72 +1433,87 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 /**
  * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
  */
-export async function getStreamLog(limit = 50, tzOverride?: string): Promise<StreamLogData> {
+/**
+ * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
+ * Supports keyset cursor pagination and cross-chunk session/day boundary stitching.
+ */
+export async function getStreamLog(
+  limit = 50,
+  tzOverride?: string,
+  cursorTimestamp?: string,
+  cursorId?: string,
+  prevDayGroup?: string,
+  prevPlayedAt?: string
+): Promise<StreamLogData> {
   const sql = getDb();
-  const clampedLimit = Math.min(Math.max(1, limit), 100);
+  const clampedLimit = Math.min(Math.max(1, limit), 250);
   const tz = tzOverride || getTimezone();
 
-  // 1. Lifetime metrics
-  const [totalsRow] = ((await sql`
-    SELECT 
-      COUNT(*)::bigint AS total_plays,
-      COALESCE(ROUND(SUM(ms_played) / 3600000.0), 0)::bigint AS logged_hours,
-      COUNT(DISTINCT t.artist_id)::bigint AS unique_artists
-    FROM plays p
-    JOIN tracks t ON p.track_id = t.id;
-  `) as any);
+  // 1. Lifetime metrics (only computed on initial top slice)
+  let metrics: [string, string, string, string] = ["--", "--", "--", "--"];
 
-  const totalPlaysStr = Number(totalsRow?.total_plays || 0).toLocaleString();
-  const loggedHoursStr = `${Number(totalsRow?.logged_hours || 0)}h`;
-  const uniqueArtistsStr = Number(totalsRow?.unique_artists || 0).toLocaleString();
+  if (!cursorTimestamp) {
+    const [totalsRow] = ((await sql`
+      SELECT 
+        COUNT(*)::bigint AS total_plays,
+        COALESCE(ROUND(SUM(ms_played) / 3600000.0), 0)::bigint AS logged_hours,
+        COUNT(DISTINCT t.artist_id)::bigint AS unique_artists
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id;
+    `) as any);
 
-  // Streak calculation
-  const dateRows = ((await sql`
-    SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
-    FROM plays
-    ORDER BY play_date DESC;
-  `) as any);
+    const totalPlaysStr = Number(totalsRow?.total_plays || 0).toLocaleString();
+    const loggedHoursStr = `${Number(totalsRow?.logged_hours || 0)}h`;
+    const uniqueArtistsStr = Number(totalsRow?.unique_artists || 0).toLocaleString();
 
-  let currentStreak = 0;
-  if (dateRows.length > 0) {
-    const playDateStrs = new Set(
-      dateRows.map((r: any) => {
-        const d = new Date(r.play_date);
-        return d.toISOString().slice(0, 10);
-      })
-    );
+    // Streak calculation
+    const dateRows = ((await sql`
+      SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
+      FROM plays
+      ORDER BY play_date DESC;
+    `) as any);
 
-    const nowTz = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
+    let currentStreak = 0;
+    if (dateRows.length > 0) {
+      const playDateStrs = new Set(
+        dateRows.map((r: any) => {
+          const d = new Date(r.play_date);
+          return d.toISOString().slice(0, 10);
+        })
+      );
 
-    const checkDate = new Date(nowTz + "T12:00:00Z");
-    let checkDateStr = nowTz;
+      const nowTz = new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
 
-    if (!playDateStrs.has(checkDateStr)) {
-      checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-      checkDateStr = checkDate.toISOString().slice(0, 10);
+      const checkDate = new Date(nowTz + "T12:00:00Z");
+      let checkDateStr = nowTz;
+
+      if (!playDateStrs.has(checkDateStr)) {
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        checkDateStr = checkDate.toISOString().slice(0, 10);
+      }
+
+      while (playDateStrs.has(checkDateStr)) {
+        currentStreak++;
+        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
+        checkDateStr = checkDate.toISOString().slice(0, 10);
+      }
     }
 
-    while (playDateStrs.has(checkDateStr)) {
-      currentStreak++;
-      checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-      checkDateStr = checkDate.toISOString().slice(0, 10);
-    }
+    const streakStr = `${currentStreak} ${currentStreak === 1 ? "DAY" : "DAYS"}`;
+    metrics = [
+      totalPlaysStr,
+      loggedHoursStr,
+      uniqueArtistsStr,
+      streakStr,
+    ];
   }
 
-  const streakStr = `${currentStreak} ${currentStreak === 1 ? "DAY" : "DAYS"}`;
-  const metrics: [string, string, string, string] = [
-    totalPlaysStr,
-    loggedHoursStr,
-    uniqueArtistsStr,
-    streakStr,
-  ];
-
-  // 2. 50 Recent plays
+  // 2. Keyset Query: Fetches (clampedLimit + 1) rows to detect hasMore
   interface StreamRow {
     id: string;
     track_id: string;
@@ -1510,31 +1528,94 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
     status: string;
   }
 
-  const streamRows: StreamRow[] = ((await sql`
-    SELECT 
-        p.id::text,
-        p.played_at,
-        p.track_id,
-        ar.id AS artist_id,
-        al.id AS album_id,
-        al.image_url AS album_image_url,
-        t.name AS title,
-        ar.name AS artist,
-        al.name AS album,
-        t.duration_ms,
-        CASE 
-            WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-            ELSE '[FULL]'
-        END AS status
-    FROM plays p
-    JOIN tracks t ON p.track_id = t.id
-    JOIN albums al ON t.album_id = al.id
-    JOIN artists ar ON t.artist_id = ar.id
-    ORDER BY p.played_at DESC
-    LIMIT ${clampedLimit};
-  `) as any);
+  let streamRows: StreamRow[];
+  if (cursorTimestamp) {
+    if (cursorId) {
+      streamRows = ((await sql`
+        SELECT 
+            p.id::text,
+            p.played_at,
+            p.track_id,
+            ar.id AS artist_id,
+            al.id AS album_id,
+            al.image_url AS album_image_url,
+            t.name AS title,
+            COALESCE(ar.name, '') AS artist,
+            COALESCE(al.name, '') AS album,
+            t.duration_ms,
+            CASE 
+                WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
+                ELSE '[FULL]'
+            END AS status
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE (p.played_at < ${cursorTimestamp}::timestamptz)
+           OR (p.played_at = ${cursorTimestamp}::timestamptz AND p.id < ${cursorId}::bigint)
+        ORDER BY p.played_at DESC, p.id DESC
+        LIMIT ${clampedLimit + 1};
+      `) as any);
+    } else {
+      streamRows = ((await sql`
+        SELECT 
+            p.id::text,
+            p.played_at,
+            p.track_id,
+            ar.id AS artist_id,
+            al.id AS album_id,
+            al.image_url AS album_image_url,
+            t.name AS title,
+            COALESCE(ar.name, '') AS artist,
+            COALESCE(al.name, '') AS album,
+            t.duration_ms,
+            CASE 
+                WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
+                ELSE '[FULL]'
+            END AS status
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE p.played_at < ${cursorTimestamp}::timestamptz
+        ORDER BY p.played_at DESC, p.id DESC
+        LIMIT ${clampedLimit + 1};
+      `) as any);
+    }
+  } else {
+    streamRows = ((await sql`
+      SELECT 
+          p.id::text,
+          p.played_at,
+          p.track_id,
+          ar.id AS artist_id,
+          al.id AS album_id,
+          al.image_url AS album_image_url,
+          t.name AS title,
+          COALESCE(ar.name, '') AS artist,
+          COALESCE(al.name, '') AS album,
+          t.duration_ms,
+          CASE 
+              WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
+              ELSE '[FULL]'
+          END AS status
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      ORDER BY p.played_at DESC, p.id DESC
+      LIMIT ${clampedLimit + 1};
+    `) as any);
+  }
 
-  // 1. Group streamRows into sittings bounded by >30-min gap
+  const hasMore = streamRows.length > clampedLimit;
+  const pagedRows = streamRows.slice(0, clampedLimit);
+
+  const lastRow = pagedRows[pagedRows.length - 1];
+  const nextCursor = lastRow ? new Date(lastRow.played_at).toISOString() : null;
+  const nextCursorId = lastRow ? String(lastRow.id) : null;
+
+  // 3. Group pagedRows into sessions bounded by >30-min gap
   interface SittingGroup {
     startIndex: number;
     rows: StreamRow[];
@@ -1544,11 +1625,11 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
   let currentGroupRows: StreamRow[] = [];
   let currentGroupStartIndex = 0;
 
-  for (let i = 0; i < streamRows.length; i++) {
-    const row = streamRows[i];
+  for (let i = 0; i < pagedRows.length; i++) {
+    const row = pagedRows[i];
     currentGroupRows.push(row);
 
-    const nextRow = streamRows[i + 1];
+    const nextRow = pagedRows[i + 1];
     if (nextRow) {
       const currentMs = new Date(row.played_at).getTime();
       const nextMs = new Date(nextRow.played_at).getTime();
@@ -1571,20 +1652,39 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
     }
   }
 
-  // 2. Map sitting startIndex -> sessionGap with summary (# tracks · duration)
+  // 4. Map session startIndex -> sessionGap with summary (# tracks · duration)
   const sittingGapMap = new Map<number, { durationStr: string; sittingLabel: string }>();
+
+  // Cross-chunk boundary stitching: detect gap between prevPlayedAt and row 0
+  if (prevPlayedAt && pagedRows.length > 0 && sittings.length > 0) {
+    const boundaryGapMs = new Date(prevPlayedAt).getTime() - new Date(pagedRows[0].played_at).getTime();
+    if (boundaryGapMs > 30 * 60 * 1000) {
+      const sitting0 = sittings[0];
+      const count = sitting0.rows.length;
+      const tracksLabel = `${count} ${count === 1 ? "TRACK" : "TRACKS"}`;
+      const sittingStartMs = new Date(sitting0.rows[sitting0.rows.length - 1].played_at).getTime();
+      const sittingEndMs = new Date(sitting0.rows[0].played_at).getTime();
+      const lastTrackDurationMs = sitting0.rows[sitting0.rows.length - 1].duration_ms || 0;
+      const sumDurationMs = sitting0.rows.reduce((sum, r) => sum + (r.duration_ms || 0), 0);
+      const runtimeMs = Math.max(sittingEndMs - sittingStartMs + lastTrackDurationMs, sumDurationMs);
+      const sittingDurationStr = formatDurationHoursMinutes(runtimeMs);
+
+      sittingGapMap.set(0, {
+        durationStr: formatDurationHoursMinutes(boundaryGapMs),
+        sittingLabel: `${tracksLabel} · ${sittingDurationStr.toUpperCase()}`,
+      });
+    }
+  }
 
   for (let k = 1; k < sittings.length; k++) {
     const prevSitting = sittings[k - 1];
     const sitting = sittings[k];
 
-    // Inactivity gap between previous (newer) sitting and this sitting
     const prevOldestMs = new Date(prevSitting.rows[prevSitting.rows.length - 1].played_at).getTime();
     const currentNewestMs = new Date(sitting.rows[0].played_at).getTime();
     const gapMs = prevOldestMs - currentNewestMs;
     const gapDurationStr = formatDurationHoursMinutes(gapMs);
 
-    // Summary of this sitting: # tracks * duration
     const count = sitting.rows.length;
     const tracksLabel = `${count} ${count === 1 ? "TRACK" : "TRACKS"}`;
 
@@ -1603,11 +1703,11 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
     });
   }
 
-  let lastDayGroup = "";
+  let lastDayGroup = prevDayGroup || "";
   const entries: StreamLogItem[] = [];
 
-  for (let i = 0; i < streamRows.length; i++) {
-    const row = streamRows[i];
+  for (let i = 0; i < pagedRows.length; i++) {
+    const row = pagedRows[i];
     const playDate = new Date(row.played_at);
     const dayGroup = formatDayGroupTz(playDate, tz);
     const isNewDay = dayGroup !== lastDayGroup;
@@ -1621,6 +1721,7 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
       artistId: row.artist_id,
       albumId: row.album_id,
       albumImageUrl: row.album_image_url || null,
+      playedAt: new Date(row.played_at).toISOString(),
       timeStr: formatHHmmTz(playDate, tz),
       title: row.title,
       artist: row.artist,
@@ -1637,8 +1738,11 @@ export async function getStreamLog(limit = 50, tzOverride?: string): Promise<Str
   return {
     metrics,
     entries,
-    lastSyncedAt: lastSync ?? (streamRows[0]?.played_at
-      ? new Date(streamRows[0].played_at).toISOString()
+    nextCursor,
+    nextCursorId,
+    hasMore,
+    lastSyncedAt: lastSync ?? (pagedRows[0]?.played_at
+      ? new Date(pagedRows[0].played_at).toISOString()
       : undefined),
   };
 }

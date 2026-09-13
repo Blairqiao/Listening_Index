@@ -14,6 +14,8 @@ interface ControlRowProps {
   isSyncing?: boolean;
   isSmallScreen?: boolean;
   onTriggerSync?: () => void;
+  streamLogCount?: number;
+  totalPlays?: string;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -35,6 +37,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   isSyncing = false,
   isSmallScreen = false,
   onTriggerSync,
+  streamLogCount,
+  totalPlays,
 }) => {
   const getScopeLabel = () => {
     switch (mode) {
@@ -84,12 +88,15 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             })}
           </div>
         );
-      case 1:
+      case 1: {
+        const count = streamLogCount || 50;
+        const total = totalPlays || "--";
         return (
           <span className="font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-            [ LAST 50 PLAYS ]
+            [ LAST {count} ]
           </span>
         );
+      }
       case 2:
         return (
           <button
