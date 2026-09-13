@@ -49,13 +49,12 @@ Change the accent color, page title, timezone, and links directly in the browser
 
 ## Deploy to Vercel
 
-### Step 1: Deploy the repository
+### Step 1: Fork and import the repository
 
-Click the button to clone the project to your GitHub account and create the Vercel deployment:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FBlairqiao%2Flistening_index&env=SPOTIFY_CLIENT_ID,SPOTIFY_CLIENT_SECRET,SPOTIFY_REFRESH_TOKEN,CRON_SECRET&envDefaults=%7B%22SPOTIFY_CLIENT_ID%22%3A%22todo%22%2C%22SPOTIFY_CLIENT_SECRET%22%3A%22todo%22%2C%22SPOTIFY_REFRESH_TOKEN%22%3A%22todo%22%2C%22CRON_SECRET%22%3A%22todo%22%7D&envDescription=Credentials%20for%20Spotify%20API%20and%20Database&project-name=listening-index)
-
-Leave the environment variable inputs as their default values and click Deploy. The site will deploy in demo mode with sample data. You will add real credentials in the next steps.
+1. Click **Fork** at the top right of this repository to create a copy under your GitHub account.
+2. Go to [vercel.com/new](https://vercel.com/new).
+3. Select your forked `listening_index` repository and click **Import**.
+4. Click **Deploy**. The site deploys in demo mode with sample data. You will connect your database and credentials in the next steps.
 
 ---
 
@@ -90,7 +89,7 @@ Choose one of two options:
 
 #### Option A: Terminal script (Fastest)
 
-Clone your repository and run:
+Clone your fork and run:
 
 ```bash
 npm install
@@ -99,7 +98,7 @@ npm run auth:spotify
 
 The script asks for your Client ID and Secret, opens Spotify in your browser, and prints your `SPOTIFY_REFRESH_TOKEN`.
 
-Add these three values in **Vercel Project Dashboard -> Settings -> Environment Variables**:
+Add these three values in **Vercel Project Dashboard -> Project -> Environment Variables**:
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
 - `SPOTIFY_REFRESH_TOKEN`
@@ -141,13 +140,24 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
 
 ### Step 6: Run your first sync
 
-1. Redeploy Vercel to ensure all env variables are updated.
-2. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
-3. The endpoint returns a JSON confirmation when complete:
+#### IMPORTANT: Make sure all [environment variables](#environment-variables) are present in Vercel and redeployed. Go to [Vercel dashboard](https://vercel.com/dashboard) and check the environment variables.
+
+1. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
+2. The endpoint returns a JSON confirmation when complete:
    ```json
    { "success": true, "processed": 50 }
    ```
-4. Open your homepage. Your live Spotify data will appear.
+3. Open your homepage. Your live Spotify data will appear.
+
+---
+
+### Keeping your fork updated
+
+When updates or fixes are published to the main repository:
+
+1. Open your fork on GitHub.
+2. Click **Sync fork**, then click **Update branch**.
+3. Vercel automatically deploys the new commits.
 
 ---
 
@@ -166,8 +176,7 @@ Open `http://localhost:3000`.
 
 ### Connect real data locally
 
-0. Use your Vercel database connection string (go to **Storage** tab in Vercel dashboard and copy connection string).
-1. Or, create a free database at [neon.tech](https://neon.tech).
+1. Copy your database connection string from the **Storage** tab in your Vercel dashboard, or create a free database at [neon.tech](https://neon.tech).
 2. Add it to `.env.local`:
    ```bash
    echo 'DATABASE_URL="postgresql://user:password@endpoint.neon.tech/neondb?sslmode=require"' >> .env.local
