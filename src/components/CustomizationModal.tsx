@@ -76,6 +76,7 @@ export const CustomizationModal: React.FC = () => {
       setIsVisible(false);
       timer = setTimeout(() => {
         setShouldRender(false);
+        setDraft(config);
       }, 200);
     }
 
@@ -157,7 +158,6 @@ export const CustomizationModal: React.FC = () => {
   // Close modal without applying uncommitted changes
   const handleCancel = useCallback(() => {
     applyAccentColorToDom(config.accentColor);
-    setDraft(config);
     closeModal();
   }, [closeModal, config]);
 

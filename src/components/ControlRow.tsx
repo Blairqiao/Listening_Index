@@ -53,7 +53,11 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     switch (mode) {
       case 0:
         return (
-          <div className="flex gap-1.5" role="group" aria-label="Time range filters">
+          <div
+            className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5"
+            role="group"
+            aria-label="Time range filters"
+          >
             {RANGES.map((r) => {
               const isActive = range === r.key;
               return (
@@ -66,7 +70,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
                     e.currentTarget.blur();
                     if (!isSyncing) onSelectRange(r.key);
                   }}
-                  className={`font-mono text-[11px] tracking-[0.08em] px-2.5 py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none ${
+                  className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center ${
                     isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
                   } ${
                     isActive
@@ -112,14 +116,20 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   };
 
   return (
-    <div className="flex justify-between items-center my-4 md:my-5 h-[28px] select-none">
+    <div
+      className={`my-3.5 sm:my-4 md:my-5 select-none ${
+        mode === 0
+          ? "flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center sm:h-[28px]"
+          : "flex justify-between items-center h-[28px]"
+      }`}
+    >
       {/* Left Slot: Scope Label */}
-      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap mr-4">
+      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4">
         {getScopeLabel()}
       </span>
 
       {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
-      <div className="flex items-center overflow-x-auto scrollbar-hidden">
+      <div className={`flex items-center ${mode === 0 ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"}`}>
         {renderControls()}
       </div>
     </div>
