@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStreamLog } from "@/lib/db/queries";
 import { getCachedStreamLog, setCachedStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { MOCK_DATA } from "@/lib/mock-data";
+import { MOCK_DATA, getMockStreamLog } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
@@ -10,34 +10,54 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
-    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 100) : 50;
+    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 250) : 50;
     const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
+
+    const cursor = searchParams.get("cursor") || undefined;
+    const cursorId = searchParams.get("cursorId") || undefined;
+    const prevDayGroup = searchParams.get("prevDayGroup") || undefined;
+    const prevPlayedAt = searchParams.get("prevPlayedAt") || undefined;
 
     // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
     if (!isDbConfigured()) {
-      return NextResponse.json(MOCK_DATA.streamLog, {
+      const mockData = getMockStreamLog(limit, cursor, cursorId, prevDayGroup, prevPlayedAt);
+      return NextResponse.json(mockData, {
         status: 200,
         headers: {
           "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       });
     }
 
-    // Check server cache first
-    let data = getCachedStreamLog(limit, tzParam || "");
-    if (!data) {
-      data = await getStreamLog(limit, tzParam);
-      setCachedStreamLog(limit, data, tzParam || "");
+    // Check server cache first (only for initial page without cursor)
+    if (!cursor) {
+      let data = getCachedStreamLog(limit, tzParam || "");
+      if (!data) {
+        data = await getStreamLog(limit, tzParam);
+        setCachedStreamLog(limit, data, tzParam || "");
+      }
+
+      return NextResponse.json(data, {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
     }
+
+    // Dynamic fetch for pagination slices
+    const data = await getStreamLog(limit, tzParam, cursor, cursorId, prevDayGroup, prevPlayedAt);
 
     return NextResponse.json(data, {
       status: 200,
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
   } catch (error: unknown) {
