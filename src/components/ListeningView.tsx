@@ -5,6 +5,7 @@ import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
+import { Spectrum } from "@/components/Spectrum";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
@@ -655,6 +656,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     activeSitting?.tagTime || sessionData.tagTime || (sessionData.isOpen ? "LIVE" : "--");
   const isSystemLive = sessionData.isOpen;
 
+  // Seeds the visualizer's synthetic pattern. The most recent play is the
+  // closest thing to "now playing" the sync-based data model exposes.
+  const latestPlay = streamLogData.entries[0];
+  const spectrumTrackKey = latestPlay
+    ? latestPlay.trackId || `${latestPlay.title}-${latestPlay.artist}`
+    : "idle";
+
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative">
       {/* Black veil holding the screen as long as needed until real data is ready */}
@@ -694,6 +702,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
           <MetricRibbon mode={activeMode} metrics={currentMetrics} />
+
+          {/* 4b. Spectrum visualizer (synthetic by default, live audio on request) */}
+          <Spectrum
+            trackKey={spectrumTrackKey}
+            isLive={isSystemLive}
+            accentColor={config.accentColor}
+          />
 
           {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
           <div
