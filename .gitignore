@@ -43,3 +43,6 @@ next-env.d.ts
 # docs
 /docs
 CONTEXT.md
+# next.js agent rules (regenerated on every build)
+AGENTS.md
+CLAUDE.md
