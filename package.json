@@ -10,8 +10,6 @@
     "sync:spotify": "tsx scripts/sync-spotify.ts",
     "auth:spotify": "tsx scripts/get-spotify-token.ts",
     "generate:cron": "tsx scripts/generate-cron-secret.ts",
-    "upload:history": "tsx scripts/upload-history.ts",
-    "enrich:metadata": "tsx scripts/enrich-metadata.ts",
     "test:rate-limit": "tsx scripts/test-rate-limit.ts"
   },
   "dependencies": {
