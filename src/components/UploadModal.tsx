@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { X, Upload, Check, AlertTriangle, FileArchive, Loader2, RefreshCw } from "lucide-react";
+import { X, Upload, Check, AlertTriangle, FileArchive, Loader2 } from "lucide-react";
 import { extractAudioHistoryEntries, isAudioHistoryFilename } from "@/lib/zip-utils";
 import { parseHistoryRecords, CompactPlayEvent } from "@/lib/history-parser";
 
@@ -494,21 +494,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 Album artwork and track metadata will enrich automatically in the background and as you browse.
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => window.location.reload()}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold uppercase tracking-[0.08em] hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Reload Dashboard</span>
-                </button>
+              <div className="pt-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-[#3A3A32] bg-[#141412] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors uppercase tracking-[0.08em] cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold uppercase tracking-[0.08em] hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  <span>Done</span>
+                  <Check className="w-4 h-4" />
+                  <span>View Dashboard</span>
                 </button>
               </div>
             </div>

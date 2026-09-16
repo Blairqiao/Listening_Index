@@ -379,6 +379,51 @@ export async function ensureTablesExist(): Promise<void> {
     );
   `;
 
+  // Standardize existing plays to whole seconds, merge collisions, and ensure unique constraint
+  await sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'plays') THEN
+        -- 1. If any plays have sub-second precision, deduplicate and standardize them
+        IF EXISTS (SELECT 1 FROM plays WHERE played_at != date_trunc('second', played_at) LIMIT 1) THEN
+          -- Merge ms_played across any collisions that would occur when truncating to whole seconds
+          UPDATE plays p2
+          SET ms_played = GREATEST(p1.ms_played, p2.ms_played)
+          FROM plays p1
+          WHERE p1.id < p2.id
+            AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
+            AND p1.track_id = p2.track_id;
+
+          -- Remove duplicate play rows, preserving the newest ID
+          DELETE FROM plays p1
+          USING plays p2
+          WHERE p1.id < p2.id
+            AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
+            AND p1.track_id = p2.track_id;
+
+          -- Standardize all played_at values to whole seconds
+          UPDATE plays
+          SET played_at = date_trunc('second', played_at)
+          WHERE played_at != date_trunc('second', played_at);
+        END IF;
+
+        -- 2. Idempotently ensure the composite unique constraint exists on (played_at, track_id)
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plays_played_at_track_id_key') THEN
+          -- Remove any remaining duplicates prior to creating the unique constraint
+          DELETE FROM plays p1
+          USING plays p2
+          WHERE p1.id < p2.id
+            AND p1.played_at = p2.played_at
+            AND p1.track_id = p2.track_id;
+
+          ALTER TABLE plays ADD CONSTRAINT plays_played_at_track_id_key UNIQUE (played_at, track_id);
+        END IF;
+      END IF;
+    EXCEPTION
+      WHEN OTHERS THEN NULL;
+    END $$;
+  `;
+
   await sql`
     CREATE INDEX IF NOT EXISTS idx_plays_played_at ON plays(played_at DESC);
   `;
