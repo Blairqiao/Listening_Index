@@ -28,6 +28,7 @@ export interface StreamLogItem {
   album: string;
   duration: string;
   albumImageUrl?: string | null;
+  swatchColor?: string;
   status?: string;
   dayGroup?: string; // '09 SEP'
   sessionGap?: {
@@ -46,6 +47,7 @@ export interface SittingItem {
   album: string;
   swatchColor: string;
   albumImageUrl?: string | null;
+  status?: string;
   isActive?: boolean;
   isFirstPlay?: boolean;
   duration?: string;
