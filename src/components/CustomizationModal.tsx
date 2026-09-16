@@ -275,7 +275,6 @@ export const CustomizationModal: React.FC = () => {
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-music-accent inline-block" />
             <h2
               id="customization-modal-title"
               className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase"

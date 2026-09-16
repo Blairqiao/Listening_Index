@@ -3,13 +3,13 @@
 import React from "react";
 import { Mode } from "@/lib/mock-listening-data";
 import { useConfig } from "@/context/ConfigContext";
-import { Menu } from "lucide-react";
+import { Menu, Upload } from "lucide-react";
 
 interface ModeTabsProps {
   activeMode: Mode;
   onSelectMode: (mode: Mode) => void;
+  onOpenUpload?: () => void;
   isSyncing?: boolean;
-  isSmallScreen?: boolean;
 }
 
 const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
@@ -21,8 +21,8 @@ const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
 export const ModeTabs: React.FC<ModeTabsProps> = ({
   activeMode,
   onSelectMode,
+  onOpenUpload,
   isSyncing = false,
-  isSmallScreen = false,
 }) => {
   const { openModal } = useConfig();
 
@@ -52,28 +52,44 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                   : "text-[#5A5A55] border-transparent hover:text-[#EDEDE8]"
                 }`}
             >
-              {isSmallScreen ? m.abbrev : m.label}
+              <span className="min-[800px]:hidden">{m.abbrev}</span>
+              <span className="hidden min-[800px]:inline">{m.label}</span>
             </button>
           );
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={openModal}
-        title="Open Customization GUI (Accent color, title, timezone, links)"
-        className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
-      >
-        {isSmallScreen ? (
-          <span className="inline-flex items-center gap-1">
+      <div className="flex items-center gap-3 sm:gap-4">
+        {onOpenUpload && (
+          <button
+            type="button"
+            onClick={onOpenUpload}
+            title="Import Spotify Extended Streaming History (.zip / .json) [Key: U]"
+            className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          >
+            <span className="min-[800px]:hidden inline-flex items-center gap-1">
+              <span>[</span>
+              <Upload className="w-3 h-3" />
+              <span>]</span>
+            </span>
+            <span className="hidden min-[800px]:inline">[ U · UPLOAD ]</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={openModal}
+          title="Open Customization GUI (Accent color, title, timezone, links) [Key: C]"
+          className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+        >
+          <span className="min-[800px]:hidden inline-flex items-center gap-1">
             <span>[</span>
-            <Menu className="w-3 h-3 transition-transform duration-200 group-hover:rotate-45" />
+            <Menu className="w-3 h-3" />
             <span>]</span>
           </span>
-        ) : (
-          <span>[ C · CONFIG ]</span>
-        )}
-      </button>
+          <span className="hidden min-[800px]:inline">[ C · CONFIG ]</span>
+        </button>
+      </div>
     </nav>
   );
 };

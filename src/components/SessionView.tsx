@@ -9,6 +9,7 @@ import {
   SittingAnalysis,
 } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
+import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 
 interface SessionViewProps {
   isOpen: boolean;
@@ -76,18 +77,64 @@ export const SessionView: React.FC<SessionViewProps> = ({
     [onSelectSitting]
   );
 
+  // Local enrichment overlay for dynamically loaded artwork and IDs
+  const [enrichmentOverlay, setEnrichmentOverlay] = useState<
+    Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string; isDelisted?: boolean }>
+  >(new Map());
+
   // Active sitting lookup
   const activeSitting = useMemo(() => {
     return sittings.find((s) => s.id === selectedSittingId) || sittings[0];
   }, [sittings, selectedSittingId]);
 
-  // Tracks to display
-  const activeTracks: SittingItem[] = useMemo(() => {
+  // Raw tracks for active sitting
+  const rawActiveTracks: SittingItem[] = useMemo(() => {
     if (activeSitting && activeSitting.tracks) {
       return activeSitting.tracks;
     }
     return sittingTracks;
   }, [activeSitting, sittingTracks]);
+
+  // Merge activeTracks with local enrichment overlay
+  const activeTracks: SittingItem[] = useMemo(() => {
+    if (enrichmentOverlay.size === 0) return rawActiveTracks;
+    return rawActiveTracks.map((track) => {
+      const trackId = track.id;
+      const overlay = enrichmentOverlay.get(trackId);
+      if (!overlay) return track;
+      return {
+        ...track,
+        albumImageUrl: overlay.albumImageUrl !== undefined ? overlay.albumImageUrl : track.albumImageUrl,
+        artistId: overlay.artistId ?? track.artistId,
+        albumId: overlay.albumId ?? track.albumId,
+        status: overlay.isDelisted ? "[DELISTED]" : track.status,
+      };
+    });
+  }, [rawActiveTracks, enrichmentOverlay]);
+
+  // Client-side deferred micro-enrichment for visible session tracks
+  useDeferredEnrichment({
+    items: activeTracks,
+    onEnriched: (enriched, delistedIds) => {
+      setEnrichmentOverlay((prev) => {
+        const next = new Map(prev);
+        for (const item of enriched) {
+          next.set(item.requestedId, {
+            albumImageUrl: item.albumImageUrl,
+            artistId: item.artistId,
+            albumId: item.albumId,
+          });
+        }
+        for (const id of delistedIds) {
+          next.set(id, {
+            albumImageUrl: null,
+            isDelisted: true,
+          });
+        }
+        return next;
+      });
+    },
+  });
 
   // Analysis computation (uses sitting.analysis if present, else computes on the fly)
   // Analysis computation (computed directly from activeTracks)

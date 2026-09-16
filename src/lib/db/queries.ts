@@ -21,6 +21,7 @@ import {
 } from "@/lib/mock-listening-data";
 
 import { siteConfig } from "@/config";
+import { makeArtistGroupKey, makeAlbumGroupKey, truncateToSeconds } from "@/lib/history-parser";
 
 export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay };
 
@@ -208,7 +209,7 @@ export async function ensureTablesExist(): Promise<void> {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       image_url TEXT,
-      artist_id TEXT REFERENCES artists(id)
+      artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL
     );
   `;
 
@@ -216,10 +217,156 @@ export async function ensureTablesExist(): Promise<void> {
     CREATE TABLE IF NOT EXISTS tracks (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      artist_id TEXT REFERENCES artists(id),
-      album_id TEXT REFERENCES albums(id),
-      duration_ms INTEGER NOT NULL
+      artist_name TEXT,
+      album_name TEXT,
+      artist_group_key TEXT,
+      album_group_key TEXT,
+      artist_id TEXT REFERENCES artists(id) ON DELETE SET NULL,
+      album_id TEXT REFERENCES albums(id) ON DELETE SET NULL,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      enrichment_status TEXT NOT NULL DEFAULT 'pending'
     );
+  `;
+
+  // Idempotently ensure base columns exist on tracks table
+  await sql`
+    ALTER TABLE tracks 
+      ADD COLUMN IF NOT EXISTS artist_name TEXT,
+      ADD COLUMN IF NOT EXISTS album_name TEXT,
+      ADD COLUMN IF NOT EXISTS artist_group_key TEXT,
+      ADD COLUMN IF NOT EXISTS album_group_key TEXT,
+      ADD COLUMN IF NOT EXISTS duration_ms INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS enrichment_status TEXT NOT NULL DEFAULT 'pending';
+  `;
+
+  // Migrate duration_ms from generated column to standard integer if previously configured
+  await sql`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'tracks' AND column_name = 'duration_ms' AND is_generated = 'ALWAYS'
+      ) THEN
+        ALTER TABLE tracks DROP COLUMN duration_ms;
+        ALTER TABLE tracks ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'tracks' AND column_name = 'api_duration_ms'
+        ) THEN
+          UPDATE tracks SET duration_ms = GREATEST(COALESCE(api_duration_ms, 0), COALESCE(max_observed_ms_played, 0));
+        END IF;
+      END IF;
+    END $$;
+  `;
+
+  // Cleanly drop obsolete columns from entities if present
+  await sql`ALTER TABLE artists DROP COLUMN IF EXISTS created_at;`;
+  await sql`ALTER TABLE albums DROP COLUMN IF EXISTS created_at;`;
+  await sql`
+    ALTER TABLE tracks 
+      DROP COLUMN IF EXISTS api_duration_ms,
+      DROP COLUMN IF EXISTS max_observed_ms_played,
+      DROP COLUMN IF EXISTS leased_at,
+      DROP COLUMN IF EXISTS lease_token,
+      DROP COLUMN IF EXISTS lease_expires_at,
+      DROP COLUMN IF EXISTS retry_count,
+      DROP COLUMN IF EXISTS next_eligible_at,
+      DROP COLUMN IF EXISTS last_error,
+      DROP COLUMN IF EXISTS leased_until,
+      DROP COLUMN IF EXISTS created_at;
+  `;
+  await sql`ALTER TABLE plays DROP COLUMN IF EXISTS source;`;
+
+  // Reset any orphaned leasing records to pending
+  await sql`
+    UPDATE tracks 
+    SET enrichment_status = 'pending' 
+    WHERE enrichment_status = 'leasing';
+  `;
+
+  // Drop obsolete lease index and unused oauth_tokens table
+  await sql`DROP INDEX IF EXISTS idx_tracks_leasing;`;
+  await sql`DROP TABLE IF EXISTS oauth_tokens;`;
+
+  // Ensure FKs are nullable and drop legacy NOT NULL if present
+  await sql`ALTER TABLE tracks ALTER COLUMN artist_id DROP NOT NULL;`;
+  await sql`ALTER TABLE tracks ALTER COLUMN album_id DROP NOT NULL;`;
+  await sql`ALTER TABLE albums ALTER COLUMN artist_id DROP NOT NULL;`;
+
+  // Restore canonical artist and album names from relational records if unpopulated or defaulted to Unknown
+  await sql`
+    UPDATE tracks t
+    SET 
+      artist_name = ar.name,
+      album_name = al.name
+    FROM artists ar, albums al
+    WHERE t.artist_id = ar.id AND t.album_id = al.id
+      AND (t.artist_name IS NULL OR t.artist_name = 'Unknown Artist' OR t.album_name IS NULL OR t.album_name = 'Unknown Album');
+  `;
+
+  // Fallback for unlinked tracks (e.g. raw export imports before enrichment)
+  await sql`
+    UPDATE tracks SET 
+      artist_name = COALESCE(artist_name, 'Unknown Artist'),
+      album_name = COALESCE(album_name, 'Unknown Album')
+    WHERE artist_name IS NULL OR album_name IS NULL;
+  `;
+
+  // Recompute grouping keys based on canonical names
+  await sql`
+    UPDATE tracks SET 
+      artist_group_key = lower(trim(artist_name)),
+      album_group_key = lower(trim(artist_name)) || '::' || lower(trim(album_name))
+    WHERE artist_group_key IS NULL OR album_group_key IS NULL 
+       OR (artist_group_key = 'unknown artist' AND artist_name != 'Unknown Artist');
+  `;
+
+  // Promote pre-enriched tracks with valid Spotify foreign keys
+  await sql`
+    UPDATE tracks
+    SET enrichment_status = 'enriched'
+    WHERE enrichment_status = 'pending'
+      AND artist_id IS NOT NULL 
+      AND album_id IS NOT NULL
+      AND artist_id NOT LIKE 'art_%'
+      AND album_id NOT LIKE 'alb_%';
+  `;
+
+  // Clean up legacy synthetic IDs if any exist
+  await sql`
+    DO $$
+    BEGIN
+      UPDATE tracks SET artist_id = NULL WHERE artist_id LIKE 'art_%';
+      UPDATE tracks SET album_id = NULL WHERE album_id LIKE 'alb_%';
+      DELETE FROM albums WHERE id LIKE 'alb_%';
+      DELETE FROM artists WHERE id LIKE 'art_%';
+    END $$;
+  `;
+
+  // Ensure foreign key constraints include ON DELETE SET NULL
+  await sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'albums_artist_id_fkey') THEN
+        ALTER TABLE albums DROP CONSTRAINT albums_artist_id_fkey;
+      END IF;
+      ALTER TABLE albums ADD CONSTRAINT albums_artist_id_fkey 
+        FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
+
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_artist_id_fkey') THEN
+        ALTER TABLE tracks DROP CONSTRAINT tracks_artist_id_fkey;
+      END IF;
+      ALTER TABLE tracks ADD CONSTRAINT tracks_artist_id_fkey 
+        FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
+
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_album_id_fkey') THEN
+        ALTER TABLE tracks DROP CONSTRAINT tracks_album_id_fkey;
+      END IF;
+      ALTER TABLE tracks ADD CONSTRAINT tracks_album_id_fkey 
+        FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL;
+    EXCEPTION
+      WHEN OTHERS THEN NULL;
+    END $$;
   `;
 
   await sql`
@@ -241,10 +388,16 @@ export async function ensureTablesExist(): Promise<void> {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS sync_state (
-      key TEXT PRIMARY KEY,
-      synced_at TIMESTAMPTZ NOT NULL
-    );
+    CREATE INDEX IF NOT EXISTS idx_tracks_artist_group_key ON tracks(artist_group_key);
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_tracks_album_group_key ON tracks(album_group_key);
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_tracks_enrichment_status ON tracks(enrichment_status)
+    WHERE enrichment_status = 'pending';
   `;
 
   await sql`
@@ -258,6 +411,66 @@ export async function ensureTablesExist(): Promise<void> {
       timezone TEXT NOT NULL,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS daily_api_usage (
+      usage_date DATE PRIMARY KEY,
+      cron_count INT NOT NULL DEFAULT 0,
+      dynamic_count INT NOT NULL DEFAULT 0,
+      total_count INT NOT NULL DEFAULT 0,
+      cooldown_until TIMESTAMPTZ,
+      cooldown_reason TEXT,
+      last_synced_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+
+  await sql`
+    ALTER TABLE daily_api_usage
+      ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS cooldown_reason TEXT,
+      ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMPTZ;
+  `;
+
+  // Migrate any active cooldown from legacy api_cooldowns table, then drop it
+  await sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'api_cooldowns') THEN
+        INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, cooldown_until, cooldown_reason, updated_at)
+        SELECT CURRENT_DATE, 0, 0, 0, cooldown_until, reason, NOW()
+        FROM api_cooldowns
+        WHERE cooldown_until > NOW()
+        ORDER BY cooldown_until DESC
+        LIMIT 1
+        ON CONFLICT (usage_date) DO UPDATE SET
+          cooldown_until = GREATEST(daily_api_usage.cooldown_until, EXCLUDED.cooldown_until),
+          cooldown_reason = EXCLUDED.cooldown_reason;
+
+        DROP TABLE api_cooldowns;
+      END IF;
+    END $$;
+  `;
+
+  // Migrate latest sync timestamp from legacy sync_state table, then drop it
+  await sql`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'sync_state') THEN
+        INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, last_synced_at, updated_at)
+        SELECT CURRENT_DATE, 0, 0, 0, synced_at, NOW()
+        FROM sync_state
+        WHERE synced_at IS NOT NULL
+        ORDER BY synced_at DESC
+        LIMIT 1
+        ON CONFLICT (usage_date) DO UPDATE SET
+          last_synced_at = EXCLUDED.last_synced_at,
+          updated_at = NOW();
+
+        DROP TABLE sync_state;
+      END IF;
+    END $$;
   `;
 
   isSchemaReady = true;
@@ -305,19 +518,43 @@ export async function upsertAlbum(
 export async function upsertTrack(
   id: string,
   name: string,
-  artistId: string,
-  albumId: string,
-  durationMs: number
+  artistId: string | null,
+  albumId: string | null,
+  durationMs: number,
+  artistName?: string,
+  albumName?: string
 ): Promise<void> {
   const sql = getDb();
+  const artName = artistName || "Unknown Artist";
+  const albName = albumName || "Unknown Album";
+  const artKey = makeArtistGroupKey(artName);
+  const albKey = makeAlbumGroupKey(artName, albName);
+
   await sql`
-    INSERT INTO tracks (id, name, artist_id, album_id, duration_ms)
-    VALUES (${id}, ${name}, ${artistId}, ${albumId}, ${durationMs})
+    INSERT INTO tracks (
+      id, name, artist_name, album_name,
+      artist_group_key, album_group_key,
+      artist_id, album_id,
+      duration_ms,
+      enrichment_status
+    )
+    VALUES (
+      ${id}, ${name}, ${artName}, ${albName},
+      ${artKey}, ${albKey},
+      ${artistId}, ${albumId},
+      ${durationMs},
+      'enriched'
+    )
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
-      artist_id = EXCLUDED.artist_id,
-      album_id = EXCLUDED.album_id,
-      duration_ms = EXCLUDED.duration_ms;
+      artist_name = COALESCE(EXCLUDED.artist_name, tracks.artist_name),
+      album_name = COALESCE(EXCLUDED.album_name, tracks.album_name),
+      artist_group_key = COALESCE(EXCLUDED.artist_group_key, tracks.artist_group_key),
+      album_group_key = COALESCE(EXCLUDED.album_group_key, tracks.album_group_key),
+      artist_id = COALESCE(EXCLUDED.artist_id, tracks.artist_id),
+      album_id = COALESCE(EXCLUDED.album_id, tracks.album_id),
+      duration_ms = GREATEST(tracks.duration_ms, EXCLUDED.duration_ms),
+      enrichment_status = 'enriched';
   `;
 }
 
@@ -331,10 +568,10 @@ export async function insertPlay(
   msPlayed: number
 ): Promise<boolean> {
   const sql = getDb();
-  const timestamp = typeof playedAt === "string" ? playedAt : playedAt.toISOString();
+  const timestamp = truncateToSeconds(playedAt);
   const rows = ((await sql`
     INSERT INTO plays (played_at, track_id, ms_played)
-    VALUES (${timestamp}, ${trackId}, ${msPlayed})
+    VALUES (${timestamp}::timestamptz, ${trackId}, ${msPlayed})
     ON CONFLICT (played_at, track_id) DO NOTHING
     RETURNING id;
   `) as any);
@@ -408,37 +645,649 @@ export async function getExistingEntityIds(params: {
 }
 
 /**
- * 7. Records the most recent sync execution timestamp in sync_state.
+ * 7. Records the most recent sync execution timestamp in daily_api_usage.
  */
 export async function recordLastSync(key: string = "spotify"): Promise<Date> {
   await ensureTablesExist();
   const sql = getDb();
+  const todayUtc = new Date().toISOString().slice(0, 10);
   const rows = ((await sql`
-    INSERT INTO sync_state (key, synced_at)
-    VALUES (${key}, NOW())
-    ON CONFLICT (key) DO UPDATE SET synced_at = EXCLUDED.synced_at
-    RETURNING synced_at;
+    INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, last_synced_at, updated_at)
+    VALUES (${todayUtc}::date, 0, 0, 0, NOW(), NOW())
+    ON CONFLICT (usage_date) DO UPDATE SET
+      last_synced_at = NOW(),
+      updated_at = NOW()
+    RETURNING last_synced_at;
   `) as any);
-  return new Date(rows[0].synced_at);
+  return new Date(rows[0].last_synced_at);
 }
 
 /**
- * 8. Retrieves the most recent sync execution timestamp from sync_state.
+ * 8. Retrieves the most recent sync execution timestamp from daily_api_usage.
  */
 export async function getLastSync(key: string = "spotify"): Promise<string | undefined> {
   try {
     await ensureTablesExist();
     const sql = getDb();
     const rows = ((await sql`
-      SELECT synced_at FROM sync_state WHERE key = ${key} LIMIT 1;
+      SELECT last_synced_at FROM daily_api_usage WHERE last_synced_at IS NOT NULL ORDER BY last_synced_at DESC LIMIT 1;
     `) as any);
-    if (rows && rows.length > 0 && rows[0].synced_at) {
-      return new Date(rows[0].synced_at).toISOString();
+    if (rows && rows.length > 0 && rows[0].last_synced_at) {
+      return new Date(rows[0].last_synced_at).toISOString();
     }
   } catch {
     // Graceful fallback if query fails
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// High-Throughput Bulk Ingestion Operations (UNNEST Array Queries)
+// ---------------------------------------------------------------------------
+
+export async function bulkUpsertArtists(artists: Array<{ id: string; name: string }>): Promise<void> {
+  if (artists.length === 0) return;
+  await ensureTablesExist();
+  const sorted = [...artists].sort((a, b) => a.id.localeCompare(b.id));
+  const ids = sorted.map((a) => a.id);
+  const names = sorted.map((a) => a.name);
+  const sql = getDb();
+  await sql`
+    INSERT INTO artists (id, name)
+    SELECT * FROM UNNEST(${ids}::text[], ${names}::text[])
+    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+  `;
+}
+
+export async function bulkUpsertAlbums(
+  albums: Array<{ id: string; name: string; imageUrl?: string | null; artistId: string }>
+): Promise<void> {
+  if (albums.length === 0) return;
+  await ensureTablesExist();
+  const sorted = [...albums].sort((a, b) => a.id.localeCompare(b.id));
+  const ids = sorted.map((a) => a.id);
+  const names = sorted.map((a) => a.name);
+  const imageUrls = sorted.map((a) => a.imageUrl ?? null);
+  const artistIds = sorted.map((a) => a.artistId);
+  const sql = getDb();
+  await sql`
+    INSERT INTO albums (id, name, image_url, artist_id)
+    SELECT * FROM UNNEST(${ids}::text[], ${names}::text[], ${imageUrls}::text[], ${artistIds}::text[])
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      image_url = COALESCE(EXCLUDED.image_url, albums.image_url),
+      artist_id = EXCLUDED.artist_id;
+  `;
+}
+
+export interface TrackUpsertItem {
+  id: string;
+  name: string;
+  artistName: string;
+  albumName: string;
+  artistGroupKey?: string;
+  albumGroupKey?: string;
+  artistId?: string | null;
+  albumId?: string | null;
+  durationMs: number;
+  enrichmentStatus?: "pending" | "enriched" | "delisted";
+}
+
+export async function bulkUpsertTracks(
+  tracks: TrackUpsertItem[]
+): Promise<void> {
+  if (tracks.length === 0) return;
+  await ensureTablesExist();
+
+  // Deduplicate and aggregate highest observed playback
+  const map = new Map<string, TrackUpsertItem>();
+  for (const t of tracks) {
+    const existing = map.get(t.id);
+    if (!existing) {
+      map.set(t.id, { ...t });
+    } else {
+      existing.durationMs = Math.max(existing.durationMs, t.durationMs);
+      if (t.artistId) existing.artistId = t.artistId;
+      if (t.albumId) existing.albumId = t.albumId;
+      if (t.enrichmentStatus === "enriched") existing.enrichmentStatus = "enriched";
+    }
+  }
+
+  const sorted = Array.from(map.values()).sort((a, b) => a.id.localeCompare(b.id));
+
+  const ids = sorted.map((t) => t.id);
+  const names = sorted.map((t) => t.name);
+  const artistNames = sorted.map((t) => t.artistName);
+  const albumNames = sorted.map((t) => t.albumName);
+  const artistGroupKeys = sorted.map((t) => t.artistGroupKey || makeArtistGroupKey(t.artistName));
+  const albumGroupKeys = sorted.map((t) => t.albumGroupKey || makeAlbumGroupKey(t.artistName, t.albumName));
+  const artistIds = sorted.map((t) => t.artistId ?? null);
+  const albumIds = sorted.map((t) => t.albumId ?? null);
+  const durations = sorted.map((t) => Math.max(0, Math.round(t.durationMs)));
+  const statuses = sorted.map((t) => t.enrichmentStatus ?? "pending");
+
+  const sql = getDb();
+  await sql`
+    INSERT INTO tracks (
+      id, name, artist_name, album_name,
+      artist_group_key, album_group_key,
+      artist_id, album_id,
+      duration_ms,
+      enrichment_status
+    )
+    SELECT 
+      u.id, u.name, u.artist_name, u.album_name,
+      u.artist_group_key, u.album_group_key,
+      u.artist_id, u.album_id,
+      u.duration_ms,
+      u.enrichment_status
+    FROM UNNEST(
+      ${ids}::text[],
+      ${names}::text[],
+      ${artistNames}::text[],
+      ${albumNames}::text[],
+      ${artistGroupKeys}::text[],
+      ${albumGroupKeys}::text[],
+      ${artistIds}::text[],
+      ${albumIds}::text[],
+      ${durations}::int[],
+      ${statuses}::text[]
+    ) AS u(
+      id, name, artist_name, album_name,
+      artist_group_key, album_group_key,
+      artist_id, album_id,
+      duration_ms,
+      enrichment_status
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      name = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.name 
+        ELSE COALESCE(EXCLUDED.name, tracks.name) 
+      END,
+      artist_name = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.artist_name 
+        ELSE COALESCE(EXCLUDED.artist_name, tracks.artist_name) 
+      END,
+      album_name = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.album_name 
+        ELSE COALESCE(EXCLUDED.album_name, tracks.album_name) 
+      END,
+      artist_group_key = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.artist_group_key 
+        ELSE COALESCE(EXCLUDED.artist_group_key, tracks.artist_group_key) 
+      END,
+      album_group_key = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.album_group_key 
+        ELSE COALESCE(EXCLUDED.album_group_key, tracks.album_group_key) 
+      END,
+      artist_id = COALESCE(EXCLUDED.artist_id, tracks.artist_id),
+      album_id = COALESCE(EXCLUDED.album_id, tracks.album_id),
+      duration_ms = CASE 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.duration_ms 
+        ELSE GREATEST(tracks.duration_ms, EXCLUDED.duration_ms) 
+      END,
+      enrichment_status = CASE 
+        WHEN EXCLUDED.enrichment_status = 'enriched' THEN 'enriched' 
+        ELSE tracks.enrichment_status 
+      END;
+  `;
+}
+
+export interface PlayInsertItem {
+  playedAt: string;
+  trackId: string;
+  msPlayed: number;
+}
+
+export async function bulkInsertPlays(
+  plays: PlayInsertItem[]
+): Promise<{ insertedCount: number }> {
+  if (plays.length === 0) return { insertedCount: 0 };
+  await ensureTablesExist();
+
+  // Deduplicate on truncated UTC seconds in JS to prevent Postgres ON CONFLICT batch error
+  const seen = new Map<string, PlayInsertItem>();
+  for (const p of plays) {
+    const truncated = truncateToSeconds(p.playedAt);
+    const key = `${truncated}::${p.trackId}`;
+    if (!seen.has(key)) {
+      seen.set(key, { ...p, playedAt: truncated });
+    }
+  }
+
+  // Sort by (played_at, track_id) to enforce deterministic lock ordering and prevent deadlocks
+  const deduped = Array.from(seen.values()).sort(
+    (a, b) => a.playedAt.localeCompare(b.playedAt) || a.trackId.localeCompare(b.trackId)
+  );
+
+  const playedAts = deduped.map((p) => p.playedAt);
+  const trackIds = deduped.map((p) => p.trackId);
+  const msPlayeds = deduped.map((p) => Math.max(0, Math.round(p.msPlayed)));
+
+  const sql = getDb();
+  const inserted = ((await sql`
+    INSERT INTO plays (played_at, track_id, ms_played)
+    SELECT u.played_at::timestamptz, u.track_id, u.ms_played
+    FROM UNNEST(
+      ${playedAts}::text[],
+      ${trackIds}::text[],
+      ${msPlayeds}::int[]
+    ) AS u(played_at, track_id, ms_played)
+    ON CONFLICT (played_at, track_id) DO UPDATE SET
+      ms_played = EXCLUDED.ms_played
+    RETURNING (xmax = 0) AS was_inserted;
+  `) as any);
+
+  const insertedCount = inserted.filter((r: any) => Boolean(r.was_inserted)).length;
+  return { insertedCount };
+}
+
+// ---------------------------------------------------------------------------
+// Metadata Enrichment Queries
+// ---------------------------------------------------------------------------
+
+export async function getEnrichmentProgress(): Promise<{
+  pending: number;
+  enriched: number;
+  delisted: number;
+  total: number;
+}> {
+  await ensureTablesExist();
+  const sql = getDb();
+  const rows = ((await sql`
+    SELECT 
+      COUNT(*) FILTER (WHERE enrichment_status = 'pending')::int AS pending,
+      COUNT(*) FILTER (WHERE enrichment_status = 'enriched')::int AS enriched,
+      COUNT(*) FILTER (WHERE enrichment_status = 'delisted')::int AS delisted,
+      COUNT(*)::int AS total
+    FROM tracks;
+  `) as any);
+  return {
+    pending: rows[0]?.pending ?? 0,
+    enriched: rows[0]?.enriched ?? 0,
+    delisted: rows[0]?.delisted ?? 0,
+    total: rows[0]?.total ?? 0,
+  };
+}
+
+export interface EnrichedTrackItem {
+  requestedId: string;
+  name: string;
+  durationMs: number;
+  artistId: string;
+  artistName: string;
+  albumId: string;
+  albumName: string;
+  albumImageUrl: string | null;
+}
+
+export async function bulkApplyEnrichment(data: {
+  enriched: EnrichedTrackItem[];
+  delistedIds: string[];
+}): Promise<void> {
+  await ensureTablesExist();
+  const sql = getDb();
+
+  // 1. Mark delisted tracks so the enrichment query terminates
+  if (data.delistedIds.length > 0) {
+    await sql`
+      UPDATE tracks
+      SET enrichment_status = 'delisted'
+      WHERE id = ANY(${data.delistedIds}::text[]);
+    `;
+  }
+
+  if (data.enriched.length === 0) return;
+
+  // 2. Collect unique artists and albums to upsert
+  const artistMap = new Map<string, string>();
+  const albumMap = new Map<string, { name: string; imageUrl: string | null; artistId: string }>();
+
+  for (const item of data.enriched) {
+    artistMap.set(item.artistId, item.artistName);
+    albumMap.set(item.albumId, {
+      name: item.albumName,
+      imageUrl: item.albumImageUrl,
+      artistId: item.artistId,
+    });
+  }
+
+  const artists = Array.from(artistMap.entries()).map(([id, name]) => ({ id, name }));
+  const albums = Array.from(albumMap.entries()).map(([id, val]) => ({
+    id,
+    name: val.name,
+    imageUrl: val.imageUrl,
+    artistId: val.artistId,
+  }));
+
+  // Upsert official artists and albums
+  await bulkUpsertArtists(artists);
+  await bulkUpsertAlbums(albums);
+
+  // 3. Update enriched tracks
+  const sorted = [...data.enriched].sort((a, b) => a.requestedId.localeCompare(b.requestedId));
+  const ids = sorted.map((t) => t.requestedId);
+  const names = sorted.map((t) => t.name);
+  const artistIds = sorted.map((t) => t.artistId);
+  const albumIds = sorted.map((t) => t.albumId);
+  const durations = sorted.map((t) => Math.max(0, Math.round(t.durationMs)));
+
+  await sql`
+    UPDATE tracks AS t
+    SET
+      name = u.name,
+      artist_id = u.artist_id,
+      album_id = u.album_id,
+      duration_ms = u.duration_ms,
+      enrichment_status = 'enriched'
+    FROM (
+      SELECT * FROM UNNEST(
+        ${ids}::text[],
+        ${names}::text[],
+        ${artistIds}::text[],
+        ${albumIds}::text[],
+        ${durations}::int[]
+      ) AS v(id, name, artist_id, album_id, duration_ms)
+    ) AS u
+    WHERE t.id = u.id;
+  `;
+}
+
+/**
+ * Retrieves pending tracks for metadata enrichment.
+ * Supports explicit trackIds (viewport micro-enrichment) or chronological background prioritization.
+ */
+export async function getPendingTracksForEnrichment(
+  batchSize: number,
+  options: {
+    trackIds?: string[];
+  } = {}
+): Promise<Array<{ id: string; name: string; artistName: string; albumName: string; albumGroupKey: string }>> {
+  await ensureTablesExist();
+  const sql = getDb();
+
+  let rows: any[] = [];
+  if (options.trackIds && options.trackIds.length > 0) {
+    rows = ((await sql`
+      SELECT id, name, artist_name, album_name, album_group_key
+      FROM tracks
+      WHERE id = ANY(${options.trackIds}::text[])
+        AND enrichment_status = 'pending'
+      LIMIT ${batchSize};
+    `) as any);
+  } else {
+    // Chronological background ordering: prioritize tracks played most recently
+    rows = ((await sql`
+      WITH latest_plays AS (
+        SELECT track_id, MAX(played_at) AS max_played_at
+        FROM plays
+        GROUP BY track_id
+      )
+      SELECT t.id, t.name, t.artist_name, t.album_name, t.album_group_key
+      FROM tracks t
+      LEFT JOIN latest_plays lp ON t.id = lp.track_id
+      WHERE t.enrichment_status = 'pending'
+      ORDER BY lp.max_played_at DESC NULLS LAST, t.id ASC
+      LIMIT ${batchSize};
+    `) as any);
+  }
+
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    artistName: r.artist_name,
+    albumName: r.album_name,
+    albumGroupKey: r.album_group_key,
+  }));
+}
+
+/**
+ * Records a global cooldown for an external API provider (e.g. Spotify 429).
+ * Consolidated into daily_api_usage.
+ */
+export async function recordApiCooldown(
+  provider: string,
+  cooldownSeconds: number,
+  reason: string
+): Promise<void> {
+  await ensureTablesExist();
+  const sql = getDb();
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  await sql`
+    INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, cooldown_until, cooldown_reason, updated_at)
+    VALUES (${todayUtc}::date, 0, 0, 0, NOW() + (${cooldownSeconds} || ' seconds')::interval, ${reason}, NOW())
+    ON CONFLICT (usage_date) DO UPDATE SET
+      cooldown_until = GREATEST(daily_api_usage.cooldown_until, EXCLUDED.cooldown_until),
+      cooldown_reason = EXCLUDED.cooldown_reason,
+      updated_at = NOW();
+  `;
+}
+
+/**
+ * Checks if an active API cooldown exists.
+ * Queries daily_api_usage for any active cooldown.
+ */
+export async function getActiveApiCooldown(provider: string = "spotify"): Promise<{
+  active: boolean;
+  cooldownUntil?: string;
+  reason?: string;
+}> {
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    const rows = ((await sql`
+      SELECT cooldown_until, cooldown_reason
+      FROM daily_api_usage
+      WHERE cooldown_until > NOW()
+      ORDER BY cooldown_until DESC
+      LIMIT 1;
+    `) as any);
+    if (rows && rows.length > 0) {
+      return {
+        active: true,
+        cooldownUntil: new Date(rows[0].cooldown_until).toISOString(),
+        reason: rows[0].cooldown_reason,
+      };
+    }
+  } catch {
+    // Return inactive if query fails
+  }
+  return { active: false };
+}
+
+export async function getPendingTracksInAlbum(
+  albumGroupKey: string
+): Promise<Array<{ id: string; name: string; artistName: string }>> {
+  await ensureTablesExist();
+  const sql = getDb();
+  const rows = ((await sql`
+    SELECT id, name, artist_name FROM tracks
+    WHERE album_group_key = ${albumGroupKey}
+      AND enrichment_status = 'pending';
+  `) as any);
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    artistName: r.artist_name,
+  }));
+}
+
+export const DAILY_API_QUOTA_TOTAL = 900;
+export const DAILY_API_QUOTA_CRON = 700;
+export const DAILY_API_QUOTA_DYNAMIC = 200;
+
+/**
+ * Checks and atomically increments Spotify API usage in daily_api_usage.
+ * Enforces 900 total ceiling, 700 cron limit, and 200 dynamic limit.
+ * Resets daily at 00:00:00 UTC.
+ */
+export async function checkAndIncrementApiQuota(
+  bucket: "cron" | "dynamic",
+  requestedCount: number = 1
+): Promise<{ allowed: boolean; remaining: number; totalToday: number; bucketToday: number }> {
+  await ensureTablesExist();
+  const sql = getDb();
+
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const bucketLimit = bucket === "cron" ? DAILY_API_QUOTA_CRON : DAILY_API_QUOTA_DYNAMIC;
+
+  // Initialize row for today if not present, and fetch active cooldown if any
+  const [existing] = ((await sql`
+    INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, updated_at)
+    VALUES (${todayUtc}::date, 0, 0, 0, NOW())
+    ON CONFLICT (usage_date) DO UPDATE SET updated_at = NOW()
+    RETURNING cron_count, dynamic_count, total_count,
+      (SELECT cooldown_until FROM daily_api_usage WHERE cooldown_until > NOW() ORDER BY cooldown_until DESC LIMIT 1) AS active_cooldown;
+  `) as any);
+
+  const currentCron = Number(existing?.cron_count || 0);
+  const currentDynamic = Number(existing?.dynamic_count || 0);
+  const currentTotal = Number(existing?.total_count || 0);
+  const currentBucket = bucket === "cron" ? currentCron : currentDynamic;
+
+  if (existing?.active_cooldown && new Date(existing.active_cooldown).getTime() > Date.now()) {
+    return {
+      allowed: false,
+      remaining: 0,
+      totalToday: currentTotal,
+      bucketToday: currentBucket,
+    };
+  }
+
+  if (requestedCount <= 0) {
+    const remainingInBucket = Math.max(0, bucketLimit - currentBucket);
+    const remainingInTotal = Math.max(0, DAILY_API_QUOTA_TOTAL - currentTotal);
+    return {
+      allowed: remainingInBucket > 0 && remainingInTotal > 0,
+      remaining: Math.min(remainingInBucket, remainingInTotal),
+      totalToday: currentTotal,
+      bucketToday: currentBucket,
+    };
+  }
+
+  if (currentTotal + requestedCount > DAILY_API_QUOTA_TOTAL || currentBucket + requestedCount > bucketLimit) {
+    const remainingInBucket = Math.max(0, bucketLimit - currentBucket);
+    const remainingInTotal = Math.max(0, DAILY_API_QUOTA_TOTAL - currentTotal);
+    return {
+      allowed: false,
+      remaining: Math.min(remainingInBucket, remainingInTotal),
+      totalToday: currentTotal,
+      bucketToday: currentBucket,
+    };
+  }
+
+  // Atomically increment
+  const updatedRows = ((await sql`
+    UPDATE daily_api_usage
+    SET
+      cron_count = CASE WHEN ${bucket} = 'cron' THEN cron_count + ${requestedCount} ELSE cron_count END,
+      dynamic_count = CASE WHEN ${bucket} = 'dynamic' THEN dynamic_count + ${requestedCount} ELSE dynamic_count END,
+      total_count = total_count + ${requestedCount},
+      updated_at = NOW()
+    WHERE usage_date = ${todayUtc}::date
+    RETURNING cron_count, dynamic_count, total_count;
+  `) as any);
+
+  const updated = updatedRows[0];
+  const newTotal = Number(updated.total_count);
+  const newBucket = bucket === "cron" ? Number(updated.cron_count) : Number(updated.dynamic_count);
+  const remainingInBucket = Math.max(0, bucketLimit - newBucket);
+  const remainingInTotal = Math.max(0, DAILY_API_QUOTA_TOTAL - newTotal);
+
+  return {
+    allowed: true,
+    remaining: Math.min(remainingInBucket, remainingInTotal),
+    totalToday: newTotal,
+    bucketToday: newBucket,
+  };
+}
+
+export async function getDailyApiQuotaStatus(): Promise<{
+  cronCount: number;
+  dynamicCount: number;
+  totalCount: number;
+  remainingCron: number;
+  remainingDynamic: number;
+  remainingTotal: number;
+}> {
+  await ensureTablesExist();
+  const sql = getDb();
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const rows = ((await sql`
+    SELECT cron_count, dynamic_count, total_count
+    FROM daily_api_usage
+    WHERE usage_date = ${todayUtc}::date
+    LIMIT 1;
+  `) as any);
+
+  const cron = Number(rows[0]?.cron_count || 0);
+  const dynamic = Number(rows[0]?.dynamic_count || 0);
+  const total = Number(rows[0]?.total_count || 0);
+
+  return {
+    cronCount: cron,
+    dynamicCount: dynamic,
+    totalCount: total,
+    remainingCron: Math.max(0, DAILY_API_QUOTA_CRON - cron),
+    remainingDynamic: Math.max(0, DAILY_API_QUOTA_DYNAMIC - dynamic),
+    remainingTotal: Math.max(0, DAILY_API_QUOTA_TOTAL - total),
+  };
+}
+
+let cachedCatalogStatus: { fullyEnriched: boolean; expiresAt: number } | null = null;
+
+/**
+ * Checks if all tracks in the catalog are enriched.
+ * Cached in memory for 60 seconds.
+ */
+export async function isCatalogFullyEnriched(): Promise<boolean> {
+  const now = Date.now();
+  if (cachedCatalogStatus && now < cachedCatalogStatus.expiresAt) {
+    return cachedCatalogStatus.fullyEnriched;
+  }
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    const rows = ((await sql`
+      SELECT 1 FROM tracks
+      WHERE enrichment_status = 'pending'
+      LIMIT 1;
+    `) as any);
+    const fullyEnriched = rows.length === 0;
+    cachedCatalogStatus = { fullyEnriched, expiresAt: now + 60000 };
+    return fullyEnriched;
+  } catch {
+    return false;
+  }
+}
+
+export async function cleanupOrphanedSyntheticEntities(): Promise<{
+  deletedAlbums: number;
+  deletedArtists: number;
+}> {
+  await ensureTablesExist();
+  const sql = getDb();
+
+  // FK constraint safety: Delete synthetic albums FIRST, then synthetic artists SECOND
+  const deletedAlbumsResult = ((await sql`
+    DELETE FROM albums
+    WHERE id LIKE 'alb_%'
+      AND id NOT IN (SELECT album_id FROM tracks WHERE album_id IS NOT NULL)
+    RETURNING id;
+  `) as any);
+
+  const deletedArtistsResult = ((await sql`
+    DELETE FROM artists
+    WHERE id LIKE 'art_%'
+      AND id NOT IN (SELECT artist_id FROM tracks WHERE artist_id IS NOT NULL)
+      AND id NOT IN (SELECT artist_id FROM albums WHERE artist_id IS NOT NULL)
+    RETURNING id;
+  `) as any);
+
+  return {
+    deletedAlbums: deletedAlbumsResult.length,
+    deletedArtists: deletedArtistsResult.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -639,7 +1488,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -652,7 +1501,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -665,7 +1514,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -678,7 +1527,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -691,7 +1540,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -703,7 +1552,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       SELECT 
         COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
-        COUNT(DISTINCT t.artist_id)::bigint AS artists,
+        COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
         MIN(p.played_at) AS window_min_date
       FROM plays p
@@ -735,8 +1584,8 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     rank: number;
     drift: string;
     track_id: string;
-    artist_id: string;
-    album_id: string;
+    artist_id: string | null;
+    album_id: string | null;
     title: string;
     artist: string;
     album: string;
@@ -747,217 +1596,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 
   let rawTopTracks: TopTrackRow[] = [];
 
-  if (range === "1d") {
-    rawTopTracks = ((await sql`
-      WITH current_window AS (
-          SELECT p.track_id, COUNT(*) AS plays,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '24 hours'
-          GROUP BY p.track_id
-      ),
-      previous_window AS (
-          SELECT p.track_id,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '48 hours'
-            AND p.played_at < NOW() - INTERVAL '24 hours'
-          GROUP BY p.track_id
-      )
-      SELECT 
-          c.rank::int,
-          CASE 
-              WHEN pw.prev_rank IS NULL THEN 'NEW'
-              WHEN pw.prev_rank = c.rank THEN '·'
-              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
-              ELSE '-' || (c.rank - pw.prev_rank)::text
-          END AS drift,
-          t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
-          t.duration_ms,
-          al.image_url AS album_image_url,
-          c.plays::int
-      FROM current_window c
-      JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
-      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
-      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
-      LIMIT 10;
-    `) as any);
-  } else if (range === "1w") {
-    rawTopTracks = ((await sql`
-      WITH current_window AS (
-          SELECT p.track_id, COUNT(*) AS plays,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '7 days'
-          GROUP BY p.track_id
-      ),
-      previous_window AS (
-          SELECT p.track_id,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '14 days'
-            AND p.played_at < NOW() - INTERVAL '7 days'
-          GROUP BY p.track_id
-      )
-      SELECT 
-          c.rank::int,
-          CASE 
-              WHEN pw.prev_rank IS NULL THEN 'NEW'
-              WHEN pw.prev_rank = c.rank THEN '·'
-              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
-              ELSE '-' || (c.rank - pw.prev_rank)::text
-          END AS drift,
-          t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
-          t.duration_ms,
-          al.image_url AS album_image_url,
-          c.plays::int
-      FROM current_window c
-      JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
-      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
-      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
-      LIMIT 10;
-    `) as any);
-  } else if (range === "1m") {
-    rawTopTracks = ((await sql`
-      WITH current_window AS (
-          SELECT p.track_id, COUNT(*) AS plays,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '30 days'
-          GROUP BY p.track_id
-      ),
-      previous_window AS (
-          SELECT p.track_id,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '60 days'
-            AND p.played_at < NOW() - INTERVAL '30 days'
-          GROUP BY p.track_id
-      )
-      SELECT 
-          c.rank::int,
-          CASE 
-              WHEN pw.prev_rank IS NULL THEN 'NEW'
-              WHEN pw.prev_rank = c.rank THEN '·'
-              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
-              ELSE '-' || (c.rank - pw.prev_rank)::text
-          END AS drift,
-          t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
-          t.duration_ms,
-          al.image_url AS album_image_url,
-          c.plays::int
-      FROM current_window c
-      JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
-      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
-      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
-      LIMIT 10;
-    `) as any);
-  } else if (range === "6m") {
-    rawTopTracks = ((await sql`
-      WITH current_window AS (
-          SELECT p.track_id, COUNT(*) AS plays,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '180 days'
-          GROUP BY p.track_id
-      ),
-      previous_window AS (
-          SELECT p.track_id,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '360 days'
-            AND p.played_at < NOW() - INTERVAL '180 days'
-          GROUP BY p.track_id
-      )
-      SELECT 
-          c.rank::int,
-          CASE 
-              WHEN pw.prev_rank IS NULL THEN 'NEW'
-              WHEN pw.prev_rank = c.rank THEN '·'
-              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
-              ELSE '-' || (c.rank - pw.prev_rank)::text
-          END AS drift,
-          t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
-          t.duration_ms,
-          al.image_url AS album_image_url,
-          c.plays::int
-      FROM current_window c
-      JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
-      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
-      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
-      LIMIT 10;
-    `) as any);
-  } else if (range === "1y") {
-    rawTopTracks = ((await sql`
-      WITH current_window AS (
-          SELECT p.track_id, COUNT(*) AS plays,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '365 days'
-          GROUP BY p.track_id
-      ),
-      previous_window AS (
-          SELECT p.track_id,
-                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
-          FROM plays p
-          WHERE p.played_at >= NOW() - INTERVAL '730 days'
-            AND p.played_at < NOW() - INTERVAL '365 days'
-          GROUP BY p.track_id
-      )
-      SELECT 
-          c.rank::int,
-          CASE 
-              WHEN pw.prev_rank IS NULL THEN 'NEW'
-              WHEN pw.prev_rank = c.rank THEN '·'
-              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
-              ELSE '-' || (c.rank - pw.prev_rank)::text
-          END AS drift,
-          t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
-          t.duration_ms,
-          al.image_url AS album_image_url,
-          c.plays::int
-      FROM current_window c
-      JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
-      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
-      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
-      LIMIT 10;
-    `) as any);
-  } else {
+  if (range === "all") {
     rawTopTracks = ((await sql`
       WITH current_window AS (
           SELECT p.track_id, COUNT(*) AS plays,
@@ -969,18 +1608,69 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
           c.rank::int,
           '·' AS drift,
           t.id AS track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
+          t.artist_id,
+          t.album_id,
           t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
+          COALESCE(ar.name, t.artist_name) AS artist,
+          COALESCE(al.name, t.album_name) AS album,
           t.duration_ms,
           al.image_url AS album_image_url,
           c.plays::int
       FROM current_window c
       JOIN tracks t ON c.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      JOIN albums al ON t.album_id = al.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      ORDER BY c.rank ASC, c.plays DESC, t.name ASC
+      LIMIT 10;
+    `) as any);
+  } else {
+    const rangeConfig: Record<string, { cur: string; prev: string }> = {
+      "1d": { cur: "24 hours", prev: "48 hours" },
+      "1w": { cur: "7 days", prev: "14 days" },
+      "1m": { cur: "30 days", prev: "60 days" },
+      "6m": { cur: "180 days", prev: "360 days" },
+      "1y": { cur: "365 days", prev: "730 days" },
+    };
+    const { cur, prev } = rangeConfig[range] || rangeConfig["1m"];
+
+    rawTopTracks = ((await sql`
+      WITH current_window AS (
+          SELECT p.track_id, COUNT(*) AS plays,
+                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
+          FROM plays p
+          WHERE p.played_at >= NOW() - (${cur})::interval
+          GROUP BY p.track_id
+      ),
+      previous_window AS (
+          SELECT p.track_id,
+                 DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
+          FROM plays p
+          WHERE p.played_at >= NOW() - (${prev})::interval
+            AND p.played_at < NOW() - (${cur})::interval
+          GROUP BY p.track_id
+      )
+      SELECT 
+          c.rank::int,
+          CASE 
+              WHEN pw.prev_rank IS NULL THEN 'NEW'
+              WHEN pw.prev_rank = c.rank THEN '·'
+              WHEN pw.prev_rank > c.rank THEN '+' || (pw.prev_rank - c.rank)::text
+              ELSE '-' || (c.rank - pw.prev_rank)::text
+          END AS drift,
+          t.id AS track_id,
+          t.artist_id,
+          t.album_id,
+          t.name AS title,
+          COALESCE(ar.name, t.artist_name) AS artist,
+          COALESCE(al.name, t.album_name) AS album,
+          t.duration_ms,
+          al.image_url AS album_image_url,
+          c.plays::int
+      FROM current_window c
+      JOIN tracks t ON c.track_id = t.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      LEFT JOIN previous_window pw ON c.track_id = pw.track_id
       ORDER BY c.rank ASC, c.plays DESC, t.name ASC
       LIMIT 10;
     `) as any);
@@ -992,92 +1682,97 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     drift: (row.drift as TrackSummary["drift"]) || "·",
     name: row.title,
     artist: row.artist,
-    artistId: row.artist_id,
+    artistId: row.artist_id || undefined,
     album: row.album,
-    albumId: row.album_id,
-    duration: formatDurationMs(row.duration_ms),
+    albumId: row.album_id || undefined,
+    duration: formatDurationMs(row.duration_ms || 0),
     plays: Number(row.plays),
     swatchColor: getSwatchColor(row.track_id + row.title),
     albumImageUrl: row.album_image_url || null,
   }));
 
+  const isEnriched = await isCatalogFullyEnriched();
+
   // 4. Top Artists (Top 5)
   interface TopArtistRow {
-    id: string;
+    id: string | null;
     name: string;
     count: number;
   }
   let rawTopArtists: TopArtistRow[] = [];
 
-  if (range === "1d") {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '24 hours'
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1w") {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '7 days'
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1m") {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '30 days'
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "6m") {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '180 days'
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1y") {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '365 days'
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
+  if (range === "all") {
+    if (isEnriched) {
+      rawTopArtists = ((await sql`
+        SELECT 
+          t.artist_id AS id,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
+          COUNT(p.id)::int AS count
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE t.artist_id IS NOT NULL
+        GROUP BY t.artist_id
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    } else {
+      rawTopArtists = ((await sql`
+        SELECT 
+          MAX(t.artist_id) AS id,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
+          COUNT(p.id)::int AS count
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        GROUP BY t.artist_group_key
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    }
   } else {
-    rawTopArtists = ((await sql`
-      SELECT ar.id, ar.name, COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN artists ar ON t.artist_id = ar.id
-      GROUP BY ar.id, ar.name
-      ORDER BY count DESC, ar.name ASC
-      LIMIT 5;
-    `) as any);
+    const artistIntervalMap: Record<string, string> = {
+      "1d": "24 hours",
+      "1w": "7 days",
+      "1m": "30 days",
+      "6m": "180 days",
+      "1y": "365 days",
+    };
+    const artistInterval = artistIntervalMap[range] || "30 days";
+    if (isEnriched) {
+      rawTopArtists = ((await sql`
+        SELECT 
+          t.artist_id AS id,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
+          COUNT(p.id)::int AS count
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE p.played_at >= NOW() - (${artistInterval})::interval
+          AND t.artist_id IS NOT NULL
+        GROUP BY t.artist_id
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    } else {
+      rawTopArtists = ((await sql`
+        SELECT 
+          MAX(t.artist_id) AS id,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
+          COUNT(p.id)::int AS count
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE p.played_at >= NOW() - (${artistInterval})::interval
+        GROUP BY t.artist_group_key
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    }
   }
 
   const topArtists = rawTopArtists.map((row, idx) => ({
-    id: row.id,
+    id: row.id || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
     count: Number(row.count),
@@ -1085,123 +1780,108 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 
   // 5. Top Albums (Top 5)
   interface TopAlbumRow {
-    id: string;
+    id: string | null;
     name: string;
     artist: string;
-    artist_id: string;
+    artist_id: string | null;
+    image_url: string | null;
     count: number;
   }
   let rawTopAlbums: TopAlbumRow[] = [];
 
-  if (range === "1d") {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
+  if (range === "all") {
+    if (isEnriched) {
+      rawTopAlbums = ((await sql`
+        SELECT 
+          t.album_id AS id,
+          COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
+          MAX(t.artist_id) AS artist_id,
+          MAX(al.image_url) AS image_url,
           COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '24 hours'
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1w") {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE t.album_id IS NOT NULL
+        GROUP BY t.album_id
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    } else {
+      rawTopAlbums = ((await sql`
+        SELECT 
+          MAX(t.album_id) AS id,
+          COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
+          MAX(t.artist_id) AS artist_id,
+          MAX(al.image_url) AS image_url,
           COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '7 days'
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1m") {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
-          COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '30 days'
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "6m") {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
-          COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '180 days'
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
-  } else if (range === "1y") {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
-          COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      WHERE p.played_at >= NOW() - INTERVAL '365 days'
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        GROUP BY t.album_group_key
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    }
   } else {
-    rawTopAlbums = ((await sql`
-      SELECT 
-          al.id,
-          al.name AS name,
-          ar.name AS artist,
-          ar.id AS artist_id,
+    const albumIntervalMap: Record<string, string> = {
+      "1d": "24 hours",
+      "1w": "7 days",
+      "1m": "30 days",
+      "6m": "180 days",
+      "1y": "365 days",
+    };
+    const albumInterval = albumIntervalMap[range] || "30 days";
+    if (isEnriched) {
+      rawTopAlbums = ((await sql`
+        SELECT 
+          t.album_id AS id,
+          COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
+          MAX(t.artist_id) AS artist_id,
+          MAX(al.image_url) AS image_url,
           COUNT(p.id)::int AS count
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON al.artist_id = ar.id
-      GROUP BY al.id, al.name, ar.id, ar.name
-      ORDER BY count DESC, al.name ASC
-      LIMIT 5;
-    `) as any);
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE p.played_at >= NOW() - (${albumInterval})::interval
+          AND t.album_id IS NOT NULL
+        GROUP BY t.album_id
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    } else {
+      rawTopAlbums = ((await sql`
+        SELECT 
+          MAX(t.album_id) AS id,
+          COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
+          COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
+          MAX(t.artist_id) AS artist_id,
+          MAX(al.image_url) AS image_url,
+          COUNT(p.id)::int AS count
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        LEFT JOIN artists ar ON t.artist_id = ar.id
+        WHERE p.played_at >= NOW() - (${albumInterval})::interval
+        GROUP BY t.album_group_key
+        ORDER BY count DESC, name ASC
+        LIMIT 5;
+      `) as any);
+    }
   }
 
   const topAlbums: AlbumSummary[] = rawTopAlbums.map((row, idx) => ({
-    id: row.id,
+    id: row.id || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
     artist: row.artist,
-    artistId: row.artist_id,
+    artistId: row.artist_id || undefined,
+    albumImageUrl: row.image_url || null,
     count: Number(row.count),
   }));
 
@@ -1433,10 +2113,6 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 /**
  * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
  */
-/**
- * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
- * Supports keyset cursor pagination and cross-chunk session/day boundary stitching.
- */
 export async function getStreamLog(
   limit = 50,
   tzOverride?: string,
@@ -1457,7 +2133,7 @@ export async function getStreamLog(
       SELECT 
         COUNT(*)::bigint AS total_plays,
         COALESCE(ROUND(SUM(ms_played) / 3600000.0), 0)::bigint AS logged_hours,
-        COUNT(DISTINCT t.artist_id)::bigint AS unique_artists
+        COUNT(DISTINCT t.artist_group_key)::bigint AS unique_artists
       FROM plays p
       JOIN tracks t ON p.track_id = t.id;
     `) as any);
@@ -1470,6 +2146,7 @@ export async function getStreamLog(
     const dateRows = ((await sql`
       SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
       FROM plays
+      WHERE played_at >= NOW() - INTERVAL '120 days'
       ORDER BY play_date DESC;
     `) as any);
 
@@ -1540,10 +2217,11 @@ export async function getStreamLog(
             al.id AS album_id,
             al.image_url AS album_image_url,
             t.name AS title,
-            COALESCE(ar.name, '') AS artist,
-            COALESCE(al.name, '') AS album,
+            COALESCE(ar.name, t.artist_name, '') AS artist,
+            COALESCE(al.name, t.album_name, '') AS album,
             t.duration_ms,
             CASE 
+                WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
                 WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
                 ELSE '[FULL]'
             END AS status
@@ -1566,10 +2244,11 @@ export async function getStreamLog(
             al.id AS album_id,
             al.image_url AS album_image_url,
             t.name AS title,
-            COALESCE(ar.name, '') AS artist,
-            COALESCE(al.name, '') AS album,
+            COALESCE(ar.name, t.artist_name, '') AS artist,
+            COALESCE(al.name, t.album_name, '') AS album,
             t.duration_ms,
             CASE 
+                WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
                 WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
                 ELSE '[FULL]'
             END AS status
@@ -1592,13 +2271,14 @@ export async function getStreamLog(
           al.id AS album_id,
           al.image_url AS album_image_url,
           t.name AS title,
-          COALESCE(ar.name, '') AS artist,
-          COALESCE(al.name, '') AS album,
+          COALESCE(ar.name, t.artist_name, '') AS artist,
+          COALESCE(al.name, t.album_name, '') AS album,
           t.duration_ms,
-          CASE 
-              WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-              ELSE '[FULL]'
-          END AS status
+            CASE 
+                WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
+                WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
+                ELSE '[FULL]'
+            END AS status
       FROM plays p
       JOIN tracks t ON p.track_id = t.id
       LEFT JOIN albums al ON t.album_id = al.id
@@ -1721,6 +2401,7 @@ export async function getStreamLog(
       artistId: row.artist_id,
       albumId: row.album_id,
       albumImageUrl: row.album_image_url || null,
+      swatchColor: getSwatchColor(row.track_id + row.title),
       playedAt: new Date(row.played_at).toISOString(),
       timeStr: formatHHmmTz(playDate, tz),
       title: row.title,
@@ -1757,8 +2438,8 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
   interface SessionPlayRow {
     id: string;
     track_id: string;
-    artist_id: string;
-    album_id: string;
+    artist_id: string | null;
+    album_id: string | null;
     played_at: string;
     title: string;
     artist: string;
@@ -1774,17 +2455,17 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
           p.id::text,
           p.played_at,
           p.track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
+          t.artist_id,
+          t.album_id,
           t.name AS title,
-          ar.name AS artist,
-          al.name AS album,
+          COALESCE(ar.name, t.artist_name) AS artist,
+          COALESCE(al.name, t.album_name) AS album,
           al.image_url AS album_image_url,
           t.duration_ms
       FROM plays p
       JOIN tracks t ON p.track_id = t.id
-      JOIN albums al ON t.album_id = al.id
-      JOIN artists ar ON t.artist_id = ar.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
       ORDER BY p.played_at DESC
       LIMIT 600
     ),
@@ -1873,8 +2554,8 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
 
     const tracks: SittingItem[] = sittingPlays.map((p, pIdx) => ({
       id: p.track_id,
-      artistId: p.artist_id,
-      albumId: p.album_id,
+      artistId: p.artist_id || undefined,
+      albumId: p.album_id || undefined,
       albumImageUrl: p.album_image_url || null,
       timestamp: formatHHmmTz(new Date(p.played_at), tz),
       title: p.title,
