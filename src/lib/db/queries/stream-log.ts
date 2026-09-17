@@ -23,7 +23,7 @@ export async function getStreamLog(
   prevPlayedAt?: string
 ): Promise<StreamLogData> {
   const sql = getDb();
-  const clampedLimit = Math.min(Math.max(1, limit), 250);
+  const clampedLimit = Math.max(1, limit);
   const tz = sanitizeTimezone(tzOverride);
 
   // Keyset Query & Lifetime Metrics: Fetched concurrently via Promise.all

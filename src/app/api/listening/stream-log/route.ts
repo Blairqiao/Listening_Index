@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
-    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 50), 250) : 50;
+    const limit = limitParam ? Math.max(1, parseInt(limitParam, 10) || 50) : 50;
     const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
 
     const cursor = searchParams.get("cursor") || undefined;
