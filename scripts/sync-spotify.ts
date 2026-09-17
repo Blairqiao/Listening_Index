@@ -140,15 +140,17 @@ async function main() {
         albumsUpserted++;
       }
 
-      // Step 3c: Upsert track if not already in DB
+      // Step 3c: Upsert track metadata (updates existing un-enriched tracks with IDs and duration)
+      await upsertTrack(
+        track.id,
+        track.name,
+        primaryArtist.id,
+        album.id,
+        track.duration_ms,
+        primaryArtist.name,
+        album.name
+      );
       if (!existingTrackIds.has(track.id)) {
-        await upsertTrack(
-          track.id,
-          track.name,
-          primaryArtist.id,
-          album.id,
-          track.duration_ms
-        );
         existingTrackIds.add(track.id);
         tracksUpserted++;
       }
@@ -158,6 +160,25 @@ async function main() {
       if (inserted) {
         playsIngested++;
       }
+    }
+
+    // Step 3e: Run quota-budgeted cron micro-enrichment for historical pending backlog
+    try {
+      console.log("[2b/3] Running quota-budgeted cron micro-enrichment (up to 14 calls)...");
+      const { runEnrichmentBatch } = await import("../src/lib/enrichment");
+      const cronEnrichmentResult = await runEnrichmentBatch({ bucket: "cron" });
+      if (cronEnrichmentResult.enrichedCount > 0 || cronEnrichmentResult.delistedCount > 0) {
+        console.log(
+          `      ✓ Cron micro-enrichment: ${cronEnrichmentResult.enrichedCount} tracks enriched, ${cronEnrichmentResult.delistedCount} delisted (${cronEnrichmentResult.progress.pending} pending remaining)`
+        );
+      } else if (cronEnrichmentResult.quotaReached) {
+        console.log("      ℹ Cron micro-enrichment paused: daily quota limit reached");
+      } else {
+        console.log("      ℹ Cron micro-enrichment idle: no pending tracks to enrich");
+      }
+    } catch (enrichErr: unknown) {
+      const msg = enrichErr instanceof Error ? enrichErr.message : String(enrichErr);
+      console.warn(`      [WARN] Cron micro-enrichment skipped: ${msg}`);
     }
 
     console.log(`      ✓ Upserted ${artistsUpserted} new artist entities`);

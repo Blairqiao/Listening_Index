@@ -28,6 +28,7 @@ export interface StreamLogItem {
   album: string;
   duration: string;
   albumImageUrl?: string | null;
+  swatchColor?: string;
   status?: string;
   dayGroup?: string; // '09 SEP'
   sessionGap?: {
@@ -46,10 +47,13 @@ export interface SittingItem {
   album: string;
   swatchColor: string;
   albumImageUrl?: string | null;
+  status?: string;
   isActive?: boolean;
   isFirstPlay?: boolean;
   duration?: string;
 }
+
+export type SessionTrackItem = SittingItem;
 
 export interface PreviousSitting {
   id?: string;
@@ -60,6 +64,8 @@ export interface PreviousSitting {
   trackCount?: number;
 }
 
+export type PreviousSession = PreviousSitting;
+
 export interface SittingAnalysis {
   firstPlaysCount: number;
   totalTracks: number;
@@ -67,6 +73,8 @@ export interface SittingAnalysis {
   topAlbum: { title: string; count: number; id?: string; artist?: string };
   topArtist: { name: string; count: number; id?: string };
 }
+
+export type SessionAnalysis = SittingAnalysis;
 
 export interface SittingSession {
   id: string;
@@ -81,6 +89,8 @@ export interface SittingSession {
   tracks: SittingItem[];
   analysis: SittingAnalysis;
 }
+
+export type SessionBlock = SittingSession;
 
 export interface SessionHistogramBar {
   id: string;
@@ -104,6 +114,7 @@ export interface SessionData {
   previousSittings: PreviousSitting[];
   lastSyncedAt?: string;
   sittings?: SittingSession[];
+  sessions?: SittingSession[];
   histogram?: SessionHistogramData;
 }
 
