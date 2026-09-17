@@ -12,7 +12,6 @@ interface ControlRowProps {
   isSessionOpen: boolean;
   sessionTagTime: string;
   isSyncing?: boolean;
-  isSmallScreen?: boolean;
   onTriggerSync?: () => void;
   streamLogCount?: number;
   totalPlays?: string;
@@ -35,21 +34,28 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   isSessionOpen,
   sessionTagTime,
   isSyncing = false,
-  isSmallScreen = false,
   onTriggerSync,
   streamLogCount,
   totalPlays,
 }) => {
-  const getScopeLabel = () => {
+  const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
-        return isSmallScreen
-          ? `[ SINCE ${compactDate(logStartDate)} ]`
-          : `[ RANGE · LOG SINCE ${logStartDate} ]`;
+        return (
+          <>
+            <span className="sm:hidden">[ SINCE {compactDate(logStartDate)} ]</span>
+            <span className="hidden sm:inline">[ RANGE · LOG SINCE {logStartDate} ]</span>
+          </>
+        );
       case 1:
         return "[ SCOPE ]";
       case 2:
-        return isSmallScreen ? "[ SES ]" : "[ SESSION ]";
+        return (
+          <>
+            <span className="sm:hidden">[ SES ]</span>
+            <span className="hidden sm:inline">[ SESSION ]</span>
+          </>
+        );
     }
   };
 

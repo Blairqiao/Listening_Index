@@ -40,6 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# spotify history data exports
+Streaming_History_*.json
+endsong_*.json
+*.zip
+
 # docs
 /docs
 CONTEXT.md

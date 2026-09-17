@@ -9,15 +9,21 @@ import {
   SittingAnalysis,
 } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
+import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 
 interface SessionViewProps {
   isOpen: boolean;
   sittingTracks?: SittingItem[];
+  sessionTracks?: SittingItem[];
   previousSittings?: PreviousSitting[];
+  previousSessions?: PreviousSitting[];
   sittings?: SittingSession[];
+  sessions?: SittingSession[];
   histogram?: SessionHistogramData;
   onSelectSitting?: (sittingId: string) => void;
+  onSelectSession?: (sessionId: string) => void;
   selectedSittingId?: string;
+  selectedSessionId?: string;
 }
 
 const DEFAULT_HISTOGRAM: SessionHistogramData = {
@@ -29,24 +35,36 @@ const DEFAULT_HISTOGRAM: SessionHistogramData = {
 
 export const SessionView: React.FC<SessionViewProps> = ({
   isOpen,
-  sittingTracks = [],
-  previousSittings = [],
-  sittings = [],
+  sittingTracks,
+  sessionTracks,
+  previousSittings: rawPreviousSittings,
+  previousSessions: rawPreviousSessions,
+  sittings: rawSittings,
+  sessions: rawSessions,
   histogram,
   onSelectSitting,
+  onSelectSession,
   selectedSittingId: externalSelectedSittingId,
+  selectedSessionId: externalSelectedSessionIdProp,
 }) => {
-  // Determine initial selected sitting ID
+  const effectiveSessionTracks = sessionTracks || sittingTracks || [];
+  const previousSittings = rawPreviousSessions || rawPreviousSittings || [];
+  const sittings = rawSessions || rawSittings || [];
+  const onSelect = onSelectSession || onSelectSitting;
+  const externalSelectedSessionId = externalSelectedSessionIdProp ?? externalSelectedSittingId;
+
+  // Determine initial selected session ID
   const initialId =
-    externalSelectedSittingId ||
+    externalSelectedSessionId ||
     sittings[0]?.id ||
     previousSittings[0]?.id ||
     "s1";
 
-  const [internalSelectedSittingId, setInternalSelectedSittingId] = useState<string>(initialId);
+  const [internalSelectedSessionId, setInternalSelectedSessionId] = useState<string>(initialId);
   const [hoveredSittingId, setHoveredSittingId] = useState<string | null>(null);
 
-  const selectedSittingId = externalSelectedSittingId ?? internalSelectedSittingId;
+  const selectedSessionId = externalSelectedSessionId ?? internalSelectedSessionId;
+  const selectedSittingId = selectedSessionId;
 
   // Track list container ref to dynamically measure height and fill exact placeholder slots
   const listRef = useRef<HTMLDivElement>(null);
@@ -67,27 +85,73 @@ export const SessionView: React.FC<SessionViewProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Handle selecting a sitting (from previous sittings or histogram bars)
+  // Handle selecting a session (from previous sessions or histogram bars)
   const handleSelectSitting = useCallback(
     (id: string) => {
-      setInternalSelectedSittingId(id);
-      onSelectSitting?.(id);
+      setInternalSelectedSessionId(id);
+      onSelect?.(id);
     },
-    [onSelectSitting]
+    [onSelect]
   );
 
-  // Active sitting lookup
-  const activeSitting = useMemo(() => {
-    return sittings.find((s) => s.id === selectedSittingId) || sittings[0];
-  }, [sittings, selectedSittingId]);
+  // Local enrichment overlay for dynamically loaded artwork and IDs
+  const [enrichmentOverlay, setEnrichmentOverlay] = useState<
+    Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string; isDelisted?: boolean }>
+  >(new Map());
 
-  // Tracks to display
-  const activeTracks: SittingItem[] = useMemo(() => {
-    if (activeSitting && activeSitting.tracks) {
-      return activeSitting.tracks;
+  // Active session lookup
+  const activeSession = useMemo(() => {
+    return sittings.find((s) => s.id === selectedSessionId) || sittings[0];
+  }, [sittings, selectedSessionId]);
+
+  // Raw tracks for active session
+  const rawActiveTracks: SittingItem[] = useMemo(() => {
+    if (activeSession && activeSession.tracks) {
+      return activeSession.tracks;
     }
-    return sittingTracks;
-  }, [activeSitting, sittingTracks]);
+    return effectiveSessionTracks;
+  }, [activeSession, effectiveSessionTracks]);
+
+  // Merge activeTracks with local enrichment overlay
+  const activeTracks: SittingItem[] = useMemo(() => {
+    if (enrichmentOverlay.size === 0) return rawActiveTracks;
+    return rawActiveTracks.map((track) => {
+      const trackId = track.id;
+      const overlay = enrichmentOverlay.get(trackId);
+      if (!overlay) return track;
+      return {
+        ...track,
+        albumImageUrl: overlay.albumImageUrl !== undefined ? overlay.albumImageUrl : track.albumImageUrl,
+        artistId: overlay.artistId ?? track.artistId,
+        albumId: overlay.albumId ?? track.albumId,
+        status: overlay.isDelisted ? "[DELISTED]" : track.status,
+      };
+    });
+  }, [rawActiveTracks, enrichmentOverlay]);
+
+  // Client-side deferred micro-enrichment for visible session tracks
+  useDeferredEnrichment({
+    items: activeTracks,
+    onEnriched: (enriched, delistedIds) => {
+      setEnrichmentOverlay((prev) => {
+        const next = new Map(prev);
+        for (const item of enriched) {
+          next.set(item.requestedId, {
+            albumImageUrl: item.albumImageUrl,
+            artistId: item.artistId,
+            albumId: item.albumId,
+          });
+        }
+        for (const id of delistedIds) {
+          next.set(id, {
+            albumImageUrl: null,
+            isDelisted: true,
+          });
+        }
+        return next;
+      });
+    },
+  });
 
   // Analysis computation (uses sitting.analysis if present, else computes on the fly)
   // Analysis computation (computed directly from activeTracks)

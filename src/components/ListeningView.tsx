@@ -10,6 +10,7 @@ import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
 import { CustomizationModal } from "@/components/CustomizationModal";
+import { UploadModal } from "@/components/UploadModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import {
   Mode,
@@ -17,7 +18,6 @@ import {
   SittingSession,
 } from "@/lib/mock-listening-data";
 import { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
-import { isScreenSmall } from "@/lib/resize-utils";
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
@@ -61,22 +61,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialOverview,
   initialStreamLog,
   initialSession,
+  isDbConfigured = true,
 }) => {
-
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsSmallScreen(isScreenSmall(window));
-    };
-
-    handleResize(); // Initial check
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const { config, openModal, closeModal, isModalOpen } = useConfig();
   const tzRef = useRef<string>(config.timezone);
@@ -450,6 +437,24 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }
   }, [fetchOverview, fetchStreamLog, fetchSession]);
 
+  // When an upload batch completes, invalidate cached overview metrics across all ranges and refetch
+  const handleUploadComplete = useCallback(async () => {
+    try {
+      // Invalidate client range cache so switching ranges displays the newly imported plays
+      setOverviewCache({});
+      const [newOverview] = await Promise.all([
+        fetchOverview(activeRangeRef.current),
+        fetchStreamLog(),
+        fetchSession(),
+      ]);
+      if (newOverview) {
+        setOverviewCache({ [activeRangeRef.current]: newOverview });
+      }
+    } catch (err) {
+      console.error("[UPLOAD COMPLETE] Error refreshing listening data:", err);
+    }
+  }, [fetchOverview, fetchStreamLog, fetchSession]);
+
   // Wall-clock auto-sync: triggers 30s after every top-of-hour (:00) and half-hour (:30) cron window
   useEffect(() => {
     let timerId: NodeJS.Timeout;
@@ -539,6 +544,24 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
+      // If either modal is open, strictly isolate shortcut handling
+      if (isUploadModalOpen || isModalOpen) {
+        if (isUploadModalOpen && (e.key === "u" || e.key === "U")) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          setIsUploadModalOpen(false);
+          return;
+        }
+        if (isModalOpen && (e.key === "c" || e.key === "C")) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          closeModal();
+          return;
+        }
+        // Block all other shortcut keys (1-3, arrows, C, U) while a modal is active
+        return;
+      }
+
       // Keys 1-3: Modes
       if (["1", "2", "3"].includes(e.key)) {
         e.preventDefault();
@@ -582,18 +605,32 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (e.key === "c" || e.key === "C") {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (isModalOpen) {
-          closeModal();
-        } else {
-          openModal();
-        }
+        openModal();
+        return;
+      }
+
+      // Key U: Open / Toggle upload modal
+      if (e.key === "u" || e.key === "U") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setIsUploadModalOpen(true);
         return;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activeMode, activeRange, handleSelectMode, handleSelectRange, isSyncing, isModalOpen, openModal, closeModal]);
+  }, [
+    activeMode,
+    activeRange,
+    handleSelectMode,
+    handleSelectRange,
+    isSyncing,
+    isModalOpen,
+    openModal,
+    closeModal,
+    isUploadModalOpen,
+  ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const currentOverview: OverviewData =
@@ -656,7 +693,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const isSystemLive = sessionData.isOpen;
 
   return (
-    <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative">
+    <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
       {/* Black veil holding the screen as long as needed until real data is ready */}
       <div
         aria-hidden="true"
@@ -673,8 +710,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           <ModeTabs
             activeMode={activeMode}
             onSelectMode={handleSelectMode}
+            onOpenUpload={() => setIsUploadModalOpen(true)}
             isSyncing={isSyncing}
-            isSmallScreen={isSmallScreen}
           />
 
           {/* 3. Fixed-Height Control Row (h-[26px], never shifts) */}
@@ -686,7 +723,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSessionOpen={sessionData.isOpen}
             sessionTagTime={sessionTagTime}
             isSyncing={isSyncing}
-            isSmallScreen={isSmallScreen}
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
             totalPlays={streamLogData.metrics[0]}
@@ -743,13 +779,20 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           isLive={isSystemLive}
           syncedAgo={syncedAgoStr}
           isSyncing={isSyncing}
-          isSmallScreen={isSmallScreen}
           onTriggerSync={handleTriggerSync}
         />
       </main>
 
       {/* 7. In-App Customization Settings Modal */}
       <CustomizationModal />
+
+      {/* 8. In-App Streaming History Upload Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadComplete={handleUploadComplete}
+        isDbConfigured={isDbConfigured}
+      />
     </div>
   );
 };
@@ -761,7 +804,7 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
 }) => {
   return (
     <ConfigProvider initialConfig={initialConfig || undefined} isDbConfigured={isDbConfigured}>
-      <ListeningViewInner {...props} />
+      <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
     </ConfigProvider>
   );
 };

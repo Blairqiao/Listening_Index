@@ -3,6 +3,7 @@
 import React from "react";
 import { StreamLogItem } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
+import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 
 interface StreamLogViewProps {
   entries: StreamLogItem[];
@@ -20,6 +21,50 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   totalPlays,
 }) => {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const [enrichmentOverlay, setEnrichmentOverlay] = React.useState<
+    Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string; isDelisted?: boolean }>
+  >(new Map());
+
+  // Merge entries with any local enrichment overlay
+  const displayEntries = React.useMemo(() => {
+    if (enrichmentOverlay.size === 0) return entries;
+    return entries.map((entry) => {
+      const trackId = entry.trackId || entry.id;
+      const overlay = enrichmentOverlay.get(trackId);
+      if (!overlay) return entry;
+      return {
+        ...entry,
+        albumImageUrl: overlay.albumImageUrl ?? entry.albumImageUrl,
+        artistId: overlay.artistId ?? entry.artistId,
+        albumId: overlay.albumId ?? entry.albumId,
+        status: overlay.isDelisted ? "[DELISTED]" : entry.status,
+      };
+    });
+  }, [entries, enrichmentOverlay]);
+
+  useDeferredEnrichment({
+    items: displayEntries,
+    onEnriched: (enriched, delistedIds) => {
+      setEnrichmentOverlay((prev) => {
+        const next = new Map(prev);
+        for (const item of enriched) {
+          next.set(item.requestedId, {
+            albumImageUrl: item.albumImageUrl,
+            artistId: item.artistId,
+            albumId: item.albumId,
+          });
+        }
+        for (const id of delistedIds) {
+          next.set(id, {
+            albumImageUrl: null,
+            isDelisted: true,
+          });
+        }
+        return next;
+      });
+    },
+  });
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}
@@ -54,8 +99,9 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
           ))
         ) : (
           <>
-            {entries.map((entry) => {
+            {displayEntries.map((entry) => {
               const trackId = entry.trackId || entry.id;
+              const isDelisted = entry.status === "[DELISTED]";
 
               return (
                 <React.Fragment key={entry.id}>
@@ -103,6 +149,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                       src={entry.albumImageUrl}
                       alt={entry.album || entry.title}
                       size={38}
+                      swatchColor={entry.swatchColor}
+                      isDelisted={isDelisted}
                     />
 
                     {/* TITLE (1.15fr, Space Grotesk 14px) */}
