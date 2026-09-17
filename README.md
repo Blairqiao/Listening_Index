@@ -151,6 +151,17 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
 
 ---
 
+### Step 7: Import your extended listening history (Optional)
+
+To backfill your entire Spotify listening history:
+
+1. Request your **Extended streaming history** from the [Spotify Privacy Settings](https://www.spotify.com/account/privacy/) page (takes a few days to prepare).
+2. Press `U` or click **[ U · UPLOAD ]** in the top navigation bar.
+3. Drag and drop the downloaded `.zip` file (or individual `endsong_*.json` files).
+4. The client extracts audio plays directly in your browser, streams them to your database, and begins progressive metadata enrichment.
+
+---
+
 ### Keeping your fork updated
 
 When updates or fixes are published to the main repository:
@@ -224,6 +235,7 @@ export const siteConfig = {
 | `3` | Switch to sessions |
 | `←` / `→` | Change time range |
 | `C` | Open customization menu |
+| `U` | Open upload history modal |
 | `Esc` | Close modal |
 
 ---
@@ -249,6 +261,7 @@ export const siteConfig = {
 | `npm run auth:spotify` | Get Spotify refresh token and save to `.env.local` |
 | `npm run generate:cron` | Generate a cron secret and save to `.env.local` |
 | `npm run sync` | Fetch recent tracks and write to database |
+| `npm run test:rate-limit` | Test Spotify Web API rate limits against batch queries |
 
 ---
 

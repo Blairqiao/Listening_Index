@@ -229,3 +229,34 @@ export function hexToHsv(hex: string, fallback: HSV = { h: 105, s: 71, v: 100 })
   if (!rgb) return fallback;
   return rgbToHsv(rgb.r, rgb.g, rgb.b);
 }
+
+/**
+ * Deterministic fallback palette for un-enriched artwork and swatches.
+ */
+export const SWATCH_PALETTE = [
+  "#2E4B3C",
+  "#2A2A4A",
+  "#3A3A22",
+  "#52302A",
+  "#1E3A4C",
+  "#3D2B4A",
+  "#4A3B2A",
+  "#2B4A45",
+  "#4A2B33",
+  "#334A2B",
+];
+
+/**
+ * Computes a deterministic swatch color from a string seed (e.g. track ID + title).
+ */
+export function getSwatchColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % SWATCH_PALETTE.length;
+  return SWATCH_PALETTE[index];
+}
+
+export const getFallbackSwatchColor = getSwatchColor;
