@@ -111,14 +111,17 @@ export const ConfigProvider: React.FC<{
 
     syncSideEffects(config);
 
-    fetch("/api/config")
-      .then((res) => res.json())
-      .then((data) => {
-        if (typeof data.isDbConfigured === "boolean") {
-          setIsDb(data.isDbConfigured);
-        }
-      })
-      .catch(() => {});
+    // Only fetch /api/config if initialConfig or db status was not provided from server props
+    if (initialConfig === undefined || propIsDbConfigured === undefined) {
+      fetch("/api/config")
+        .then((res) => res.json())
+        .then((data) => {
+          if (typeof data.isDbConfigured === "boolean") {
+            setIsDb(data.isDbConfigured);
+          }
+        })
+        .catch(() => {});
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

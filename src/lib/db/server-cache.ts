@@ -1,5 +1,5 @@
 import { revalidateTag } from "next/cache";
-import type { OverviewData, StreamLogData, SessionData } from "./queries";
+import type { OverviewData, StreamLogData, SessionData } from "./queries/types";
 import { RangeKey } from "@/lib/mock-listening-data";
 
 interface CacheEntry<T> {
@@ -77,10 +77,21 @@ export function setCachedSession(data: SessionData, tz = ""): void {
   cacheStore.session.set(key, { data, timestamp: Date.now() });
 }
 
+const cacheClearListeners: Array<() => void> = [];
+
+export function registerCacheClearListener(listener: () => void): void {
+  cacheClearListeners.push(listener);
+}
+
 export function clearServerCache(): void {
   cacheStore.overview.clear();
   cacheStore.streamLog.clear();
   cacheStore.session.clear();
+  for (const listener of cacheClearListeners) {
+    try {
+      listener();
+    } catch {}
+  }
   console.log("[SERVER CACHE] All server listening caches purged.");
 
   try {

@@ -172,3 +172,60 @@ export function parseHistoryRecords(records: unknown[]): CompactPlayEvent[] {
 
   return results;
 }
+
+export interface DebouncePlayItem {
+  playedAt: string | Date;
+  trackId: string;
+  [key: string]: any;
+}
+
+/**
+ * Filters out rapid duplicate plays of the same track occurring within < cooldownMs (default: 30,000ms / 30s).
+ *
+ * Handles live Spotify Web API skips, reconnection loops, and player restart glitches
+ * where Spotify emits multiple played_at events spaced seconds apart without ms_played duration.
+ *
+ * Algorithm:
+ * 1. Sorts candidate plays chronologically (oldest to newest).
+ * 2. Compares each play to the most recently accepted play timestamp for that track.
+ * 3. Discards any play where `(currentTimestampMs - lastAcceptedTimestampMs) < cooldownMs`.
+ * 4. Accepts any play where `(currentTimestampMs - lastAcceptedTimestampMs) >= cooldownMs` and updates the accepted timestamp.
+ */
+export function debouncePlays<T extends DebouncePlayItem>(
+  plays: T[],
+  cooldownMs: number = 30_000,
+  initialLastSeen?: Map<string, number>
+): { debounced: T[]; droppedCount: number } {
+  if (plays.length === 0) {
+    return { debounced: [], droppedCount: 0 };
+  }
+
+  // Sort chronologically ascending
+  const sorted = [...plays].sort(
+    (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
+  );
+
+  const lastSeen = new Map<string, number>(initialLastSeen);
+  const debounced: T[] = [];
+  let droppedCount = 0;
+
+  for (const play of sorted) {
+    const playTimeMs = new Date(play.playedAt).getTime();
+    if (isNaN(playTimeMs)) {
+      droppedCount++;
+      continue;
+    }
+
+    const prevSeenMs = lastSeen.get(play.trackId);
+    lastSeen.set(play.trackId, playTimeMs);
+
+    if (prevSeenMs !== undefined && Math.abs(playTimeMs - prevSeenMs) < cooldownMs) {
+      droppedCount++;
+      continue;
+    }
+
+    debounced.push(play);
+  }
+
+  return { debounced, droppedCount };
+}

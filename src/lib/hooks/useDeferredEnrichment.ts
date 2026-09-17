@@ -84,7 +84,12 @@ export function useDeferredEnrichment({
           }),
         });
 
-        if (!res.ok) return;
+        if (!res.ok) {
+          for (const id of pendingCandidates) {
+            sessionRequestedTrackIds.delete(id);
+          }
+          return;
+        }
 
         const data = (await res.json()) as {
           success?: boolean;
@@ -105,7 +110,10 @@ export function useDeferredEnrichment({
           onEnrichedRef.current?.(data.enriched || [], data.delistedIds || []);
         }
       } catch {
-        // Network or transient error: silent fail, swatches remain
+        // Network or transient error: silent fail, allow future retry
+        for (const id of pendingCandidates) {
+          sessionRequestedTrackIds.delete(id);
+        }
       }
     }, 600);
 

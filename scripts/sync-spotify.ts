@@ -6,13 +6,16 @@ dotenv.config({ path: "spotify.env" });
 import { fetchRecentlyPlayed } from "../src/lib/spotify";
 import {
   ensureTablesExist,
-  upsertArtist,
-  upsertAlbum,
-  upsertTrack,
-  insertPlay,
+  bulkUpsertArtists,
+  bulkUpsertAlbums,
+  bulkUpsertTracks,
+  bulkInsertPlays,
   getExistingEntityIds,
   recordLastSync,
+  TrackUpsertItem,
+  PlayInsertItem,
 } from "../src/lib/db/queries";
+import { debouncePlays } from "../src/lib/history-parser";
 
 /**
  * Spotify Synchronization & Ingestion Pipeline (ETL)
@@ -74,11 +77,24 @@ async function main() {
     }
 
     // 2b. Reverse stream items to ingest chronologically (oldest -> newest)
-    // Plays are NOT pre-filtered; every play event is delivered to the database ledger.
-    // Idempotency is enforced strictly at the database layer via ON CONFLICT (played_at, track_id) DO NOTHING.
-    const newStreamItems = [...streamItems].reverse();
+    const reversedItems = [...streamItems].reverse();
 
-    // 2c. Pre-filter existing artists, albums, and tracks in batch to avoid redundant upserts
+    // 2c. Debounce rapid duplicate stream events (< 30s gap per track)
+    // Spotify live API emits multiple events for rapid skips, stutters, and reconnect loops
+    const { debounced: newStreamItems, droppedCount: debouncedDuplicatesCount } = debouncePlays(
+      reversedItems.map((item) => ({
+        ...item,
+        playedAt: item.played_at,
+        trackId: item.track.id,
+      })),
+      30_000
+    );
+
+    if (debouncedDuplicatesCount > 0) {
+      console.log(`      Debounced ${debouncedDuplicatesCount} rapid duplicate stream events (< 30s gap)`);
+    }
+
+    // 2d. Pre-filter existing artists, albums, and tracks in batch to avoid redundant upserts
     const candidateArtistIds = new Set<string>();
     const candidateAlbumIds = new Set<string>();
     const candidateTrackIds = new Set<string>();
@@ -104,13 +120,13 @@ async function main() {
       `      Entities in batch: ${candidateArtistIds.size} artists (${existingArtistIds.size} existing), ${candidateAlbumIds.size} albums (${existingAlbumIds.size} existing), ${candidateTrackIds.size} tracks (${existingTrackIds.size} existing)`
     );
 
-    // 3. Foreign Key Cascade Ingestion
+    // 3. Foreign Key Cascade Ingestion (High-Throughput Batch UNNEST Queries)
     console.log("[2/3] Ingesting entities in strict foreign-key order...");
 
-    let artistsUpserted = 0;
-    let albumsUpserted = 0;
-    let tracksUpserted = 0;
-    let playsIngested = 0;
+    const newArtistsMap = new Map<string, { id: string; name: string }>();
+    const newAlbumsMap = new Map<string, { id: string; name: string; imageUrl?: string | null; artistId: string }>();
+    const tracksMap = new Map<string, TrackUpsertItem>();
+    const playsList: PlayInsertItem[] = [];
 
     for (const item of newStreamItems) {
       const { track, played_at } = item;
@@ -118,48 +134,65 @@ async function main() {
       const album = track.album;
       const albumArtist = album.artists?.[0] || primaryArtist;
 
-      // Step 3a: Upsert primary artist if not already in DB
       if (!existingArtistIds.has(primaryArtist.id)) {
-        await upsertArtist(primaryArtist.id, primaryArtist.name);
-        existingArtistIds.add(primaryArtist.id);
-        artistsUpserted++;
+        newArtistsMap.set(primaryArtist.id, { id: primaryArtist.id, name: primaryArtist.name });
       }
-
-      // If album has a distinct primary artist, ensure they exist as well
       if (albumArtist.id && !existingArtistIds.has(albumArtist.id)) {
-        await upsertArtist(albumArtist.id, albumArtist.name);
-        existingArtistIds.add(albumArtist.id);
-        artistsUpserted++;
+        newArtistsMap.set(albumArtist.id, { id: albumArtist.id, name: albumArtist.name });
       }
 
-      // Step 3b: Upsert album if not already in DB
       if (!existingAlbumIds.has(album.id)) {
         const imageUrl = album.images?.[0]?.url || null;
-        await upsertAlbum(album.id, album.name, imageUrl, albumArtist.id);
-        existingAlbumIds.add(album.id);
-        albumsUpserted++;
+        newAlbumsMap.set(album.id, { id: album.id, name: album.name, imageUrl, artistId: albumArtist.id });
       }
 
-      // Step 3c: Upsert track metadata (updates existing un-enriched tracks with IDs and duration)
-      await upsertTrack(
-        track.id,
-        track.name,
-        primaryArtist.id,
-        album.id,
-        track.duration_ms,
-        primaryArtist.name,
-        album.name
-      );
-      if (!existingTrackIds.has(track.id)) {
-        existingTrackIds.add(track.id);
-        tracksUpserted++;
+      const existingTrack = tracksMap.get(track.id);
+      if (!existingTrack) {
+        tracksMap.set(track.id, {
+          id: track.id,
+          name: track.name,
+          artistId: primaryArtist.id,
+          albumId: album.id,
+          durationMs: track.duration_ms,
+          artistName: primaryArtist.name,
+          albumName: album.name,
+          enrichmentStatus: "enriched",
+        });
+      } else {
+        existingTrack.durationMs = Math.max(existingTrack.durationMs, track.duration_ms);
       }
 
-      // Step 3d: Insert play event
-      const inserted = await insertPlay(played_at, track.id, track.duration_ms);
-      if (inserted) {
-        playsIngested++;
+      playsList.push({
+        playedAt: played_at,
+        trackId: track.id,
+        msPlayed: track.duration_ms,
+      });
+    }
+
+    let artistsUpserted = 0;
+    let albumsUpserted = 0;
+    let tracksUpserted = 0;
+    let playsIngested = 0;
+
+    if (newArtistsMap.size > 0) {
+      await bulkUpsertArtists(Array.from(newArtistsMap.values()));
+      artistsUpserted = newArtistsMap.size;
+    }
+    if (newAlbumsMap.size > 0) {
+      await bulkUpsertAlbums(Array.from(newAlbumsMap.values()));
+      albumsUpserted = newAlbumsMap.size;
+    }
+    if (tracksMap.size > 0) {
+      await bulkUpsertTracks(Array.from(tracksMap.values()));
+      let newTrackCount = 0;
+      for (const trackId of tracksMap.keys()) {
+        if (!existingTrackIds.has(trackId)) newTrackCount++;
       }
+      tracksUpserted = newTrackCount;
+    }
+    if (playsList.length > 0) {
+      const { insertedCount } = await bulkInsertPlays(playsList);
+      playsIngested = insertedCount;
     }
 
     // Step 3e: Run quota-budgeted cron micro-enrichment for historical pending backlog

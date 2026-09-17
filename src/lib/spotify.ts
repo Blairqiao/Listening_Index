@@ -80,10 +80,12 @@ interface CachedToken {
 }
 
 let tokenCache: CachedToken | null = null;
+let activeTokenPromise: Promise<string> | null = null;
 
 /**
  * Retrieves an active Spotify access token using the refresh token flow.
  * Caches token in-memory with a 5-minute safety buffer.
+ * Deduplicates concurrent token refresh calls via an in-flight promise latch.
  */
 export async function getAccessToken(): Promise<string> {
   const now = Date.now();
@@ -92,6 +94,13 @@ export async function getAccessToken(): Promise<string> {
   if (tokenCache && now < tokenCache.expiresAt - 5 * 60 * 1000) {
     return tokenCache.accessToken;
   }
+
+  if (activeTokenPromise) {
+    return activeTokenPromise;
+  }
+
+  activeTokenPromise = (async () => {
+    try {
 
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -162,6 +171,12 @@ export async function getAccessToken(): Promise<string> {
   };
 
   return data.access_token;
+    } finally {
+      activeTokenPromise = null;
+    }
+  })();
+
+  return activeTokenPromise;
 }
 
 /**
