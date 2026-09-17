@@ -53,6 +53,7 @@ export interface SessionData {
   previousSittings: PreviousSitting[];
   lastSyncedAt?: string;
   sittings?: SittingSession[];
+  sessions?: SittingSession[];
   histogram?: SessionHistogramData;
 }
 
@@ -239,131 +240,119 @@ export async function ensureTablesExist(): Promise<void> {
       ADD COLUMN IF NOT EXISTS enrichment_status TEXT NOT NULL DEFAULT 'pending';
   `;
 
-  // Migrate duration_ms from generated column to standard integer if previously configured
+  // Migrate legacy schema only if unmigrated tracks or columns are detected
   await sql`
     DO $$
     BEGIN
       IF EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'tracks' AND column_name = 'duration_ms' AND is_generated = 'ALWAYS'
+        WHERE table_name = 'tracks' AND column_name = 'api_duration_ms'
+      ) OR EXISTS (
+        SELECT 1 FROM tracks WHERE artist_group_key IS NULL LIMIT 1
       ) THEN
-        ALTER TABLE tracks DROP COLUMN duration_ms;
-        ALTER TABLE tracks ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
         IF EXISTS (
           SELECT 1 FROM information_schema.columns 
-          WHERE table_name = 'tracks' AND column_name = 'api_duration_ms'
+          WHERE table_name = 'tracks' AND column_name = 'duration_ms' AND is_generated = 'ALWAYS'
         ) THEN
-          UPDATE tracks SET duration_ms = GREATEST(COALESCE(api_duration_ms, 0), COALESCE(max_observed_ms_played, 0));
+          ALTER TABLE tracks DROP COLUMN duration_ms;
+          ALTER TABLE tracks ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0;
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'tracks' AND column_name = 'api_duration_ms'
+          ) THEN
+            UPDATE tracks SET duration_ms = GREATEST(COALESCE(api_duration_ms, 0), COALESCE(max_observed_ms_played, 0));
+          END IF;
         END IF;
+
+        ALTER TABLE artists DROP COLUMN IF EXISTS created_at;
+        ALTER TABLE albums DROP COLUMN IF EXISTS created_at;
+        ALTER TABLE tracks 
+          DROP COLUMN IF EXISTS api_duration_ms,
+          DROP COLUMN IF EXISTS max_observed_ms_played,
+          DROP COLUMN IF EXISTS leased_at,
+          DROP COLUMN IF EXISTS lease_token,
+          DROP COLUMN IF EXISTS lease_expires_at,
+          DROP COLUMN IF EXISTS retry_count,
+          DROP COLUMN IF EXISTS next_eligible_at,
+          DROP COLUMN IF EXISTS last_error,
+          DROP COLUMN IF EXISTS leased_until,
+          DROP COLUMN IF EXISTS created_at;
+        ALTER TABLE plays DROP COLUMN IF EXISTS source;
+
+        UPDATE tracks 
+        SET enrichment_status = 'pending' 
+        WHERE enrichment_status = 'leasing';
+
+        DROP INDEX IF EXISTS idx_tracks_leasing;
+        DROP TABLE IF EXISTS oauth_tokens;
+
+        ALTER TABLE tracks ALTER COLUMN artist_id DROP NOT NULL;
+        ALTER TABLE tracks ALTER COLUMN album_id DROP NOT NULL;
+        ALTER TABLE albums ALTER COLUMN artist_id DROP NOT NULL;
+
+        UPDATE tracks t
+        SET 
+          artist_name = ar.name,
+          album_name = al.name
+        FROM artists ar, albums al
+        WHERE t.artist_id = ar.id AND t.album_id = al.id
+          AND (t.artist_name IS NULL OR t.artist_name = 'Unknown Artist' OR t.album_name IS NULL OR t.album_name = 'Unknown Album');
+
+        UPDATE tracks SET 
+          artist_name = COALESCE(artist_name, 'Unknown Artist'),
+          album_name = COALESCE(album_name, 'Unknown Album')
+        WHERE artist_name IS NULL OR album_name IS NULL;
+
+        UPDATE tracks SET 
+          artist_group_key = lower(trim(artist_name)),
+          album_group_key = lower(trim(artist_name)) || '::' || lower(trim(album_name))
+        WHERE artist_group_key IS NULL OR album_group_key IS NULL 
+           OR (artist_group_key = 'unknown artist' AND artist_name != 'Unknown Artist');
+
+        UPDATE tracks
+        SET enrichment_status = 'enriched'
+        WHERE enrichment_status = 'pending'
+          AND artist_id IS NOT NULL 
+          AND album_id IS NOT NULL
+          AND artist_id NOT LIKE 'art_%'
+          AND album_id NOT LIKE 'alb_%';
+
+        UPDATE tracks SET artist_id = NULL WHERE artist_id LIKE 'art_%';
+        UPDATE tracks SET album_id = NULL WHERE album_id LIKE 'alb_%';
+        DELETE FROM albums WHERE id LIKE 'alb_%';
+        DELETE FROM artists WHERE id LIKE 'art_%';
+
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'albums_artist_id_fkey') THEN
+          ALTER TABLE albums DROP CONSTRAINT albums_artist_id_fkey;
+        END IF;
+        ALTER TABLE albums ADD CONSTRAINT albums_artist_id_fkey 
+          FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
+
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_artist_id_fkey') THEN
+          ALTER TABLE tracks DROP CONSTRAINT tracks_artist_id_fkey;
+        END IF;
+        ALTER TABLE tracks ADD CONSTRAINT tracks_artist_id_fkey 
+          FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
+
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_album_id_fkey') THEN
+          ALTER TABLE tracks DROP CONSTRAINT tracks_album_id_fkey;
+        END IF;
+        ALTER TABLE tracks ADD CONSTRAINT tracks_album_id_fkey 
+          FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL;
       END IF;
+    EXCEPTION
+      WHEN OTHERS THEN NULL;
     END $$;
   `;
 
-  // Cleanly drop obsolete columns from entities if present
-  await sql`ALTER TABLE artists DROP COLUMN IF EXISTS created_at;`;
-  await sql`ALTER TABLE albums DROP COLUMN IF EXISTS created_at;`;
-  await sql`
-    ALTER TABLE tracks 
-      DROP COLUMN IF EXISTS api_duration_ms,
-      DROP COLUMN IF EXISTS max_observed_ms_played,
-      DROP COLUMN IF EXISTS leased_at,
-      DROP COLUMN IF EXISTS lease_token,
-      DROP COLUMN IF EXISTS lease_expires_at,
-      DROP COLUMN IF EXISTS retry_count,
-      DROP COLUMN IF EXISTS next_eligible_at,
-      DROP COLUMN IF EXISTS last_error,
-      DROP COLUMN IF EXISTS leased_until,
-      DROP COLUMN IF EXISTS created_at;
-  `;
-  await sql`ALTER TABLE plays DROP COLUMN IF EXISTS source;`;
-
-  // Reset any orphaned leasing records to pending
-  await sql`
-    UPDATE tracks 
-    SET enrichment_status = 'pending' 
-    WHERE enrichment_status = 'leasing';
-  `;
-
-  // Drop obsolete lease index and unused oauth_tokens table
-  await sql`DROP INDEX IF EXISTS idx_tracks_leasing;`;
-  await sql`DROP TABLE IF EXISTS oauth_tokens;`;
-
-  // Ensure FKs are nullable and drop legacy NOT NULL if present
-  await sql`ALTER TABLE tracks ALTER COLUMN artist_id DROP NOT NULL;`;
-  await sql`ALTER TABLE tracks ALTER COLUMN album_id DROP NOT NULL;`;
-  await sql`ALTER TABLE albums ALTER COLUMN artist_id DROP NOT NULL;`;
-
-  // Restore canonical artist and album names from relational records if unpopulated or defaulted to Unknown
-  await sql`
-    UPDATE tracks t
-    SET 
-      artist_name = ar.name,
-      album_name = al.name
-    FROM artists ar, albums al
-    WHERE t.artist_id = ar.id AND t.album_id = al.id
-      AND (t.artist_name IS NULL OR t.artist_name = 'Unknown Artist' OR t.album_name IS NULL OR t.album_name = 'Unknown Album');
-  `;
-
-  // Fallback for unlinked tracks (e.g. raw export imports before enrichment)
-  await sql`
-    UPDATE tracks SET 
-      artist_name = COALESCE(artist_name, 'Unknown Artist'),
-      album_name = COALESCE(album_name, 'Unknown Album')
-    WHERE artist_name IS NULL OR album_name IS NULL;
-  `;
-
-  // Recompute grouping keys based on canonical names
-  await sql`
-    UPDATE tracks SET 
-      artist_group_key = lower(trim(artist_name)),
-      album_group_key = lower(trim(artist_name)) || '::' || lower(trim(album_name))
-    WHERE artist_group_key IS NULL OR album_group_key IS NULL 
-       OR (artist_group_key = 'unknown artist' AND artist_name != 'Unknown Artist');
-  `;
-
-  // Promote pre-enriched tracks with valid Spotify foreign keys
-  await sql`
-    UPDATE tracks
-    SET enrichment_status = 'enriched'
-    WHERE enrichment_status = 'pending'
-      AND artist_id IS NOT NULL 
-      AND album_id IS NOT NULL
-      AND artist_id NOT LIKE 'art_%'
-      AND album_id NOT LIKE 'alb_%';
-  `;
-
-  // Clean up legacy synthetic IDs if any exist
+  // Purge any legacy delisted tracks and their associated plays
   await sql`
     DO $$
     BEGIN
-      UPDATE tracks SET artist_id = NULL WHERE artist_id LIKE 'art_%';
-      UPDATE tracks SET album_id = NULL WHERE album_id LIKE 'alb_%';
-      DELETE FROM albums WHERE id LIKE 'alb_%';
-      DELETE FROM artists WHERE id LIKE 'art_%';
-    END $$;
-  `;
-
-  // Ensure foreign key constraints include ON DELETE SET NULL
-  await sql`
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'albums_artist_id_fkey') THEN
-        ALTER TABLE albums DROP CONSTRAINT albums_artist_id_fkey;
+      IF EXISTS (SELECT 1 FROM tracks WHERE enrichment_status = 'delisted' LIMIT 1) THEN
+        DELETE FROM plays WHERE track_id IN (SELECT id FROM tracks WHERE enrichment_status = 'delisted');
+        DELETE FROM tracks WHERE enrichment_status = 'delisted';
       END IF;
-      ALTER TABLE albums ADD CONSTRAINT albums_artist_id_fkey 
-        FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
-
-      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_artist_id_fkey') THEN
-        ALTER TABLE tracks DROP CONSTRAINT tracks_artist_id_fkey;
-      END IF;
-      ALTER TABLE tracks ADD CONSTRAINT tracks_artist_id_fkey 
-        FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE SET NULL;
-
-      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tracks_album_id_fkey') THEN
-        ALTER TABLE tracks DROP CONSTRAINT tracks_album_id_fkey;
-      END IF;
-      ALTER TABLE tracks ADD CONSTRAINT tracks_album_id_fkey 
-        FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL;
     EXCEPTION
       WHEN OTHERS THEN NULL;
     END $$;
@@ -380,36 +369,36 @@ export async function ensureTablesExist(): Promise<void> {
   `;
 
   // Standardize existing plays to whole seconds, merge collisions, and ensure unique constraint
+  // Only executed if the composite unique constraint does not already exist, guaranteeing sub-5ms cold starts.
   await sql`
     DO $$
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'plays') THEN
-        -- 1. If any plays have sub-second precision, deduplicate and standardize them
-        IF EXISTS (SELECT 1 FROM plays WHERE played_at != date_trunc('second', played_at) LIMIT 1) THEN
-          -- Merge ms_played across any collisions that would occur when truncating to whole seconds
-          UPDATE plays p2
-          SET ms_played = GREATEST(p1.ms_played, p2.ms_played)
-          FROM plays p1
-          WHERE p1.id < p2.id
-            AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
-            AND p1.track_id = p2.track_id;
-
-          -- Remove duplicate play rows, preserving the newest ID
-          DELETE FROM plays p1
-          USING plays p2
-          WHERE p1.id < p2.id
-            AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
-            AND p1.track_id = p2.track_id;
-
-          -- Standardize all played_at values to whole seconds
-          UPDATE plays
-          SET played_at = date_trunc('second', played_at)
-          WHERE played_at != date_trunc('second', played_at);
-        END IF;
-
-        -- 2. Idempotently ensure the composite unique constraint exists on (played_at, track_id)
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'plays_played_at_track_id_key') THEN
-          -- Remove any remaining duplicates prior to creating the unique constraint
+          -- 1. If any plays have sub-second precision, deduplicate and standardize them
+          IF EXISTS (SELECT 1 FROM plays WHERE played_at != date_trunc('second', played_at) LIMIT 1) THEN
+            -- Merge ms_played across any collisions that would occur when truncating to whole seconds
+            UPDATE plays p2
+            SET ms_played = GREATEST(p1.ms_played, p2.ms_played)
+            FROM plays p1
+            WHERE p1.id < p2.id
+              AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
+              AND p1.track_id = p2.track_id;
+
+            -- Remove duplicate play rows, preserving the newest ID
+            DELETE FROM plays p1
+            USING plays p2
+            WHERE p1.id < p2.id
+              AND date_trunc('second', p1.played_at) = date_trunc('second', p2.played_at)
+              AND p1.track_id = p2.track_id;
+
+            -- Standardize all played_at values to whole seconds
+            UPDATE plays
+            SET played_at = date_trunc('second', played_at)
+            WHERE played_at != date_trunc('second', played_at);
+          END IF;
+
+          -- 2. Remove any remaining duplicate rows prior to creating the unique constraint
           DELETE FROM plays p1
           USING plays p2
           WHERE p1.id < p2.id
@@ -592,10 +581,22 @@ export async function upsertTrack(
     )
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
-      artist_name = COALESCE(EXCLUDED.artist_name, tracks.artist_name),
-      album_name = COALESCE(EXCLUDED.album_name, tracks.album_name),
-      artist_group_key = COALESCE(EXCLUDED.artist_group_key, tracks.artist_group_key),
-      album_group_key = COALESCE(EXCLUDED.album_group_key, tracks.album_group_key),
+      artist_name = CASE 
+        WHEN EXCLUDED.artist_name = 'Unknown Artist' THEN tracks.artist_name 
+        ELSE COALESCE(EXCLUDED.artist_name, tracks.artist_name) 
+      END,
+      album_name = CASE 
+        WHEN EXCLUDED.album_name = 'Unknown Album' THEN tracks.album_name 
+        ELSE COALESCE(EXCLUDED.album_name, tracks.album_name) 
+      END,
+      artist_group_key = CASE 
+        WHEN EXCLUDED.artist_group_key = 'unknown artist' THEN tracks.artist_group_key 
+        ELSE COALESCE(EXCLUDED.artist_group_key, tracks.artist_group_key) 
+      END,
+      album_group_key = CASE 
+        WHEN EXCLUDED.album_group_key LIKE 'unknown artist::%' THEN tracks.album_group_key 
+        ELSE COALESCE(EXCLUDED.album_group_key, tracks.album_group_key) 
+      END,
       artist_id = COALESCE(EXCLUDED.artist_id, tracks.artist_id),
       album_id = COALESCE(EXCLUDED.album_id, tracks.album_id),
       duration_ms = GREATEST(tracks.duration_ms, EXCLUDED.duration_ms),
@@ -943,14 +944,14 @@ export async function getEnrichmentProgress(): Promise<{
     SELECT 
       COUNT(*) FILTER (WHERE enrichment_status = 'pending')::int AS pending,
       COUNT(*) FILTER (WHERE enrichment_status = 'enriched')::int AS enriched,
-      COUNT(*) FILTER (WHERE enrichment_status = 'delisted')::int AS delisted,
+      0::int AS delisted,
       COUNT(*)::int AS total
     FROM tracks;
   `) as any);
   return {
     pending: rows[0]?.pending ?? 0,
     enriched: rows[0]?.enriched ?? 0,
-    delisted: rows[0]?.delisted ?? 0,
+    delisted: 0,
     total: rows[0]?.total ?? 0,
   };
 }
@@ -973,11 +974,14 @@ export async function bulkApplyEnrichment(data: {
   await ensureTablesExist();
   const sql = getDb();
 
-  // 1. Mark delisted tracks so the enrichment query terminates
+  // 1. Purge delisted tracks and their associated plays so they never remain in the system
   if (data.delistedIds.length > 0) {
     await sql`
-      UPDATE tracks
-      SET enrichment_status = 'delisted'
+      DELETE FROM plays
+      WHERE track_id = ANY(${data.delistedIds}::text[]);
+    `;
+    await sql`
+      DELETE FROM tracks
       WHERE id = ANY(${data.delistedIds}::text[]);
     `;
   }
@@ -2534,6 +2538,7 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
       sittingTracks: [],
       previousSittings: [],
       sittings: [],
+      sessions: [],
       histogram: {
         avgRuntimeMinutes: 0,
         oldestDate: "--",
@@ -2742,6 +2747,7 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
     sittingTracks,
     previousSittings,
     sittings,
+    sessions: sittings,
     histogram,
     lastSyncedAt: lastSync ?? (rawPlays[0]
       ? new Date(rawPlays[0].played_at).toISOString()

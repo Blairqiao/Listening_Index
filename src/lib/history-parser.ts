@@ -96,8 +96,14 @@ export function isAudioMusicTrack(item: SpotifyAudioHistoryRecord): boolean {
   const trackId = extractTrackId(item.spotify_track_uri);
   if (!trackId) return false;
 
-  // 2. Must have a non-empty track title
+  // 2. Must have non-empty track title, artist name, and album name
   if (!item.master_metadata_track_name || item.master_metadata_track_name.trim().length === 0) {
+    return false;
+  }
+  if (!item.master_metadata_album_artist_name || item.master_metadata_album_artist_name.trim().length === 0) {
+    return false;
+  }
+  if (!item.master_metadata_album_album_name || item.master_metadata_album_album_name.trim().length === 0) {
     return false;
   }
 
@@ -147,8 +153,8 @@ export function parseHistoryRecords(records: unknown[]): CompactPlayEvent[] {
 
     try {
       const playedAt = truncateToSeconds(item.ts);
-      const artistName = (item.master_metadata_album_artist_name || "Unknown Artist").trim();
-      const albumName = (item.master_metadata_album_album_name || "Unknown Album").trim();
+      const artistName = item.master_metadata_album_artist_name!.trim();
+      const albumName = item.master_metadata_album_album_name!.trim();
       results.push({
         playedAt,
         msPlayed: Math.max(0, item.ms_played),
