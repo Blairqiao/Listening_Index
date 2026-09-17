@@ -395,43 +395,34 @@ export async function bulkInsertPlays(
   if (plays.length === 0) return { insertedCount: 0 };
   await ensureTablesExist();
 
-  // 1. In-batch 30-second debounce per track
-  const { debounced } = debouncePlays(plays, 30_000);
-  if (debounced.length === 0) return { insertedCount: 0 };
-
-  // 2. Cross-batch boundary check against recent DB plays within 30s
-  const candidateTrackIds = Array.from(new Set(debounced.map((p) => p.trackId)));
-  const timesMs = debounced.map((p) => new Date(p.playedAt).getTime());
+  // 1. Check DB boundary for candidate tracks to populate initialLastSeen
+  const candidateTrackIds = Array.from(new Set(plays.map((p) => p.trackId)));
+  const timesMs = plays.map((p) => new Date(p.playedAt).getTime());
   const minTime = new Date(Math.min(...timesMs) - 30_000).toISOString();
   const maxTime = new Date(Math.max(...timesMs) + 30_000).toISOString();
 
   const sql = getDb();
   const existingRecentPlays = (await sql`
-    SELECT track_id, played_at
+    SELECT track_id, MAX(played_at) as latest_played_at
     FROM plays
     WHERE track_id = ANY(${candidateTrackIds}::text[])
       AND played_at >= ${minTime}::timestamptz
-      AND played_at <= ${maxTime}::timestamptz;
-  `) as Array<{ track_id: string; played_at: Date | string }>;
+      AND played_at <= ${maxTime}::timestamptz
+    GROUP BY track_id;
+  `) as Array<{ track_id: string; latest_played_at: Date | string }>;
 
-  const eligiblePlays: PlayInsertItem[] = [];
-  for (const p of debounced) {
-    const pTime = new Date(p.playedAt).getTime();
-    const hasConflict = existingRecentPlays.some(
-      (ep) =>
-        ep.track_id === p.trackId &&
-        Math.abs(new Date(ep.played_at).getTime() - pTime) < 30_000
-    );
-    if (!hasConflict) {
-      eligiblePlays.push(p);
-    }
+  const initialLastSeen = new Map<string, number>();
+  for (const ep of existingRecentPlays) {
+    initialLastSeen.set(ep.track_id, new Date(ep.latest_played_at).getTime());
   }
 
-  if (eligiblePlays.length === 0) return { insertedCount: 0 };
+  // 2. Debounce candidate plays with cross-batch continuity
+  const { debounced } = debouncePlays(plays, 30_000, initialLastSeen);
+  if (debounced.length === 0) return { insertedCount: 0 };
 
   // 3. Deduplicate on truncated UTC seconds in JS to prevent Postgres ON CONFLICT batch error
   const seen = new Map<string, PlayInsertItem>();
-  for (const p of eligiblePlays) {
+  for (const p of debounced) {
     const truncated = truncateToSeconds(p.playedAt);
     const key = `${truncated}::${p.trackId}`;
     if (!seen.has(key)) {

@@ -69,6 +69,7 @@ export type PreviousSession = PreviousSitting;
 export interface SittingAnalysis {
   firstPlaysCount: number;
   totalTracks: number;
+  topTrack?: { title: string; count: number; id?: string; artist?: string } | null;
   topSong: { title: string; count: number; id?: string; artist?: string } | null;
   topAlbum: { title: string; count: number; id?: string; artist?: string };
   topArtist: { name: string; count: number; id?: string };
