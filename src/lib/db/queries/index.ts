@@ -11,6 +11,7 @@ export {
   formatHHmmTz,
   formatDayGroupTz,
   formatLogStartDate,
+  formatSessionAge,
   formatSittingAge,
 } from "./helpers";
 

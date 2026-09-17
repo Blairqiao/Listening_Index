@@ -104,7 +104,7 @@ export function formatLogStartDate(date: Date, tz = getTimezone()): string {
   }
 }
 
-export function formatSittingAge(ageMs: number): string {
+export function formatSessionAge(ageMs: number): string {
   const ageMins = Math.max(1, Math.round(ageMs / 60000));
   if (ageMins < 60) {
     return `${ageMins}M`;
@@ -116,3 +116,6 @@ export function formatSittingAge(ageMs: number): string {
   const ageDays = Math.floor(ageHours / 24);
   return `${ageDays}D`;
 }
+
+/** Legacy alias for backwards compatibility */
+export const formatSittingAge = formatSessionAge;

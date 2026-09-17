@@ -179,17 +179,20 @@ export interface DebouncePlayItem {
   [key: string]: any;
 }
 
+/** Canonical domain alias: stream events prior to meeting the Play Threshold */
+export type DebounceStreamEventItem = DebouncePlayItem;
+
 /**
- * Filters out rapid duplicate plays of the same track occurring within < cooldownMs (default: 30,000ms / 30s).
+ * Filters out rapid duplicate stream events of the same track occurring within < cooldownMs (default: 30,000ms / 30s).
  *
  * Handles live Spotify Web API skips, reconnection loops, and player restart glitches
  * where Spotify emits multiple played_at events spaced seconds apart without ms_played duration.
  *
  * Algorithm:
- * 1. Sorts candidate plays chronologically (oldest to newest).
- * 2. Compares each play to the most recently accepted play timestamp for that track.
- * 3. Discards any play where `(currentTimestampMs - lastAcceptedTimestampMs) < cooldownMs`.
- * 4. Accepts any play where `(currentTimestampMs - lastAcceptedTimestampMs) >= cooldownMs` and updates the accepted timestamp.
+ * 1. Sorts candidate events chronologically (oldest to newest).
+ * 2. Compares each event against the preceding stream event for that track.
+ * 3. Discards any stream event where elapsed time since the previous event is < cooldownMs (< 30s aborted listen).
+ * 4. Accepts any stream event where delta >= cooldownMs and updates the observed timestamp.
  */
 export function debouncePlays<T extends DebouncePlayItem>(
   plays: T[],
@@ -229,3 +232,6 @@ export function debouncePlays<T extends DebouncePlayItem>(
 
   return { debounced, droppedCount };
 }
+
+/** Canonical domain alias for stream event debouncing */
+export const debounceStreamEvents = debouncePlays;

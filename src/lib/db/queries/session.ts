@@ -169,19 +169,19 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
 
     // Analysis
     const firstPlaysCount = sittingPlays.filter((p) => p.is_first_play).length;
-    const songCounts = new Map<string, number>();
+    const trackCounts = new Map<string, number>();
     for (const p of sittingPlays) {
-      songCounts.set(p.title, (songCounts.get(p.title) || 0) + 1);
+      trackCounts.set(p.title, (trackCounts.get(p.title) || 0) + 1);
     }
-    let maxSongCount = 0;
-    for (const count of songCounts.values()) {
-      if (count > maxSongCount) maxSongCount = count;
+    let maxTrackCount = 0;
+    for (const count of trackCounts.values()) {
+      if (count > maxTrackCount) maxTrackCount = count;
     }
-    let topSong: { title: string; count: number } | null = null;
-    if (sittingPlays.length > 0 && maxSongCount > 0) {
-      const latestPlay = sittingPlays.find((p) => songCounts.get(p.title) === maxSongCount);
+    let topTrack: { title: string; count: number } | null = null;
+    if (sittingPlays.length > 0 && maxTrackCount > 0) {
+      const latestPlay = sittingPlays.find((p) => trackCounts.get(p.title) === maxTrackCount);
       if (latestPlay) {
-        topSong = { title: latestPlay.title, count: maxSongCount };
+        topTrack = { title: latestPlay.title, count: maxTrackCount };
       }
     }
 
@@ -231,7 +231,8 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
       analysis: {
         firstPlaysCount,
         totalTracks: trackCount,
-        topSong,
+        topTrack,
+        topSong: topTrack,
         topAlbum,
         topArtist,
       },
