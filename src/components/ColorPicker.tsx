@@ -257,7 +257,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       {/* 4. Curated Presets Palette */}
       <div className="flex flex-col gap-1.5 pt-1">
         <span className="font-mono text-[9px] tracking-[0.14em] text-[#6A6A64] uppercase">
-          [ PRESET SWATCHES ]
+          [ PRESET COLORS ]
         </span>
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5" role="group" aria-label="Color presets">
           {PRESET_COLORS.map((preset) => {

@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, isDbConfigured } from "@/lib/db";
+import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { runEnrichmentBatch } from "@/lib/enrichment";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedAdminRequest(request)) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized: Admin authorization required to run metadata enrichment." },
+      { status: 401 }
+    );
+  }
+
   try {
     // 1. Enforce Preconditions
     if (!isDbConfigured()) {

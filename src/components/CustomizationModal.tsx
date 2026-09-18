@@ -1,7 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { X, Check, Copy, RotateCcw, Clock, ExternalLink, Search, ChevronDown } from "lucide-react";
+import {
+  X,
+  Check,
+  Copy,
+  RotateCcw,
+  Clock,
+  ExternalLink,
+  Search,
+  ChevronDown,
+  ShieldCheck,
+  ShieldAlert,
+  Eye,
+  EyeOff,
+  Lock,
+} from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
 import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
@@ -52,6 +66,10 @@ export const CustomizationModal: React.FC = () => {
     isDbConfigured,
     isModalOpen,
     closeModal,
+    isAuthenticated,
+    isPasswordConfigured,
+    login,
+    logout,
   } = useConfig();
 
   // Local draft state while modal is open
@@ -61,6 +79,12 @@ export const CustomizationModal: React.FC = () => {
   const [currentTimeStr, setCurrentTimeStr] = useState<string>("");
   const [isTzOpen, setIsTzOpen] = useState<boolean>(false);
   const tzContainerRef = useRef<HTMLDivElement>(null);
+
+  // In-modal admin authentication state
+  const [adminPassword, setAdminPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isUnlocking, setIsUnlocking] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Animation transition state for smooth open and close
   const [shouldRender, setShouldRender] = useState<boolean>(isModalOpen);
@@ -77,13 +101,16 @@ export const CustomizationModal: React.FC = () => {
       timer = setTimeout(() => {
         setShouldRender(false);
         setDraft(config);
+        setAdminPassword("");
+        setShowPassword(false);
+        setAuthError(null);
       }, 200);
     }
 
     return () => {
       clearTimeout(timer);
     };
-  }, [isModalOpen]);
+  }, [isModalOpen, config]);
 
   // Sync draft state whenever modal is opened
   const prevIsOpenRef = useRef(isModalOpen);
@@ -93,6 +120,9 @@ export const CustomizationModal: React.FC = () => {
       setCopiedCode(false);
       setTzSearch("");
       setIsTzOpen(false);
+      setAdminPassword("");
+      setShowPassword(false);
+      setAuthError(null);
     }
     prevIsOpenRef.current = isModalOpen;
   }, [isModalOpen, config]);
@@ -195,9 +225,33 @@ export const CustomizationModal: React.FC = () => {
     }
   }, [hasUnsavedChanges]);
 
-  // Save and apply changes to site (persists to Neon DB if connected, or local fallback)
+  // Admin password unlock handler
+  const handleUnlock = async () => {
+    if (!adminPassword.trim() || isUnlocking) return;
+    setIsUnlocking(true);
+    setAuthError(null);
+    try {
+      const res = await login(adminPassword);
+      if (res.success) {
+        setAdminPassword("");
+        setAuthError(null);
+      } else {
+        setAuthError(res.error || "Authentication failed.");
+      }
+    } catch (e: unknown) {
+      setAuthError(e instanceof Error ? e.message : "Authentication error.");
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  // Save and apply changes to site (persists to Neon DB if authenticated, or local fallback)
   const handleSave = async () => {
-    if (!hasUnsavedChanges && !isSaving) return;
+    if (!hasUnsavedChanges && !saveError && !isSaving) return;
 
     setSaveError(null);
 
@@ -213,7 +267,12 @@ export const CustomizationModal: React.FC = () => {
       updateConfig(draft);
     }
 
-    // 3. Persist to Neon DB in the background
+    // 3. If not authenticated, do not send request to /api/config (local cache only)
+    if (!isAuthenticated) {
+      return;
+    }
+
+    // 4. Persist to Neon DB in the background
     setIsSaving(true);
     try {
       const res = await fetch("/api/config", {
@@ -221,8 +280,8 @@ export const CustomizationModal: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(isFactory ? { ...DEFAULT_SITE_CONFIG, resetToDefault: true } : draft),
       });
-      const data = await res.json();
-      if (!data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
         setSaveError(data.error || "Save failed");
       }
     } catch (e: unknown) {
@@ -274,22 +333,35 @@ export const CustomizationModal: React.FC = () => {
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h2
               id="customization-modal-title"
-              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase"
+              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
             >
               [ ACTIVE CONFIGURATION ]
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={handleCancel}
-            title="Close (Esc)"
-            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus:outline-none"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out (lock database access)"
+                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
+              >
+                <Lock className="w-3 h-3" />
+                LOCK
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleCancel}
+              title="Close (Esc)"
+              className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus:outline-none"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}
@@ -300,9 +372,7 @@ export const CustomizationModal: React.FC = () => {
               <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
                 [ 01 · IDENTITY ]
               </span>
-              <span className="font-mono text-[9px] text-[#6A6A64]">
-                DEFAULT: src/config.ts
-              </span>
+
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -483,7 +553,7 @@ export const CustomizationModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 mb-[-10]">
                 <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
                   GITHUB REPOSITORY URL
                 </label>
@@ -507,6 +577,59 @@ export const CustomizationModal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* In-Modal Minimal Password Strip (when locked) */}
+          {!isAuthenticated && (
+            <div className="pt-3 border-t border-[#1F1F1C] space-y-2">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUnlock();
+                }}
+                className="flex items-center gap-2"
+              >
+                <div className="relative flex-1 flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={adminPassword}
+                    onChange={(e) => {
+                      setAdminPassword(e.target.value);
+                      if (authError) setAuthError(null);
+                    }}
+                    placeholder="Admin password to deploy globally to database..."
+                    className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-3 py-1.5 focus:outline-none placeholder:text-[#52524C]"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isUnlocking || !adminPassword.trim()}
+                  className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent text-[#EDEDE8] hover:text-music-accent bg-[#171715] hover:bg-music-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap cursor-pointer select-none"
+                >
+                  {isUnlocking ? "UNLOCKING..." : "UNLOCK"}
+                </button>
+              </form>
+
+              {authError && (
+                <div className="font-mono text-[10px] tracking-[0.06em] text-red-400">
+                  [ {authError.toUpperCase()} ]
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Modal Footer Controls */}
@@ -545,11 +668,10 @@ export const CustomizationModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving || !hasUnsavedChanges}
+              disabled={isSaving || (!hasUnsavedChanges && !saveError)}
               className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
                 isSaving
                   ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
@@ -568,11 +690,17 @@ export const CustomizationModal: React.FC = () => {
               ) : saveError ? (
                 <span>SAVE FAILED · RETRY</span>
               ) : hasUnsavedChanges ? (
-                <span>SAVE & APPLY</span>
+                <span>{isAuthenticated ? "SAVE & DEPLOY TO DATABASE" : "SAVE LOCALLY"}</span>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5 text-music-accent" />
-                  <span>{isDbConfigured ? "DEPLOYED TO DATABASE" : "SAVED TO CONFIG.TS"}</span>
+                  <span>
+                    {isAuthenticated
+                      ? isDbConfigured
+                        ? "DEPLOYED TO DATABASE"
+                        : "SAVED TO CONFIG.TS"
+                      : "SAVED LOCALLY"}
+                  </span>
                 </>
               )}
             </button>
