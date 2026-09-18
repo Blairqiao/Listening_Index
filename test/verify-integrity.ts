@@ -77,9 +77,13 @@ test("Overview Data across all ranges returns rawMetrics and valid activityCaden
   }
 });
 
-test("Stream Log Keyset Pagination", async () => {
+test("Stream Log Keyset Pagination & rawMetrics", async () => {
   const page1 = await getStreamLog(20);
-  assert.ok(page1.metrics.length === 4);
+  assert.ok(page1.rawMetrics, "page1 must have rawMetrics");
+  assert.equal(typeof page1.rawMetrics.totalPlays, "number");
+  assert.equal(typeof page1.rawMetrics.uniqueTracks, "number");
+  assert.equal(typeof page1.rawMetrics.uniqueArtists, "number");
+  assert.equal(typeof page1.rawMetrics.streakDays, "number");
   assert.equal(page1.entries.length, 20);
   assert.ok(page1.hasMore);
   assert.ok(page1.nextCursor);
