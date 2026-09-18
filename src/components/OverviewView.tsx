@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
+import { formatCadenceTooltip } from "@/lib/format-utils";
 
 interface OverviewViewProps {
   range: RangeKey;
@@ -337,7 +338,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         {/* Activity Tracker */}
         <div>
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none">
-            [ ACTIVITY / {range === "all" ? "1Y" : range.toUpperCase()} ]
+            [ ACTIVITY / {range === "all" ? "ALL" : range.toUpperCase()} ]
           </div>
 
             <div>
@@ -365,10 +366,15 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         ? (item.isMarker !== undefined ? item.isMarker : i % 4 === 0)
                         : Boolean(item.isMarker);
 
+                    const tooltipText =
+                      item.startTime && item.endTime
+                        ? formatCadenceTooltip(item, range, "UTC")
+                        : `${item.date} — ${item.count} plays`;
+
                     return (
                       <div
                         key={i}
-                        title={`${item.date} — ${item.count} plays`}
+                        title={tooltipText}
                         className={`flex-1 rounded-none select-none transition-none cursor-default ${
                           isHot
                             ? "bg-music-accent"
@@ -428,15 +434,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
               {range === "6m" && (
                 <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
-                  {activityCadence
-                    .filter((item) => item.markerLabel)
-                    .map((item, i) => (
-                      <span key={i}>{item.markerLabel}</span>
-                    ))}
+                  {(activityCadence.some((item) => item.markerLabel)
+                    ? activityCadence.filter((item) => item.markerLabel)
+                    : activityCadence.filter((_, idx) => idx % 4 === 0 || idx === activityCadence.length - 1)
+                  ).map((item, i) => (
+                    <span key={i}>{item.markerLabel || item.date}</span>
+                  ))}
                 </div>
               )}
 
-              {(range === "1y" || range === "all") && (
+              {range === "1y" && (
                 <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
                   {activityCadence.length <= 12 ? (
                     activityCadence.map((item, i) => (
@@ -453,6 +460,21 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <span>{cadenceEndDate}</span>
                     </>
                   )}
+                </div>
+              )}
+
+              {range === "all" && (
+                <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+                  {activityCadence.map((item, i) => {
+                    const year = item.startTime
+                      ? new Date(item.startTime).getUTCFullYear()
+                      : item.date;
+                    return (
+                      <span key={i} className="text-center flex-1">
+                        {year}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

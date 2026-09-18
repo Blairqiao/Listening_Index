@@ -9,29 +9,36 @@ import {
   SessionHistogramBar,
   RangeKey,
   ActivityDay,
+  ActivityBucket,
 } from "@/lib/mock-listening-data";
+import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "@/lib/format-utils";
 
-export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay };
+export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay, ActivityBucket };
+export type { OverviewMetricsRaw, StreamLogMetricsRaw };
 
 export interface OverviewData {
   logStartDate: string;
+  rawMetrics: OverviewMetricsRaw;
   metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
   topTracks: TrackSummary[];
   topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
   topAlbums: AlbumSummary[];
   clockBuckets?: number[]; // 24 values representing hourly distribution (0-23)
-  activityCadence?: ActivityDay[];
+  activityCadence: ActivityBucket[];
   lastSyncedAt?: string;
 }
 
+
 export interface StreamLogData {
-  metrics: [string, string, string, string]; // Total Plays, Logged Time, Unique Artists, Current Streak
+  rawMetrics: StreamLogMetricsRaw;
+  metrics: [string, string, string, string]; // Total Plays, Unique Tracks, Unique Artists, Current Streak
   entries: StreamLogItem[];
   nextCursor?: string | null;
   nextCursorId?: string | null;
   hasMore?: boolean;
   lastSyncedAt?: string;
 }
+
 
 export interface SessionData {
   isOpen: boolean;

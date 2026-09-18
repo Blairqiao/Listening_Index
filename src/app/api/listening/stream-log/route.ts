@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStreamLog } from "@/lib/db/queries";
-import { getCachedStreamLog, setCachedStreamLog } from "@/lib/db/server-cache";
+import { getOrFetchStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA, getMockStreamLog } from "@/lib/mock-data";
 
@@ -33,11 +33,9 @@ export async function GET(request: NextRequest) {
 
     // Check server cache first (only for initial page without cursor)
     if (!cursor) {
-      let data = getCachedStreamLog(limit, tzParam || "");
-      if (!data) {
-        data = await getStreamLog(limit, tzParam);
-        setCachedStreamLog(limit, data, tzParam || "");
-      }
+      const data = await getOrFetchStreamLog(limit, tzParam || "", () =>
+        getStreamLog(limit, tzParam)
+      );
 
       return NextResponse.json(data, {
         status: 200,

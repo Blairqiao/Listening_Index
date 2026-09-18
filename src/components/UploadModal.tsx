@@ -295,7 +295,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3.5 space-y-2">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-[#6A6A64] uppercase tracking-[0.08em] flex items-center gap-1.5 font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-music-accent" />
                   DATABASE ENRICHMENT STATUS
                 </span>
                 <span className="text-[#EDEDE8] font-bold">
@@ -316,7 +316,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               {/* Progress bar */}
               <div className="h-1.5 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
                 <div
-                  className="h-full bg-[#38BDF8] transition-all duration-500 ease-out"
+                  className="h-full bg-music-accent transition-all duration-500 ease-out"
                   style={{
                     width: `${
                       enrichmentProgress.total > 0
