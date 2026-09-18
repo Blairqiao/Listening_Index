@@ -341,7 +341,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 onClick={handleLogout}
                 disabled={isProcessingRef.current}
                 title="Lock session"
-                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-amber-400 px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
+                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
               >
                 <Lock className="w-3 h-3" />
                 <span>LOCK</span>
@@ -442,7 +442,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     <span>[ PROTECTED REPOSITORY ACTION ]</span>
                   </div>
                   <p className="text-[11px] text-[#A8A8A2] leading-relaxed">
-                    To protect your permanent playback history, only authorized administrators can ingest new stream events.
+                    Only authorized administrators can ingest new stream events.
                   </p>
                 </div>
 
@@ -453,7 +453,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                       htmlFor="admin-master-password"
                       className="block font-mono text-[10px] uppercase tracking-[0.1em] text-[#8A8A82] mb-1.5"
                     >
-                      ENTER MASTER PASSWORD
+                      ENTER PASSWORD
                     </label>
                     <div className="relative flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
                       <input
@@ -464,7 +464,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                           setPasswordInput(e.target.value);
                           if (authError) setAuthError(null);
                         }}
-                        placeholder="ENTER MASTER PASSWORD"
+                        placeholder="ENTER PASSWORD"
                         className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-3 py-2 focus:outline-none placeholder:text-[#52524C]"
                         autoComplete="current-password"
                       />

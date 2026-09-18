@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   Eye,
   EyeOff,
+  Lock,
 } from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
@@ -339,17 +340,6 @@ export const CustomizationModal: React.FC = () => {
             >
               [ ACTIVE CONFIGURATION ]
             </h2>
-            {isAuthenticated ? (
-              <span className="font-mono text-[10px] tracking-[0.08em] text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 inline-flex items-center gap-1 select-none whitespace-nowrap">
-                <ShieldCheck className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-                <span>[ OWNER · DATABASE ACCESS ]</span>
-              </span>
-            ) : (
-              <span className="font-mono text-[10px] tracking-[0.08em] text-amber-400 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 inline-flex items-center gap-1 select-none whitespace-nowrap">
-                <ShieldAlert className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                <span>[ GUEST · LOCAL CACHE ONLY ]</span>
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {isAuthenticated && (
@@ -357,9 +347,10 @@ export const CustomizationModal: React.FC = () => {
                 type="button"
                 onClick={handleLogout}
                 title="Log out (lock database access)"
-                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-amber-400 px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer select-none"
+                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
               >
-                LOGOUT
+                <Lock className="w-3 h-3" />
+                LOCK
               </button>
             )}
             <button
@@ -381,9 +372,7 @@ export const CustomizationModal: React.FC = () => {
               <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
                 [ 01 · IDENTITY ]
               </span>
-              <span className="font-mono text-[9px] text-[#6A6A64]">
-                DEFAULT: src/config.ts
-              </span>
+
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -564,7 +553,7 @@ export const CustomizationModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 mb-[-10]">
                 <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
                   GITHUB REPOSITORY URL
                 </label>
@@ -591,7 +580,7 @@ export const CustomizationModal: React.FC = () => {
 
           {/* In-Modal Minimal Password Strip (when locked) */}
           {!isAuthenticated && (
-            <div className="pt-2 border-t border-[#1F1F1C] space-y-2">
+            <div className="pt-3 border-t border-[#1F1F1C] space-y-2">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -701,7 +690,7 @@ export const CustomizationModal: React.FC = () => {
               ) : saveError ? (
                 <span>SAVE FAILED · RETRY</span>
               ) : hasUnsavedChanges ? (
-                <span>{isAuthenticated ? "SAVE & DEPLOY TO DATABASE" : "SAVE LOCALLY (CACHE ONLY)"}</span>
+                <span>{isAuthenticated ? "SAVE & DEPLOY TO DATABASE" : "SAVE LOCALLY"}</span>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5 text-music-accent" />
@@ -710,7 +699,7 @@ export const CustomizationModal: React.FC = () => {
                       ? isDbConfigured
                         ? "DEPLOYED TO DATABASE"
                         : "SAVED TO CONFIG.TS"
-                      : "SAVED LOCALLY (CACHE ONLY)"}
+                      : "SAVED LOCALLY"}
                   </span>
                 </>
               )}
