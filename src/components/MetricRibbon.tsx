@@ -75,11 +75,6 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
           >
             <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] flex items-center justify-between">
               <span>{label}</span>
-              {isToggleable && (
-                <span className="text-[9px] tracking-widest text-[#888882] ml-2 select-none">
-                  [MIN / HRS]
-                </span>
-              )}
             </div>
             <div className="font-mono text-[19px] sm:text-[20px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all">
               {metrics[i]}
