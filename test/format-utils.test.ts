@@ -172,4 +172,15 @@ test("formatCadenceTooltip formats dates month-first in upper and lowercase", ()
     formatCadenceTooltip(yearBucket, "all", "UTC"),
     "2024 — 12,450 plays"
   );
+
+  // Singular play count
+  const singularBucket = {
+    startTime: "2024-01-01T00:00:00.000Z",
+    endTime: "2024-12-31T23:59:59.000Z",
+    count: 1,
+  };
+  assert.equal(
+    formatCadenceTooltip(singularBucket, "all", "UTC"),
+    "2024 — 1 play"
+  );
 });
