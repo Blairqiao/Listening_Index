@@ -10,21 +10,34 @@ import {
   RangeKey,
   ActivityDay,
 } from "@/lib/mock-listening-data";
+import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "@/lib/format-utils";
 
 export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay };
+export type { OverviewMetricsRaw, StreamLogMetricsRaw };
+
+export interface ActivityBucket {
+  startTime: string; // ISO 8601 string
+  endTime: string; // ISO 8601 string
+  count: number; // Qualified plays count
+  isMarker?: boolean;
+  markerLabel?: string;
+}
 
 export interface OverviewData {
   logStartDate: string;
+  rawMetrics?: OverviewMetricsRaw;
   metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
   topTracks: TrackSummary[];
   topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
   topAlbums: AlbumSummary[];
   clockBuckets?: number[]; // 24 values representing hourly distribution (0-23)
-  activityCadence?: ActivityDay[];
+  activityCadence?: ActivityBucket[] | any;
   lastSyncedAt?: string;
 }
 
+
 export interface StreamLogData {
+  rawMetrics?: StreamLogMetricsRaw;
   metrics: [string, string, string, string]; // Total Plays, Logged Time, Unique Artists, Current Streak
   entries: StreamLogItem[];
   nextCursor?: string | null;
@@ -32,6 +45,7 @@ export interface StreamLogData {
   hasMore?: boolean;
   lastSyncedAt?: string;
 }
+
 
 export interface SessionData {
   isOpen: boolean;
