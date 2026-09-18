@@ -53,5 +53,5 @@ worktrees/
 
 # docs
 /docs/*
-!/docs/superpowers/
+!/docs/superpowers/*
 CONTEXT.md
