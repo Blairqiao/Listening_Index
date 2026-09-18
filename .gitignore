@@ -46,7 +46,9 @@ endsong_*.json
 *.zip
 
 # worktrees
+.worktrees
 .worktrees/
+worktrees
 worktrees/
 
 # docs
