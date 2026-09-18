@@ -18,6 +18,12 @@ import {
   SittingSession,
 } from "@/lib/mock-listening-data";
 import { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
+import {
+  formatOverviewMetrics,
+  formatStreamLogMetrics,
+  type OverviewMetricsRaw,
+  type StreamLogMetricsRaw,
+} from "@/lib/format-utils";
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
@@ -74,6 +80,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [activeRange, setActiveRange] = useState<RangeKey>("1w");
   // Displayed range stays frozen until the new range dataset has been fetched and cached
   const [displayedRange, setDisplayedRange] = useState<RangeKey>("1w");
+
+  // Overview time unit state: "minutes" | "hours", persisted to localStorage
+  const [overviewTimeUnit, setOverviewTimeUnit] = useState<"minutes" | "hours">(() => {
+    if (typeof window === "undefined") return "minutes";
+    try {
+      const saved = localStorage.getItem("listening_overview_time_unit");
+      return saved === "hours" ? "hours" : "minutes";
+    } catch {
+      return "minutes";
+    }
+  });
+
+  const handleToggleTimeUnit = useCallback(() => {
+    setOverviewTimeUnit((prev) => {
+      const next = prev === "minutes" ? "hours" : "minutes";
+      try {
+        localStorage.setItem("listening_overview_time_unit", next);
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // In-memory client cache per range key to eliminate flash and jitter on range toggling
   const [overviewCache, setOverviewCache] = useState<Partial<Record<RangeKey, OverviewData>>>(() => {
@@ -636,12 +663,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const currentOverview: OverviewData =
     overviewCache[displayedRange] || {
       logStartDate: "--",
-      rawMetrics: {
-        totalMs: 0,
-        trackCount: 0,
-        artistCount: 0,
-        elapsedDays: 1,
-      },
+      rawMetrics: undefined as unknown as OverviewMetricsRaw,
       metrics: ["--", "--", "--", "--"],
       topTracks: [],
       topArtists: [],
@@ -651,12 +673,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const streamLogData: StreamLogData =
     streamLogState || {
-      rawMetrics: {
-        totalPlays: 0,
-        uniqueTracks: 0,
-        uniqueArtists: 0,
-        streakDays: 0,
-      },
+      rawMetrics: undefined as unknown as StreamLogMetricsRaw,
       metrics: ["--", "--", "--", "--"],
       entries: [],
     };
@@ -693,9 +710,19 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [activeSitting, sessionData.metrics]);
 
   // Active metrics per mode
+  const overviewMetrics: [string, string, string, string] =
+    currentOverview.rawMetrics
+      ? formatOverviewMetrics(currentOverview.rawMetrics, overviewTimeUnit, displayedRange)
+      : currentOverview.metrics;
+
+  const streamMetrics: [string, string, string, string] =
+    streamLogData.rawMetrics
+      ? formatStreamLogMetrics(streamLogData.rawMetrics)
+      : streamLogData.metrics;
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
-    0: currentOverview.metrics,
-    1: streamLogData.metrics,
+    0: overviewMetrics,
+    1: streamMetrics,
     2: currentSessionMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
@@ -741,7 +768,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
-          <MetricRibbon mode={activeMode} metrics={currentMetrics} />
+          <MetricRibbon
+            mode={activeMode}
+            metrics={currentMetrics}
+            overviewTimeUnit={overviewTimeUnit}
+            onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
+          />
 
           {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
           <div
