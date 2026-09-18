@@ -184,3 +184,14 @@ test("formatCadenceTooltip formats dates month-first in upper and lowercase", ()
     "2024 — 1 play"
   );
 });
+
+test("Mock Data 6M cadence has valid markerLabel and isMarker for month transitions", async () => {
+  const { MOCK_DATA } = await import("../src/lib/mock-listening-data");
+  const cadence = MOCK_DATA.overview["6m"].activityCadence;
+  assert.equal(cadence.length, 26);
+  const markers = cadence.filter((item: any) => item.markerLabel);
+  assert.ok(markers.length >= 6, "Should have month markers across 6M");
+  assert.equal(markers[0].markerLabel, "MAR");
+  assert.equal(markers[markers.length - 1].markerLabel, "SEP");
+});
+

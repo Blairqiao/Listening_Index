@@ -434,11 +434,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
               {range === "6m" && (
                 <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
-                  {activityCadence
-                    .filter((item) => item.markerLabel)
-                    .map((item, i) => (
-                      <span key={i}>{item.markerLabel}</span>
-                    ))}
+                  {(activityCadence.some((item) => item.markerLabel)
+                    ? activityCadence.filter((item) => item.markerLabel)
+                    : activityCadence.filter((_, idx) => idx % 4 === 0 || idx === activityCadence.length - 1)
+                  ).map((item, i) => (
+                    <span key={i}>{item.markerLabel || item.date}</span>
+                  ))}
                 </div>
               )}
 
