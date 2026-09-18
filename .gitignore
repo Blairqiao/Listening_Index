@@ -51,7 +51,7 @@ endsong_*.json
 worktrees
 worktrees/
 
-# docs
-/docs/*
-!/docs/superpowers/
+# AI agent documentation and scratch artifacts
+docs/
+.superpowers/
 CONTEXT.md
