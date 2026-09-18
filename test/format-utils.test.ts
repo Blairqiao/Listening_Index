@@ -20,15 +20,21 @@ test("formatOverviewMetrics formats minutes correctly with commas", () => {
   assert.equal(dailyAvg, "2.8h");
 });
 
-test("formatOverviewMetrics formats hours with decimal for 1d and integer for all", () => {
+test("formatOverviewMetrics formats hours with decimal for 1d and 1w, and integer for 1m and all", () => {
   const rawShort = {
     totalMs: 12960000, // 3.6 hours
     trackCount: 42,
     artistCount: 20,
     elapsedDays: 1,
   };
-  const [timeShort] = formatOverviewMetrics(rawShort, "hours", "1d");
-  assert.equal(timeShort, "3.6");
+  const [time1d] = formatOverviewMetrics(rawShort, "hours", "1d");
+  assert.equal(time1d, "3.6");
+
+  const [time1w] = formatOverviewMetrics(rawShort, "hours", "1w");
+  assert.equal(time1w, "3.6");
+
+  const [time1m] = formatOverviewMetrics(rawShort, "hours", "1m");
+  assert.equal(time1m, "4");
 
   const rawLong = {
     totalMs: 7470000000, // 2,075 hours
@@ -80,6 +86,17 @@ test("formatCadenceTooltip formats dates month-first in upper and lowercase", ()
     "Aug 28 – Sep 03, 2026 — 92 plays"
   );
 
+  // 6M Weekly bucket crossing year boundary
+  const weekCrossYear = {
+    startTime: "2025-12-28T00:00:00.000Z",
+    endTime: "2026-01-03T23:59:59.000Z",
+    count: 50,
+  };
+  assert.equal(
+    formatCadenceTooltip(weekCrossYear, "6m", "UTC"),
+    "Dec 28, 2025 – Jan 03, 2026 — 50 plays"
+  );
+
   // 1Y Monthly bucket
   const monthBucket = {
     startTime: "2026-09-01T00:00:00.000Z",
@@ -89,6 +106,39 @@ test("formatCadenceTooltip formats dates month-first in upper and lowercase", ()
   assert.equal(
     formatCadenceTooltip(monthBucket, "1y", "UTC"),
     "Sep 2026 — 95 plays"
+  );
+
+  // 1M Daily bucket
+  const dayBucket = {
+    startTime: "2026-09-15T00:00:00.000Z",
+    endTime: "2026-09-15T23:59:59.000Z",
+    count: 24,
+  };
+  assert.equal(
+    formatCadenceTooltip(dayBucket, "1m", "UTC"),
+    "Sep 15, 2026 — 24 plays"
+  );
+
+  // 1W Hourly bucket
+  const hourRangeBucket = {
+    startTime: "2026-09-15T14:00:00.000Z",
+    endTime: "2026-09-15T16:00:00.000Z",
+    count: 12,
+  };
+  assert.equal(
+    formatCadenceTooltip(hourRangeBucket, "1w", "UTC"),
+    "Sep 15, 14:00–16:00 — 12 plays"
+  );
+
+  // 1D Hourly bucket
+  const singleHourBucket = {
+    startTime: "2026-09-15T14:30:00.000Z",
+    endTime: "2026-09-15T14:45:00.000Z",
+    count: 5,
+  };
+  assert.equal(
+    formatCadenceTooltip(singleHourBucket, "1d", "UTC"),
+    "14:30 — 5 plays"
   );
 
   // ALL Yearly bucket
