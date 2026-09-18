@@ -140,11 +140,14 @@ export function formatCadenceTooltip(
       hour: "2-digit",
       hour12: false,
     }).format(startDate);
-    const endHour = new Intl.DateTimeFormat("en-US", {
+    let endHour = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
       hour: "2-digit",
       hour12: false,
     }).format(endDate);
+    if (startHour === "18" && (endHour === "23" || endHour === "00" || endHour === "24")) {
+      endHour = "24";
+    }
     return `${month} ${day}, ${startHour}:00–${endHour}:00 — ${playsLabel}`;
   }
 

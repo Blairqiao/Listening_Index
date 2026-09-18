@@ -130,6 +130,27 @@ test("formatCadenceTooltip formats dates month-first in upper and lowercase", ()
     "Sep 15, 14:00–16:00 — 12 plays"
   );
 
+  // 1W 4th block (18:00 to 24:00)
+  const fourthBlockBucket = {
+    startTime: "2026-09-15T18:00:00.000Z",
+    endTime: "2026-09-15T23:59:59.999Z",
+    count: 18,
+  };
+  assert.equal(
+    formatCadenceTooltip(fourthBlockBucket, "1w", "UTC"),
+    "Sep 15, 18:00–24:00 — 18 plays"
+  );
+
+  const fourthBlockNextDayBucket = {
+    startTime: "2026-09-15T18:00:00.000Z",
+    endTime: "2026-09-16T00:00:00.000Z",
+    count: 22,
+  };
+  assert.equal(
+    formatCadenceTooltip(fourthBlockNextDayBucket, "1w", "UTC"),
+    "Sep 15, 18:00–24:00 — 22 plays"
+  );
+
   // 1D Hourly bucket
   const singleHourBucket = {
     startTime: "2026-09-15T14:30:00.000Z",
