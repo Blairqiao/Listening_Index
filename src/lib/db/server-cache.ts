@@ -96,11 +96,14 @@ export function setCachedSession(data: SessionData, tz = ""): void {
 
 const cacheClearListeners: Array<() => void> = [];
 
+let cacheEpoch = 0;
+
 export function registerCacheClearListener(listener: () => void): void {
   cacheClearListeners.push(listener);
 }
 
 export function clearServerCache(): void {
+  cacheEpoch++;
   cacheStore.overview.clear();
   cacheStore.streamLog.clear();
   cacheStore.session.clear();
@@ -150,10 +153,13 @@ export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
   const key = `${range}:${tz}`;
   let inFlight = cacheStore.inFlightOverview.get(key) as Promise<T> | undefined;
   if (!inFlight) {
+    const fetchEpoch = cacheEpoch;
     inFlight = (async () => {
       try {
         const data = await fetcher();
-        setCachedOverview(range, data, tz);
+        if (fetchEpoch === cacheEpoch) {
+          setCachedOverview(range, data, tz);
+        }
         return data;
       } finally {
         cacheStore.inFlightOverview.delete(key);
@@ -193,10 +199,13 @@ export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogDat
   const key = `${limit}:${tz}`;
   let inFlight = cacheStore.inFlightStreamLog.get(key) as Promise<T> | undefined;
   if (!inFlight) {
+    const fetchEpoch = cacheEpoch;
     inFlight = (async () => {
       try {
         const data = await fetcher();
-        setCachedStreamLog(limit, data, tz);
+        if (fetchEpoch === cacheEpoch) {
+          setCachedStreamLog(limit, data, tz);
+        }
         return data;
       } finally {
         cacheStore.inFlightStreamLog.delete(key);
@@ -233,10 +242,13 @@ export async function getOrFetchSession<T extends SessionData = SessionData>(
   const key = tz || "default";
   let inFlight = cacheStore.inFlightSession.get(key) as Promise<T> | undefined;
   if (!inFlight) {
+    const fetchEpoch = cacheEpoch;
     inFlight = (async () => {
       try {
         const data = await fetcher();
-        setCachedSession(data, tz);
+        if (fetchEpoch === cacheEpoch) {
+          setCachedSession(data, tz);
+        }
         return data;
       } finally {
         cacheStore.inFlightSession.delete(key);

@@ -59,7 +59,7 @@ export function formatCadenceTooltip(
 ): string {
   const startDate = new Date(bucket.startTime);
   const endDate = new Date(bucket.endTime);
-  const playsLabel = `${bucket.count.toLocaleString()} plays`;
+  const playsLabel = `${bucket.count.toLocaleString()} ${bucket.count === 1 ? "play" : "plays"}`;
 
   if (range === "all") {
     const year = new Intl.DateTimeFormat("en-US", {

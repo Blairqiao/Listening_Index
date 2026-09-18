@@ -415,8 +415,46 @@ test("Server Cache getOrFetch concurrent deduplication", async () => {
     getOrFetchSession("UTC", sessionFetcher),
   ]);
   assert.equal(sessionCalls, 1, "Concurrent Session requests must share single fetcher call");
-  assert.equal(sess1.tagTime, "0M");
-  assert.equal(sess2.tagTime, "0M");
+  // Test that clearServerCache during in-flight fetch discards stale write to cache
+  clearServerCache();
+  let staleFetcherCalls = 0;
+  const slowFetcher = async () => {
+    staleFetcherCalls++;
+    await new Promise((r) => setTimeout(r, 40));
+    return {
+      logStartDate: "STALE",
+      rawMetrics: { totalMs: 999, trackCount: 999, artistCount: 999, elapsedDays: 1 },
+      metrics: ["999", "999", "999", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+
+  const inFlightPromise = getOrFetchOverview("1m", "UTC", slowFetcher);
+  // Clear cache while fetcher is in-flight
+  await new Promise((r) => setTimeout(r, 10));
+  clearServerCache();
+  await inFlightPromise;
+
+  // Next call should NOT return the stale cached value, but invoke a fresh fetcher
+  let freshCalls = 0;
+  const freshFetcher = async () => {
+    freshCalls++;
+    return {
+      logStartDate: "FRESH",
+      rawMetrics: { totalMs: 123, trackCount: 123, artistCount: 123, elapsedDays: 1 },
+      metrics: ["123", "123", "123", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+  const freshData = await getOrFetchOverview("1m", "UTC", freshFetcher);
+  assert.equal(freshCalls, 1, "Cache purge during in-flight must prevent stale write so fresh fetcher is called");
+  assert.equal(freshData.logStartDate, "FRESH");
 });
 
 

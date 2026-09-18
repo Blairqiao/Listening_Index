@@ -81,16 +81,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Displayed range stays frozen until the new range dataset has been fetched and cached
   const [displayedRange, setDisplayedRange] = useState<RangeKey>("1w");
 
-  // Overview time unit state: "minutes" | "hours", persisted to localStorage
-  const [overviewTimeUnit, setOverviewTimeUnit] = useState<"minutes" | "hours">(() => {
-    if (typeof window === "undefined") return "minutes";
+  // Overview time unit state: "minutes" | "hours", initialized to "minutes" for SSR consistency
+  const [overviewTimeUnit, setOverviewTimeUnit] = useState<"minutes" | "hours">("minutes");
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("listening_overview_time_unit");
-      return saved === "hours" ? "hours" : "minutes";
-    } catch {
-      return "minutes";
-    }
-  });
+      if (saved === "hours" || saved === "minutes") {
+        setOverviewTimeUnit(saved);
+      }
+    } catch {}
+  }, []);
 
   const handleToggleTimeUnit = useCallback(() => {
     setOverviewTimeUnit((prev) => {
@@ -663,7 +664,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const currentOverview: OverviewData =
     overviewCache[displayedRange] || {
       logStartDate: "--",
-      rawMetrics: undefined as unknown as OverviewMetricsRaw,
+      rawMetrics: {
+        totalMs: 0,
+        trackCount: 0,
+        artistCount: 0,
+        elapsedDays: 1,
+      },
       metrics: ["--", "--", "--", "--"],
       topTracks: [],
       topArtists: [],
@@ -673,7 +679,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const streamLogData: StreamLogData =
     streamLogState || {
-      rawMetrics: undefined as unknown as StreamLogMetricsRaw,
+      rawMetrics: {
+        totalPlays: 0,
+        uniqueTracks: 0,
+        uniqueArtists: 0,
+        streakDays: 0,
+      },
       metrics: ["--", "--", "--", "--"],
       entries: [],
     };

@@ -352,9 +352,9 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       const count = hourMap.get(hourKey) || 0;
       clockBuckets[23 - i] = count;
 
-      const bucketStart = new Date(d);
-      bucketStart.setUTCMinutes(0, 0, 0);
-      const bucketEnd = new Date(bucketStart.getTime() + 3600000 - 1);
+      const [yr, mo, dy, hr] = [Number(m.year), Number(m.month) - 1, Number(m.day), Number(m.hour)];
+      const bucketStart = new Date(Date.UTC(yr, mo, dy, hr, 0, 0, 0));
+      const bucketEnd = new Date(Date.UTC(yr, mo, dy, hr, 59, 59, 999));
 
       activityCadence.push({
         date: `${m.hour}:00`,
@@ -519,8 +519,12 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     }
     const currentYear = now.getFullYear();
     const startYear = Math.min(minYear, currentYear);
+    const maxPlayYear = (cadenceRows as any[]).length > 0
+      ? Math.max(...(cadenceRows as any[]).map((r: any) => Number(r.play_year)))
+      : currentYear;
+    const endYear = Math.max(currentYear, Number.isFinite(maxPlayYear) ? maxPlayYear : currentYear);
 
-    for (let yr = startYear; yr <= currentYear; yr++) {
+    for (let yr = startYear; yr <= endYear; yr++) {
       const count = countMap.get(yr) || 0;
       activityCadence.push({
         date: String(yr),
