@@ -104,9 +104,6 @@ export function formatCadenceTooltip(
     const eDay = endParts.find((p) => p.type === "day")?.value || "";
     const eYear = endParts.find((p) => p.type === "year")?.value || "";
 
-    if (sMonth === eMonth && sYear === eYear) {
-      return `${sMonth} ${sDay} – ${eMonth} ${eDay}, ${sYear} — ${playsLabel}`;
-    }
     if (sYear === eYear) {
       return `${sMonth} ${sDay} – ${eMonth} ${eDay}, ${sYear} — ${playsLabel}`;
     }
