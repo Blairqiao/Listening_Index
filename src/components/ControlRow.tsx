@@ -48,7 +48,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           </>
         );
       case 1:
-        return "[ SCOPE ]";
+        return "[ STREAM LOG ]";
       case 2:
         return (
           <>
@@ -98,9 +98,14 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         const count = streamLogCount || 50;
         const total = totalPlays || "--";
         return (
-          <span className="font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-            [ LAST {count} ]
-          </span>
+          <>
+            <span className="sm:hidden font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+              [ LAST {count} ]
+            </span>
+            <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+              [ LAST {count} TRACKS ]
+            </span>
+          </>
         );
       }
       case 2:

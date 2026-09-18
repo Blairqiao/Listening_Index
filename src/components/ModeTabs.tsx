@@ -13,9 +13,9 @@ interface ModeTabsProps {
 }
 
 const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
-  { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVERVIEW ]" },
+  { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVR ]" },
   { id: 1, label: "[ 2 · STREAM LOG ]", abbrev: "[ LOG ]" },
-  { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SESSIONS ]" },
+  { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SES ]" },
 ];
 
 export const ModeTabs: React.FC<ModeTabsProps> = ({
