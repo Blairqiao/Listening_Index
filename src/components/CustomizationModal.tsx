@@ -250,7 +250,7 @@ export const CustomizationModal: React.FC = () => {
 
   // Save and apply changes to site (persists to Neon DB if authenticated, or local fallback)
   const handleSave = async () => {
-    if (!hasUnsavedChanges && !isSaving) return;
+    if (!hasUnsavedChanges && !saveError && !isSaving) return;
 
     setSaveError(null);
 
@@ -682,7 +682,7 @@ export const CustomizationModal: React.FC = () => {
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving || !hasUnsavedChanges}
+              disabled={isSaving || (!hasUnsavedChanges && !saveError)}
               className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
                 isSaving
                   ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
