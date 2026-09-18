@@ -1,9 +1,21 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { X, Upload, Check, AlertTriangle, FileArchive, Loader2 } from "lucide-react";
+import {
+  X,
+  Upload,
+  Check,
+  AlertTriangle,
+  FileArchive,
+  Loader2,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldAlert,
+} from "lucide-react";
 import { extractAudioHistoryEntries, isAudioHistoryFilename } from "@/lib/zip-utils";
 import { parseHistoryRecords, CompactPlayEvent } from "@/lib/history-parser";
+import { useConfig } from "@/context/ConfigContext";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -27,9 +39,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onUploadComplete,
   isDbConfigured,
 }) => {
+  const { isAuthenticated, login, logout } = useConfig();
+
   const [step, setStep] = useState<UploadStep>("idle");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Password challenge state
+  const [passwordInput, setPasswordInput] = useState<string>("");
+  const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // Ingestion Progress
   const [stage1Current, setStage1Current] = useState<number>(0);
@@ -99,6 +119,43 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
+
+  // Reset password challenge state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setPasswordInput("");
+      setAuthError(null);
+      setShowPassword(false);
+    }
+  }, [isOpen]);
+
+  const handleAuthenticate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!passwordInput.trim() || isAuthenticating) return;
+
+    setIsAuthenticating(true);
+    setAuthError(null);
+
+    try {
+      const res = await login(passwordInput);
+      if (res.success) {
+        setPasswordInput("");
+        setAuthError(null);
+        setStep("idle");
+      } else {
+        setAuthError(res.error || "Invalid administrator password");
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setStep("idle");
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -277,15 +334,29 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               [ IMPORT SPOTIFY STREAMING HISTORY ]
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isProcessingRef.current}
-            className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            title="Close modal (Esc)"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={isProcessingRef.current}
+                title="Lock session"
+                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-amber-400 px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
+              >
+                <Lock className="w-3 h-3" />
+                <span>LOCK</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isProcessingRef.current}
+              className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              title="Close modal (Esc)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -359,6 +430,109 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 A connected PostgreSQL database (<code className="text-[#FFC4C4]">DATABASE_URL</code>) is
                 required to store your streaming history.
               </p>
+            </div>
+          ) : !isAuthenticated ? (
+            /* Unauthenticated Locked Gate (Variant C) */
+            <div className="space-y-4">
+              <div className="border border-[#26261F] bg-[#0F0F0E] p-5 sm:p-6 space-y-4">
+                {/* Warning Banner */}
+                <div className="border border-amber-500/30 bg-amber-500/5 p-4 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold uppercase tracking-[0.08em] text-amber-400">
+                    <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+                    <span>[ PROTECTED REPOSITORY ACTION ]</span>
+                  </div>
+                  <p className="text-[11px] text-[#A8A8A2] leading-relaxed">
+                    To protect your permanent playback history, only authorized administrators can ingest new stream events.
+                  </p>
+                </div>
+
+                {/* Master Password Form */}
+                <form onSubmit={handleAuthenticate} className="space-y-3">
+                  <div>
+                    <label
+                      htmlFor="admin-master-password"
+                      className="block font-mono text-[10px] uppercase tracking-[0.1em] text-[#8A8A82] mb-1.5"
+                    >
+                      ENTER MASTER PASSWORD
+                    </label>
+                    <div className="relative flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
+                      <input
+                        id="admin-master-password"
+                        type={showPassword ? "text" : "password"}
+                        value={passwordInput}
+                        onChange={(e) => {
+                          setPasswordInput(e.target.value);
+                          if (authError) setAuthError(null);
+                        }}
+                        placeholder="ENTER MASTER PASSWORD"
+                        className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-3 py-2 focus:outline-none placeholder:text-[#52524C]"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="px-3 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
+                        title={showPassword ? "Hide password" : "Show password"}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {authError && (
+                    <div className="font-mono text-[10px] tracking-[0.06em] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
+                      [ {authError.toUpperCase()} ]
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isAuthenticating || !passwordInput.trim()}
+                    className="w-full py-2.5 px-4 bg-music-accent text-black font-bold uppercase tracking-[0.08em] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                  >
+                    {isAuthenticating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>AUTHENTICATING...</span>
+                      </>
+                    ) : (
+                      <span>AUTHENTICATE</span>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Standard Spotify Export Instructions Below */}
+              <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[#6A6A64] text-[10px] space-y-1.5">
+                <div className="flex items-center gap-1.5 text-[#EDEDE8] font-bold uppercase tracking-[0.08em]">
+                  <FileArchive className="w-3.5 h-3.5 text-music-accent" />
+                  <span>How to request your export from Spotify</span>
+                </div>
+                <p>
+                  1. Visit{" "}
+                  <a
+                    href="https://www.spotify.com/account/privacy/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-music-accent underline underline-offset-2 hover:opacity-80"
+                  >
+                    spotify.com/account/privacy
+                  </a>
+                  .
+                </p>
+                <p>
+                  2. Select <strong className="text-[#EDEDE8]">Extended streaming history</strong> and
+                  request download.
+                </p>
+                <p>
+                  3. Upload the resulting <code className="text-music-accent">.zip</code> or JSON files directly above.
+                </p>
+              </div>
             </div>
           ) : step === "idle" ? (
             /* Idle Drag & Drop Zone */
