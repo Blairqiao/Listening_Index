@@ -45,6 +45,10 @@ Streaming_History_*.json
 endsong_*.json
 *.zip
 
+# worktrees
+.worktrees/
+worktrees/
+
 # docs
 /docs/*
 !/docs/superpowers/
