@@ -46,5 +46,6 @@ endsong_*.json
 *.zip
 
 # docs
-/docs
+/docs/*
+!/docs/superpowers/
 CONTEXT.md
