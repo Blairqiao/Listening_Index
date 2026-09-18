@@ -9,7 +9,7 @@ import {
   SiteConfigState,
 } from "@/lib/db/queries";
 import { siteConfig } from "@/config";
-import { isSameOriginRequest } from "@/lib/auth-utils";
+import { isSameOriginRequest, isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { generateConfigTsCode, normalizeSiteConfig } from "@/lib/config-utils";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedAdminRequest(request)) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized: Admin authorization required to modify configuration." },
+      { status: 401 }
+    );
+  }
+
   if (!isSameOriginRequest(request)) {
     return NextResponse.json(
       { success: false, error: "Unauthorized: Cross-origin request not permitted" },

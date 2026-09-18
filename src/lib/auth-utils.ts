@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 
 /**
  * Validates whether an incoming HTTP request originated from the same host,
@@ -17,4 +18,9 @@ export function isSameOriginRequest(request: NextRequest): boolean {
     Boolean(origin && host && origin.includes(host)) ||
     Boolean(referer && host && referer.includes(host))
   );
+}
+
+export function isAuthorizedAdminRequest(request: NextRequest): boolean {
+  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  return verifySessionToken(cookie);
 }
