@@ -315,6 +315,89 @@ test("AsyncLatchCache Deep Module Concurrency & Invalidation", async () => {
   assert.equal(siteConfigCache.peek(), null);
 });
 
+test("Server Cache getOrFetch concurrent deduplication", async () => {
+  const {
+    getOrFetchOverview,
+    getOrFetchStreamLog,
+    getOrFetchSession,
+    clearServerCache,
+  } = await import("../src/lib/db/server-cache");
+  clearServerCache();
+
+  let calls = 0;
+  const fetcher = async () => {
+    calls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      logStartDate: "01 JAN 2026",
+      rawMetrics: { totalMs: 60000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
+      metrics: ["1", "1", "1", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+
+  const [d1, d2] = await Promise.all([
+    getOrFetchOverview("1w", "UTC", fetcher),
+    getOrFetchOverview("1w", "UTC", fetcher),
+  ]);
+
+  assert.equal(calls, 1, "Concurrent in-flight requests must share single fetcher call");
+  assert.equal(d1.rawMetrics.totalMs, 60000);
+  assert.equal(d2.rawMetrics.totalMs, 60000);
+
+  // Subsequent call within TTL returns cached value without re-invoking fetcher
+  const d3 = await getOrFetchOverview("1w", "UTC", fetcher);
+  assert.equal(calls, 1, "Cached call must not invoke fetcher");
+  assert.equal(d3.rawMetrics.totalMs, 60000);
+
+  // StreamLog concurrent deduplication
+  let streamLogCalls = 0;
+  const streamFetcher = async () => {
+    streamLogCalls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      rawMetrics: { totalPlays: 10, uniqueTracks: 8, uniqueArtists: 5, streakDays: 2 },
+      metrics: ["10", "8", "5", "2 DAYS"],
+      entries: [],
+    } as any;
+  };
+
+  const [s1, s2] = await Promise.all([
+    getOrFetchStreamLog(50, "UTC", streamFetcher),
+    getOrFetchStreamLog(50, "UTC", streamFetcher),
+  ]);
+  assert.equal(streamLogCalls, 1, "Concurrent StreamLog requests must share single fetcher call");
+  assert.equal(s1.rawMetrics.totalPlays, 10);
+  assert.equal(s2.rawMetrics.totalPlays, 10);
+
+  // Session concurrent deduplication
+  let sessionCalls = 0;
+  const sessionFetcher = async () => {
+    sessionCalls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      isOpen: false,
+      tagTime: "0M",
+      metrics: ["0", "0", "0", ""],
+      sittingTracks: [],
+      previousSittings: [],
+    } as any;
+  };
+
+  const [sess1, sess2] = await Promise.all([
+    getOrFetchSession("UTC", sessionFetcher),
+    getOrFetchSession("UTC", sessionFetcher),
+  ]);
+  assert.equal(sessionCalls, 1, "Concurrent Session requests must share single fetcher call");
+  assert.equal(sess1.tagTime, "0M");
+  assert.equal(sess2.tagTime, "0M");
+});
+
+
+
 test("Playback Debounce (30-second duplicate catch)", () => {
   // 1. Exact user incident: 5 events of trackA spaced 24s, 3.5s, 3.5s, 3.7s apart
   const incidentEvents = [
