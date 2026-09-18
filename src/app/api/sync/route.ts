@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncSpotify } from "../../../../scripts/sync-spotify";
 import { clearServerCache } from "@/lib/db/server-cache";
 import { isConfigured, isDbConfigured } from "@/lib/db";
-import { isSameOriginRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
@@ -10,32 +10,21 @@ export const maxDuration = 60; // Up to 60s execution allowance for serverless
 let isSyncInProgress = false;
 
 function isAuthorized(request: NextRequest): boolean {
-  // 1. Allow same-origin requests from our own application UI
-  if (isSameOriginRequest(request) && request.method === "POST") {
-    return true;
-  }
-
+  // 1. External machine-to-machine calls via CRON_SECRET
   const cronSecret = process.env.CRON_SECRET;
-
-  // In local development, bypass check if CRON_SECRET is not yet configured
-  if (!isConfigured(cronSecret)) {
-    if (process.env.NODE_ENV === "development") {
-      return true;
-    }
-    console.error("[AUTH ERROR · /api/sync] CRON_SECRET environment variable is missing or unconfigured.");
-    return false;
-  }
-
-  // 2. Check Bearer token (Standard for cron-job.org / external webcrons)
   const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) {
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
     return true;
   }
 
-  // 3. Check query parameter fallback (?key=... or ?secret=...)
   const url = new URL(request.url);
   const keyParam = url.searchParams.get("key") || url.searchParams.get("secret");
-  if (keyParam === cronSecret) {
+  if (cronSecret && keyParam === cronSecret) {
+    return true;
+  }
+
+  // 2. Browser-initiated requests from UI require admin authorization session
+  if (isAuthorizedAdminRequest(request)) {
     return true;
   }
 

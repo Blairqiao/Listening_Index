@@ -9,7 +9,7 @@ import {
   generateConfigTsCode as buildConfigTsCode,
 } from "@/lib/config-utils";
 
-export type { SiteConfigState };
+export type { ConfigContextType, SiteConfigState };
 
 interface ConfigContextType {
   config: SiteConfigState;
@@ -22,6 +22,10 @@ interface ConfigContextType {
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
+  isAuthenticated: boolean;
+  isPasswordConfigured: boolean;
+  login: (password: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
 }
 
 const STORAGE_KEY = "listening_index_config";
@@ -34,9 +38,20 @@ export const ConfigProvider: React.FC<{
   children: React.ReactNode;
   initialConfig?: SiteConfigState;
   isDbConfigured?: boolean;
+  initialIsAuthenticated?: boolean;
+  initialIsPasswordConfigured?: boolean;
   onConfigChange?: (newConfig: SiteConfigState, prevConfig: SiteConfigState) => void;
-}> = ({ children, initialConfig, isDbConfigured: propIsDbConfigured = true, onConfigChange }) => {
+}> = ({
+  children,
+  initialConfig,
+  isDbConfigured: propIsDbConfigured = true,
+  initialIsAuthenticated = false,
+  initialIsPasswordConfigured = false,
+  onConfigChange,
+}) => {
   const [isDb, setIsDb] = useState<boolean>(propIsDbConfigured);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialIsAuthenticated);
+  const [isPasswordConfigured, setIsPasswordConfigured] = useState<boolean>(initialIsPasswordConfigured);
 
   // Initialize config once from initialConfig or localStorage or defaults
   const [config, setConfig] = useState<SiteConfigState>(() => {
@@ -174,6 +189,77 @@ export const ConfigProvider: React.FC<{
     return buildConfigTsCode(config);
   }, [config]);
 
+  // Probe admin authentication status on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    fetch("/api/auth/status")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Status HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (typeof data?.isAuthenticated === "boolean") {
+          setIsAuthenticated(data.isAuthenticated);
+        }
+        const configured =
+          typeof data?.isConfigured === "boolean"
+            ? data.isConfigured
+            : typeof data?.isPasswordConfigured === "boolean"
+            ? data.isPasswordConfigured
+            : undefined;
+        if (typeof configured === "boolean") {
+          setIsPasswordConfigured(configured);
+        }
+      })
+      .catch((err) => {
+        console.warn("[AUTH] Failed to probe auth status:", err);
+        setIsAuthenticated(false);
+      });
+  }, []);
+
+  const login = useCallback(
+    async (password: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.success) {
+          setIsAuthenticated(true);
+          setIsPasswordConfigured(true);
+          return { success: true };
+        }
+        setIsAuthenticated(false);
+        return {
+          success: false,
+          error: typeof data?.error === "string" ? data.error : "Authentication failed.",
+        };
+      } catch (err: unknown) {
+        setIsAuthenticated(false);
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Network error during authentication.",
+        };
+      }
+    },
+    []
+  );
+
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+    } catch (err: unknown) {
+      console.warn("[AUTH] Logout error:", err);
+    } finally {
+      setIsAuthenticated(false);
+    }
+  }, []);
+
   const openModal = useCallback(() => setIsModalOpen(true), []);
   const closeModal = useCallback(() => setIsModalOpen(false), []);
 
@@ -190,6 +276,10 @@ export const ConfigProvider: React.FC<{
         isModalOpen,
         openModal,
         closeModal,
+        isAuthenticated,
+        isPasswordConfigured,
+        login,
+        logout,
       }}
     >
       {children}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, isDbConfigured } from "@/lib/db";
+import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import {
   bulkUpsertTracks,
   bulkInsertPlays,
@@ -12,6 +13,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedAdminRequest(request)) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized: Admin authorization required to import streaming history." },
+      { status: 401 }
+    );
+  }
+
   try {
     // 1. Enforce Preconditions (Only requires DB)
     if (!isDbConfigured()) {
