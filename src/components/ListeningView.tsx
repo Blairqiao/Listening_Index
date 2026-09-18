@@ -636,6 +636,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const currentOverview: OverviewData =
     overviewCache[displayedRange] || {
       logStartDate: "--",
+      rawMetrics: {
+        totalMs: 0,
+        trackCount: 0,
+        artistCount: 0,
+        elapsedDays: 1,
+      },
       metrics: ["--", "--", "--", "--"],
       topTracks: [],
       topArtists: [],

@@ -30,16 +30,35 @@ test("Database Schema Check", async () => {
   assert.equal(typeof fullyEnriched, "boolean");
 });
 
-test("Overview Data across all ranges", async () => {
+test("Overview Data across all ranges returns rawMetrics and valid activityCadence", async () => {
   const ranges = ["1d", "1w", "1m", "6m", "1y", "all"] as const;
   for (const range of ranges) {
     const data = await getOverviewData(range);
     assert.ok(data, `Data should exist for range ${range}`);
+    assert.ok(data.rawMetrics, `rawMetrics must exist for ${range}`);
+    assert.equal(typeof data.rawMetrics.totalMs, "number");
+    assert.equal(typeof data.rawMetrics.trackCount, "number");
+    assert.equal(typeof data.rawMetrics.artistCount, "number");
+    assert.equal(typeof data.rawMetrics.elapsedDays, "number");
+
     assert.equal(data.metrics.length, 4, `Metrics should have 4 elements for ${range}`);
     assert.ok(Array.isArray(data.topTracks), `topTracks should be array for ${range}`);
     assert.ok(Array.isArray(data.topArtists), `topArtists should be array for ${range}`);
     assert.ok(Array.isArray(data.topAlbums), `topAlbums should be array for ${range}`);
-    assert.ok(Array.isArray(data.activityCadence), `activityCadence should be array for ${range}`);
+    assert.ok(Array.isArray(data.activityCadence), `activityCadence must be array for ${range}`);
+
+    if (data.activityCadence.length > 0) {
+      const bucket = data.activityCadence[0];
+      assert.ok(bucket.startTime, `bucket must have startTime for ${range}`);
+      assert.ok(bucket.endTime, `bucket must have endTime for ${range}`);
+      assert.equal(typeof bucket.count, "number");
+    }
+    if (range === "all") {
+      // In all range, each bucket represents a year
+      const firstYear = new Date(data.activityCadence[0].startTime).getFullYear();
+      const lastYear = new Date(data.activityCadence[data.activityCadence.length - 1].startTime).getFullYear();
+      assert.ok(lastYear >= firstYear, "Yearly cadence must be chronological");
+    }
 
     if (data.topTracks.length > 0) {
       const t = data.topTracks[0];
