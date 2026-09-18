@@ -30,8 +30,8 @@ export interface OverviewData {
 
 
 export interface StreamLogData {
-  rawMetrics?: StreamLogMetricsRaw;
-  metrics: [string, string, string, string]; // Total Plays, Logged Time, Unique Artists, Current Streak
+  rawMetrics: StreamLogMetricsRaw;
+  metrics: [string, string, string, string]; // Total Plays, Unique Tracks, Unique Artists, Current Streak
   entries: StreamLogItem[];
   nextCursor?: string | null;
   nextCursorId?: string | null;

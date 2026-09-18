@@ -1,11 +1,8 @@
 import { isDbConfigured } from "../index";
 import {
-  getCachedOverview,
-  setCachedOverview,
-  getCachedStreamLog,
-  setCachedStreamLog,
-  getCachedSession,
-  setCachedSession,
+  getOrFetchOverview,
+  getOrFetchStreamLog,
+  getOrFetchSession,
 } from "../server-cache";
 import { getOverviewData } from "./overview";
 import { getStreamLog } from "./stream-log";
@@ -26,32 +23,9 @@ export async function getInitialMusicData(): Promise<{
   }
 
   try {
-    const overviewPromise = (async () => {
-      let overview = getCachedOverview("1w");
-      if (!overview) {
-        overview = await getOverviewData("1w");
-        setCachedOverview("1w", overview);
-      }
-      return overview;
-    })();
-
-    const streamLogPromise = (async () => {
-      let streamLog = getCachedStreamLog(50);
-      if (!streamLog) {
-        streamLog = await getStreamLog(50);
-        setCachedStreamLog(50, streamLog);
-      }
-      return streamLog;
-    })();
-
-    const sessionPromise = (async () => {
-      let session = getCachedSession();
-      if (!session) {
-        session = await getCurrentSession();
-        setCachedSession(session);
-      }
-      return session;
-    })();
+    const overviewPromise = getOrFetchOverview("1w", () => getOverviewData("1w"));
+    const streamLogPromise = getOrFetchStreamLog(50, () => getStreamLog(50));
+    const sessionPromise = getOrFetchSession(() => getCurrentSession());
 
     const [overviewResult, streamLogResult, sessionResult] = await Promise.allSettled([
       overviewPromise,

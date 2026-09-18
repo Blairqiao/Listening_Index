@@ -651,6 +651,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const streamLogData: StreamLogData =
     streamLogState || {
+      rawMetrics: {
+        totalPlays: 0,
+        uniqueTracks: 0,
+        uniqueArtists: 0,
+        streakDays: 0,
+      },
       metrics: ["--", "--", "--", "--"],
       entries: [],
     };

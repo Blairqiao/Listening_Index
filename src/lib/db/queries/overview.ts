@@ -353,7 +353,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       clockBuckets[23 - i] = count;
 
       const bucketStart = new Date(d);
-      bucketStart.setMinutes(0, 0, 0);
+      bucketStart.setUTCMinutes(0, 0, 0);
       const bucketEnd = new Date(bucketStart.getTime() + 3600000 - 1);
 
       activityCadence.push({

@@ -1,4 +1,4 @@
-import type { OverviewMetricsRaw } from "./format-utils";
+import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
 
 export type Mode = 0 | 1 | 2; // 0 = Overview, 1 = Stream Log, 2 = Session
 export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
@@ -156,7 +156,8 @@ export interface OverviewData {
 export interface MockListeningData {
   overview: Record<RangeKey, OverviewData>;
   streamLog: {
-    metrics: [string, string, string, string]; // Plays, Time, Artists, Streak
+    rawMetrics: StreamLogMetricsRaw;
+    metrics: [string, string, string, string]; // Plays, Unique Tracks, Artists, Streak
     entries: StreamLogItem[];
     nextCursor?: string | null;
     nextCursorId?: string | null;
@@ -919,7 +920,13 @@ export const MOCK_DATA: MockListeningData = {
   // Mode 1: Stream Log (50 Plays, Day Groups, Session Gaps)
   // -------------------------------------------------------------------------
   streamLog: {
-    metrics: ["150", "9h 45m", "34", "14 DAYS"],
+    rawMetrics: {
+      totalPlays: 150,
+      uniqueTracks: 84,
+      uniqueArtists: 34,
+      streakDays: 14,
+    },
+    metrics: ["150", "84", "34", "14 DAYS"],
     hasMore: true,
     nextCursor: "2026-09-07T18:54:00.000Z",
     nextCursorId: "sl-50",
@@ -5161,6 +5168,7 @@ export function getMockStreamLog(
   prevDayGroup?: string,
   prevPlayedAt?: string
 ): {
+  rawMetrics: StreamLogMetricsRaw;
   metrics: [string, string, string, string];
   entries: StreamLogItem[];
   hasMore: boolean;
@@ -5212,7 +5220,13 @@ export function getMockStreamLog(
   });
 
   return {
-    metrics: ["150", "9h 45m", "34", "14 DAYS"],
+    rawMetrics: {
+      totalPlays: 150,
+      uniqueTracks: 84,
+      uniqueArtists: 34,
+      streakDays: 14,
+    },
+    metrics: ["150", "84", "34", "14 DAYS"],
     entries,
     hasMore,
     nextCursor: lastEntry?.playedAt ?? null,
