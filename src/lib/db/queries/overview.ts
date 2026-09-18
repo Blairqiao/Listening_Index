@@ -9,11 +9,10 @@ import {
   formatDurationMs,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
-import type { OverviewData, RangeKey } from "./types";
+import type { OverviewData, RangeKey, ActivityBucket } from "./types";
 import type {
   TrackSummary,
   AlbumSummary,
-  ActivityDay,
 } from "@/lib/mock-listening-data";
 
 export const OVERVIEW_INTERVAL_CONFIG: Record<
@@ -36,6 +35,9 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   const tz = sanitizeTimezone(tzOverride);
   const isEnrichedPromise = isCatalogFullyEnriched();
   const isAll = range === "all";
+  const timeFilter = isAll
+    ? sql`TRUE`
+    : sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
 
   // 1. Min Date (Log Start Date)
   const minDatePromise = sql`
@@ -43,28 +45,17 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   `;
 
   // 2. Metrics Ribbon
-  const metricPromise = isAll
-    ? sql`
-        SELECT 
-          COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
-          COUNT(DISTINCT p.track_id)::bigint AS tracks,
-          COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
-          COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
-          MIN(p.played_at) AS window_min_date
-        FROM plays p
-        JOIN tracks t ON p.track_id = t.id;
-      `
-    : sql`
-        SELECT 
-          COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
-          COUNT(DISTINCT p.track_id)::bigint AS tracks,
-          COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
-          COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
-          MIN(p.played_at) AS window_min_date
-        FROM plays p
-        JOIN tracks t ON p.track_id = t.id
-        WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval;
-      `;
+  const metricPromise = sql`
+    SELECT 
+      COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
+      COUNT(DISTINCT p.track_id)::bigint AS tracks,
+      COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
+      COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
+      MIN(p.played_at) AS window_min_date
+    FROM plays p
+    JOIN tracks t ON p.track_id = t.id
+    WHERE ${timeFilter};
+  `;
 
   // 3. Top Tracks with Drift
   const topTracksPromise = isAll
@@ -137,138 +128,46 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       `;
 
   // 4. Top Artists (Top 5)
-  const topArtistsPromise = isEnrichedPromise.then((isEnriched) =>
-    isAll
-      ? isEnriched
-        ? sql`
-            SELECT 
-              t.artist_id AS id,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE t.artist_id IS NOT NULL
-            GROUP BY t.artist_id
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-        : sql`
-            SELECT 
-              MAX(t.artist_id) AS id,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            GROUP BY t.artist_group_key
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-      : isEnriched
-        ? sql`
-            SELECT 
-              t.artist_id AS id,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
-              AND t.artist_id IS NOT NULL
-            GROUP BY t.artist_id
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-        : sql`
-            SELECT 
-              MAX(t.artist_id) AS id,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
-            GROUP BY t.artist_group_key
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-  );
+  const topArtistsPromise = isEnrichedPromise.then((isEnriched) => {
+    const artistGroupCol = isEnriched ? sql`t.artist_id` : sql`t.artist_group_key`;
+    const enrichedFilter = isEnriched ? sql`t.artist_id IS NOT NULL` : sql`TRUE`;
+    return sql`
+      SELECT 
+        ${isEnriched ? sql`t.artist_id` : sql`MAX(t.artist_id)`} AS id,
+        COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
+        COUNT(p.id)::int AS count
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      WHERE ${timeFilter} AND ${enrichedFilter}
+      GROUP BY ${artistGroupCol}
+      ORDER BY count DESC, name ASC
+      LIMIT 5;
+    `;
+  });
 
   // 5. Top Albums (Top 5)
-  const topAlbumsPromise = isEnrichedPromise.then((isEnriched) =>
-    isAll
-      ? isEnriched
-        ? sql`
-            SELECT 
-              t.album_id AS id,
-              COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
-              MAX(t.artist_id) AS artist_id,
-              MAX(al.image_url) AS image_url,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN albums al ON t.album_id = al.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE t.album_id IS NOT NULL
-            GROUP BY t.album_id
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-        : sql`
-            SELECT 
-              MAX(t.album_id) AS id,
-              COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
-              MAX(t.artist_id) AS artist_id,
-              MAX(al.image_url) AS image_url,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN albums al ON t.album_id = al.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            GROUP BY t.album_group_key
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-      : isEnriched
-        ? sql`
-            SELECT 
-              t.album_id AS id,
-              COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
-              MAX(t.artist_id) AS artist_id,
-              MAX(al.image_url) AS image_url,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN albums al ON t.album_id = al.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
-              AND t.album_id IS NOT NULL
-            GROUP BY t.album_id
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-        : sql`
-            SELECT 
-              MAX(t.album_id) AS id,
-              COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
-              COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
-              MAX(t.artist_id) AS artist_id,
-              MAX(al.image_url) AS image_url,
-              COUNT(p.id)::int AS count
-            FROM plays p
-            JOIN tracks t ON p.track_id = t.id
-            LEFT JOIN albums al ON t.album_id = al.id
-            LEFT JOIN artists ar ON t.artist_id = ar.id
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
-            GROUP BY t.album_group_key
-            ORDER BY count DESC, name ASC
-            LIMIT 5;
-          `
-  );
+  const topAlbumsPromise = isEnrichedPromise.then((isEnriched) => {
+    const albumGroupCol = isEnriched ? sql`t.album_id` : sql`t.album_group_key`;
+    const enrichedFilter = isEnriched ? sql`t.album_id IS NOT NULL` : sql`TRUE`;
+    return sql`
+      SELECT 
+        ${isEnriched ? sql`t.album_id` : sql`MAX(t.album_id)`} AS id,
+        COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
+        COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
+        MAX(t.artist_id) AS artist_id,
+        MAX(al.image_url) AS image_url,
+        COUNT(p.id)::int AS count
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      WHERE ${timeFilter} AND ${enrichedFilter}
+      GROUP BY ${albumGroupCol}
+      ORDER BY count DESC, name ASC
+      LIMIT 5;
+    `;
+  });
 
   // 6. Activity cadence query
   let cadenceQueryPromise;
@@ -321,10 +220,11 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   } else {
     cadenceQueryPromise = sql`
       SELECT 
-          TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym,
+          EXTRACT(YEAR FROM p.played_at AT TIME ZONE ${tz})::int AS play_year,
           COUNT(*)::int AS count
       FROM plays p
-      GROUP BY ym;
+      GROUP BY play_year
+      ORDER BY play_year ASC;
     `;
   }
 
@@ -368,10 +268,21 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     elapsedDays = OVERVIEW_INTERVAL_CONFIG[range].elapsedDays;
   }
 
-  const minutesStr = Number(metricRow?.minutes || 0).toLocaleString();
-  const tracksStr = Number(metricRow?.tracks || 0).toLocaleString();
-  const artistsStr = Number(metricRow?.artists || 0).toLocaleString();
-  const totalHours = Number(metricRow?.total_ms || 0) / 3600000.0;
+  const totalMs = Number(metricRow?.total_ms || 0);
+  const trackCount = Number(metricRow?.tracks || 0);
+  const artistCount = Number(metricRow?.artists || 0);
+
+  const rawMetrics = {
+    totalMs,
+    trackCount,
+    artistCount,
+    elapsedDays,
+  };
+
+  const minutesStr = Math.round(totalMs / 60000).toLocaleString();
+  const tracksStr = trackCount.toLocaleString();
+  const artistsStr = artistCount.toLocaleString();
+  const totalHours = totalMs / 3600000.0;
   const dailyAvgStr = `${(totalHours / elapsedDays).toFixed(1)}h`;
   const metrics: [string, string, string, string] = [
     minutesStr,
@@ -417,7 +328,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 
   // Process activity cadence
   let clockBuckets: number[] | undefined = undefined;
-  let activityCadence: ActivityDay[] = [];
+  const activityCadence: ActivityBucket[] = [];
   const now = new Date();
 
   if (range === "1d") {
@@ -425,7 +336,6 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       (cadenceRows as any[]).map((r) => [r.hour_key, Number(r.count)])
     );
     clockBuckets = new Array(24).fill(0);
-    activityCadence = [];
 
     for (let i = 23; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 3600000);
@@ -441,8 +351,15 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       const hourKey = `${m.year}-${m.month}-${m.day} ${m.hour}`;
       const count = hourMap.get(hourKey) || 0;
       clockBuckets[23 - i] = count;
+
+      const [yr, mo, dy, hr] = [Number(m.year), Number(m.month) - 1, Number(m.day), Number(m.hour)];
+      const bucketStart = new Date(Date.UTC(yr, mo, dy, hr, 0, 0, 0));
+      const bucketEnd = new Date(Date.UTC(yr, mo, dy, hr, 59, 59, 999));
+
       activityCadence.push({
         date: `${m.hour}:00`,
+        startTime: bucketStart.toISOString(),
+        endTime: bucketEnd.toISOString(),
         count,
       });
     }
@@ -467,11 +384,20 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       }).format(d);
       const dayLabel = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
       const dayNumber = dayLabel.split(" ")[0];
+      const [year, month, day] = dayKey.split("-").map(Number);
 
       for (let b = 0; b < 4; b++) {
         const count = blockMap.get(`${dayKey}_${b}`) || 0;
+        const startHour = b * 6;
+        const startTime = new Date(Date.UTC(year, month - 1, day, startHour, 0, 0, 0)).toISOString();
+        const endTime = b === 3
+          ? new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString()
+          : new Date(Date.UTC(year, month - 1, day, startHour + 6, 0, 0, 0)).toISOString();
+
         activityCadence.push({
           date: `${dayLabel} ${BLOCK_TIMES[b]}`,
+          startTime,
+          endTime,
           count,
           isMarker: b === 0,
           markerLabel: b === 0 ? dayNumber : undefined,
@@ -493,8 +419,14 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       const label = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
       const idx = 29 - i;
       const isMarker = idx === 0 || idx === 7 || idx === 14 || idx === 21 || idx === 29;
+      const [year, month, day] = dayKey.split("-").map(Number);
+      const startTime = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
+      const endTime = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
+
       activityCadence.push({
         date: label,
+        startTime,
+        endTime,
         count: countMap.get(dayKey) || 0,
         isMarker,
         markerLabel: isMarker ? label : undefined,
@@ -508,6 +440,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     for (let w = 25; w >= 0; w--) {
       let weekCount = 0;
       let weekStartKey = "";
+      let weekEndKey = "";
       for (let dayOffset = 6; dayOffset >= 0; dayOffset--) {
         const totalDaysAgo = w * 7 + dayOffset;
         const d = new Date(now.getTime() - totalDaysAgo * 86400000);
@@ -518,6 +451,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
           day: "2-digit",
         }).format(d);
         if (!weekStartKey) weekStartKey = dayKey;
+        if (dayOffset === 0) weekEndKey = dayKey;
         weekCount += countMap.get(dayKey) || 0;
       }
 
@@ -529,15 +463,21 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       const isNewMonth = monthAbbr !== lastMonth;
       if (isNewMonth) lastMonth = monthAbbr;
 
+      const [sYear, sMonth, sDay] = weekStartKey.split("-").map(Number);
+      const [eYear, eMonth, eDay] = weekEndKey.split("-").map(Number);
+      const startTime = new Date(Date.UTC(sYear, sMonth - 1, sDay, 0, 0, 0, 0)).toISOString();
+      const endTime = new Date(Date.UTC(eYear, eMonth - 1, eDay, 23, 59, 59, 999)).toISOString();
+
       activityCadence.push({
         date: `W${26 - w}`,
+        startTime,
+        endTime,
         count: weekCount,
         isMarker: isNewMonth,
         markerLabel: isNewMonth ? monthAbbr : undefined,
       });
     }
-  } else {
-    // Both 1y and all: 12-month cadence
+  } else if (range === "1y") {
     const countMap = new Map<string, number>(
       (cadenceRows as any[]).map((r: any) => [String(r.ym), Number(r.count)])
     );
@@ -549,15 +489,55 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
         month: "short",
       }).format(d).toUpperCase();
 
+      const yr = d.getFullYear();
+      const mo = d.getMonth();
+      const startTime = new Date(Date.UTC(yr, mo, 1, 0, 0, 0, 0)).toISOString();
+      const endTime = new Date(Date.UTC(yr, mo + 1, 0, 23, 59, 59, 999)).toISOString();
+
       activityCadence.push({
         date: monthAbbr,
+        startTime,
+        endTime,
         count: countMap.get(ymKey) || 0,
+      });
+    }
+  } else {
+    // range === "all"
+    const countMap = new Map<number, number>(
+      (cadenceRows as any[]).map((r: any) => [Number(r.play_year), Number(r.count)])
+    );
+    const minRowYear = minDateRow?.log_start_date
+      ? new Date(minDateRow.log_start_date).getFullYear()
+      : now.getFullYear() - 1;
+
+    let minYear = minRowYear;
+    if (cadenceRows && (cadenceRows as any[]).length > 0) {
+      const minPlayYear = Math.min(...(cadenceRows as any[]).map((r: any) => Number(r.play_year)));
+      if (Number.isFinite(minPlayYear)) {
+        minYear = Math.min(minYear, minPlayYear);
+      }
+    }
+    const currentYear = now.getFullYear();
+    const startYear = Math.min(minYear, currentYear);
+    const maxPlayYear = (cadenceRows as any[]).length > 0
+      ? Math.max(...(cadenceRows as any[]).map((r: any) => Number(r.play_year)))
+      : currentYear;
+    const endYear = Math.max(currentYear, Number.isFinite(maxPlayYear) ? maxPlayYear : currentYear);
+
+    for (let yr = startYear; yr <= endYear; yr++) {
+      const count = countMap.get(yr) || 0;
+      activityCadence.push({
+        date: String(yr),
+        startTime: new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0)).toISOString(),
+        endTime: new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999)).toISOString(),
+        count,
       });
     }
   }
 
   return {
     logStartDate,
+    rawMetrics,
     metrics,
     topTracks,
     topArtists,

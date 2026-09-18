@@ -30,16 +30,35 @@ test("Database Schema Check", async () => {
   assert.equal(typeof fullyEnriched, "boolean");
 });
 
-test("Overview Data across all ranges", async () => {
+test("Overview Data across all ranges returns rawMetrics and valid activityCadence", async () => {
   const ranges = ["1d", "1w", "1m", "6m", "1y", "all"] as const;
   for (const range of ranges) {
     const data = await getOverviewData(range);
     assert.ok(data, `Data should exist for range ${range}`);
+    assert.ok(data.rawMetrics, `rawMetrics must exist for ${range}`);
+    assert.equal(typeof data.rawMetrics.totalMs, "number");
+    assert.equal(typeof data.rawMetrics.trackCount, "number");
+    assert.equal(typeof data.rawMetrics.artistCount, "number");
+    assert.equal(typeof data.rawMetrics.elapsedDays, "number");
+
     assert.equal(data.metrics.length, 4, `Metrics should have 4 elements for ${range}`);
     assert.ok(Array.isArray(data.topTracks), `topTracks should be array for ${range}`);
     assert.ok(Array.isArray(data.topArtists), `topArtists should be array for ${range}`);
     assert.ok(Array.isArray(data.topAlbums), `topAlbums should be array for ${range}`);
-    assert.ok(Array.isArray(data.activityCadence), `activityCadence should be array for ${range}`);
+    assert.ok(Array.isArray(data.activityCadence), `activityCadence must be array for ${range}`);
+
+    if (data.activityCadence.length > 0) {
+      const bucket = data.activityCadence[0];
+      assert.ok(bucket.startTime, `bucket must have startTime for ${range}`);
+      assert.ok(bucket.endTime, `bucket must have endTime for ${range}`);
+      assert.equal(typeof bucket.count, "number");
+    }
+    if (range === "all") {
+      // In all range, each bucket represents a year
+      const firstYear = new Date(data.activityCadence[0].startTime).getFullYear();
+      const lastYear = new Date(data.activityCadence[data.activityCadence.length - 1].startTime).getFullYear();
+      assert.ok(lastYear >= firstYear, "Yearly cadence must be chronological");
+    }
 
     if (data.topTracks.length > 0) {
       const t = data.topTracks[0];
@@ -58,9 +77,13 @@ test("Overview Data across all ranges", async () => {
   }
 });
 
-test("Stream Log Keyset Pagination", async () => {
+test("Stream Log Keyset Pagination & rawMetrics", async () => {
   const page1 = await getStreamLog(20);
-  assert.ok(page1.metrics.length === 4);
+  assert.ok(page1.rawMetrics, "page1 must have rawMetrics");
+  assert.equal(typeof page1.rawMetrics.totalPlays, "number");
+  assert.equal(typeof page1.rawMetrics.uniqueTracks, "number");
+  assert.equal(typeof page1.rawMetrics.uniqueArtists, "number");
+  assert.equal(typeof page1.rawMetrics.streakDays, "number");
   assert.equal(page1.entries.length, 20);
   assert.ok(page1.hasMore);
   assert.ok(page1.nextCursor);
@@ -314,6 +337,127 @@ test("AsyncLatchCache Deep Module Concurrency & Invalidation", async () => {
   assert.equal(catalogStatusCache.peek(), null);
   assert.equal(siteConfigCache.peek(), null);
 });
+
+test("Server Cache getOrFetch concurrent deduplication", async () => {
+  const {
+    getOrFetchOverview,
+    getOrFetchStreamLog,
+    getOrFetchSession,
+    clearServerCache,
+  } = await import("../src/lib/db/server-cache");
+  clearServerCache();
+
+  let calls = 0;
+  const fetcher = async () => {
+    calls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      logStartDate: "01 JAN 2026",
+      rawMetrics: { totalMs: 60000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
+      metrics: ["1", "1", "1", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+
+  const [d1, d2] = await Promise.all([
+    getOrFetchOverview("1w", "UTC", fetcher),
+    getOrFetchOverview("1w", "UTC", fetcher),
+  ]);
+
+  assert.equal(calls, 1, "Concurrent in-flight requests must share single fetcher call");
+  assert.equal(d1.rawMetrics.totalMs, 60000);
+  assert.equal(d2.rawMetrics.totalMs, 60000);
+
+  // Subsequent call within TTL returns cached value without re-invoking fetcher
+  const d3 = await getOrFetchOverview("1w", "UTC", fetcher);
+  assert.equal(calls, 1, "Cached call must not invoke fetcher");
+  assert.equal(d3.rawMetrics.totalMs, 60000);
+
+  // StreamLog concurrent deduplication
+  let streamLogCalls = 0;
+  const streamFetcher = async () => {
+    streamLogCalls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      rawMetrics: { totalPlays: 10, uniqueTracks: 8, uniqueArtists: 5, streakDays: 2 },
+      metrics: ["10", "8", "5", "2 DAYS"],
+      entries: [],
+    } as any;
+  };
+
+  const [s1, s2] = await Promise.all([
+    getOrFetchStreamLog(50, "UTC", streamFetcher),
+    getOrFetchStreamLog(50, "UTC", streamFetcher),
+  ]);
+  assert.equal(streamLogCalls, 1, "Concurrent StreamLog requests must share single fetcher call");
+  assert.equal(s1.rawMetrics.totalPlays, 10);
+  assert.equal(s2.rawMetrics.totalPlays, 10);
+
+  // Session concurrent deduplication
+  let sessionCalls = 0;
+  const sessionFetcher = async () => {
+    sessionCalls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return {
+      isOpen: false,
+      tagTime: "0M",
+      metrics: ["0", "0", "0", ""],
+      sittingTracks: [],
+      previousSittings: [],
+    } as any;
+  };
+
+  const [sess1, sess2] = await Promise.all([
+    getOrFetchSession("UTC", sessionFetcher),
+    getOrFetchSession("UTC", sessionFetcher),
+  ]);
+  assert.equal(sessionCalls, 1, "Concurrent Session requests must share single fetcher call");
+  // Test that clearServerCache during in-flight fetch discards stale write to cache
+  clearServerCache();
+  let staleFetcherCalls = 0;
+  const slowFetcher = async () => {
+    staleFetcherCalls++;
+    await new Promise((r) => setTimeout(r, 40));
+    return {
+      logStartDate: "STALE",
+      rawMetrics: { totalMs: 999, trackCount: 999, artistCount: 999, elapsedDays: 1 },
+      metrics: ["999", "999", "999", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+
+  const inFlightPromise = getOrFetchOverview("1m", "UTC", slowFetcher);
+  // Clear cache while fetcher is in-flight
+  await new Promise((r) => setTimeout(r, 10));
+  clearServerCache();
+  await inFlightPromise;
+
+  // Next call should NOT return the stale cached value, but invoke a fresh fetcher
+  let freshCalls = 0;
+  const freshFetcher = async () => {
+    freshCalls++;
+    return {
+      logStartDate: "FRESH",
+      rawMetrics: { totalMs: 123, trackCount: 123, artistCount: 123, elapsedDays: 1 },
+      metrics: ["123", "123", "123", "0.0h"],
+      topTracks: [],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    } as any;
+  };
+  const freshData = await getOrFetchOverview("1m", "UTC", freshFetcher);
+  assert.equal(freshCalls, 1, "Cache purge during in-flight must prevent stale write so fresh fetcher is called");
+  assert.equal(freshData.logStartDate, "FRESH");
+});
+
+
 
 test("Playback Debounce (30-second duplicate catch)", () => {
   // 1. Exact user incident: 5 events of trackA spaced 24s, 3.5s, 3.5s, 3.7s apart

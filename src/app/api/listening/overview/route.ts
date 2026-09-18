@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOverviewData, RangeKey } from "@/lib/db/queries";
-import { getCachedOverview, setCachedOverview } from "@/lib/db/server-cache";
+import { getOrFetchOverview } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
 
@@ -37,12 +37,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Check server cache first
-    let overviewData = getCachedOverview(range, tzParam || "");
-    if (!overviewData) {
-      overviewData = await getOverviewData(range, tzParam);
-      setCachedOverview(range, overviewData, tzParam || "");
-    }
+    const overviewData = await getOrFetchOverview(range, tzParam || "", () =>
+      getOverviewData(range, tzParam)
+    );
 
     return NextResponse.json(overviewData, {
       status: 200,

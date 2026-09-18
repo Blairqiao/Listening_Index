@@ -1,3 +1,5 @@
+import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
+
 export type Mode = 0 | 1 | 2; // 0 = Overview, 1 = Stream Log, 2 = Session
 export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
 
@@ -128,27 +130,34 @@ export interface AlbumSummary {
   count: number; // e.g., 241
 }
 
-export interface ActivityDay {
-  date: string; // '05 SEP', 'W34', etc.
+export interface ActivityBucket {
+  startTime: string; // ISO 8601 string
+  endTime: string; // ISO 8601 string
   count: number;
   isMarker?: boolean;
   markerLabel?: string;
+  date: string;
 }
+
+export type ActivityDay = ActivityBucket;
 
 export interface OverviewData {
   logStartDate: string;
+  rawMetrics: OverviewMetricsRaw;
   metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
   topTracks: TrackSummary[];
   topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
   topAlbums: AlbumSummary[];
   clockBuckets?: number[]; // 24 values
-  activityCadence?: ActivityDay[]; // Multi-scale activity distribution
+  activityCadence: ActivityBucket[]; // Multi-scale activity distribution
+  lastSyncedAt?: string;
 }
 
 export interface MockListeningData {
   overview: Record<RangeKey, OverviewData>;
   streamLog: {
-    metrics: [string, string, string, string]; // Plays, Time, Artists, Streak
+    rawMetrics: StreamLogMetricsRaw;
+    metrics: [string, string, string, string]; // Plays, Unique Tracks, Artists, Streak
     entries: StreamLogItem[];
     nextCursor?: string | null;
     nextCursorId?: string | null;
@@ -662,6 +671,12 @@ export const MOCK_DATA: MockListeningData = {
   overview: {
     "1d": {
       logStartDate: "08 SEP 2026",
+      rawMetrics: {
+        totalMs: 12900000,
+        trackCount: 42,
+        artistCount: 20,
+        elapsedDays: 1,
+      },
       metrics: ["215", "42", "20", "3.6h"],
       topTracks: TOP_TRACKS_1D,
       topArtists: [
@@ -680,11 +695,17 @@ export const MOCK_DATA: MockListeningData = {
       ],
       activityCadence: (() => {
         const counts = [2, 1, 0, 0, 0, 0, 0, 1, 3, 5, 8, 4, 3, 6, 7, 2, 4, 9, 12, 14, 8, 6, 3, 1];
+        const base = new Date("2026-09-08T23:00:00.000Z");
         return Array.from({ length: 24 }, (_, idx) => {
           const hoursAgo = 23 - idx;
-          const h = (new Date().getHours() - hoursAgo + 24) % 24;
+          const d = new Date(base.getTime() - hoursAgo * 3600000);
+          d.setUTCMinutes(0, 0, 0);
+          const end = new Date(d.getTime() + 3600000 - 1);
+          const h = d.getUTCHours();
           return {
             date: `${h < 10 ? `0${h}` : h}:00`,
+            startTime: d.toISOString(),
+            endTime: end.toISOString(),
             count: counts[idx % counts.length],
           };
         });
@@ -692,6 +713,12 @@ export const MOCK_DATA: MockListeningData = {
     },
     "1w": {
       logStartDate: "02 SEP 2026",
+      rawMetrics: {
+        totalMs: 91200000,
+        trackCount: 194,
+        artistCount: 58,
+        elapsedDays: 7,
+      },
       metrics: ["1,520", "194", "58", "3.6h"],
       topTracks: TOP_TRACKS_1W,
       topArtists: [
@@ -709,14 +736,22 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "05", name: "Rumours", artist: "Fleetwood Mac", id: "1BZhsjlBYzDbKyJdYBMxev", artistId: "08GQAI4e5rBaRujQwE7AVn", count: 14 },
       ],
       activityCadence: (() => {
-        const blocks: ActivityDay[] = [];
+        const blocks: ActivityBucket[] = [];
         const BLOCK_TIMES = ["00:00–06:00", "06:00–12:00", "12:00–18:00", "18:00–24:00"];
         const dayLabels = ["03 SEP", "04 SEP", "05 SEP", "06 SEP", "07 SEP", "08 SEP", "09 SEP"];
         for (let i = 0; i < 7; i++) {
+          const dayNum = i + 3;
           for (let b = 0; b < 4; b++) {
             const count = Math.max(1, Math.round(Math.sin((i * 4 + b) * 0.6) * 10 + 9));
+            const startHour = b * 6;
+            const startTime = new Date(Date.UTC(2026, 8, dayNum, startHour, 0, 0, 0)).toISOString();
+            const endTime = b === 3
+              ? new Date(Date.UTC(2026, 8, dayNum, 23, 59, 59, 999)).toISOString()
+              : new Date(Date.UTC(2026, 8, dayNum, startHour + 6, 0, 0, 0)).toISOString();
             blocks.push({
               date: `${dayLabels[i]} ${BLOCK_TIMES[b]}`,
+              startTime,
+              endTime,
               count,
               isMarker: b === 0,
               markerLabel: b === 0 ? dayLabels[i].split(" ")[0] : undefined,
@@ -728,6 +763,12 @@ export const MOCK_DATA: MockListeningData = {
     },
     "1m": {
       logStartDate: "09 AUG 2026",
+      rawMetrics: {
+        totalMs: 416400000,
+        trackCount: 375,
+        artistCount: 92,
+        elapsedDays: 30,
+      },
       metrics: ["6,940", "375", "92", "3.8h"],
       topTracks: TOP_TRACKS_1M,
       topArtists: [
@@ -748,8 +789,12 @@ export const MOCK_DATA: MockListeningData = {
         const day = i + 10;
         const dStr = day <= 31 ? `${day} AUG` : `${day - 31} SEP`;
         const isMarker = i === 0 || i === 7 || i === 14 || i === 21 || i === 29;
+        const monthIndex = day <= 31 ? 7 : 8; // 7 = Aug, 8 = Sep
+        const calendarDay = day <= 31 ? day : day - 31;
         return {
           date: dStr,
+          startTime: new Date(Date.UTC(2026, monthIndex, calendarDay, 0, 0, 0, 0)).toISOString(),
+          endTime: new Date(Date.UTC(2026, monthIndex, calendarDay, 23, 59, 59, 999)).toISOString(),
           count: 14 + Math.round(Math.sin(i * 0.45) * 12 + (i % 4) * 6),
           isMarker,
           markerLabel: isMarker ? dStr : undefined,
@@ -758,6 +803,12 @@ export const MOCK_DATA: MockListeningData = {
     },
     "6m": {
       logStartDate: "09 MAR 2026",
+      rawMetrics: {
+        totalMs: 2526000000,
+        trackCount: 1890,
+        artistCount: 320,
+        elapsedDays: 180,
+      },
       metrics: ["42,100", "1,890", "320", "3.9h"],
       topTracks: TOP_TRACKS_6M,
       topArtists: [
@@ -774,13 +825,42 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "04", name: "To Pimp a Butterfly", artist: "Kendrick Lamar", id: "7ycBtnsMtyVbbw3fMwR2nM", artistId: "2YZyLoL8N0Wb9xBt1NhZWg", count: 420 },
         { rank: "05", name: "Currents", artist: "Tame Impala", id: "79dL7FLiJFOO0EoehTaA1m", artistId: "5INjqkS1o8h1imAzPqGZBb", count: 390 },
       ],
-      activityCadence: Array.from({ length: 26 }, (_, i) => ({
-        date: `W${i + 1}`,
-        count: 85 + Math.round(Math.sin(i * 0.38) * 38 + (i % 3) * 14),
-      })),
+      activityCadence: (() => {
+        const base = new Date(Date.UTC(2026, 8, 9, 0, 0, 0, 0));
+        let lastMonth = "";
+        return Array.from({ length: 26 }, (_, i) => {
+          const weekEnd = new Date(base.getTime() - (25 - i) * 7 * 86400000);
+          weekEnd.setUTCHours(23, 59, 59, 999);
+          const weekStart = new Date(weekEnd.getTime() - 7 * 86400000 + 1);
+          weekStart.setUTCHours(0, 0, 0, 0);
+
+          const monthAbbr = new Intl.DateTimeFormat("en-US", {
+            timeZone: "UTC",
+            month: "short",
+          }).format(weekStart).toUpperCase();
+
+          const isNewMonth = monthAbbr !== lastMonth;
+          if (isNewMonth) lastMonth = monthAbbr;
+
+          return {
+            date: `W${i + 1}`,
+            startTime: weekStart.toISOString(),
+            endTime: weekEnd.toISOString(),
+            count: 85 + Math.round(Math.sin(i * 0.38) * 38 + (i % 3) * 14),
+            isMarker: isNewMonth,
+            markerLabel: isNewMonth ? monthAbbr : undefined,
+          };
+        });
+      })(),
     },
     "1y": {
       logStartDate: "09 SEP 2025",
+      rawMetrics: {
+        totalMs: 6912000000,
+        trackCount: 4250,
+        artistCount: 740,
+        elapsedDays: 365,
+      },
       metrics: ["115,200", "4,250", "740", "3.7h"],
       topTracks: TOP_TRACKS_1Y,
       topArtists: [
@@ -798,14 +878,33 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "05", name: "Abbey Road", artist: "The Beatles", id: "0ETFjACtuP2ADo6LFhL6HN", artistId: "3WrFJ7ztbogyGnTHbHJFl2", count: 960 },
       ],
       activityCadence: [
-        "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP"
-      ].map((date, i) => ({
-        date,
+        { month: 9, year: 2025, name: "OCT" },
+        { month: 10, year: 2025, name: "NOV" },
+        { month: 11, year: 2025, name: "DEC" },
+        { month: 0, year: 2026, name: "JAN" },
+        { month: 1, year: 2026, name: "FEB" },
+        { month: 2, year: 2026, name: "MAR" },
+        { month: 3, year: 2026, name: "APR" },
+        { month: 4, year: 2026, name: "MAY" },
+        { month: 5, year: 2026, name: "JUN" },
+        { month: 6, year: 2026, name: "JUL" },
+        { month: 7, year: 2026, name: "AUG" },
+        { month: 8, year: 2026, name: "SEP" },
+      ].map((item, i) => ({
+        date: item.name,
+        startTime: new Date(Date.UTC(item.year, item.month, 1, 0, 0, 0, 0)).toISOString(),
+        endTime: new Date(Date.UTC(item.year, item.month + 1, 0, 23, 59, 59, 999)).toISOString(),
         count: 95 + Math.round(Math.sin(i * 0.48) * 36 + (i % 4) * 12),
       })),
     },
     all: {
       logStartDate: "14 AUG 2024",
+      rawMetrics: {
+        totalMs: 13104000000,
+        trackCount: 8620,
+        artistCount: 1310,
+        elapsedDays: 1040,
+      },
       metrics: ["218,400", "8,620", "1,310", "3.5h"],
       topTracks: TOP_TRACKS_ALL,
       topArtists: [
@@ -822,11 +921,11 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "04", name: "To Pimp a Butterfly", artist: "Kendrick Lamar", id: "7ycBtnsMtyVbbw3fMwR2nM", artistId: "2YZyLoL8N0Wb9xBt1NhZWg", count: 2210 },
         { rank: "05", name: "Abbey Road", artist: "The Beatles", id: "0ETFjACtuP2ADo6LFhL6HN", artistId: "3WrFJ7ztbogyGnTHbHJFl2", count: 1860 },
       ],
-      activityCadence: [
-        "OCT", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP"
-      ].map((date, i) => ({
-        date,
-        count: 125 + Math.round(Math.cos(i * 0.45) * 44 + (i % 3) * 18),
+      activityCadence: [2024, 2025, 2026].map((yr, i) => ({
+        date: String(yr),
+        startTime: new Date(Date.UTC(yr, 0, 1, 0, 0, 0, 0)).toISOString(),
+        endTime: new Date(Date.UTC(yr, 11, 31, 23, 59, 59, 999)).toISOString(),
+        count: [54200, 98400, 65800][i],
       })),
     },
   },
@@ -835,7 +934,13 @@ export const MOCK_DATA: MockListeningData = {
   // Mode 1: Stream Log (50 Plays, Day Groups, Session Gaps)
   // -------------------------------------------------------------------------
   streamLog: {
-    metrics: ["150", "9h 45m", "34", "14 DAYS"],
+    rawMetrics: {
+      totalPlays: 150,
+      uniqueTracks: 84,
+      uniqueArtists: 34,
+      streakDays: 14,
+    },
+    metrics: ["150", "84", "34", "14 DAYS"],
     hasMore: true,
     nextCursor: "2026-09-07T18:54:00.000Z",
     nextCursorId: "sl-50",
@@ -5077,6 +5182,7 @@ export function getMockStreamLog(
   prevDayGroup?: string,
   prevPlayedAt?: string
 ): {
+  rawMetrics: StreamLogMetricsRaw;
   metrics: [string, string, string, string];
   entries: StreamLogItem[];
   hasMore: boolean;
@@ -5128,7 +5234,13 @@ export function getMockStreamLog(
   });
 
   return {
-    metrics: ["150", "9h 45m", "34", "14 DAYS"],
+    rawMetrics: {
+      totalPlays: 150,
+      uniqueTracks: 84,
+      uniqueArtists: 34,
+      streakDays: 14,
+    },
+    metrics: ["150", "84", "34", "14 DAYS"],
     entries,
     hasMore,
     nextCursor: lastEntry?.playedAt ?? null,

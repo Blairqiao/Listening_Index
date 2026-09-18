@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentSession } from "@/lib/db/queries";
-import { getCachedSession, setCachedSession } from "@/lib/db/server-cache";
+import { getOrFetchSession } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
 
@@ -23,12 +23,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Check server cache first
-    let sessionData = getCachedSession(tzParam || "");
-    if (!sessionData) {
-      sessionData = await getCurrentSession(tzParam);
-      setCachedSession(sessionData, tzParam || "");
-    }
+    const sessionData = await getOrFetchSession(tzParam || "", () =>
+      getCurrentSession(tzParam)
+    );
 
     return NextResponse.json(sessionData, {
       status: 200,

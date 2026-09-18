@@ -117,31 +117,24 @@ export async function getPendingTracksForEnrichment(
   await ensureTablesExist();
   const sql = getDb();
 
-  let rows: any[] = [];
-  if (options.trackIds && options.trackIds.length > 0) {
-    rows = ((await sql`
-      SELECT id, name, artist_name, album_name, album_group_key
-      FROM tracks
-      WHERE id = ANY(${options.trackIds}::text[])
-        AND enrichment_status = 'pending'
-      LIMIT ${batchSize};
-    `) as any);
-  } else {
-    // Chronological background ordering: prioritize tracks played most recently
-    rows = ((await sql`
-      WITH latest_plays AS (
-        SELECT track_id, MAX(played_at) AS max_played_at
-        FROM plays
-        GROUP BY track_id
-      )
-      SELECT t.id, t.name, t.artist_name, t.album_name, t.album_group_key
-      FROM tracks t
-      LEFT JOIN latest_plays lp ON t.id = lp.track_id
-      WHERE t.enrichment_status = 'pending'
-      ORDER BY lp.max_played_at DESC NULLS LAST, t.id ASC
-      LIMIT ${batchSize};
-    `) as any);
-  }
+  const trackFilter =
+    options.trackIds && options.trackIds.length > 0
+      ? sql`t.id = ANY(${options.trackIds}::text[])`
+      : sql`TRUE`;
+
+  const rows = ((await sql`
+    WITH latest_plays AS (
+      SELECT track_id, MAX(played_at) AS max_played_at
+      FROM plays
+      GROUP BY track_id
+    )
+    SELECT t.id, t.name, t.artist_name, t.album_name, t.album_group_key
+    FROM tracks t
+    LEFT JOIN latest_plays lp ON t.id = lp.track_id
+    WHERE t.enrichment_status = 'pending' AND ${trackFilter}
+    ORDER BY lp.max_played_at DESC NULLS LAST, t.id ASC
+    LIMIT ${batchSize};
+  `) as any);
 
   return rows.map((r: any) => ({
     id: r.id,

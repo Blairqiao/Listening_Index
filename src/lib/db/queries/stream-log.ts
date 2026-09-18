@@ -9,7 +9,7 @@ import {
   formatDurationHoursMinutes,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
-import type { StreamLogData, StreamLogItem } from "./types";
+import type { StreamLogData, StreamLogItem, StreamLogMetricsRaw } from "./types";
 
 /**
  * Mode 2: Retrieves the chronological stream log buffer of recent plays and lifetime metrics.
@@ -41,17 +41,56 @@ export async function getStreamLog(
     status: string;
   }
 
+  let rawMetrics: StreamLogMetricsRaw = {
+    totalPlays: 0,
+    uniqueTracks: 0,
+    uniqueArtists: 0,
+    streakDays: 0,
+  };
   let metrics: [string, string, string, string] = ["--", "--", "--", "--"];
   let streamRows: StreamRow[];
   let lastSync: string | undefined;
 
   const lastSyncPromise = getLastSync("spotify");
 
+  const isNumericCursorId = Boolean(cursorId && /^\d+$/.test(cursorId));
+  const cursorClause = !cursorTimestamp
+    ? sql`TRUE`
+    : isNumericCursorId
+    ? sql`(p.played_at < ${cursorTimestamp}::timestamptz) OR (p.played_at = ${cursorTimestamp}::timestamptz AND p.id < ${cursorId}::bigint)`
+    : sql`p.played_at < ${cursorTimestamp}::timestamptz`;
+
+  const streamRowsPromise = sql`
+    SELECT 
+        p.id::text,
+        p.played_at,
+        p.track_id,
+        ar.id AS artist_id,
+        al.id AS album_id,
+        al.image_url AS album_image_url,
+        t.name AS title,
+        COALESCE(ar.name, t.artist_name, '') AS artist,
+        COALESCE(al.name, t.album_name, '') AS album,
+        t.duration_ms,
+        CASE 
+            WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
+            WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
+            ELSE '[FULL]'
+        END AS status
+    FROM plays p
+    JOIN tracks t ON p.track_id = t.id
+    LEFT JOIN albums al ON t.album_id = al.id
+    LEFT JOIN artists ar ON t.artist_id = ar.id
+    WHERE ${cursorClause}
+    ORDER BY p.played_at DESC, p.id DESC
+    LIMIT ${clampedLimit + 1};
+  `;
+
   if (!cursorTimestamp) {
     const totalsPromise = sql`
       SELECT 
         COUNT(*)::bigint AS total_plays,
-        COALESCE(ROUND(SUM(ms_played) / 3600000.0), 0)::bigint AS logged_hours,
+        COUNT(DISTINCT p.track_id)::bigint AS unique_tracks,
         COUNT(DISTINCT t.artist_group_key)::bigint AS unique_artists
       FROM plays p
       JOIN tracks t ON p.track_id = t.id;
@@ -62,31 +101,6 @@ export async function getStreamLog(
       FROM plays
       WHERE played_at >= NOW() - INTERVAL '120 days'
       ORDER BY play_date DESC;
-    `;
-
-    const streamRowsPromise = sql`
-      SELECT 
-          p.id::text,
-          p.played_at,
-          p.track_id,
-          ar.id AS artist_id,
-          al.id AS album_id,
-          al.image_url AS album_image_url,
-          t.name AS title,
-          COALESCE(ar.name, t.artist_name, '') AS artist,
-          COALESCE(al.name, t.album_name, '') AS album,
-          t.duration_ms,
-          CASE 
-              WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
-              WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-              ELSE '[FULL]'
-          END AS status
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id
-      LEFT JOIN albums al ON t.album_id = al.id
-      LEFT JOIN artists ar ON t.artist_id = ar.id
-      ORDER BY p.played_at DESC, p.id DESC
-      LIMIT ${clampedLimit + 1};
     `;
 
     const [totalsResult, dateRowsResult, streamRowsResult, lastSyncResult] =
@@ -101,10 +115,6 @@ export async function getStreamLog(
     const dateRows = dateRowsResult as any;
     streamRows = streamRowsResult as any;
     lastSync = lastSyncResult;
-
-    const totalPlaysStr = Number(totalsRow?.total_plays || 0).toLocaleString();
-    const loggedHoursStr = `${Number(totalsRow?.logged_hours || 0)}h`;
-    const uniqueArtistsStr = Number(totalsRow?.unique_artists || 0).toLocaleString();
 
     // Streak calculation
     let currentStreak = 0;
@@ -138,68 +148,29 @@ export async function getStreamLog(
       }
     }
 
+    const totalPlays = Number(totalsRow?.total_plays || 0);
+    const uniqueTracks = Number(totalsRow?.unique_tracks || 0);
+    const uniqueArtists = Number(totalsRow?.unique_artists || 0);
+
+    rawMetrics = {
+      totalPlays,
+      uniqueTracks,
+      uniqueArtists,
+      streakDays: currentStreak,
+    };
+
+    const totalPlaysStr = totalPlays.toLocaleString();
+    const uniqueTracksStr = uniqueTracks.toLocaleString();
+    const uniqueArtistsStr = uniqueArtists.toLocaleString();
     const streakStr = `${currentStreak} ${currentStreak === 1 ? "DAY" : "DAYS"}`;
+
     metrics = [
       totalPlaysStr,
-      loggedHoursStr,
+      uniqueTracksStr,
       uniqueArtistsStr,
       streakStr,
     ];
   } else {
-    const isNumericCursorId = Boolean(cursorId && /^\d+$/.test(cursorId));
-    const streamRowsPromise = isNumericCursorId
-      ? sql`
-        SELECT 
-            p.id::text,
-            p.played_at,
-            p.track_id,
-            ar.id AS artist_id,
-            al.id AS album_id,
-            al.image_url AS album_image_url,
-            t.name AS title,
-            COALESCE(ar.name, t.artist_name, '') AS artist,
-            COALESCE(al.name, t.album_name, '') AS album,
-            t.duration_ms,
-            CASE 
-                WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
-                WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-                ELSE '[FULL]'
-            END AS status
-        FROM plays p
-        JOIN tracks t ON p.track_id = t.id
-        LEFT JOIN albums al ON t.album_id = al.id
-        LEFT JOIN artists ar ON t.artist_id = ar.id
-        WHERE (p.played_at < ${cursorTimestamp}::timestamptz)
-           OR (p.played_at = ${cursorTimestamp}::timestamptz AND p.id < ${cursorId}::bigint)
-        ORDER BY p.played_at DESC, p.id DESC
-        LIMIT ${clampedLimit + 1};
-      `
-      : sql`
-        SELECT 
-            p.id::text,
-            p.played_at,
-            p.track_id,
-            ar.id AS artist_id,
-            al.id AS album_id,
-            al.image_url AS album_image_url,
-            t.name AS title,
-            COALESCE(ar.name, t.artist_name, '') AS artist,
-            COALESCE(al.name, t.album_name, '') AS album,
-            t.duration_ms,
-            CASE 
-                WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
-                WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-                ELSE '[FULL]'
-            END AS status
-        FROM plays p
-        JOIN tracks t ON p.track_id = t.id
-        LEFT JOIN albums al ON t.album_id = al.id
-        LEFT JOIN artists ar ON t.artist_id = ar.id
-        WHERE p.played_at < ${cursorTimestamp}::timestamptz
-        ORDER BY p.played_at DESC, p.id DESC
-        LIMIT ${clampedLimit + 1};
-      `;
-
     const [streamRowsResult, lastSyncResult] = await Promise.all([
       streamRowsPromise,
       lastSyncPromise,
@@ -335,6 +306,7 @@ export async function getStreamLog(
   }
 
   return {
+    rawMetrics,
     metrics,
     entries,
     nextCursor,
