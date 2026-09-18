@@ -825,19 +825,33 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "04", name: "To Pimp a Butterfly", artist: "Kendrick Lamar", id: "7ycBtnsMtyVbbw3fMwR2nM", artistId: "2YZyLoL8N0Wb9xBt1NhZWg", count: 420 },
         { rank: "05", name: "Currents", artist: "Tame Impala", id: "79dL7FLiJFOO0EoehTaA1m", artistId: "5INjqkS1o8h1imAzPqGZBb", count: 390 },
       ],
-      activityCadence: Array.from({ length: 26 }, (_, i) => {
+      activityCadence: (() => {
         const base = new Date(Date.UTC(2026, 8, 9, 0, 0, 0, 0));
-        const weekEnd = new Date(base.getTime() - (25 - i) * 7 * 86400000);
-        weekEnd.setUTCHours(23, 59, 59, 999);
-        const weekStart = new Date(weekEnd.getTime() - 7 * 86400000 + 1);
-        weekStart.setUTCHours(0, 0, 0, 0);
-        return {
-          date: `W${i + 1}`,
-          startTime: weekStart.toISOString(),
-          endTime: weekEnd.toISOString(),
-          count: 85 + Math.round(Math.sin(i * 0.38) * 38 + (i % 3) * 14),
-        };
-      }),
+        let lastMonth = "";
+        return Array.from({ length: 26 }, (_, i) => {
+          const weekEnd = new Date(base.getTime() - (25 - i) * 7 * 86400000);
+          weekEnd.setUTCHours(23, 59, 59, 999);
+          const weekStart = new Date(weekEnd.getTime() - 7 * 86400000 + 1);
+          weekStart.setUTCHours(0, 0, 0, 0);
+
+          const monthAbbr = new Intl.DateTimeFormat("en-US", {
+            timeZone: "UTC",
+            month: "short",
+          }).format(weekStart).toUpperCase();
+
+          const isNewMonth = monthAbbr !== lastMonth;
+          if (isNewMonth) lastMonth = monthAbbr;
+
+          return {
+            date: `W${i + 1}`,
+            startTime: weekStart.toISOString(),
+            endTime: weekEnd.toISOString(),
+            count: 85 + Math.round(Math.sin(i * 0.38) * 38 + (i % 3) * 14),
+            isMarker: isNewMonth,
+            markerLabel: isNewMonth ? monthAbbr : undefined,
+          };
+        });
+      })(),
     },
     "1y": {
       logStartDate: "09 SEP 2025",
