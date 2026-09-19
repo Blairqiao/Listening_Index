@@ -13,6 +13,8 @@ export type { ConfigContextType, SiteConfigState };
 
 interface ConfigContextType {
   config: SiteConfigState;
+  deployedConfig: SiteConfigState;
+  markAsDeployed: (cfg: SiteConfigState) => void;
   updateConfig: (patch: Partial<SiteConfigState>) => void;
   resetToDefaults: () => void;
   applyAccentColorLive: (color: string) => void;
@@ -78,6 +80,24 @@ export const ConfigProvider: React.FC<{
   const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
+  // Track configuration as persisted on the server/database
+  const [deployedConfig, setDeployedConfig] = useState<SiteConfigState>(() => {
+    if (initialConfig) {
+      return {
+        ...initialConfig,
+        accentColor: normalizeHex(initialConfig.accentColor),
+      };
+    }
+    return DEFAULT_CONFIG;
+  });
+
+  const markAsDeployed = useCallback((cfg: SiteConfigState) => {
+    setDeployedConfig({
+      ...cfg,
+      accentColor: normalizeHex(cfg.accentColor),
+    });
+  }, []);
+
   // Apply accent color to document root CSS variable & high-priority style tag
   const applyAccentColorLive = useCallback((color: string) => {
     applyAccentColorToDom(color);
@@ -102,29 +122,21 @@ export const ConfigProvider: React.FC<{
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // In demo mode (when no database is configured), check browser localStorage
-    if (!propIsDbConfigured) {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
-          const merged: SiteConfigState = {
-            title: parsed.title || initialConfig?.title || DEFAULT_CONFIG.title,
-            ownerName: parsed.ownerName || initialConfig?.ownerName || DEFAULT_CONFIG.ownerName,
-            accentColor: normalizeHex(parsed.accentColor || initialConfig?.accentColor || DEFAULT_CONFIG.accentColor),
-            siteUrl: parsed.siteUrl || initialConfig?.siteUrl || DEFAULT_CONFIG.siteUrl,
-            githubUrl: parsed.githubUrl || initialConfig?.githubUrl || DEFAULT_CONFIG.githubUrl,
-            timezone: parsed.timezone || initialConfig?.timezone || DEFAULT_CONFIG.timezone,
-          };
-          setConfig(merged);
-          setIsCustomized(true);
-          syncSideEffects(merged);
-          return;
-        }
-      } catch {}
+    // Check browser localStorage for locally saved configurations
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
+        const localCfg = normalizeSiteConfig(parsed, initialConfig || DEFAULT_CONFIG);
+        setConfig(localCfg);
+        setIsCustomized(true);
+        syncSideEffects(localCfg);
+      } else {
+        syncSideEffects(config);
+      }
+    } catch {
+      syncSideEffects(config);
     }
-
-    syncSideEffects(config);
 
     // Only fetch /api/config if initialConfig or db status was not provided from server props
     if (initialConfig === undefined || propIsDbConfigured === undefined) {
@@ -133,6 +145,10 @@ export const ConfigProvider: React.FC<{
         .then((data) => {
           if (typeof data.isDbConfigured === "boolean") {
             setIsDb(data.isDbConfigured);
+          }
+          if (data?.config) {
+            const normalized = normalizeSiteConfig(data.config, DEFAULT_CONFIG);
+            setDeployedConfig(normalized);
           }
         })
         .catch(() => {});
@@ -267,6 +283,8 @@ export const ConfigProvider: React.FC<{
     <ConfigContext.Provider
       value={{
         config,
+        deployedConfig,
+        markAsDeployed,
         updateConfig,
         resetToDefaults,
         applyAccentColorLive,
