@@ -61,6 +61,8 @@ const POPULAR_TIMEZONES = [
 export const CustomizationModal: React.FC = () => {
   const {
     config,
+    deployedConfig,
+    markAsDeployed,
     updateConfig,
     resetToDefaults,
     isDbConfigured,
@@ -214,16 +216,31 @@ export const CustomizationModal: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const hasUnsavedChanges = useMemo(() => {
+  // Check if draft differs from current local active config
+  const hasLocalEdits = useMemo(() => {
     return !areSiteConfigsEqual(draft, config);
   }, [draft, config]);
 
-  // Clear save error when new unsaved edits occur
+  // Check if draft matches what is currently deployed in the database / server
+  const isDeployedToDb = useMemo(() => {
+    return areSiteConfigsEqual(draft, deployedConfig);
+  }, [draft, deployedConfig]);
+
+  // Can the user save or deploy?
+  const canSave = useMemo(() => {
+    if (saveError) return true;
+    if (isAuthenticated) {
+      return !isDeployedToDb || hasLocalEdits;
+    }
+    return hasLocalEdits;
+  }, [saveError, isAuthenticated, isDeployedToDb, hasLocalEdits]);
+
+  // Clear save error when new valid changes occur
   useEffect(() => {
-    if (hasUnsavedChanges) {
+    if (canSave) {
       setSaveError(null);
     }
-  }, [hasUnsavedChanges]);
+  }, [canSave]);
 
   // Admin password unlock handler
   const handleUnlock = async () => {
@@ -236,10 +253,10 @@ export const CustomizationModal: React.FC = () => {
         setAdminPassword("");
         setAuthError(null);
       } else {
-        setAuthError(res.error || "Authentication failed.");
+        setAuthError(res.error || "Authentication failed");
       }
     } catch (e: unknown) {
-      setAuthError(e instanceof Error ? e.message : "Authentication error.");
+      setAuthError(e instanceof Error ? e.message : "Authentication error");
     } finally {
       setIsUnlocking(false);
     }
@@ -251,7 +268,7 @@ export const CustomizationModal: React.FC = () => {
 
   // Save and apply changes to site (persists to Neon DB if authenticated, or local fallback)
   const handleSave = async () => {
-    if (!hasUnsavedChanges && !saveError && !isSaving) return;
+    if (!canSave && !isSaving) return;
 
     setSaveError(null);
 
@@ -283,6 +300,8 @@ export const CustomizationModal: React.FC = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         setSaveError(data.error || "Save failed");
+      } else {
+        markAsDeployed(isFactory ? DEFAULT_SITE_CONFIG : draft);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Network error";
@@ -671,13 +690,13 @@ export const CustomizationModal: React.FC = () => {
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving || (!hasUnsavedChanges && !saveError)}
+              disabled={isSaving || !canSave}
               className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
                 isSaving
                   ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
                   : saveError
                   ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
-                  : hasUnsavedChanges
+                  : canSave
                   ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
                   : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
               }`}
@@ -689,8 +708,18 @@ export const CustomizationModal: React.FC = () => {
                 </>
               ) : saveError ? (
                 <span>SAVE FAILED · RETRY</span>
-              ) : hasUnsavedChanges ? (
-                <span>{isAuthenticated ? "SAVE & DEPLOY TO DATABASE" : "SAVE LOCALLY"}</span>
+              ) : canSave ? (
+                <span>
+                  {isAuthenticated
+                    ? hasLocalEdits
+                      ? isDbConfigured
+                        ? "SAVE & DEPLOY TO DATABASE"
+                        : "SAVE & APPLY TO CONFIG.TS"
+                      : isDbConfigured
+                      ? "DEPLOY TO DATABASE"
+                      : "SAVE TO CONFIG.TS"
+                    : "SAVE LOCALLY"}
+                </span>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5 text-music-accent" />
