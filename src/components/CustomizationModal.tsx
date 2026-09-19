@@ -347,7 +347,7 @@ export const CustomizationModal: React.FC = () => {
                 type="button"
                 onClick={handleLogout}
                 title="Log out (lock database access)"
-                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-amber-500/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
+                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-music-accent/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
               >
                 <Lock className="w-3 h-3" />
                 LOCK

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "ADMIN_PASSWORD is not configured in server environment variables.",
+        error: "ADMIN_PASSWORD is not configured in server environment variables",
       },
       { status: 500 }
     );
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     if (!verifyAdminPassword(password)) {
       return NextResponse.json(
-        { success: false, error: "Invalid admin password." },
+        { success: false, error: "Invalid admin password" },
         { status: 401 }
       );
     }
@@ -33,12 +33,12 @@ export async function POST(request: NextRequest) {
     const token = createSessionToken();
     const cookieHeader = getSessionCookieHeader(token);
 
-    const response = NextResponse.json({ success: true, message: "Authorized successfully." });
+    const response = NextResponse.json({ success: true, message: "Authorized successfully" });
     response.headers.set("Set-Cookie", cookieHeader);
     return response;
   } catch (err: unknown) {
     return NextResponse.json(
-      { success: false, error: "Authentication failed unexpectedly." },
+      { success: false, error: "Authentication failed unexpectedly" },
       { status: 500 }
     );
   }
