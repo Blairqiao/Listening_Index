@@ -1,6 +1,6 @@
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
 
-export type Mode = 0 | 1 | 2; // 0 = Overview, 1 = Stream Log, 2 = Session
+export type Mode = 0 | 1 | 2 | 3; // 0 = Overview, 1 = Stream Log, 2 = Session, 3 = Spectrum
 export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
 
 export interface TrackSummary {

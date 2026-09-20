@@ -55,3 +55,7 @@ worktrees/
 docs/
 .superpowers/
 CONTEXT.md
+
+# next.js agent rules (regenerated on every build)
+AGENTS.md
+CLAUDE.md
