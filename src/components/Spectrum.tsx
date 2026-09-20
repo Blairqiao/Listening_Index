@@ -9,12 +9,24 @@ import {
   SyntheticSpectrumSource,
 } from "@/lib/spectrum-source";
 
-/** Reserved strip under the baseline for the mirrored reflection. */
-const REFLECT = 14;
+/** Reserved strip under the baseline for the mirrored reflection, as a
+ *  share of canvas height. The tab panel is much taller than the original
+ *  ribbon strip, where a fixed 14px would read as a rounding error. */
+function reflectHeight(h: number) {
+  return Math.max(8, Math.min(40, h * 0.12));
+}
 /** How fast a peak cap slides back down, in band units per second. */
 const PEAK_FALL = 0.55;
+/** Display curve applied to bar heights only, never to the band data. A full
+ *  tab panel is several times taller than the strip these levels were tuned
+ *  against, so linear mapping leaves typical values hugging the floor. */
+const DISPLAY_GAMMA = 0.6;
 
-type Mode = "synthetic" | "live";
+function barHeight(v: number, available: number) {
+  return Math.max(2, Math.pow(Math.max(0, v), DISPLAY_GAMMA) * available);
+}
+
+export type SourceMode = "synthetic" | "live";
 
 interface SpectrumProps {
   /** Identifies the current track so the synthetic pattern changes with it. */
@@ -22,6 +34,8 @@ interface SpectrumProps {
   /** True while a listening session is open; damps the bars when idle. */
   isLive: boolean;
   accentColor: string;
+  /** Lets the page surface which source is driving the bars. */
+  onSourceChange?: (source: SourceMode) => void;
 }
 
 /**
@@ -41,6 +55,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
   trackKey,
   isLive,
   accentColor,
+  onSourceChange,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sourceRef = useRef<SpectrumSource | null>(null);
@@ -49,12 +64,14 @@ export const Spectrum: React.FC<SpectrumProps> = ({
   const peaksRef = useRef(new Float32Array(BAND_COUNT));
   const accentRef = useRef(accentColor);
   const trackRef = useRef({ trackKey, isLive });
+  const onSourceChangeRef = useRef(onSourceChange);
 
-  const [mode, setMode] = useState<Mode>("synthetic");
+  const [mode, setMode] = useState<SourceMode>("synthetic");
   const [note, setNote] = useState<string | null>(null);
 
   accentRef.current = accentColor;
   trackRef.current = { trackKey, isLive };
+  onSourceChangeRef.current = onSourceChange;
 
   // Keep the synthetic pattern in step with the track without restarting the
   // animation loop, which would reset every bar to zero.
@@ -69,6 +86,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
     syntheticRef.current = synthetic;
     sourceRef.current = synthetic;
     setMode("synthetic");
+    onSourceChangeRef.current?.("synthetic");
   }, []);
 
   const enableLiveAudio = useCallback(async () => {
@@ -83,6 +101,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
       syntheticRef.current = null;
       setMode("live");
       setNote(null);
+      onSourceChangeRef.current?.("live");
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
       const message = err instanceof Error ? err.message : "";
@@ -158,7 +177,8 @@ export const Spectrum: React.FC<SpectrumProps> = ({
       const h = cssHeight;
       ctx.clearRect(0, 0, w, h);
 
-      const baseY = h - REFLECT;
+      const reflect = reflectHeight(h);
+      const baseY = h - reflect;
       const gap = 3;
       const bw = Math.max(2, (w - gap * (BAND_COUNT - 1)) / BAND_COUNT);
       const [c1, c2, c3] = gradientStops(accentRef.current);
@@ -170,7 +190,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
       for (let i = 0; i < BAND_COUNT; i++) {
         const v = bands[i];
         const x = i * (bw + gap);
-        const bh = Math.max(2, v * baseY);
+        const bh = barHeight(v, baseY);
 
         ctx.fillStyle = grad;
         ctx.globalAlpha = 0.25 + v * 0.75;
@@ -184,7 +204,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
           x,
           baseY + 2,
           bw,
-          Math.min(REFLECT - 2, bh * 0.35),
+          Math.min(reflect - 2, bh * 0.35),
           Math.min(3, bw / 2)
         );
         ctx.fill();
@@ -194,7 +214,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
         if (peaks[i] > 0.02) {
           ctx.globalAlpha = 0.8;
           ctx.fillStyle = "#EDEDE8";
-          roundRect(ctx, x, baseY - Math.max(2, peaks[i] * baseY) - 3, bw, 2, 1);
+          roundRect(ctx, x, baseY - barHeight(peaks[i], baseY) - 3, bw, 2, 1);
           ctx.fill();
         }
       }
@@ -228,9 +248,9 @@ export const Spectrum: React.FC<SpectrumProps> = ({
   return (
     <section
       aria-label="Audio spectrum visualizer"
-      className="border-t border-[#1C1C1A] bg-[#080808] px-3.5 sm:px-4 pt-2 pb-1.5 select-none"
+      className="h-full min-h-[320px] md:min-h-0 flex flex-col border border-[#1C1C1A] bg-[#080808] px-3.5 sm:px-4 pt-2.5 pb-3 select-none"
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-2">
         <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
           SPECTRUM
         </span>
@@ -262,7 +282,7 @@ export const Spectrum: React.FC<SpectrumProps> = ({
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="block w-full h-[72px]"
+        className="block w-full flex-1 min-h-0"
       />
     </section>
   );

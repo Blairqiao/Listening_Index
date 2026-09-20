@@ -26,6 +26,8 @@ const getRibbonLabels = (
       return ["TOTAL PLAYS", "UNIQUE TRACKS", "UNIQUE ARTISTS", "CURRENT STREAK"];
     case 2:
       return ["SESSION RUNTIME", "TOTAL TRACKS", "UNIQUE ARTISTS", "START TIME"];
+    case 3:
+      return ["SOURCE", "BANDS", "SEEDED BY", "SESSION"];
   }
 };
 
