@@ -97,7 +97,7 @@ export class SyntheticSpectrumSource implements SpectrumSource {
     const beat = Math.pow(Math.max(0, Math.sin(this.phase * Math.PI * bps)), 8);
     // Between sessions the strip stays alive but visibly calmer. Damping much
     // below this reads as a dead flat line, which is how the demo data looks.
-    const idle = this.active ? 1 : 0.55;
+    const idle = this.active ? 1 : 0.62;
 
     for (let i = 0; i < BAND_COUNT; i++) {
       const f = i / (BAND_COUNT - 1);
@@ -105,13 +105,19 @@ export class SyntheticSpectrumSource implements SpectrumSource {
       // Bass follows the beat, mids and treble wander on slower sines so the
       // display never settles into an obvious repeating pattern.
       const kick = beat * Math.max(0, 1 - f * 2.2);
+      // Raising these to a power makes each layer spend most of its time near
+      // zero and spike occasionally, which is what gives the display its
+      // contrast. A plain sine sits around its midpoint and reads as a
+      // uniform hedge of bars.
       const body =
-        0.5 *
-        (0.35 + 0.65 * Math.sin(this.phase * (0.7 + f * 1.9) + offset) ** 2) *
-        (1 - f * 0.4);
+        0.78 *
+        (0.5 + 0.5 * Math.sin(this.phase * (0.7 + f * 1.9) + offset)) ** 3 *
+        (1 - f * 0.35);
       const shimmer =
-        0.3 * (0.5 + 0.5 * Math.sin(this.phase * (3.1 + f * 6.0) + offset * 2)) * f;
-      const target = Math.min(1, (kick * 0.55 + body + shimmer + 0.08) * idle);
+        0.55 *
+        (0.5 + 0.5 * Math.sin(this.phase * (3.1 + f * 6.0) + offset * 2)) ** 2 *
+        f;
+      const target = Math.min(1, (kick * 0.85 + body + shimmer) * idle);
 
       const rate = target > this.smoothed[i] ? ATTACK : RELEASE;
       this.smoothed[i] += (target - this.smoothed[i]) * rate;
