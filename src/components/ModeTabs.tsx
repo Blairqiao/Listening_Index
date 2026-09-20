@@ -17,6 +17,7 @@ const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   { id: 1, label: "[ 2 · STREAM LOG ]", abbrev: "[ LOG ]" },
   { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SES ]" },
   { id: 3, label: "[ 4 · SPECTRUM ]", abbrev: "[ SPC ]" },
+  { id: 4, label: "[ 5 · PLAYER ]", abbrev: "[ PLY ]" },
 ];
 
 export const ModeTabs: React.FC<ModeTabsProps> = ({
