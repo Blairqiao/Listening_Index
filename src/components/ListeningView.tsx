@@ -7,6 +7,7 @@ import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
 import { Spectrum, SourceMode } from "@/components/Spectrum";
 import { BAND_COUNT } from "@/lib/spectrum-source";
+import { PlayerView, PlayerStatus } from "@/components/PlayerView";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
@@ -125,6 +126,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Which source is driving the spectrum, mirrored up for the metric ribbon.
   const [spectrumSource, setSpectrumSource] = useState<SourceMode>("synthetic");
+
+  // Player connection state, mirrored up for the metric ribbon.
+  const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("disconnected");
+  const [playerTrack, setPlayerTrack] = useState<string | null>(null);
+  const handlePlayerStatus = useCallback((s: PlayerStatus, t: string | null) => {
+    setPlayerStatus(s);
+    setPlayerTrack(t);
+  }, []);
 
   // Manual sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -594,12 +603,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           closeModal();
           return;
         }
-        // Block all other shortcut keys (1-4, arrows, C, U) while a modal is active
+        // Block all other shortcut keys (1-5, arrows, C, U) while a modal is active
         return;
       }
 
-      // Keys 1-4: Modes
-      if (["1", "2", "3", "4"].includes(e.key)) {
+      // Keys 1-5: Modes
+      if (["1", "2", "3", "4", "5"].includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -753,11 +762,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     sessionData.isOpen ? "LIVE" : "IDLE",
   ];
 
+  const PLAYER_DEVICE_LABEL: Record<PlayerStatus, string> = {
+    unconfigured: "NOT CONFIGURED",
+    disconnected: "NOT CONNECTED",
+    connecting: "STARTING",
+    ready: "READY",
+    error: "ERROR",
+  };
+
+  const playerMetrics: [string, string, string, string] = [
+    PLAYER_DEVICE_LABEL[playerStatus],
+    playerStatus === "ready" || playerStatus === "connecting" ? "LINKED" : "--",
+    playerTrack || "--",
+    playerStatus === "ready" ? "PREMIUM" : "--",
+  ];
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
     3: spectrumMetrics,
+    4: playerMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -860,6 +885,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 onSourceChange={setSpectrumSource}
               />
             )}
+
+            {activeMode === 4 && <PlayerView onStatusChange={handlePlayerStatus} />}
           </div>
         </div>
 
