@@ -5,7 +5,8 @@ import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
-import { Spectrum } from "@/components/Spectrum";
+import { Spectrum, SourceMode } from "@/components/Spectrum";
+import { BAND_COUNT } from "@/lib/spectrum-source";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
@@ -121,6 +122,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   useEffect(() => {
     activeRangeRef.current = activeRange;
   }, [activeRange]);
+
+  // Which source is driving the spectrum, mirrored up for the metric ribbon.
+  const [spectrumSource, setSpectrumSource] = useState<SourceMode>("synthetic");
 
   // Manual sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -587,12 +591,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           closeModal();
           return;
         }
-        // Block all other shortcut keys (1-3, arrows, C, U) while a modal is active
+        // Block all other shortcut keys (1-4, arrows, C, U) while a modal is active
         return;
       }
 
-      // Keys 1-3: Modes
-      if (["1", "2", "3"].includes(e.key)) {
+      // Keys 1-4: Modes
+      if (["1", "2", "3", "4"].includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -732,10 +736,25 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       ? formatStreamLogMetrics(streamLogData.rawMetrics)
       : streamLogData.metrics;
 
+  // Seeds the visualizer's synthetic pattern. The most recent play is the
+  // closest thing to "now playing" the sync-based data model exposes.
+  const latestPlay = streamLogData.entries[0];
+  const spectrumTrackKey = latestPlay
+    ? latestPlay.trackId || `${latestPlay.title}-${latestPlay.artist}`
+    : "idle";
+
+  const spectrumMetrics: [string, string, string, string] = [
+    spectrumSource === "live" ? "LIVE AUDIO" : "SYNTHETIC",
+    String(BAND_COUNT),
+    latestPlay?.title || "--",
+    sessionData.isOpen ? "LIVE" : "IDLE",
+  ];
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
+    3: spectrumMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -743,12 +762,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     activeSitting?.tagTime || sessionData.tagTime || (sessionData.isOpen ? "LIVE" : "--");
   const isSystemLive = sessionData.isOpen;
 
-  // Seeds the visualizer's synthetic pattern. The most recent play is the
-  // closest thing to "now playing" the sync-based data model exposes.
-  const latestPlay = streamLogData.entries[0];
-  const spectrumTrackKey = latestPlay
-    ? latestPlay.trackId || `${latestPlay.title}-${latestPlay.artist}`
-    : "idle";
 
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
@@ -794,13 +807,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
           />
 
-          {/* 4b. Spectrum visualizer (synthetic by default, live audio on request) */}
-          <Spectrum
-            trackKey={spectrumTrackKey}
-            isLive={isSystemLive}
-            accentColor={config.accentColor}
-          />
-
           {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
           <div
             className={`h-auto md:h-[584px] transition-opacity duration-150 ${
@@ -838,6 +844,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 histogram={sessionData.histogram}
                 selectedSittingId={selectedSittingId}
                 onSelectSitting={(id) => setSelectedSittingId(id)}
+              />
+            )}
+
+            {activeMode === 3 && (
+              <Spectrum
+                trackKey={spectrumTrackKey}
+                isLive={isSystemLive}
+                accentColor={config.accentColor}
+                onSourceChange={setSpectrumSource}
               />
             )}
           </div>
