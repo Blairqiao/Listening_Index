@@ -17,10 +17,10 @@ function reflectHeight(h: number) {
 }
 /** How fast a peak cap slides back down, in band units per second. */
 const PEAK_FALL = 0.55;
-/** Display curve applied to bar heights only, never to the band data. A full
- *  tab panel is several times taller than the strip these levels were tuned
- *  against, so linear mapping leaves typical values hugging the floor. */
-const DISPLAY_GAMMA = 0.6;
+/** Display curve applied to bar heights only, never to the band data. Kept
+ *  close to linear: the levels now carry their own dynamic range, and a
+ *  stronger curve would flatten quiet bars back up toward the loud ones. */
+const DISPLAY_GAMMA = 0.85;
 
 function barHeight(v: number, available: number) {
   return Math.max(2, Math.pow(Math.max(0, v), DISPLAY_GAMMA) * available);
