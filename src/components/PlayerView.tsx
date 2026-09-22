@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useConfig } from "@/context/ConfigContext";
 import {
   beginLogin,
   beginLoginPopup,
@@ -9,6 +10,7 @@ import {
   getFreshAccessToken,
   getRedirectUri,
   readToken,
+  setConfiguredClientId,
 } from "@/lib/spotify-auth";
 
 const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
@@ -52,6 +54,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   const deviceIdRef = useRef<string | null>(null);
   const statusRef = useRef<(s: PlayerStatus, t: string | null) => void>(() => {});
 
+  const { config, openModal, isAuthenticated } = useConfig();
   const [status, setStatus] = useState<PlayerStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<SpotifyPlaybackState | null>(null);
@@ -67,12 +70,19 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     statusRef.current(status, track?.name ?? null);
   }, [status, track?.name]);
 
-  // Nothing works without a public client id, so say so rather than failing
-  // inside the SDK with an opaque initialization error.
+  // Nothing works without a client id, so say so rather than failing inside
+  // the SDK with an opaque initialization error.
   useEffect(() => {
-    if (!getClientId()) setStatus("unconfigured");
-    else if (readToken()) setStatus("connecting");
-  }, []);
+    setConfiguredClientId(config.spotifyClientId);
+    const hasId = Boolean(getClientId());
+    setStatus((prev) => {
+      if (!hasId) return "unconfigured";
+      // An id arriving (saved in the customization menu) has to lift the
+      // unconfigured panel straight away, without a reload.
+      if (prev === "unconfigured") return readToken() ? "connecting" : "disconnected";
+      return prev;
+    });
+  }, [config.spotifyClientId]);
 
   const connect = useCallback(async () => {
     setError(null);
@@ -131,15 +141,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     }
   }, [volume]);
 
-  // Auto-connect when the visitor has already authorized.
+  // Auto-connect once a client id is known and the visitor has authorized
+  // before. Depends on the configured id, which arrives with site config
+  // rather than at mount.
   useEffect(() => {
     if (readToken() && getClientId()) void connect();
-    return () => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.spotifyClientId]);
+
+  useEffect(
+    () => () => {
       playerRef.current?.disconnect();
       playerRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    },
+    []
+  );
 
   // The SDK only pushes state on change, so tick the position between events.
   useEffect(() => {
@@ -210,15 +226,28 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   if (status === "unconfigured") {
     return (
       <Shell>
-        <p className="text-[#8A8A82] leading-relaxed max-w-[560px]">
-          Set <Code>NEXT_PUBLIC_SPOTIFY_CLIENT_ID</Code> to your Spotify app&apos;s client
-          id, then add this redirect URI in the Spotify developer dashboard:
+        <p className="text-[#8A8A82] leading-relaxed max-w-[520px]">
+          The player is switched off until a Spotify client id is set for this site.
         </p>
-        <Code block>{typeof window === "undefined" ? "/callback" : getRedirectUri()}</Code>
-        <p className="text-[#5A5A55] leading-relaxed max-w-[560px]">
-          The client id is public by design — PKCE never sends the client secret to the
-          browser, so this is safe to expose.
-        </p>
+        {isAuthenticated ? (
+          <>
+            <button
+              type="button"
+              onClick={openModal}
+              className="border border-music-accent text-music-accent px-3 py-1 bg-transparent cursor-pointer hover:bg-music-accent/10"
+            >
+              [ ADD SPOTIFY CLIENT ID ]
+            </button>
+            <p className="text-[#5A5A55] leading-relaxed max-w-[520px] text-[11px]">
+              Paste it under PLAYER in the customization menu. No code or redeploy
+              needed — it saves with the rest of your settings.
+            </p>
+          </>
+        ) : (
+          <p className="text-[#5A5A55] leading-relaxed max-w-[520px] text-[11px]">
+            Whoever runs this dashboard can switch it on from the customization menu.
+          </p>
+        )}
       </Shell>
     );
   }

@@ -74,6 +74,13 @@ export const CustomizationModal: React.FC = () => {
     logout,
   } = useConfig();
 
+  // Shown verbatim so it can be pasted straight into the Spotify dashboard;
+  // it differs between localhost and the deployed origin.
+  const [redirectUri, setRedirectUri] = useState("/callback");
+  useEffect(() => {
+    setRedirectUri(`${window.location.origin}/callback`);
+  }, []);
+
   // Local draft state while modal is open
   const [draft, setDraft] = useState<SiteConfigState>(config);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
@@ -594,6 +601,52 @@ export const CustomizationModal: React.FC = () => {
                   </a>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 mt-5">
+            <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
+              <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
+                [ 05 · PLAYER ]
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                SPOTIFY CLIENT ID
+              </label>
+              <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
+                <input
+                  type="text"
+                  value={draft.spotifyClientId}
+                  onChange={(e) => setDraft({ ...draft, spotifyClientId: e.target.value })}
+                  placeholder="Paste from developer.spotify.com/dashboard"
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
+                />
+                <a
+                  href="https://developer.spotify.com/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#6A6A64] hover:text-music-accent ml-2"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+              <p className="font-mono text-[10px] leading-relaxed text-[#6A6A64]">
+                Turns on the player tab. Register this redirect URI in the same Spotify
+                app first:
+              </p>
+              <code className="block font-mono text-[10px] text-music-accent bg-[#141413] border border-[#26261F] px-2.5 py-1.5 overflow-x-auto">
+                {redirectUri}
+              </code>
+              <p className="font-mono text-[10px] leading-relaxed text-[#6A6A64]">
+                The client id is public by design — PKCE never sends your client secret
+                to the browser. Listeners need Spotify Premium, and while the app is in
+                Development Mode each one must be added to its user list in the Spotify
+                dashboard.
+              </p>
             </div>
           </div>
 
