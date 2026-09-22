@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { completeLogin, consumeReturnPath } from "@/lib/spotify-auth";
+import { AUTH_MESSAGE, completeLogin, consumeReturnPath } from "@/lib/spotify-auth";
 
 function CallbackInner() {
   const router = useRouter();
@@ -10,23 +10,42 @@ function CallbackInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Opened as a popup by the player tab, rather than as a full-page redirect.
+    const opener = window.opener as Window | null;
+    const isPopup = Boolean(opener && opener !== window);
+
+    const report = (ok: boolean) => {
+      if (!isPopup) return false;
+      try {
+        opener!.postMessage({ type: AUTH_MESSAGE, ok }, window.location.origin);
+      } catch {}
+      window.close();
+      return true;
+    };
+
     const denied = params.get("error");
     if (denied) {
-      setError(denied === "access_denied" ? "Authorization was declined." : denied);
+      const message =
+        denied === "access_denied" ? "Authorization was declined." : denied;
+      if (!report(false)) setError(message);
       return;
     }
     const code = params.get("code");
     if (!code) {
-      setError("No authorization code in the callback URL.");
+      if (!report(false)) setError("No authorization code in the callback URL.");
       return;
     }
     let cancelled = false;
     completeLogin(code)
       .then(() => {
-        if (!cancelled) router.replace(consumeReturnPath());
+        if (cancelled) return;
+        // Tokens are in localStorage, which the opener shares, so it only
+        // needs to be told to look again.
+        if (!report(true)) router.replace(consumeReturnPath());
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (cancelled) return;
+        if (!report(false)) setError(e instanceof Error ? e.message : String(e));
       });
     return () => {
       cancelled = true;

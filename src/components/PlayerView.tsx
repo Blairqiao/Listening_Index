@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   beginLogin,
+  beginLoginPopup,
   clearToken,
   getClientId,
   getFreshAccessToken,
@@ -56,6 +57,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   const [state, setState] = useState<SpotifyPlaybackState | null>(null);
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.6);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   statusRef.current = (s, t) => onStatusChange?.(s, t);
 
@@ -108,7 +110,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
       );
       player.addListener("authentication_error", () => {
         clearToken();
-        fail("Spotify rejected the token. Connect again.");
+        fail(
+          "Spotify rejected the token. If this app is still in Development Mode, " +
+            "your account has to be added to its user list in the Spotify dashboard."
+        );
       });
       player.addListener("initialization_error", (e) => fail(e.message));
       player.addListener("playback_error", (e) => setError(e.message));
@@ -172,6 +177,26 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     setStatus("disconnected");
   }, []);
 
+  /** Popup first so the dashboard never unloads; full redirect if blocked. */
+  const handleConnectClick = useCallback(async () => {
+    setError(null);
+    setIsConnecting(true);
+    try {
+      const result = await beginLoginPopup();
+      if (result === null) {
+        // Popup blocked — the redirect leaves and comes back to /callback.
+        await beginLogin();
+        return;
+      }
+      if (result) await connect();
+      else setError("Spotify window closed before finishing.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [connect]);
+
   const onVolume = useCallback((v: number) => {
     setVolume(v);
     void playerRef.current?.setVolume(v);
@@ -208,11 +233,19 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
         </p>
         <button
           type="button"
-          onClick={() => void beginLogin()}
-          className="border border-music-accent text-music-accent px-3 py-1 bg-transparent cursor-pointer hover:bg-music-accent/10"
+          disabled={isConnecting}
+          onClick={() => void handleConnectClick()}
+          className={`border px-3 py-1 bg-transparent ${
+            isConnecting
+              ? "border-[#1C1C1A] text-[#5A5A55] cursor-wait"
+              : "border-music-accent text-music-accent cursor-pointer hover:bg-music-accent/10"
+          }`}
         >
-          [ CONNECT SPOTIFY ]
+          {isConnecting ? "[ WAITING FOR SPOTIFY... ]" : "[ CONNECT SPOTIFY ]"}
         </button>
+        <p className="text-[#5A5A55] text-[11px] max-w-[520px] leading-relaxed">
+          Opens a Spotify window. The dashboard stays where it is.
+        </p>
       </Shell>
     );
   }
