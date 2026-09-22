@@ -15,6 +15,8 @@
 
 const TOKEN_KEY = "spotify_player_token";
 const VERIFIER_KEY = "spotify_player_verifier";
+/** Posted by the callback tab once tokens are stored. */
+export const AUTH_MESSAGE = "spotify-player-auth";
 const RETURN_KEY = "spotify_player_return_to";
 
 /** `streaming` is what the Web Playback SDK requires; the read scopes let us
@@ -95,11 +97,62 @@ export async function beginLogin(): Promise<void> {
   const clientId = getClientId();
   if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
 
+  window.location.href = await buildAuthUrl();
+}
+
+/**
+ * Connects in a popup instead, so the dashboard never unloads: no reload, no
+ * lost tab, no re-fetch of the whole page just to sign in. Resolves true once
+ * the callback tab reports success, false if the visitor closes the popup.
+ * Returns null when the browser blocked the popup, so the caller can fall
+ * back to the full-page redirect.
+ */
+export async function beginLoginPopup(): Promise<boolean | null> {
+  const url = await buildAuthUrl();
+  const w = 480;
+  const h = 720;
+  // Center on the window the visitor is actually looking at.
+  const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
+  const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
+  const popup = window.open(
+    url,
+    "spotify-authorize",
+    `width=${w},height=${h},left=${Math.round(left)},top=${Math.round(top)}`
+  );
+  if (!popup) return null;
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearInterval(poll);
+      resolve(ok);
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== AUTH_MESSAGE) return;
+      finish(Boolean(e.data.ok));
+    };
+    window.addEventListener("message", onMessage);
+    // A closed popup is the only signal when the visitor backs out, since
+    // no message is ever posted in that case.
+    const poll = setInterval(() => {
+      if (popup.closed) finish(Boolean(readToken()));
+    }, 400);
+  });
+}
+
+async function buildAuthUrl(): Promise<string> {
+  const clientId = getClientId();
+  if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
+
   const verifier = randomString(64);
   const challenge = await challengeFor(verifier);
   try {
-    sessionStorage.setItem(VERIFIER_KEY, verifier);
-    // Come back to whichever tab the visitor was on.
+    // localStorage rather than sessionStorage: the popup is its own context.
+    localStorage.setItem(VERIFIER_KEY, verifier);
     sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search);
   } catch {}
 
@@ -111,7 +164,7 @@ export async function beginLogin(): Promise<void> {
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
-  window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+  return `https://accounts.spotify.com/authorize?${params}`;
 }
 
 export function consumeReturnPath(): string {
@@ -148,8 +201,8 @@ export async function completeLogin(code: string): Promise<StoredToken> {
   if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
   let verifier = "";
   try {
-    verifier = sessionStorage.getItem(VERIFIER_KEY) || "";
-    sessionStorage.removeItem(VERIFIER_KEY);
+    verifier = localStorage.getItem(VERIFIER_KEY) || "";
+    localStorage.removeItem(VERIFIER_KEY);
   } catch {}
   if (!verifier) throw new Error("Missing PKCE verifier — start the login again");
 
