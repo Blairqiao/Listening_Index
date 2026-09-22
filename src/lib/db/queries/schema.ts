@@ -241,8 +241,13 @@ export async function ensureTablesExist(): Promise<void> {
             site_url TEXT NOT NULL,
             github_url TEXT NOT NULL,
             timezone TEXT NOT NULL,
+            spotify_client_id TEXT NOT NULL DEFAULT '',
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           );
+
+          -- Added after the table shipped, so existing databases need it too.
+          ALTER TABLE site_settings
+            ADD COLUMN IF NOT EXISTS spotify_client_id TEXT NOT NULL DEFAULT '';
 
           CREATE TABLE IF NOT EXISTS daily_api_usage (
             usage_date DATE PRIMARY KEY,

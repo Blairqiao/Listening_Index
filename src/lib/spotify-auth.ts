@@ -36,8 +36,19 @@ export interface StoredToken {
   expiresAt: number;
 }
 
+/**
+ * Set by the app once site config has loaded, so the owner can configure the
+ * player from the customization menu instead of editing an env var and
+ * redeploying. The env var still takes precedence for deploys already using it.
+ */
+let configuredClientId: string | null = null;
+
+export function setConfiguredClientId(id: string | null | undefined) {
+  configuredClientId = id?.trim() || null;
+}
+
 export function getClientId(): string | null {
-  return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || null;
+  return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || configuredClientId;
 }
 
 export function getRedirectUri(): string {
