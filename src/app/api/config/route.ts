@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { isDbConfigured } from "@/lib/db";
-import {
-  getActiveSiteConfig,
-  saveActiveSiteConfig,
-  resetActiveSiteConfig,
-  SiteConfigState,
-} from "@/lib/db/queries";
+import { isBackendConfigured } from "@/lib/db/adapter";
+import { configRepository } from "@/lib/db/repositories";
+import type { SiteConfigState } from "@/lib/db/queries";
 import { siteConfig } from "@/config";
 import { isSameOriginRequest, isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { generateConfigTsCode, normalizeSiteConfig } from "@/lib/config-utils";
@@ -15,11 +12,11 @@ import { generateConfigTsCode, normalizeSiteConfig } from "@/lib/config-utils";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const activeConfig = await getActiveSiteConfig();
+  const activeConfig = await configRepository().getActiveSiteConfig();
   return NextResponse.json({
     config: activeConfig,
     defaultConfig: siteConfig,
-    isDbConfigured: isDbConfigured(),
+    isDbConfigured: isBackendConfigured(),
     isLocalDev: process.env.NODE_ENV === "development",
   });
 }
@@ -46,12 +43,12 @@ export async function POST(request: NextRequest) {
     let targetConfig: SiteConfigState;
 
     if (isReset) {
-      targetConfig = await resetActiveSiteConfig();
+      targetConfig = await configRepository().resetActiveSiteConfig();
     } else {
       targetConfig = normalizeSiteConfig(body, siteConfig);
 
-      if (isDbConfigured()) {
-        await saveActiveSiteConfig(targetConfig);
+      if (isBackendConfigured()) {
+        await configRepository().saveActiveSiteConfig(targetConfig);
       }
     }
 
