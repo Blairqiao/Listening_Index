@@ -10,13 +10,15 @@
  * it simply gains a sibling.
  */
 
-import { getDbBackend, type ConfigRepository } from "./adapter";
+import { getDbBackend, type ConfigRepository, type UserRepository } from "./adapter";
 import {
   getActiveSiteConfig as pgGetActiveSiteConfig,
   saveActiveSiteConfig as pgSaveActiveSiteConfig,
   resetActiveSiteConfig as pgResetActiveSiteConfig,
 } from "./queries/config";
 import { mongoConfigRepository } from "./mongo/config";
+import { postgresUserRepository } from "./queries/users";
+import { mongoUserRepository } from "./mongo/users";
 
 const postgresConfigRepository: ConfigRepository = {
   getActiveSiteConfig: pgGetActiveSiteConfig,
@@ -26,4 +28,8 @@ const postgresConfigRepository: ConfigRepository = {
 
 export function configRepository(): ConfigRepository {
   return getDbBackend() === "mongodb" ? mongoConfigRepository : postgresConfigRepository;
+}
+
+export function userRepository(): UserRepository {
+  return getDbBackend() === "mongodb" ? mongoUserRepository : postgresUserRepository;
 }

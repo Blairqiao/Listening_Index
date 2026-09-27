@@ -35,6 +35,26 @@ export interface ConfigRepository {
   resetActiveSiteConfig(): Promise<SiteConfigState>;
 }
 
+/**
+ * Guests who signed in with Spotify so the player remembers them across
+ * devices. Deliberately separate from the listening tables: this dashboard
+ * still shows one person's history, and a guest record exists only to hold
+ * their player credentials.
+ */
+export interface GuestUser {
+  /** Spotify user id. Their identity and our primary key. */
+  id: string;
+  displayName: string | null;
+  /** AES-256-GCM ciphertext, never the raw token. */
+  encryptedRefreshToken: string;
+}
+
+export interface UserRepository {
+  getUser(id: string): Promise<GuestUser | null>;
+  upsertUser(user: GuestUser): Promise<void>;
+  deleteUser(id: string): Promise<void>;
+}
+
 export function getDbBackend(): DbBackend {
   return process.env.DB_BACKEND === "mongodb" ? "mongodb" : "postgres";
 }

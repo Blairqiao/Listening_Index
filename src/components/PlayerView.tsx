@@ -12,6 +12,13 @@ import {
   readToken,
   setConfiguredClientId,
 } from "@/lib/spotify-auth";
+import {
+  fetchAccessToken,
+  readGuestSession,
+  signInPopup,
+  signOut,
+  type GuestSession,
+} from "@/lib/spotify-session";
 
 const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
 const DEVICE_NAME = "Listening Index";
@@ -61,6 +68,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   const [position, setPosition] = useState(0);
   const [volume, setVolume] = useState(0.6);
   const [isConnecting, setIsConnecting] = useState(false);
+  // When the server holds the session, it wins: a cookie travels between
+  // devices, localStorage does not.
+  const [guest, setGuest] = useState<GuestSession | null>(null);
+  const guestRef = useRef<GuestSession | null>(null);
+  guestRef.current = guest;
+
+  useEffect(() => {
+    let cancelled = false;
+    void readGuestSession().then((s) => {
+      if (!cancelled) setGuest(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   statusRef.current = (s, t) => onStatusChange?.(s, t);
 
@@ -89,7 +111,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     setStatus("connecting");
     try {
       await loadSdk();
-      const token = await getFreshAccessToken();
+      const serverSide = guestRef.current?.available && guestRef.current.signedIn;
+      const token = serverSide ? await fetchAccessToken() : await getFreshAccessToken();
       if (!token) {
         setStatus("disconnected");
         return;
@@ -102,7 +125,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
         // Called again whenever the SDK needs a fresh token, so refreshing
         // here keeps a long session alive without a reconnect.
         getOAuthToken: (cb) => {
-          void getFreshAccessToken().then((t) => t && cb(t));
+          const fromServer = guestRef.current?.available && guestRef.current.signedIn;
+          const next = fromServer ? fetchAccessToken() : getFreshAccessToken();
+          void next.then((t) => t && cb(t));
         },
       });
 
@@ -145,9 +170,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   // before. Depends on the configured id, which arrives with site config
   // rather than at mount.
   useEffect(() => {
-    if (readToken() && getClientId()) void connect();
+    if (!getClientId()) return;
+    const signedInServerSide = guest?.available && guest.signedIn;
+    if (signedInServerSide || readToken()) void connect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.spotifyClientId]);
+  }, [config.spotifyClientId, guest?.available, guest?.signedIn]);
 
   useEffect(
     () => () => {
@@ -167,7 +194,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   /** Moves playback from whatever device is active onto this browser. */
   const transferHere = useCallback(async () => {
     const id = deviceIdRef.current;
-    const token = await getFreshAccessToken();
+    const serverSide = guestRef.current?.available && guestRef.current.signedIn;
+    const token = serverSide ? await fetchAccessToken() : await getFreshAccessToken();
     if (!id || !token) return;
     setError(null);
     const res = await fetch("https://api.spotify.com/v1/me/player", {
@@ -189,6 +217,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     playerRef.current = null;
     deviceIdRef.current = null;
     clearToken();
+    if (guestRef.current?.available && guestRef.current.signedIn) {
+      void signOut().then(() => setGuest({ available: true, signedIn: false, displayName: null }));
+    }
     setState(null);
     setStatus("disconnected");
   }, []);
@@ -198,6 +229,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
     setError(null);
     setIsConnecting(true);
     try {
+      if (guestRef.current?.available) {
+        const pending = signInPopup();
+        if (pending === null) {
+          // Popup blocked: go there as a normal navigation instead.
+          window.location.href = "/api/spotify/login";
+          return;
+        }
+        const ok = await pending;
+        if (!ok) {
+          setError("Sign-in did not complete.");
+          return;
+        }
+        setGuest(await readGuestSession());
+        await connect();
+        return;
+      }
       const result = await beginLoginPopup();
       if (result === null) {
         // Popup blocked — the redirect leaves and comes back to /callback.
