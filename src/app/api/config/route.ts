@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { isDbConfigured } from "@/lib/db";
 import { isBackendConfigured } from "@/lib/db/adapter";
 import { configRepository } from "@/lib/db/repositories";
 import type { SiteConfigState } from "@/lib/db/queries";
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
     // Only write to local src/config.ts if no database is configured (local/demo fallback mode)
     // When Neon DB is connected, src/config.ts remains untouched as the default configuration blueprint.
     let wroteToFile = false;
-    if (!isDbConfigured()) {
+    if (!isBackendConfigured()) {
       try {
         const fileContent = generateConfigTsCode(targetConfig);
         const configPath = path.join(process.cwd(), "src", "config.ts");
@@ -69,10 +68,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       persistedTo: {
-        database: isDbConfigured(),
+        database: isBackendConfigured(),
         file: wroteToFile,
       },
-      message: isDbConfigured()
+      message: isBackendConfigured()
         ? "Saved active configuration to Neon database"
         : "Saved to local configuration file",
       config: targetConfig,
