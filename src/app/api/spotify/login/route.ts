@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveSiteConfig } from "@/lib/db/queries/config";
+import { configRepository } from "@/lib/db/repositories";
 import {
   challengeFor,
   createVerifier,
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const config = await getActiveSiteConfig();
+  const config = await configRepository().getActiveSiteConfig();
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
   if (!clientId) {
     return NextResponse.json({ error: "No Spotify client id configured." }, { status: 503 });

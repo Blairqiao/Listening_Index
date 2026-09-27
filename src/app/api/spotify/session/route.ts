@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveSiteConfig } from "@/lib/db/queries/config";
+import { configRepository } from "@/lib/db/repositories";
 import { userRepository } from "@/lib/db/repositories";
 import {
   SESSION_COOKIE,
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Stored credential unreadable." }, { status: 500 });
   }
 
-  const config = await getActiveSiteConfig();
+  const config = await configRepository().getActiveSiteConfig();
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
   if (!clientId) return NextResponse.json({ error: "No client id." }, { status: 503 });
 

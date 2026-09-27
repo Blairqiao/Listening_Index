@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { siteConfig } from "@/config";
-import { getActiveSiteConfig } from "@/lib/db/queries";
+import { configRepository } from "@/lib/db/repositories";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const activeConfig = await getActiveSiteConfig();
+  const activeConfig = await configRepository().getActiveSiteConfig();
   return {
     title: `${activeConfig.title} | ${activeConfig.ownerName}`,
     description: "Personal Spotify listening data aggregator and index.",
@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const activeConfig = await getActiveSiteConfig();
+  const activeConfig = await configRepository().getActiveSiteConfig();
 
   return (
     <html
