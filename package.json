@@ -10,7 +10,8 @@
     "sync:spotify": "tsx scripts/sync-spotify.ts",
     "auth:spotify": "tsx scripts/get-spotify-token.ts",
     "generate:cron": "tsx scripts/generate-cron-secret.ts",
-    "test:rate-limit": "tsx scripts/test-rate-limit.ts"
+    "test:rate-limit": "tsx scripts/test-rate-limit.ts",
+    "check:mongo": "tsx scripts/check-mongo.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
