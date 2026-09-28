@@ -1,4 +1,4 @@
-# Listening index
+# Listening Index
 
 A personal Spotify dashboard that tracks and stores your streaming history.
 
@@ -43,7 +43,9 @@ Change the accent color, page title, timezone, and links directly in the browser
 - A Spotify Premium account (Spotify requires Premium to create apps in its developer dashboard)
 - A free GitHub account
 - A free Vercel account
+- A free [Neon](https://neon.tech) account (optional if connecting through Vercel)
 - A free cron-job.org account
+- Node.js 20+ (for local development)
 
 ---
 
@@ -138,9 +140,24 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
 
 ---
 
-### Step 6: Run your first sync
+### Step 6: Configure Admin Password
 
-#### IMPORTANT: Make sure all [environment variables](#environment-variables) are present in Vercel and redeployed. Go to [Vercel dashboard](https://vercel.com/dashboard) and check the environment variables.
+Your Listening Index is designed to be public so friends and visitors can browse your music stats. To prevent unauthorized visitors from modifying your site or database, configure an administrative password:
+
+1. In your Vercel project dashboard, go to **Settings -> Environment Variables**.
+2. Add a new variable:
+   - **Name**: `ADMIN_PASSWORD`
+   - **Value**: Any strong, secure passphrase of your choice
+3. What this protects:
+   - **Customization (`C` key)**: Unlocks the ability to save custom site settings, titles, links, and accent colors permanently to your Neon database for all visitors.
+   - **History Ingestion (`U` key)**: Authorizes uploading extended streaming history JSON/ZIP archives into the database.
+   - **Manual Sync**: Allows triggering instant Spotify synchronizations directly from the web interface.
+
+---
+
+### Step 7: Run your first sync
+
+#### IMPORTANT: Make sure all [environment variables](#environment-variables) (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REFRESH_TOKEN`, `CRON_SECRET`, and `ADMIN_PASSWORD`) are present in Vercel and redeployed. Go to the [Vercel dashboard](https://vercel.com/dashboard) and verify your environment variables before testing.
 
 1. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
 2. The endpoint returns a JSON confirmation when complete:
@@ -151,14 +168,15 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
 
 ---
 
-### Step 7: Import your extended listening history (Optional)
+### Step 8: Import your extended listening history (Optional)
 
 To backfill your entire Spotify listening history:
 
 1. Request your **Extended streaming history** from the [Spotify Privacy Settings](https://www.spotify.com/account/privacy/) page (takes a few days to prepare).
 2. Press `U` or click **[ U · UPLOAD ]** in the top navigation bar.
-3. Drag and drop the downloaded `.zip` file (or individual `endsong_*.json` files).
-4. The client extracts audio plays directly in your browser, streams them to your database, and begins progressive metadata enrichment.
+3. Enter your `ADMIN_PASSWORD` when prompted to unlock ingestion access.
+4. Drag and drop the downloaded `.zip` file (or individual `endsong_*.json` files).
+5. The client extracts audio plays directly in your browser, streams them to your database, and begins progressive metadata enrichment.
 
 ---
 
@@ -187,11 +205,8 @@ Open `http://localhost:3000`.
 
 ### Connect real data locally
 
-1. Copy your database connection string from the **Storage** tab in your Vercel dashboard, or create a free database at [neon.tech](https://neon.tech).
-2. Add it to `.env.local`:
-   ```bash
-   echo 'DATABASE_URL="postgresql://user:password@endpoint.neon.tech/neondb?sslmode=require"' >> .env.local
-   ```
+1. Copy your database connection string (`DATABASE_URL`) from the **Storage** tab in your Vercel dashboard, or from the [Neon Console](https://console.neon.tech).
+2. Create `.env.local` from the template `.env.example`
 3. Run the setup scripts to authorize Spotify and generate your cron key:
    ```bash
    npm run auth:spotify
@@ -208,7 +223,7 @@ Press `C` or click **[ C · CONFIG ]** in the top navigation to open the customi
 - Change the accent color with a color picker or preset swatches.
 - Select your timezone to match your daily activity graph.
 - Update your display title, name, Spotify link, and GitHub repository link.
-- Click **Save & Apply**. When connected to Neon, settings save to the database and update for all visitors. In local development or demo mode, settings save to your local setup.
+- Click **Save & Apply**. When connected to Neon, entering your `ADMIN_PASSWORD` saves the settings permanently to the database for all visitors. Unauthorized visitors or guests can still customize settings locally in their browser session.
 - Click **Reset Defaults** to restore values from `src/config.ts`.
 
 To set permanent defaults in code, edit `src/config.ts`:
@@ -244,11 +259,12 @@ export const siteConfig = {
 
 | Variable | Description | Where to find |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | PostgreSQL connection string | Neon dashboard or Vercel Storage |
+| `DATABASE_URL` | Neon PostgreSQL connection string (`POSTGRES_URL` also accepted) | Neon dashboard or Vercel Storage tab |
+| `ADMIN_PASSWORD` | Secret passphrase to authorize administrative actions (saving config to Neon DB, uploading extended history, manual sync from UI) | Set your own secure passphrase |
 | `SPOTIFY_CLIENT_ID` | Spotify app client ID | Spotify Developer Dashboard |
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret | Spotify Developer Dashboard |
-| `SPOTIFY_REFRESH_TOKEN` | OAuth refresh token | Generated via `npm run auth:spotify` or curl |
-| `CRON_SECRET` | Secret token to secure `/api/sync` | Generated key |
+| `SPOTIFY_REFRESH_TOKEN` | OAuth refresh token for user account | Generated via `npm run auth:spotify` or curl flow |
+| `CRON_SECRET` | Secret token securing `/api/sync` against unauthorized triggers | Generated via `npm run generate:cron` or online generator |
 
 ---
 
@@ -257,10 +273,11 @@ export const siteConfig = {
 | Command | Action |
 | :--- | :--- |
 | `npm run dev` | Start development server on `localhost:3000` |
-| `npm run build` | Build production application |
-| `npm run auth:spotify` | Get Spotify refresh token and save to `.env.local` |
-| `npm run generate:cron` | Generate a cron secret and save to `.env.local` |
-| `npm run sync` | Fetch recent tracks and write to database |
+| `npm run build` | Build production Next.js application |
+| `npm run start` | Start production Next.js server locally |
+| `npm run auth:spotify` | Interactive CLI to authorize Spotify and save refresh token to `.env.local` |
+| `npm run generate:cron` | Generate a secure `CRON_SECRET` and save to `.env.local` |
+| `npm run sync` | Fetch recent tracks from Spotify and write to database (`sync:spotify` alias) |
 | `npm run test:rate-limit` | Test Spotify Web API rate limits against batch queries |
 
 ---
