@@ -106,30 +106,33 @@ export async function getAccessToken(): Promise<string> {
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
 
-  if (
-    !isConfigured(clientId) ||
-    !isConfigured(clientSecret) ||
-    !isConfigured(refreshToken)
-  ) {
+  if (!isConfigured(clientId) || !isConfigured(refreshToken)) {
     throw new Error(
-      "Spotify credentials are not configured yet (currently set to 'todo' or empty). Ensure SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, " +
+      "Spotify credentials are not configured yet (currently set to 'todo' or empty). Ensure SPOTIFY_CLIENT_ID " +
         "and SPOTIFY_REFRESH_TOKEN are updated in your environment."
     );
   }
-
-  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  // A refresh token from the Authorization Code flow is redeemed with the
+  // client secret; one from the PKCE flow has no secret and is redeemed with
+  // the client id alone. Support both, so a token minted by a PKCE app works.
+  if (isConfigured(clientSecret)) {
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  } else {
+    body.set("client_id", clientId!);
+  }
 
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body: body.toString(),
   });
 
