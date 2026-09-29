@@ -49,14 +49,35 @@ export function getMongoClient(): Promise<MongoClient> {
   if (process.env.NODE_ENV === "development") {
     // Survives hot reload, which would otherwise leak a client per edit.
     if (!global.__listeningIndexMongo) {
-      global.__listeningIndexMongo = createClient();
+      global.__listeningIndexMongo = forgetOnFailure(createClient(), () => {
+        global.__listeningIndexMongo = undefined;
+      });
     }
     return global.__listeningIndexMongo;
   }
   if (!cachedClient) {
-    cachedClient = createClient();
+    cachedClient = forgetOnFailure(createClient(), () => {
+      cachedClient = null;
+    });
   }
   return cachedClient;
+}
+
+/**
+ * Caching the connection promise is what makes the client shared, but a
+ * rejected promise must not be cached: one transient failure (a network
+ * blip, a cold cluster, an allowlist change) would otherwise fail every
+ * later request until the process restarted. On failure the cache is
+ * cleared, so the next request tries again.
+ */
+function forgetOnFailure(
+  pending: Promise<MongoClient>,
+  forget: () => void
+): Promise<MongoClient> {
+  return pending.catch((error) => {
+    forget();
+    throw error;
+  });
 }
 
 let cachedClient: Promise<MongoClient> | null = null;
