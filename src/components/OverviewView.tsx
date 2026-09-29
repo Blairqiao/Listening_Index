@@ -83,7 +83,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const albumPlaceholderCount = Math.max(0, 5 - topAlbums.length);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-8 md:gap-[26px] mt-4 md:mt-6">
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6">
       {/* Left Column: Top Tracks (1.5fr) */}
       <div className="min-w-0">
         <div className="flex justify-between items-baseline mb-2 select-none">
@@ -235,7 +235,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       </div>
 
       {/* Right Column: Artist Index, Album Index, Activity Tracker (1fr) */}
-      <div className="flex flex-col gap-8 md:gap-0 md:justify-between h-full min-w-0">
+      <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
         {/* [ ARTIST INDEX ] (Top 5) */}
         <div>
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none">
