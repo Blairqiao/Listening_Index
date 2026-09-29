@@ -141,6 +141,8 @@ export const Spectrum: React.FC<SpectrumProps> = ({
     let last = performance.now();
     let cssWidth = 0;
     let cssHeight = 0;
+    let stopsFor = "";
+    let stops: [string, string, string] = ["#000", "#000", "#000"];
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -181,7 +183,13 @@ export const Spectrum: React.FC<SpectrumProps> = ({
       const baseY = h - reflect;
       const gap = 3;
       const bw = Math.max(2, (w - gap * (BAND_COUNT - 1)) / BAND_COUNT);
-      const [c1, c2, c3] = gradientStops(accentRef.current);
+      // Colour-space conversion only when the accent actually changes, not
+      // on every one of ~60 frames a second.
+      if (stopsFor !== accentRef.current) {
+        stopsFor = accentRef.current;
+        stops = gradientStops(stopsFor);
+      }
+      const [c1, c2, c3] = stops;
       const grad = ctx.createLinearGradient(0, baseY, 0, 2);
       grad.addColorStop(0, c1);
       grad.addColorStop(0.55, c2);
