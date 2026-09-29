@@ -25,11 +25,12 @@ export const OWNER_VERIFIER_COOKIE = "owner_spotify_pkce";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const VERIFIER_TTL_SECONDS = 10 * 60; // one login attempt
 
-/** Distinct from ADMIN_PASSWORD: signing guest sessions with the admin
- *  password would mean rotating it silently logged out every guest, and
- *  would widen what a leak of either one costs. */
+/** Deliberately its own secret. It does not fall back to CRON_SECRET, which
+ *  the README has owners put in a cron-job.org URL: anyone who read that URL
+ *  could otherwise forge a session for any guest and mint their tokens. Nor
+ *  ADMIN_PASSWORD, so rotating one never silently logs out the other. */
 function getSessionKey(): string | null {
-  const key = process.env.SESSION_SECRET || process.env.CRON_SECRET;
+  const key = process.env.SESSION_SECRET;
   return key && key.trim() ? key : null;
 }
 
@@ -103,10 +104,16 @@ export function createGuestSession(userId: string): string | null {
 export function readGuestSession(token?: string | null): string | null {
   const key = getSessionKey();
   if (!key || !token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  const [encodedId, expiresStr, sig] = parts;
+  // Split from the right: the signature and expiry never contain a dot, but
+  // a Spotify user id can (legacy usernames such as "john.smith"), and
+  // encodeURIComponent leaves dots as they are.
+  const sigDot = token.lastIndexOf(".");
+  const expDot = sigDot > 0 ? token.lastIndexOf(".", sigDot - 1) : -1;
+  if (expDot <= 0) return null;
+  const encodedId = token.slice(0, expDot);
+  const expiresStr = token.slice(expDot + 1, sigDot);
+  const sig = token.slice(sigDot + 1);
+  if (!/^\d+$/.test(expiresStr)) return null;
   const expiresAt = parseInt(expiresStr, 10);
   if (!Number.isFinite(expiresAt) || Math.floor(Date.now() / 1000) > expiresAt) return null;
 
