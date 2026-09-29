@@ -44,6 +44,11 @@ function getEncryptionKey(): Buffer | null {
   return key.length === 32 ? key : null;
 }
 
+/** Whether tokens can be sealed at rest — needed by guests and the owner alike. */
+export function getEncryptionKeyConfigured(): boolean {
+  return getEncryptionKey() !== null;
+}
+
 export function isGuestAuthConfigured(): boolean {
   return Boolean(getSessionKey() && getEncryptionKey());
 }
@@ -113,7 +118,12 @@ export function readGuestSession(token?: string | null): string | null {
   // Constant-time: a plain === would leak the signature byte by byte.
   if (!crypto.timingSafeEqual(a, b)) return null;
 
-  return decodeURIComponent(encodedId);
+  const userId = decodeURIComponent(encodedId);
+  // Reserved ids (the owner's stored credential) are never guest identities.
+  // Refusing them here means even a correctly signed session cannot reach
+  // the owner's token through the guest endpoints.
+  if (userId.startsWith("__")) return null;
+  return userId;
 }
 
 function cookie(name: string, value: string, maxAge: number): string {
