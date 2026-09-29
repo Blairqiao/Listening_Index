@@ -11,6 +11,7 @@ interface StreamLogViewProps {
   isLoadingMore?: boolean;
   hasMore?: boolean;
   totalPlays?: string;
+  isLoading?: boolean;
 }
 
 export const StreamLogView: React.FC<StreamLogViewProps> = ({
@@ -19,8 +20,42 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   isLoadingMore = false,
   hasMore = false,
   totalPlays,
+  isLoading = false,
 }) => {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const [isMobile, setIsMobile] = React.useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+  const [mobileVisibleCount, setMobileVisibleCount] = React.useState<number>(25);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const prevEntriesLenRef = React.useRef(entries.length);
+  React.useEffect(() => {
+    if (entries.length > prevEntriesLenRef.current && prevEntriesLenRef.current > 0) {
+      const diff = entries.length - prevEntriesLenRef.current;
+      setMobileVisibleCount((prev) => {
+        if (prev >= prevEntriesLenRef.current) {
+          return prev + diff;
+        }
+        return prev;
+      });
+    } else if (entries.length === 0) {
+      setMobileVisibleCount(25);
+    }
+    prevEntriesLenRef.current = entries.length;
+  }, [entries.length]);
 
   const [enrichmentOverlay, setEnrichmentOverlay] = React.useState<
     Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string; isDelisted?: boolean }>
@@ -42,6 +77,25 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       };
     });
   }, [entries, enrichmentOverlay]);
+
+  const renderedEntries = isMobile ? displayEntries.slice(0, mobileVisibleCount) : displayEntries;
+  const canLoadMore = hasMore || (isMobile && mobileVisibleCount < displayEntries.length);
+
+  const handleScrollToTop = () => {
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleLoadMore = () => {
+    if (isLoadingMore) return;
+    if (isMobile && mobileVisibleCount < displayEntries.length) {
+      setMobileVisibleCount((prev) => prev + 25);
+    } else {
+      onLoadMore?.();
+    }
+  };
 
   useDeferredEnrichment({
     items: displayEntries,
@@ -84,22 +138,31 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
         role="list"
       >
         {entries.length === 0 ? (
-          Array.from({ length: 9 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 py-2 border-b border-[#191917] items-center animate-pulse"
-            >
-              <div className="h-3 bg-[#191917] rounded w-10" />
-              <div className="w-[38px] h-[38px] rounded bg-[#141413]" />
-              <div className="h-3.5 bg-[#191917] rounded w-32 max-w-[80%]" />
-              <div className="h-3 bg-[#141413] rounded w-20 max-w-[75%]" />
-              <div className="h-3 bg-[#141413] rounded w-24 max-w-[75%] hidden md:block" />
-              <div className="h-3 bg-[#191917] rounded w-8 ml-auto" />
-            </div>
-          ))
+          isLoading ? (
+            Array.from({ length: 9 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 py-2 border-b border-[#191917] items-center animate-pulse"
+              >
+                <div className="h-3 bg-[#191917] rounded w-10" />
+                <div className="w-[38px] h-[38px] rounded bg-[#141413]" />
+                <div className="h-3.5 bg-[#191917] rounded w-32 max-w-[80%]" />
+                <div className="h-3 bg-[#141413] rounded w-20 max-w-[75%]" />
+                <div className="h-3 bg-[#141413] rounded w-24 max-w-[75%] hidden md:block" />
+                <div className="h-3 bg-[#191917] rounded w-8 ml-auto" />
+              </div>
+            ))
+          ) : (
+            Array.from({ length: 9 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="h-[54px] border-b border-[#191917]"
+              />
+            ))
+          )
         ) : (
           <>
-            {displayEntries.map((entry) => {
+            {renderedEntries.map((entry) => {
               const trackId = entry.trackId || entry.id;
               const isDelisted = entry.status === "[DELISTED]";
 
@@ -214,23 +277,28 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
             })}
 
             {/* Bottom Pagination Controls or Terminal Genesis Record */}
-            {hasMore ? (
+            {canLoadMore ? (
               <div className="w-full py-5 px-1 select-none font-mono text-[11px] flex items-center gap-3">
                 <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
                 <div className="inline-flex items-center gap-[4px]">
                   <button
                     type="button"
                     disabled={isLoadingMore}
-                    onClick={onLoadMore}
+                    onClick={handleLoadMore}
                     className={`group font-mono text-[11px] tracking-[0.1em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${
                       isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
                     }`}
                   >
-                    <span>{isLoadingMore ? "[ FETCHING PLAYS... ]" : "[ LOAD 50 MORE PLAYS ]"}</span>
+                    <span className="md:hidden">
+                      {isLoadingMore ? "[ FETCHING PLAYS... ]" : "[ LOAD 25 MORE PLAYS ]"}
+                    </span>
+                    <span className="hidden md:inline">
+                      {isLoadingMore ? "[ FETCHING PLAYS... ]" : "[ LOAD 50 MORE PLAYS ]"}
+                    </span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+                    onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
                     className="group font-mono text-[11px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
                   >
@@ -248,7 +316,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+                    onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
                     className="group font-mono text-[11px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
                   >
