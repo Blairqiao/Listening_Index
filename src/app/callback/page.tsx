@@ -25,8 +25,10 @@ function CallbackInner() {
 
     const denied = params.get("error");
     if (denied) {
+      // `error` arrives in the URL, so anyone can put any text in it. Show
+      // fixed wording only, never the parameter itself.
       const message =
-        denied === "access_denied" ? "Authorization was declined." : denied;
+        denied === "access_denied" ? "Authorization was declined." : "Sign-in failed.";
       if (!report(false)) setError(message);
       return;
     }
