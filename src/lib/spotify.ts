@@ -131,6 +131,15 @@ let tokenCache: CachedToken | null = null;
 let activeTokenPromise: Promise<string> | null = null;
 
 /**
+ * Drops the cached access token. Called when the owner connects or
+ * disconnects from the settings menu: the cache would otherwise keep
+ * answering for the previous account for up to an hour.
+ */
+export function resetSpotifyTokenCache(): void {
+  tokenCache = null;
+}
+
+/**
  * Retrieves an active Spotify access token using the refresh token flow.
  * Caches token in-memory with a 5-minute safety buffer.
  * Deduplicates concurrent token refresh calls via an in-flight promise latch.

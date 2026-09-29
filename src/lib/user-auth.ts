@@ -20,6 +20,8 @@ import crypto from "node:crypto";
 
 export const SESSION_COOKIE = "spotify_session";
 export const VERIFIER_COOKIE = "spotify_pkce";
+/** Separate from the guest verifier so the two flows can never consume each other's. */
+export const OWNER_VERIFIER_COOKIE = "owner_spotify_pkce";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const VERIFIER_TTL_SECONDS = 10 * 60; // one login attempt
 
@@ -143,6 +145,12 @@ export function verifierCookie(verifier: string): string {
 }
 export function clearVerifierCookie(): string {
   return cookie(VERIFIER_COOKIE, "", 0);
+}
+export function ownerVerifierCookie(verifier: string): string {
+  return cookie(OWNER_VERIFIER_COOKIE, verifier, VERIFIER_TTL_SECONDS);
+}
+export function clearOwnerVerifierCookie(): string {
+  return cookie(OWNER_VERIFIER_COOKIE, "", 0);
 }
 
 /** PKCE, server side. No client secret is needed, so the player still works
