@@ -18,6 +18,13 @@ const VERIFIER_KEY = "spotify_player_verifier";
 /** Posted by the callback tab once tokens are stored. */
 export const AUTH_MESSAGE = "spotify-player-auth";
 const RETURN_KEY = "spotify_player_return_to";
+/**
+ * The client id a sign-in was started with. The callback runs as a fresh
+ * page (a popup, or a full redirect) that never received the id the owner
+ * saved in the settings menu, so it reads it back from here. Client ids are
+ * public, so persisting one costs nothing.
+ */
+const FLOW_CLIENT_ID_KEY = "spotify_player_client_id";
 
 /** `streaming` is what the Web Playback SDK requires; the read scopes let us
  *  name the account, and the modify scopes drive transport controls. */
@@ -48,7 +55,15 @@ export function setConfiguredClientId(id: string | null | undefined) {
 }
 
 export function getClientId(): string | null {
-  return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || configuredClientId;
+  if (process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID) return process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
+  if (configuredClientId) return configuredClientId;
+  // A page that never mounted the player (the callback, or a reload before
+  // settings arrive) falls back to the id the last sign-in used.
+  try {
+    return localStorage.getItem(FLOW_CLIENT_ID_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function getRedirectUri(): string {
@@ -164,6 +179,7 @@ async function buildAuthUrl(): Promise<string> {
   try {
     // localStorage rather than sessionStorage: the popup is its own context.
     localStorage.setItem(VERIFIER_KEY, verifier);
+    localStorage.setItem(FLOW_CLIENT_ID_KEY, clientId);
     sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search);
   } catch {}
 
@@ -206,8 +222,25 @@ async function postToken(body: Record<string, string>): Promise<StoredToken> {
   };
 }
 
+/**
+ * One exchange per authorization code. React's development mode runs effects
+ * twice; without this, the second run would find the single-use verifier
+ * already consumed by the first and report a failure for a sign-in that
+ * actually succeeded.
+ */
+const exchanges = new Map<string, Promise<StoredToken>>();
+
 /** Exchanges the ?code= from the redirect for tokens. Called on /callback. */
-export async function completeLogin(code: string): Promise<StoredToken> {
+export function completeLogin(code: string): Promise<StoredToken> {
+  let pending = exchanges.get(code);
+  if (!pending) {
+    pending = exchangeCode(code);
+    exchanges.set(code, pending);
+  }
+  return pending;
+}
+
+async function exchangeCode(code: string): Promise<StoredToken> {
   const clientId = getClientId();
   if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
   let verifier = "";
