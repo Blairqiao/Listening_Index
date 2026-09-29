@@ -20,8 +20,20 @@ export function useNowPlaying(): { data: NowPlaying | null; progressMs: number }
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // A fetch in progress leaves `timer` null, so the timer alone can't tell
+    // "idle" from "polling": without this flag, hiding and showing the tab
+    // mid-fetch would start a second loop.
+    let inFlight = false;
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = !cancelled && !document.hidden ? setTimeout(poll, POLL_MS) : null;
+    };
 
     const poll = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      timer = null;
       try {
         const res = await fetch("/api/now-playing", { cache: "no-store" });
         if (res.ok) {
@@ -34,15 +46,17 @@ export function useNowPlaying(): { data: NowPlaying | null; progressMs: number }
         }
       } catch {
         // Transient network failure: keep showing the last known state.
+      } finally {
+        inFlight = false;
       }
-      if (!cancelled && !document.hidden) timer = setTimeout(poll, POLL_MS);
+      schedule();
     };
 
     const onVisibility = () => {
       if (document.hidden) {
         if (timer) clearTimeout(timer);
         timer = null;
-      } else if (!timer) {
+      } else if (!timer && !inFlight) {
         void poll();
       }
     };
