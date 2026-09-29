@@ -804,7 +804,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 topArtists={currentOverview.topArtists}
                 topAlbums={currentOverview.topAlbums}
                 activityCadence={currentOverview.activityCadence}
-                isLoading={isRangeLoading && !overviewCache[displayedRange]}
+                isLoading={!overviewCache[displayedRange] && isDbConfigured}
               />
             )}
 

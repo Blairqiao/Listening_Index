@@ -78,6 +78,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       ? activityCadence[activityCadence.length - 1].date
       : "";
 
+  const trackPlaceholderCount = Math.max(0, 10 - displayTracks.length);
+  const artistPlaceholderCount = Math.max(0, 5 - topArtists.length);
+  const albumPlaceholderCount = Math.max(0, 5 - topAlbums.length);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-8 md:gap-[26px] mt-4 md:mt-6">
       {/* Left Column: Top Tracks (1.5fr) */}
@@ -214,10 +218,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   </div>
                 );
               })}
-              {Array.from({ length: Math.max(0, 10 - displayTracks.length) }).map((_, idx) => (
+              {Array.from({ length: trackPlaceholderCount }).map((_, idx) => (
                 <div
                   key={`track-ph-${idx}`}
-                  className="h-[54px] md:h-[55px] border-b border-[#191917]"
+                  className={`h-[54px] md:h-[55px] ${
+                    idx === trackPlaceholderCount - 1
+                      ? "border-b-0"
+                      : "border-b border-[#191917]"
+                  }`}
                   aria-hidden="true"
                 />
               ))}
@@ -276,10 +284,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </a>
                   );
                 })}
-                {Array.from({ length: Math.max(0, 5 - topArtists.length) }).map((_, idx) => (
+                {Array.from({ length: artistPlaceholderCount }).map((_, idx) => (
                   <div
                     key={`artist-ph-${idx}`}
-                    className="h-[35px] border-b border-[#191917]"
+                    className={`h-[35px] ${
+                      idx === artistPlaceholderCount - 1
+                        ? "border-b-0"
+                        : "border-b border-[#191917]"
+                    }`}
                     aria-hidden="true"
                   />
                 ))}
@@ -362,10 +374,14 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </div>
                   );
                 })}
-                {Array.from({ length: Math.max(0, 5 - topAlbums.length) }).map((_, idx) => (
+                {Array.from({ length: albumPlaceholderCount }).map((_, idx) => (
                   <div
                     key={`album-ph-${idx}`}
-                    className="h-[35px] border-b border-[#191917]"
+                    className={`h-[35px] ${
+                      idx === albumPlaceholderCount - 1
+                        ? "border-b-0"
+                        : "border-b border-[#191917]"
+                    }`}
                     aria-hidden="true"
                   />
                 ))}
