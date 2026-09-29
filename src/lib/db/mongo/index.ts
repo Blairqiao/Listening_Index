@@ -86,33 +86,3 @@ export async function getMongoDb(): Promise<Db> {
   const client = await getMongoClient();
   return client.db(DB_NAME);
 }
-
-/**
- * Creates the indexes the app relies on.
- *
- * This is the counterpart to schema.ts, and the contrast is the point:
- * MongoDB does not need CREATE TABLE, because a collection springs into
- * existence on first write and documents carry their own shape. What it does
- * need is indexes — and critically the unique one, which is the only thing
- * that makes re-syncing the same plays idempotent.
- *
- * createIndex is idempotent, so calling this on every cold start is safe.
- */
-export async function ensureMongoIndexes(): Promise<void> {
-  const db = await getMongoDb();
-
-  // The direct equivalent of the Postgres
-  // CONSTRAINT plays_played_at_track_id_key UNIQUE (played_at, track_id).
-  // Without it, every 30-minute sync would duplicate the last 50 plays.
-  await db
-    .collection("plays")
-    .createIndex({ playedAt: 1, trackId: 1 }, { unique: true, name: "plays_played_at_track_id" });
-
-  // Stream Log reads newest-first; this is what keeps that a range scan
-  // rather than a full collection sort.
-  await db.collection("plays").createIndex({ playedAt: -1 }, { name: "plays_played_at_desc" });
-
-  await db
-    .collection("tracks")
-    .createIndex({ enrichmentStatus: 1 }, { name: "tracks_enrichment_status" });
-}
