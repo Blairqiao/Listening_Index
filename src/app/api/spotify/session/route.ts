@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE,
   clearSessionCookie,
   decryptToken,
+  encryptToken,
   isGuestAuthConfigured,
   readGuestSession,
 } from "@/lib/user-auth";
@@ -86,8 +87,11 @@ export async function POST(request: NextRequest) {
   });
   const json = await res.json();
   if (!res.ok || !json.access_token) {
-    // A revoked grant is permanent, so drop the record rather than retrying.
-    if (res.status === 400) {
+    // Only invalid_grant means the guest revoked access (or the token expired
+    // for good). Other 400s, such as invalid_client after the owner changes
+    // the client id, are configuration problems: deleting every guest's
+    // credential over one would log them all out for nothing.
+    if (json.error === "invalid_grant") {
       await userRepository().deleteUser(userId).catch(() => {});
       const gone = NextResponse.json(
         { error: "Spotify access was revoked. Sign in again." },
@@ -97,6 +101,18 @@ export async function POST(request: NextRequest) {
       return gone;
     }
     return NextResponse.json({ error: "Could not refresh token." }, { status: 502 });
+  }
+
+  // PKCE refreshes can rotate the refresh token. Keep the new one, or the
+  // next refresh presents a token Spotify has retired.
+  if (json.refresh_token && json.refresh_token !== refreshToken) {
+    await userRepository()
+      .upsertUser({
+        id: user.id,
+        displayName: user.displayName,
+        encryptedRefreshToken: encryptToken(json.refresh_token),
+      })
+      .catch(() => {});
   }
 
   return NextResponse.json({
