@@ -320,7 +320,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 2-Column Main Band: Left 1.5fr / Right 1fr */}
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-8 md:gap-[26px]">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px]">
         {/* Left Column: Track list */}
         <div className="min-w-0">
           <div className="flex justify-between items-baseline mb-2 select-none">
@@ -446,7 +446,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
             <button
               type="button"
               onClick={() => setIsTracksExpanded((prev) => !prev)}
-              className="md:hidden w-full py-2.5 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
             >
               {isTracksExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${activeTracks.length} TRACKS ⌄`}
             </button>
@@ -454,7 +454,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
         </div>
 
         {/* Right Column: Analysis + Previous Sittings + Histogram */}
-        <div className="flex flex-col gap-8 md:gap-0 md:justify-between h-full min-w-0">
+        <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
           {/* Analysis Panel */}
           <div>
             <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] block mb-2 select-none">
