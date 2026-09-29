@@ -333,10 +333,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
               : "border-music-accent text-music-accent cursor-pointer hover:bg-music-accent/10"
           }`}
         >
-          {isConnecting ? "[ WAITING FOR SPOTIFY... ]" : "[ CONNECT SPOTIFY ]"}
+          {isConnecting
+            ? "[ WAITING FOR SPOTIFY... ]"
+            : guest?.available
+            ? "[ SIGN IN WITH SPOTIFY ]"
+            : "[ CONNECT SPOTIFY ]"}
         </button>
         <p className="text-[#5A5A55] text-[11px] max-w-[520px] leading-relaxed">
-          Opens a Spotify window. The dashboard stays where it is.
+          {guest?.available
+            ? "Opens a Spotify window. You stay signed in on any device you open this on."
+            : "Opens a Spotify window. The dashboard stays where it is."}
         </p>
       </Shell>
     );
