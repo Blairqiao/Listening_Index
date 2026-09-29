@@ -59,6 +59,9 @@ function msToClock(ms: number): string {
 export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
+  // Sign-in and the auto-connect effect can both ask to connect at nearly the
+  // same moment; only one attempt may be in flight.
+  const connectingRef = useRef(false);
   const statusRef = useRef<(s: PlayerStatus, t: string | null) => void>(() => {});
 
   const { config, openModal, isAuthenticated } = useConfig();
@@ -107,8 +110,15 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
   }, [config.spotifyClientId]);
 
   const connect = useCallback(async () => {
+    if (connectingRef.current) return;
+    connectingRef.current = true;
     setError(null);
     setStatus("connecting");
+    // Each Spotify.Player registers its own Connect device. Replacing one
+    // without disconnecting it would leave a ghost "Listening Index" device
+    // and a second set of listeners firing into this component.
+    playerRef.current?.disconnect();
+    playerRef.current = null;
     try {
       await loadSdk();
       const serverSide = guestRef.current?.available && guestRef.current.signedIn;
@@ -154,10 +164,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ onStatusChange }) => {
       player.addListener("playback_error", (e) => setError(e.message));
 
       const ok = await player.connect();
-      if (!ok) fail("The player could not connect.");
-      playerRef.current = player;
+      if (ok) {
+        playerRef.current = player;
+      } else {
+        player.disconnect();
+        fail("The player could not connect.");
+      }
     } catch (e) {
       fail(e instanceof Error ? e.message : String(e));
+    } finally {
+      connectingRef.current = false;
     }
 
     function fail(message: string) {
