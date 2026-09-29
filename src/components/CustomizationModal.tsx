@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
+import { OwnerSpotifyConnect } from "@/components/OwnerSpotifyConnect";
 import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
 import {
   areSiteConfigsEqual,
@@ -648,6 +649,15 @@ export const CustomizationModal: React.FC = () => {
                 dashboard.
               </p>
             </div>
+
+            {/* Admin-only: the account the whole dashboard reads. */}
+            {isAuthenticated && (
+              <OwnerSpotifyConnect
+                hasSavedClientId={Boolean(
+                  process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId
+                )}
+              />
+            )}
           </div>
 
           {/* In-Modal Minimal Password Strip (when locked) */}
