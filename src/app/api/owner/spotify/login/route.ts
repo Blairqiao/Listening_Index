@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requestOrigin } from "@/lib/request-origin";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { configRepository } from "@/lib/db/repositories";
 import { canStoreOwnerCredential } from "@/lib/owner-spotify";
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: `${request.nextUrl.origin}/api/owner/spotify/callback`,
+    redirect_uri: `${requestOrigin(request)}/api/owner/spotify/callback`,
     scope: OWNER_SCOPES,
     code_challenge_method: "S256",
     code_challenge: challengeFor(verifier),

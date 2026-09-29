@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { requestOrigin } from "@/lib/request-origin";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { configRepository } from "@/lib/db/repositories";
 import { saveOwnerCredential } from "@/lib/owner-spotify";
@@ -26,7 +27,7 @@ function closePopup(origin: string, ok: boolean, message: string | null) {
  * and it can be reached directly by URL.
  */
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const origin = requestOrigin(request);
 
   if (!isAuthorizedAdminRequest(request)) {
     return closePopup(origin, false, "Admin sign-in required.");
