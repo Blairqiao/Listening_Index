@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requestOrigin } from "@/lib/request-origin";
 import { configRepository } from "@/lib/db/repositories";
 import { userRepository } from "@/lib/db/repositories";
 import {
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
  * flow in a popup: the page tells the opener it is done and closes itself.
  */
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
+  const origin = requestOrigin(request);
   const error = request.nextUrl.searchParams.get("error");
   const code = request.nextUrl.searchParams.get("code");
   const verifier = request.cookies.get(VERIFIER_COOKIE)?.value;

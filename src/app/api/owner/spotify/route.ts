@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requestOrigin } from "@/lib/request-origin";
 import { isConfigured } from "@/lib/db";
 import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/auth-utils";
 import { canStoreOwnerCredential, clearOwnerCredential, getOwnerCredential } from "@/lib/owner-spotify";
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     source: viaEnv ? "environment" : stored ? "menu" : null,
     displayName: stored?.displayName ?? null,
     canConnect: canStoreOwnerCredential(),
-    redirectUri: `${request.nextUrl.origin}/api/owner/spotify/callback`,
+    redirectUri: `${requestOrigin(request)}/api/owner/spotify/callback`,
   });
 }
 

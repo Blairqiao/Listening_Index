@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requestOrigin } from "@/lib/request-origin";
 import { configRepository } from "@/lib/db/repositories";
 import {
   challengeFor,
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   const verifier = createVerifier();
-  const origin = request.nextUrl.origin;
+  const origin = requestOrigin(request);
 
   const params = new URLSearchParams({
     client_id: clientId,
