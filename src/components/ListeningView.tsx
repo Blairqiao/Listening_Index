@@ -307,9 +307,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         }
       }
 
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+      const limit = isMobile ? "25" : "50";
+
       const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
       const params = new URLSearchParams({
-        limit: "50",
+        limit,
         cursor,
         cursorId,
         prevPlayedAt,
@@ -811,6 +814,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 isLoadingMore={isLoadingMorePlays}
                 hasMore={streamLogState?.hasMore ?? (streamLogData.entries.length >= 50)}
                 totalPlays={streamLogData.metrics[0]}
+                isLoading={!streamLogState && isDbConfigured}
               />
             )}
 
