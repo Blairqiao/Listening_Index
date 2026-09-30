@@ -54,4 +54,33 @@ test("LivePlayerView - production component contract & architecture rules", () =
   assert.match(source, /SyntheticSpectrumSource/, "Must support synthetic spectrum source");
   assert.match(source, /LiveAudioSpectrumSource/, "Must support live audio hardware capture");
   assert.match(source, /BAND_COUNT/, "Must use 32-band spectrum layout");
+
+  // 7. Regression check: connectPlayer must NOT have volume in its dependency array
+  assert.match(
+    source,
+    /const connectPlayer = useCallback\(async \(\) => {[\s\S]*?}, \[\]\);/,
+    "connectPlayer must have an empty dependency array to prevent reconnection cascade on volume change"
+  );
+
+  // 8. Regression check: SpectrumCanvas source mode effect must not depend on trackKey or isLive
+  assert.match(
+    source,
+    /},\s*\[sourceMode,\s*onToggleSource\]\);/,
+    "SpectrumCanvas sourceMode effect must not depend on trackKey or isLive to avoid re-prompting audio stream"
+  );
+
+  // 9. Regression check: getOAuthToken handles 401 status
+  assert.match(
+    source,
+    /if \(r\.status === 401\)/,
+    "getOAuthToken must explicitly handle 401 unauthorized status"
+  );
 });
+
+import { getRibbonLabels } from "../src/components/MetricRibbon";
+
+test("MetricRibbon - Mode 3 labels aligned with metrics", () => {
+  const labels = getRibbonLabels(3);
+  assert.deepEqual(labels, ["STATUS", "BANDS", "NOW STREAMING", "SOURCE"]);
+});
+

@@ -1,9 +1,9 @@
 # Task 3: Production LivePlayerView Component (Split Console)
 
-*2026-09-30T06:57:25Z by Showboat 0.6.1*
-<!-- showboat-id: 084a94e9-086c-4f7c-8bc0-45a58c1fdd09 -->
+*2026-09-30T07:09:06Z by Showboat 0.6.1*
+<!-- showboat-id: 348dd31c-e321-4449-964b-58429c4f39cd -->
 
-Running unit tests for LivePlayerView component and helpers:
+Running unit tests for LivePlayerView component and helpers (including regression checks):
 
 ```bash
 npx tsx test/live-player-view.test.ts | sed -E 's/\([0-9.]+m?s\)/(...ms)/g; s/duration_ms [0-9.]+/duration_ms .../g'
@@ -13,9 +13,10 @@ npx tsx test/live-player-view.test.ts | sed -E 's/\([0-9.]+m?s\)/(...ms)/g; s/du
 ✔ LivePlayerView - msToClock helper formatting (...ms)
 ✔ LivePlayerView - gradientStops generates 3 distinct color stops from accent (...ms)
 ✔ LivePlayerView - production component contract & architecture rules (...ms)
-ℹ tests 3
+✔ MetricRibbon - Mode 3 labels aligned with metrics (...ms)
+ℹ tests 4
 ℹ suites 0
-ℹ pass 3
+ℹ pass 4
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
@@ -71,7 +72,7 @@ Mobile viewport visual verification (390x844) showing mobile isolation (hidden v
 ![Mobile 390x844 View](.artifacts/screenshots/task-mobile.png)
 ```
 
-![Mobile 390x844 View](456549be-2026-09-30.png)
+![Mobile 390x844 View](a31900e2-2026-09-30.png)
 
 Desktop viewport visual verification (1280x800) showing Variant B Split Console with 32-band spectrum:
 
@@ -79,4 +80,4 @@ Desktop viewport visual verification (1280x800) showing Variant B Split Console 
 ![Desktop 1280x800 View](.artifacts/screenshots/task-desktop.png)
 ```
 
-![Desktop 1280x800 View](a8860da0-2026-09-30.png)
+![Desktop 1280x800 View](c01ed7e6-2026-09-30.png)
