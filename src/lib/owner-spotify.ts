@@ -13,9 +13,12 @@
  * otherwise, can resolve to this record.
  */
 
-import { userRepository } from "@/lib/db/repositories";
-import { isBackendConfigured } from "@/lib/db/adapter";
-import { decryptToken, encryptToken, getEncryptionKeyConfigured } from "@/lib/user-auth";
+import { isDbConfigured } from "@/lib/db";
+import {
+  getOwnerPlaybackToken,
+  saveOwnerPlaybackToken,
+  deleteOwnerPlaybackToken,
+} from "@/lib/db/queries/config";
 
 export const OWNER_RECORD_ID = "__owner__";
 
@@ -24,21 +27,17 @@ export interface OwnerCredential {
   refreshToken: string;
 }
 
-/** Storing the owner token needs somewhere to put it and a key to seal it. */
+/** Storing the owner token needs a configured database. */
 export function canStoreOwnerCredential(): boolean {
-  return isBackendConfigured() && getEncryptionKeyConfigured();
+  return isDbConfigured();
 }
 
 export async function getOwnerCredential(): Promise<OwnerCredential | null> {
   if (!canStoreOwnerCredential()) return null;
   try {
-    const record = await userRepository().getUser(OWNER_RECORD_ID);
-    if (!record) return null;
-    const refreshToken = decryptToken(record.encryptedRefreshToken);
-    // Undecryptable means the key changed: treat as not connected rather
-    // than sending garbage to Spotify.
-    if (!refreshToken) return null;
-    return { displayName: record.displayName, refreshToken };
+    const token = await getOwnerPlaybackToken();
+    if (!token) return null;
+    return { displayName: null, refreshToken: token };
   } catch {
     return null;
   }
@@ -46,15 +45,11 @@ export async function getOwnerCredential(): Promise<OwnerCredential | null> {
 
 export async function saveOwnerCredential(
   refreshToken: string,
-  displayName: string | null
+  _displayName: string | null
 ): Promise<void> {
-  await userRepository().upsertUser({
-    id: OWNER_RECORD_ID,
-    displayName,
-    encryptedRefreshToken: encryptToken(refreshToken),
-  });
+  await saveOwnerPlaybackToken(refreshToken);
 }
 
 export async function clearOwnerCredential(): Promise<void> {
-  await userRepository().deleteUser(OWNER_RECORD_ID);
+  await deleteOwnerPlaybackToken();
 }

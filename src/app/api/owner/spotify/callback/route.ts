@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requestOrigin } from "@/lib/request-origin";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { configRepository } from "@/lib/db/repositories";
+import { getActiveSiteConfig } from "@/lib/db/queries";
 import { saveOwnerCredential } from "@/lib/owner-spotify";
 import { closePopup as renderPopup, describeOAuthError } from "@/lib/popup-response";
 import { resetSpotifyTokenCache } from "@/lib/spotify";
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   if (!code) return closePopup(origin, false, "No authorization code returned.");
   if (!verifier) return closePopup(origin, false, "Connection expired. Try again.");
 
-  const config = await configRepository().getActiveSiteConfig();
+  const config = await getActiveSiteConfig();
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
   if (!clientId) return closePopup(origin, false, "No Spotify client id configured.");
 

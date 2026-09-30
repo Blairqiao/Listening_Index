@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestOrigin } from "@/lib/request-origin";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { configRepository } from "@/lib/db/repositories";
+import { getActiveSiteConfig } from "@/lib/db/queries";
 import { canStoreOwnerCredential } from "@/lib/owner-spotify";
 import { challengeFor, createVerifier, ownerVerifierCookie } from "@/lib/user-auth";
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const config = await configRepository().getActiveSiteConfig();
+  const config = await getActiveSiteConfig();
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
   if (!clientId) {
     return NextResponse.json(

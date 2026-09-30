@@ -166,3 +166,87 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
 
   return defaults;
 }
+
+/**
+ * Retrieves the owner's Spotify playback refresh token from site_settings.
+ * Returns null if not set or database is unconfigured.
+ */
+export async function getOwnerPlaybackToken(): Promise<string | null> {
+  if (!isDbConfigured()) {
+    return null;
+  }
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    const rows = ((await sql`
+      SELECT owner_playback_token
+      FROM site_settings
+      WHERE id = 'active'
+      LIMIT 1;
+    `) as any);
+
+    if (rows && rows.length > 0 && rows[0]?.owner_playback_token) {
+      return rows[0].owner_playback_token;
+    }
+    return null;
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to get owner playback token from Neon DB:", error);
+    return null;
+  }
+}
+
+/**
+ * Persists the owner's Spotify playback refresh token in site_settings.
+ */
+export async function saveOwnerPlaybackToken(token: string): Promise<void> {
+  if (!isDbConfigured()) {
+    return;
+  }
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    await sql`
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, owner_playback_token, updated_at)
+      VALUES (
+        'active',
+        ${siteConfig.title},
+        ${siteConfig.ownerName},
+        ${siteConfig.accentColor},
+        ${siteConfig.siteUrl},
+        ${siteConfig.githubUrl},
+        ${siteConfig.timezone || "America/Chicago"},
+        ${siteConfig.spotifyClientId || ""},
+        ${token},
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        owner_playback_token = EXCLUDED.owner_playback_token,
+        updated_at = NOW();
+    `;
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to save owner playback token to Neon DB:", error);
+    throw error;
+  }
+}
+
+/**
+ * Clears the owner's Spotify playback refresh token from site_settings.
+ */
+export async function deleteOwnerPlaybackToken(): Promise<void> {
+  if (!isDbConfigured()) {
+    return;
+  }
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    await sql`
+      UPDATE site_settings
+      SET owner_playback_token = NULL,
+          updated_at = NOW()
+      WHERE id = 'active';
+    `;
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to delete owner playback token from Neon DB:", error);
+    throw error;
+  }
+}

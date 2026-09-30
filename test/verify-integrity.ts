@@ -252,6 +252,9 @@ test("Modular Query Submodule Imports", async () => {
   assert.equal(typeof ingestionMod.bulkUpsertTracks, "function");
   assert.equal(typeof enrichmentMod.getEnrichmentProgress, "function");
   assert.equal(typeof configMod.getActiveSiteConfig, "function");
+  assert.equal(typeof configMod.getOwnerPlaybackToken, "function");
+  assert.equal(typeof configMod.saveOwnerPlaybackToken, "function");
+  assert.equal(typeof configMod.deleteOwnerPlaybackToken, "function");
   assert.equal(typeof schemaMod.ensureTablesExist, "function");
   assert.equal(typeof initialDataMod.getInitialMusicData, "function");
   assert.equal(typeof cacheMod.clearDbQueryCaches, "function");
@@ -263,6 +266,9 @@ test("Modular Query Submodule Imports", async () => {
   assert.equal(indexMod.bulkUpsertTracks, ingestionMod.bulkUpsertTracks);
   assert.equal(indexMod.getEnrichmentProgress, enrichmentMod.getEnrichmentProgress);
   assert.equal(indexMod.getActiveSiteConfig, configMod.getActiveSiteConfig);
+  assert.equal(indexMod.getOwnerPlaybackToken, configMod.getOwnerPlaybackToken);
+  assert.equal(indexMod.saveOwnerPlaybackToken, configMod.saveOwnerPlaybackToken);
+  assert.equal(indexMod.deleteOwnerPlaybackToken, configMod.deleteOwnerPlaybackToken);
   assert.equal(indexMod.ensureTablesExist, schemaMod.ensureTablesExist);
   assert.equal(indexMod.getInitialMusicData, initialDataMod.getInitialMusicData);
   assert.equal(indexMod.clearDbQueryCaches, cacheMod.clearDbQueryCaches);
@@ -584,5 +590,12 @@ test("Database Ingestion Debounce & Proximity Protection", async () => {
   }
 });
 
-
-
+test("Owner Playback Token Persistence in Neon site_settings", async () => {
+  const { getOwnerPlaybackToken, saveOwnerPlaybackToken, deleteOwnerPlaybackToken } = await import("../src/lib/db/queries/config");
+  await saveOwnerPlaybackToken("mock_refresh_token_123");
+  const token = await getOwnerPlaybackToken();
+  assert.strictEqual(token, "mock_refresh_token_123");
+  await deleteOwnerPlaybackToken();
+  const cleared = await getOwnerPlaybackToken();
+  assert.strictEqual(cleared, null);
+});

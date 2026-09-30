@@ -242,12 +242,17 @@ export async function ensureTablesExist(): Promise<void> {
             github_url TEXT NOT NULL,
             timezone TEXT NOT NULL,
             spotify_client_id TEXT NOT NULL DEFAULT '',
+            owner_playback_token TEXT,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           );
 
           -- Added after the table shipped, so existing databases need it too.
           ALTER TABLE site_settings
-            ADD COLUMN IF NOT EXISTS spotify_client_id TEXT NOT NULL DEFAULT '';
+            ADD COLUMN IF NOT EXISTS spotify_client_id TEXT NOT NULL DEFAULT '',
+            ADD COLUMN IF NOT EXISTS owner_playback_token TEXT;
+
+          -- Drop legacy guest user table
+          DROP TABLE IF EXISTS player_users;
 
           CREATE TABLE IF NOT EXISTS daily_api_usage (
             usage_date DATE PRIMARY KEY,
