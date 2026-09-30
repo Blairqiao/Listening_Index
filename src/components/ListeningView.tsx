@@ -86,7 +86,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
   const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
-  const [activeMode, setActiveMode] = useState<Mode>(0);
+  const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin
   useEffect(() => {
@@ -212,10 +212,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2") {
-        setActiveMode(parseInt(m, 10) as Mode);
-      } else if (m === "3" && isAuthenticated) {
-        setActiveMode(3);
+      if (m === "0" || m === "1" || m === "2" || m === "3") {
+        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
       }
       const r = params.get("range");
       if (r && RANGE_KEYS.includes(r as RangeKey)) {
@@ -556,11 +554,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
-      if (mode === 3 && !isAuthenticated) {
-        setActiveMode(0);
-        return;
-      }
-      setActiveMode(mode);
+      setActiveMode(sanitizeActiveMode(mode, isAuthenticated));
     },
     [isSyncing, isAuthenticated]
   );
