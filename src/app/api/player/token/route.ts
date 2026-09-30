@@ -40,13 +40,18 @@ async function exchangeAuthCode(
   code: string,
   redirectUri: string,
   clientId: string,
-  clientSecret?: string
+  clientSecret?: string,
+  codeVerifier?: string
 ): Promise<Response> {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri,
   });
+
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/x-www-form-urlencoded",
@@ -81,7 +86,10 @@ export async function GET(request: NextRequest) {
   }
 
   const config = await getActiveSiteConfig();
-  const clientId = process.env.SPOTIFY_CLIENT_ID || config.spotifyClientId;
+  const clientId =
+    process.env.SPOTIFY_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
+    config.spotifyClientId;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
   if (!clientId) {
@@ -130,9 +138,13 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const { code, redirectUri, refreshToken } = body;
+  const codeVerifier = body.codeVerifier || body.code_verifier;
 
   const config = await getActiveSiteConfig();
-  const clientId = process.env.SPOTIFY_CLIENT_ID || config.spotifyClientId;
+  const clientId =
+    process.env.SPOTIFY_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
+    config.spotifyClientId;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
   if (!clientId) {
@@ -143,7 +155,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (refreshToken) {
-    await saveOwnerPlaybackToken(refreshToken);
     const response = await refreshSpotifyToken(refreshToken, clientId, clientSecret);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -159,9 +170,9 @@ export async function POST(request: NextRequest) {
       refresh_token?: string;
     };
 
-    if (data.refresh_token && data.refresh_token !== refreshToken) {
-      await saveOwnerPlaybackToken(data.refresh_token);
-    }
+    // Persist only after Spotify successfully validates the token
+    const tokenToSave = data.refresh_token || refreshToken;
+    await saveOwnerPlaybackToken(tokenToSave);
 
     return NextResponse.json({
       linked: true,
@@ -171,7 +182,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (code && redirectUri) {
-    const response = await exchangeAuthCode(code, redirectUri, clientId, clientSecret);
+    const response = await exchangeAuthCode(
+      code,
+      redirectUri,
+      clientId,
+      clientSecret,
+      codeVerifier
+    );
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
@@ -186,9 +203,14 @@ export async function POST(request: NextRequest) {
       refresh_token?: string;
     };
 
-    if (data.refresh_token) {
-      await saveOwnerPlaybackToken(data.refresh_token);
+    if (!data.refresh_token) {
+      return NextResponse.json(
+        { error: "Spotify response did not include a refresh token" },
+        { status: 400 }
+      );
     }
+
+    await saveOwnerPlaybackToken(data.refresh_token);
 
     return NextResponse.json({
       linked: true,
