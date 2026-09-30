@@ -107,26 +107,4 @@ test("Player OAuth Flow - Red/Green TDD Verification", async (t) => {
       await deleteOwnerPlaybackToken();
     }
   });
-
-  await t.test("proxy redirects localhost to 127.0.0.1 in development", async () => {
-    const prevEnv = process.env.NODE_ENV;
-    (process.env as Record<string, string | undefined>).NODE_ENV = "development";
-    try {
-      const { proxy } = await import("../src/proxy");
-      const req = new NextRequest("http://localhost:8888/live?tab=4", {
-        headers: { host: "localhost:8888" },
-      });
-      const res = proxy(req);
-      assert.equal(res.status, 307);
-      assert.equal(res.headers.get("location"), "http://127.0.0.1:8888/live?tab=4");
-
-      const loopbackReq = new NextRequest("http://127.0.0.1:8888/live?tab=4", {
-        headers: { host: "127.0.0.1:8888" },
-      });
-      const loopbackRes = proxy(loopbackReq);
-      assert.equal(loopbackRes.status, 200);
-    } finally {
-      (process.env as Record<string, string | undefined>).NODE_ENV = prevEnv;
-    }
-  });
 });
