@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: getRedirectUri(),
+    redirect_uri: getRedirectUri(request),
     scope: PLAYER_SCOPES,
     code_challenge_method: "S256",
     code_challenge: challengeFor(verifier),
