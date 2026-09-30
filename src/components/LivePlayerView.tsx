@@ -105,6 +105,9 @@ const SpectrumCanvas: React.FC<{
   const accentRef = useRef(accentColor);
   accentRef.current = accentColor;
 
+  const trackRef = useRef({ trackKey, isLive });
+  trackRef.current = { trackKey, isLive };
+
   useEffect(() => {
     syntheticRef.current?.setTrack(trackKey, isLive);
   }, [trackKey, isLive]);
@@ -136,7 +139,8 @@ const SpectrumCanvas: React.FC<{
     } else {
       sourceRef.current?.stop();
       liveRef.current = null;
-      const synthetic = new SyntheticSpectrumSource(trackKey, isLive);
+      const { trackKey: k, isLive: l } = trackRef.current;
+      const synthetic = new SyntheticSpectrumSource(k, l);
       syntheticRef.current = synthetic;
       sourceRef.current = synthetic;
     }
@@ -145,7 +149,7 @@ const SpectrumCanvas: React.FC<{
       cancelled = true;
       sourceRef.current?.stop();
     };
-  }, [sourceMode, trackKey, isLive, onToggleSource]);
+  }, [sourceMode, onToggleSource]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -157,7 +161,8 @@ const SpectrumCanvas: React.FC<{
     let last = performance.now();
     let cssWidth = 0;
     let cssHeight = 0;
-    let stops: [string, string, string] = ["#000", "#000", "#000"];
+    let lastAccent = "";
+    let stops: [string, string, string] = gradientStops(accentRef.current);
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -186,7 +191,10 @@ const SpectrumCanvas: React.FC<{
       const peaks = peaksRef.current;
       if (source) source.read(bands, dt);
 
-      stops = gradientStops(accentRef.current);
+      if (accentRef.current !== lastAccent) {
+        lastAccent = accentRef.current;
+        stops = gradientStops(lastAccent);
+      }
 
       ctx.clearRect(0, 0, cssWidth, cssHeight);
       if (cssWidth <= 0 || cssHeight <= 0) {
@@ -289,6 +297,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
   const [state, setState] = useState<SpotifyPlaybackState | null>(null);
   const [position, setPosition] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0.7);
+  const volumeRef = useRef<number>(0.7);
+  volumeRef.current = volume;
   const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
 
@@ -318,19 +328,37 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
 
       const player = new window.Spotify.Player({
         name: DEVICE_NAME,
-        volume,
+        volume: volumeRef.current,
         getOAuthToken: (cb) => {
           fetch("/api/player/token")
-            .then((r) => r.json())
+            .then((r) => {
+              if (r.status === 401) {
+                setIsLinked(false);
+                setPlayerStatus("unlinked");
+                setErrorMessage("Authentication session expired. Please re-link.");
+                return null;
+              }
+              return r.json();
+            })
             .then((d) => {
+              if (!d) return;
               if (d?.accessToken) {
                 cb(d.accessToken);
               } else if (d?.linked === false) {
                 setIsLinked(false);
                 setPlayerStatus("unlinked");
+              } else if (d?.error) {
+                setIsLinked(false);
+                setPlayerStatus("unlinked");
+                setErrorMessage(d.error);
               }
             })
-            .catch((e) => console.error("[PLAYER] Failed to refresh token:", e));
+            .catch((e) => {
+              console.error("[PLAYER] Failed to refresh token:", e);
+              setIsLinked(false);
+              setPlayerStatus("unlinked");
+              setErrorMessage("Failed to refresh token from server.");
+            });
         },
       });
 
@@ -386,7 +414,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
     } finally {
       connectingRef.current = false;
     }
-  }, [volume]);
+  }, []);
 
   // Initial check of /api/player/token on mount
   const checkTokenStatus = useCallback(async () => {
@@ -587,6 +615,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
 
   const handleVolume = useCallback((v: number) => {
     setVolume(v);
+    volumeRef.current = v;
     playerRef.current?.setVolume(v);
   }, []);
 
