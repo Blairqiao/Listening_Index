@@ -5,6 +5,54 @@
  */
 
 import { isConfigured } from "@/lib/db";
+import { getActiveSiteConfig } from "@/lib/db/queries";
+import { getOwnerCredential, saveOwnerCredential } from "@/lib/owner-spotify";
+
+/**
+ * Where the owner's Spotify credentials come from.
+ *
+ * Environment variables win, so a deployment configured the original way is
+ * untouched. Without them, the credential saved from the settings menu is
+ * used, with the client id the owner entered there.
+ */
+async function resolveCredentials(): Promise<{
+  clientId: string;
+  clientSecret: string | undefined;
+  refreshToken: string;
+  fromDatabase: boolean;
+  displayName: string | null;
+} | null> {
+  const envId = process.env.SPOTIFY_CLIENT_ID;
+  const envToken = process.env.SPOTIFY_REFRESH_TOKEN;
+  if (isConfigured(envId) && isConfigured(envToken)) {
+    return {
+      clientId: envId!,
+      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+      refreshToken: envToken!,
+      fromDatabase: false,
+      displayName: null,
+    };
+  }
+
+  const stored = await getOwnerCredential();
+  if (!stored) return null;
+  const config = await getActiveSiteConfig();
+  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
+  if (!clientId) return null;
+  // Connected through PKCE, so it is redeemed with the client id alone.
+  return {
+    clientId,
+    clientSecret: undefined,
+    refreshToken: stored.refreshToken,
+    fromDatabase: true,
+    displayName: stored.displayName,
+  };
+}
+
+/** True when the owner's Spotify is reachable by either route. */
+export async function isOwnerSpotifyConfigured(): Promise<boolean> {
+  return (await resolveCredentials()) !== null;
+}
 
 export interface SpotifyApiErrorDetails {
   status: number;
@@ -83,6 +131,15 @@ let tokenCache: CachedToken | null = null;
 let activeTokenPromise: Promise<string> | null = null;
 
 /**
+ * Drops the cached access token. Called when the owner connects or
+ * disconnects from the settings menu: the cache would otherwise keep
+ * answering for the previous account for up to an hour.
+ */
+export function resetSpotifyTokenCache(): void {
+  tokenCache = null;
+}
+
+/**
  * Retrieves an active Spotify access token using the refresh token flow.
  * Caches token in-memory with a 5-minute safety buffer.
  * Deduplicates concurrent token refresh calls via an in-flight promise latch.
@@ -102,34 +159,35 @@ export async function getAccessToken(): Promise<string> {
   activeTokenPromise = (async () => {
     try {
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
-
-  if (
-    !isConfigured(clientId) ||
-    !isConfigured(clientSecret) ||
-    !isConfigured(refreshToken)
-  ) {
+  const creds = await resolveCredentials();
+  if (!creds) {
     throw new Error(
-      "Spotify credentials are not configured yet (currently set to 'todo' or empty). Ensure SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, " +
-        "and SPOTIFY_REFRESH_TOKEN are updated in your environment."
+      "Spotify is not connected. Connect it from the settings menu, or set " +
+        "SPOTIFY_CLIENT_ID and SPOTIFY_REFRESH_TOKEN in your environment."
     );
   }
-
-  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const { clientId, clientSecret, refreshToken } = creds;
 
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: refreshToken,
   });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  // A refresh token from the Authorization Code flow is redeemed with the
+  // client secret; one from the PKCE flow has no secret and is redeemed with
+  // the client id alone. Support both, so a token minted by a PKCE app works.
+  if (isConfigured(clientSecret)) {
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  } else {
+    body.set("client_id", clientId);
+  }
 
   const response = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body: body.toString(),
   });
 
@@ -163,7 +221,14 @@ export async function getAccessToken(): Promise<string> {
     token_type: string;
     expires_in: number;
     scope?: string;
+    refresh_token?: string;
   };
+
+  // PKCE refreshes can rotate the refresh token. A stored one must be
+  // replaced, or the next refresh would present a token Spotify retired.
+  if (creds.fromDatabase && data.refresh_token && data.refresh_token !== refreshToken) {
+    await saveOwnerCredential(data.refresh_token, creds.displayName).catch(() => {});
+  }
 
   tokenCache = {
     accessToken: data.access_token,
