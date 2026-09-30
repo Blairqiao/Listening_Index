@@ -66,9 +66,16 @@ export function getClientId(): string | null {
   }
 }
 
-export function getRedirectUri(): string {
+import type { NextRequest } from "next/server";
+import { requestOrigin } from "./request-origin";
+
+export function getRedirectUri(request?: NextRequest): string {
   if (process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI) {
     return process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+  }
+  if (request) {
+    const origin = requestOrigin(request);
+    return `${origin}/callback`;
   }
   if (typeof window !== "undefined") {
     const origin = window.location.origin;

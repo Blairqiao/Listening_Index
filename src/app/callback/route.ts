@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: getRedirectUri(),
+      redirect_uri: getRedirectUri(request),
       code_verifier: verifier,
     });
 
