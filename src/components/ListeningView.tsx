@@ -5,8 +5,7 @@ import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
-import { Spectrum, SourceMode } from "@/components/Spectrum";
-import { BAND_COUNT } from "@/lib/spectrum-source";
+import { LivePlayerView } from "@/components/LivePlayerView";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
@@ -57,6 +56,17 @@ function setCachedStreamLogDepth(count: number) {
   } catch {}
 }
 
+export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
+  if (mode === 3 && !isAuthenticated) {
+    return 0;
+  }
+  return mode;
+}
+
+export function getAllowedShortcutKeys(isAuthenticated: boolean): string[] {
+  return isAuthenticated ? ["1", "2", "3", "4"] : ["1", "2", "3"];
+}
+
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
@@ -73,10 +83,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { config, openModal, closeModal, isModalOpen } = useConfig();
+  const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
   const tzRef = useRef<string>(config.timezone);
-  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session
-  const [activeMode, setActiveMode] = useState<Mode>(0);
+  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
+  const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
+
+  // Safeguard: mode 3 is strictly restricted to authenticated admin
+  useEffect(() => {
+    if (!isAuthenticated && activeMode === 3) {
+      setActiveMode(0);
+    }
+  }, [isAuthenticated, activeMode]);
 
   // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all", default "1d"
   const [activeRange, setActiveRange] = useState<RangeKey>("1w");
@@ -122,9 +139,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   useEffect(() => {
     activeRangeRef.current = activeRange;
   }, [activeRange]);
-
-  // Which source is driving the spectrum, mirrored up for the metric ribbon.
-  const [spectrumSource, setSpectrumSource] = useState<SourceMode>("synthetic");
 
   // Manual sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -198,8 +212,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2") {
-        setActiveMode(parseInt(m, 10) as Mode);
+      if (m === "0" || m === "1" || m === "2" || m === "3") {
+        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
       }
       const r = params.get("range");
       if (r && RANGE_KEYS.includes(r as RangeKey)) {
@@ -216,7 +230,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         openModal();
       }
     }
-  }, [openModal]);
+  }, [openModal, isAuthenticated]);
 
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
@@ -312,9 +326,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         }
       }
 
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+      const limit = isMobile ? "25" : "50";
+
       const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
       const params = new URLSearchParams({
-        limit: "50",
+        limit,
         cursor,
         cursorId,
         prevPlayedAt,
@@ -537,9 +554,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
-      setActiveMode(mode);
+      setActiveMode(sanitizeActiveMode(mode, isAuthenticated));
     },
-    [isSyncing]
+    [isSyncing, isAuthenticated]
   );
 
   const handleSelectRange = useCallback(
@@ -562,7 +579,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   );
 
   // Keyboard navigation
-  // Keys 1-3: Switch modes
+  // Keys 1-3 (or 1-4 for admin): Switch modes
   // ArrowLeft / ArrowRight: Step range in Mode 0 (clamped at 1D and ALL, no wrap)
   // Key C: Open / Toggle config panel
   useEffect(() => {
@@ -591,12 +608,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           closeModal();
           return;
         }
-        // Block all other shortcut keys (1-4, arrows, C, U) while a modal is active
+        // Block all other shortcut keys (1-5, arrows, C, U) while a modal is active
         return;
       }
 
-      // Keys 1-4: Modes
-      if (["1", "2", "3", "4"].includes(e.key)) {
+      // Keys 1-3 (or 1-4 for authenticated admin): Modes
+      const allowedKeys = getAllowedShortcutKeys(isAuthenticated);
+      if (allowedKeys.includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -663,6 +681,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     openModal,
     closeModal,
     isUploadModalOpen,
+    isAuthenticated,
   ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
@@ -736,25 +755,21 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       ? formatStreamLogMetrics(streamLogData.rawMetrics)
       : streamLogData.metrics;
 
-  // Seeds the visualizer's synthetic pattern. The most recent play is the
-  // closest thing to "now playing" the sync-based data model exposes.
+  // Seeds the visualizer's synthetic pattern. The live now-playing track wins
   const latestPlay = streamLogData.entries[0];
-  const spectrumTrackKey = latestPlay
-    ? latestPlay.trackId || `${latestPlay.title}-${latestPlay.artist}`
-    : "idle";
 
-  const spectrumMetrics: [string, string, string, string] = [
-    spectrumSource === "live" ? "LIVE AUDIO" : "SYNTHETIC",
-    String(BAND_COUNT),
-    latestPlay?.title || "--",
-    sessionData.isOpen ? "LIVE" : "IDLE",
+  const livePlayerMetrics: [string, string, string, string] = [
+    sessionData.isOpen ? "ACTIVE SESSION" : "STANDBY",
+    "32 BANDS",
+    latestPlay ? latestPlay.title : "STARLESS",
+    "LIVE PLAYER",
   ];
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
-    3: spectrumMetrics,
+    3: livePlayerMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -822,6 +837,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 topArtists={currentOverview.topArtists}
                 topAlbums={currentOverview.topAlbums}
                 activityCadence={currentOverview.activityCadence}
+                isLoading={!overviewCache[displayedRange] && isDbConfigured}
               />
             )}
 
@@ -832,6 +848,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 isLoadingMore={isLoadingMorePlays}
                 hasMore={streamLogState?.hasMore ?? (streamLogData.entries.length >= 50)}
                 totalPlays={streamLogData.metrics[0]}
+                isLoading={!streamLogState && isDbConfigured}
               />
             )}
 
@@ -848,12 +865,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             )}
 
             {activeMode === 3 && (
-              <Spectrum
-                trackKey={spectrumTrackKey}
-                isLive={isSystemLive}
-                accentColor={config.accentColor}
-                onSourceChange={setSpectrumSource}
-              />
+              <LivePlayerView latestPlay={latestPlay} />
             )}
           </div>
         </div>

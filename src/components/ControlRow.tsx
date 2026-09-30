@@ -59,8 +59,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       case 3:
         return (
           <>
-            <span className="sm:hidden">[ SPC ]</span>
-            <span className="hidden sm:inline">[ SPECTRUM ]</span>
+            <span className="sm:hidden">[ LIVE ]</span>
+            <span className="hidden sm:inline">[ LIVE PLAYER ]</span>
           </>
         );
     }
@@ -138,8 +138,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           </button>
         );
       case 3:
-        // The spectrum has no range or sync control of its own; its only
-        // control (the live-audio toggle) lives on the visualizer itself.
+        // Integrated live player controls live on the panel itself.
         return null;
     }
   };

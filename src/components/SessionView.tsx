@@ -63,6 +63,24 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const [internalSelectedSessionId, setInternalSelectedSessionId] = useState<string>(initialId);
   const [hoveredSittingId, setHoveredSittingId] = useState<string | null>(null);
 
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+  const [isTracksExpanded, setIsTracksExpanded] = useState(false);
+  const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const selectedSessionId = externalSelectedSessionId ?? internalSelectedSessionId;
   const selectedSittingId = selectedSessionId;
 
@@ -128,6 +146,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
       };
     });
   }, [rawActiveTracks, enrichmentOverlay]);
+
+  const visibleTracks = isMobile && !isTracksExpanded ? activeTracks.slice(0, 6) : activeTracks;
 
   // Client-side deferred micro-enrichment for visible session tracks
   useDeferredEnrichment({
@@ -280,13 +300,19 @@ export const SessionView: React.FC<SessionViewProps> = ({
     return list.slice(0, 20);
   }, [previousSittings, sittings]);
 
+  const visibleSits = isMobile && !isSessionsExpanded ? sitsList.slice(0, 5) : sitsList;
+
   // Histogram data (server pre-computed with fallback)
   const histData = histogram ?? DEFAULT_HISTOGRAM;
 
+  const activeBars = useMemo(() => {
+    return histData.bars ? histData.bars.slice(-20) : [];
+  }, [histData.bars]);
+
   const maxHistRuntime = useMemo(() => {
-    if (!histData.bars || histData.bars.length === 0) return 1;
-    return Math.max(...histData.bars.map((b) => b.runtimeMinutes), 1);
-  }, [histData]);
+    if (!activeBars || activeBars.length === 0) return 1;
+    return Math.max(...activeBars.map((b) => b.runtimeMinutes), 1);
+  }, [activeBars]);
 
   // Placeholder rows count (at least slotCount rows total)
   const placeholderCount = Math.max(0, slotCount - activeTracks.length);
@@ -294,7 +320,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 2-Column Main Band: Left 1.5fr / Right 1fr */}
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-[26px]">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px]">
         {/* Left Column: Track list */}
         <div className="min-w-0">
           <div className="flex justify-between items-baseline mb-2 select-none">
@@ -312,15 +338,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
             className="h-auto md:h-[550px] overflow-y-auto scrollbar-hidden"
             role="list"
           >
-            {/* Empty notice if zero tracks */}
-            {activeTracks.length === 0 && (
-              <div className="py-2 px-1 font-mono text-[11px] text-[#4A4A46] tracking-[0.1em] border-b border-[#191917]">
-                [ NO TRACKS LOGGED IN THIS SITTING ]
-              </div>
-            )}
-
             {/* Active Sitting Track Rows */}
-            {activeTracks.map((track, idx) => {
+            {visibleTracks.map((track, idx) => {
               const isSpotifyTrackId = track.id && !track.id.startsWith("tr-");
               const trackHref = isSpotifyTrackId
                 ? `https://open.spotify.com/track/${track.id}`
@@ -413,20 +432,29 @@ export const SessionView: React.FC<SessionViewProps> = ({
               );
             })}
 
-            {/* Placeholder Rows to fill remaining capacity (54px/55px height with 38px dark square, hidden on mobile) */}
+            {/* Placeholder Rows to fill remaining capacity (54px/55px height, hidden on mobile unless zero tracks) */}
             {Array.from({ length: placeholderCount }).map((_, idx) => (
               <div
                 key={`ph-${idx}`}
-                className="hidden md:flex h-[54px] md:h-[55px] border-b border-[#191917] items-center px-1 select-none"
+                className={`${activeTracks.length === 0 ? "flex" : "hidden md:flex"} h-[54px] md:h-[55px] border-b border-[#191917] items-center px-1 select-none`}
                 aria-hidden="true"
-              >
-              </div>
+              />
             ))}
           </div>
+
+          {activeTracks.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setIsTracksExpanded((prev) => !prev)}
+              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+            >
+              {isTracksExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${activeTracks.length} TRACKS ⌄`}
+            </button>
+          )}
         </div>
 
         {/* Right Column: Analysis + Previous Sittings + Histogram */}
-        <div className="flex flex-col justify-between h-full min-w-0">
+        <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
           {/* Analysis Panel */}
           <div>
             <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] block mb-2 select-none">
@@ -550,7 +578,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               className="h-auto md:h-[180px] overflow-y-auto scrollbar-hidden"
               role="list"
             >
-              {sitsList.map((sitting, idx) => {
+              {visibleSits.map((sitting, idx) => {
                 const sittingId = sitting.id || `s${idx + 1}`;
                 const isSelected = sittingId === selectedSittingId;
                 const isHovered = sittingId === hoveredSittingId;
@@ -600,6 +628,16 @@ export const SessionView: React.FC<SessionViewProps> = ({
                 );
               })}
             </div>
+
+            {sitsList.length > 5 && (
+              <button
+                type="button"
+                onClick={() => setIsSessionsExpanded((prev) => !prev)}
+                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+              >
+                {isSessionsExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${sitsList.length} SESSIONS ⌄`}
+              </button>
+            )}
           </div>
 
           {/* Sessions Histogram (Moved into right column matching Overview design) */}
@@ -619,7 +657,21 @@ export const SessionView: React.FC<SessionViewProps> = ({
               role="region"
               aria-label="Last 20 sessions runtime histogram"
             >
-              {histData.bars.map((bar, idx) => {
+              {/* Left empty baseline bars padding up to 20 total bars */}
+              {Array.from({ length: Math.max(0, 20 - activeBars.length) }).map((_, idx) => (
+                <div
+                  key={`empty-bar-${idx}`}
+                  className="flex-1 h-full flex flex-col justify-end"
+                  aria-hidden="true"
+                >
+                  <div
+                    style={{ height: "4%" }}
+                    className="w-full bg-[#1C1C1A]"
+                  />
+                </div>
+              ))}
+
+              {activeBars.map((bar, idx) => {
                 const isSelected = bar.id === selectedSittingId;
                 const isHovered = bar.id === hoveredSittingId;
                 const heightPct = Math.max(

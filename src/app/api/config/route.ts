@@ -6,7 +6,7 @@ import {
   getActiveSiteConfig,
   saveActiveSiteConfig,
   resetActiveSiteConfig,
-  SiteConfigState,
+  type SiteConfigState,
 } from "@/lib/db/queries";
 import { siteConfig } from "@/config";
 import { isSameOriginRequest, isAuthorizedAdminRequest } from "@/lib/auth-utils";
