@@ -12,12 +12,20 @@ interface ModeTabsProps {
   isSyncing?: boolean;
 }
 
-const MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
+export const BASE_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVR ]" },
   { id: 1, label: "[ 2 · STREAM LOG ]", abbrev: "[ LOG ]" },
   { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SES ]" },
+];
+
+export const ADMIN_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
+  ...BASE_MODES,
   { id: 3, label: "[ 4 · LIVE PLAYER ]", abbrev: "[ LIVE ]" },
 ];
+
+export function getAvailableModes(isAuthenticated: boolean): Array<{ id: Mode; label: string; abbrev: string }> {
+  return isAuthenticated ? ADMIN_MODES : BASE_MODES;
+}
 
 export const ModeTabs: React.FC<ModeTabsProps> = ({
   activeMode,
@@ -25,7 +33,8 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
   onOpenUpload,
   isSyncing = false,
 }) => {
-  const { openModal } = useConfig();
+  const { openModal, isAuthenticated } = useConfig();
+  const modes = isAuthenticated ? ADMIN_MODES : BASE_MODES;
 
   return (
     <nav
@@ -33,7 +42,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
       className="flex items-center justify-between mt-4 md:mt-5 border-b border-[#1C1C1A] select-none"
     >
       <div className="flex gap-4 sm:gap-6 mr-4">
-        {MODES.map((m) => {
+        {modes.map((m) => {
           const isActive = activeMode === m.id;
           return (
             <button

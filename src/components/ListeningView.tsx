@@ -56,6 +56,17 @@ function setCachedStreamLogDepth(count: number) {
   } catch {}
 }
 
+export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
+  if (mode === 3 && !isAuthenticated) {
+    return 0;
+  }
+  return mode;
+}
+
+export function getAllowedShortcutKeys(isAuthenticated: boolean): string[] {
+  return isAuthenticated ? ["1", "2", "3", "4"] : ["1", "2", "3"];
+}
+
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
@@ -72,10 +83,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { config, openModal, closeModal, isModalOpen } = useConfig();
+  const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
   const tzRef = useRef<string>(config.timezone);
-  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session
+  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(0);
+
+  // Safeguard: mode 3 is strictly restricted to authenticated admin
+  useEffect(() => {
+    if (!isAuthenticated && activeMode === 3) {
+      setActiveMode(0);
+    }
+  }, [isAuthenticated, activeMode]);
 
   // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all", default "1d"
   const [activeRange, setActiveRange] = useState<RangeKey>("1w");
@@ -196,6 +214,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const m = params.get("mode");
       if (m === "0" || m === "1" || m === "2") {
         setActiveMode(parseInt(m, 10) as Mode);
+      } else if (m === "3" && isAuthenticated) {
+        setActiveMode(3);
       }
       const r = params.get("range");
       if (r && RANGE_KEYS.includes(r as RangeKey)) {
@@ -212,7 +232,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         openModal();
       }
     }
-  }, [openModal]);
+  }, [openModal, isAuthenticated]);
 
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
@@ -536,9 +556,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
+      if (mode === 3 && !isAuthenticated) {
+        setActiveMode(0);
+        return;
+      }
       setActiveMode(mode);
     },
-    [isSyncing]
+    [isSyncing, isAuthenticated]
   );
 
   const handleSelectRange = useCallback(
@@ -561,7 +585,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   );
 
   // Keyboard navigation
-  // Keys 1-3: Switch modes
+  // Keys 1-3 (or 1-4 for admin): Switch modes
   // ArrowLeft / ArrowRight: Step range in Mode 0 (clamped at 1D and ALL, no wrap)
   // Key C: Open / Toggle config panel
   useEffect(() => {
@@ -594,8 +618,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // Keys 1-4: Modes
-      if (["1", "2", "3", "4"].includes(e.key)) {
+      // Keys 1-3 (or 1-4 for authenticated admin): Modes
+      const allowedKeys = getAllowedShortcutKeys(isAuthenticated);
+      if (allowedKeys.includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -662,6 +687,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     openModal,
     closeModal,
     isUploadModalOpen,
+    isAuthenticated,
   ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
