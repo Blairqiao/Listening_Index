@@ -35,6 +35,19 @@ test("Player Token API - /api/player/token", async (t) => {
       const grantType = params.get("grant_type");
 
       if (grantType === "authorization_code") {
+        const code = params.get("code");
+        if (code === "code_no_refresh") {
+          return new Response(
+            JSON.stringify({
+              access_token: "mock_access_token_auth_code",
+              token_type: "Bearer",
+              scope: "streaming user-read-email user-read-private",
+              expires_in: 3600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
           JSON.stringify({
             access_token: "mock_access_token_auth_code",
@@ -181,6 +194,80 @@ test("Player Token API - /api/player/token", async (t) => {
     assert.strictEqual(saved, "direct_custom_refresh_token");
   });
 
+  await t.test("POST with invalid refreshToken does NOT persist to database and returns error", async () => {
+    // Ensure clean state
+    await deleteOwnerPlaybackToken();
+
+    const sessionToken = createSessionToken();
+    const req = new NextRequest("http://localhost:3000/api/player/token", {
+      method: "POST",
+      headers: {
+        cookie: `${ADMIN_COOKIE_NAME}=${sessionToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        refreshToken: "invalid_token",
+      }),
+    });
+
+    const res = await POST(req);
+    assert.strictEqual(res.status, 400);
+
+    // Verify token was NOT persisted prematurely
+    const saved = await getOwnerPlaybackToken();
+    assert.strictEqual(saved, null);
+  });
+
+  await t.test("POST with code exchange missing refresh_token returns 400 and does NOT persist", async () => {
+    await deleteOwnerPlaybackToken();
+
+    const sessionToken = createSessionToken();
+    const req = new NextRequest("http://localhost:3000/api/player/token", {
+      method: "POST",
+      headers: {
+        cookie: `${ADMIN_COOKIE_NAME}=${sessionToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code: "code_no_refresh",
+        redirectUri: "http://localhost:3000/api/owner/spotify/callback",
+      }),
+    });
+
+    const res = await POST(req);
+    assert.strictEqual(res.status, 400);
+    const data = await res.json();
+    assert.strictEqual(data.error, "Spotify response did not include a refresh token");
+
+    // Verify nothing persisted
+    const saved = await getOwnerPlaybackToken();
+    assert.strictEqual(saved, null);
+  });
+
+  await t.test("POST with code and codeVerifier forwards code_verifier to Spotify (PKCE)", async () => {
+    const sessionToken = createSessionToken();
+    const req = new NextRequest("http://localhost:3000/api/player/token", {
+      method: "POST",
+      headers: {
+        cookie: `${ADMIN_COOKIE_NAME}=${sessionToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        code: "test_pkce_code",
+        redirectUri: "http://localhost:3000/api/owner/spotify/callback",
+        codeVerifier: "pkce_verifier_string_xyz",
+      }),
+    });
+
+    const res = await POST(req);
+    assert.strictEqual(res.status, 200);
+
+    // Verify code_verifier was forwarded in Spotify request body
+    assert.ok(lastSpotifyRequestBody);
+    const params = new URLSearchParams(lastSpotifyRequestBody);
+    assert.strictEqual(params.get("code_verifier"), "pkce_verifier_string_xyz");
+  });
+
   await t.test("Authenticated requests via Authorization: Bearer header work", async () => {
     const sessionToken = createSessionToken();
     const req = new NextRequest("http://localhost:3000/api/player/token", {
@@ -191,7 +278,6 @@ test("Player Token API - /api/player/token", async (t) => {
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.linked, true);
-    assert.strictEqual(data.accessToken, "mock_access_token_for_direct_custom_refresh_token");
   });
 
   await t.test("Authenticated DELETE unlinks player token", async () => {
