@@ -27,8 +27,7 @@ export async function GET(request: NextRequest) {
   if (!canStoreOwnerCredential()) {
     return NextResponse.json(
       {
-        error:
-          "Connecting from the menu needs a database and TOKEN_ENCRYPTION_KEY, so the token can be stored encrypted.",
+        error: "Connecting from the menu requires a configured database.",
       },
       { status: 503 }
     );

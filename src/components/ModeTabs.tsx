@@ -34,7 +34,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
   isSyncing = false,
 }) => {
   const { openModal, isAuthenticated } = useConfig();
-  const modes = isAuthenticated ? ADMIN_MODES : BASE_MODES;
+  const modes = getAvailableModes(isAuthenticated);
 
   return (
     <nav
