@@ -5,7 +5,7 @@
  */
 
 import { isConfigured } from "@/lib/db";
-import { configRepository } from "@/lib/db/repositories";
+import { getActiveSiteConfig } from "@/lib/db/queries";
 import { getOwnerCredential, saveOwnerCredential } from "@/lib/owner-spotify";
 
 /**
@@ -36,7 +36,7 @@ async function resolveCredentials(): Promise<{
 
   const stored = await getOwnerCredential();
   if (!stored) return null;
-  const config = await configRepository().getActiveSiteConfig();
+  const config = await getActiveSiteConfig();
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
   if (!clientId) return null;
   // Connected through PKCE, so it is redeemed with the client id alone.
