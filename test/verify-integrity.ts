@@ -322,6 +322,7 @@ test("AsyncLatchCache Deep Module Concurrency & Invalidation", async () => {
     title: "Test",
     ownerName: "Test",
     accentColor: "#000",
+    spotifyClientId: "",
     siteUrl: "",
     githubUrl: "",
     timezone: "UTC",
