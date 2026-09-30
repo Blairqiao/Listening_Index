@@ -181,10 +181,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (code && redirectUri) {
+  if (code) {
+    const effectiveRedirectUri = redirectUri || body.redirect_uri || "http://127.0.0.1:8888/callback";
     const response = await exchangeAuthCode(
       code,
-      redirectUri,
+      effectiveRedirectUri,
       clientId,
       clientSecret,
       codeVerifier

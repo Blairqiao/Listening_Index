@@ -25,6 +25,7 @@ import {
   DEFAULT_SITE_CONFIG,
   generateConfigTsCode,
 } from "@/lib/config-utils";
+import { getRedirectUri } from "@/lib/spotify-auth";
 
 // Major timezones fallback if Intl.supportedValuesOf is unavailable
 const POPULAR_TIMEZONES = [
@@ -76,10 +77,10 @@ export const CustomizationModal: React.FC = () => {
   } = useConfig();
 
   // Shown verbatim so it can be pasted straight into the Spotify dashboard;
-  // it differs between localhost and the deployed origin.
-  const [redirectUri, setRedirectUri] = useState("/callback");
+  // Spotify rejects localhost and strictly requires 127.0.0.1:8888/callback locally.
+  const [redirectUri, setRedirectUri] = useState<string>("http://127.0.0.1:8888/callback");
   useEffect(() => {
-    setRedirectUri(`${window.location.origin}/callback`);
+    setRedirectUri(getRedirectUri());
   }, []);
 
   // Local draft state while modal is open

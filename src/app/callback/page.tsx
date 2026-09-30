@@ -17,7 +17,7 @@ function CallbackInner() {
     const report = (ok: boolean) => {
       if (!isPopup) return false;
       try {
-        opener!.postMessage({ type: AUTH_MESSAGE, ok }, window.location.origin);
+        opener!.postMessage({ type: AUTH_MESSAGE, ok }, "*");
       } catch {}
       window.close();
       return true;

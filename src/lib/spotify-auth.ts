@@ -67,7 +67,18 @@ export function getClientId(): string | null {
 }
 
 export function getRedirectUri(): string {
-  return `${window.location.origin}/callback`;
+  if (process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI) {
+    return process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+  }
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin;
+    // Spotify strictly rejects "localhost" in redirect URIs and requires the registered loopback: http://127.0.0.1:8888/callback
+    if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
+      return "http://127.0.0.1:8888/callback";
+    }
+    return `${origin}/callback`;
+  }
+  return "http://127.0.0.1:8888/callback";
 }
 
 function randomString(length: number): string {
@@ -157,7 +168,13 @@ export async function beginLoginPopup(): Promise<boolean | null> {
       resolve(ok);
     };
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
+      const isAllowedOrigin =
+        e.origin === window.location.origin ||
+        e.origin === "http://127.0.0.1:8888" ||
+        e.origin === "http://localhost:8888" ||
+        e.origin === "http://127.0.0.1:3000" ||
+        e.origin === "http://localhost:3000";
+      if (!isAllowedOrigin) return;
       if (e.data?.type !== AUTH_MESSAGE) return;
       finish(Boolean(e.data.ok));
     };

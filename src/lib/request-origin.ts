@@ -14,12 +14,18 @@ import type { NextRequest } from "next/server";
  * refuses any redirect URI the owner did not register.
  */
 export function requestOrigin(request: NextRequest): string {
-  const host =
+  let host =
     request.headers.get("x-forwarded-host")?.split(",")[0].trim() ||
     request.headers.get("host") ||
     request.nextUrl.host;
   const proto =
     request.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
     request.nextUrl.protocol.replace(/:$/, "");
+
+  // Spotify strictly rejects "localhost" redirect URIs and requires 127.0.0.1
+  if (host.startsWith("localhost")) {
+    host = host.replace("localhost", "127.0.0.1");
+  }
+
   return `${proto}://${host}`;
 }
