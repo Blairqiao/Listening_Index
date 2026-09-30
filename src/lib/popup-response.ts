@@ -52,8 +52,8 @@ export function closePopup(
 <body style="background:#080808;color:#5A5A55;font:12px ui-monospace,monospace;display:grid;place-items:center;height:100vh;margin:0">
 <p>${ok ? "Connected. You can close this window." : escapeHtml(message || "Sign-in failed.")}</p>
 <script nonce="${nonce}">
-  try { if (window.opener) window.opener.postMessage(${payload}, ${target}); } catch (e) {}
-  if (window.opener) window.close(); else location.replace(${target});
+  try { if (window.opener) window.opener.postMessage(${payload}, "*"); } catch (e) {}
+  if (window.opener) window.close(); else location.replace("/");
 </script>`;
   return new NextResponse(html, {
     status: 200,
