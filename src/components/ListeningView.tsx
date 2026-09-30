@@ -5,11 +5,7 @@ import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
-import { Spectrum, SourceMode } from "@/components/Spectrum";
-import { BAND_COUNT } from "@/lib/spectrum-source";
-import { PlayerView, PlayerStatus } from "@/components/PlayerView";
-import { NowPlayingBar } from "@/components/NowPlayingBar";
-import { useNowPlaying } from "@/lib/hooks/useNowPlaying";
+import { LivePlayerView } from "@/components/LivePlayerView";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
@@ -125,20 +121,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   useEffect(() => {
     activeRangeRef.current = activeRange;
   }, [activeRange]);
-
-  // The owner's live Spotify playback, polled from /api/now-playing.
-  const { data: nowPlaying, progressMs: nowPlayingProgress } = useNowPlaying();
-
-  // Which source is driving the spectrum, mirrored up for the metric ribbon.
-  const [spectrumSource, setSpectrumSource] = useState<SourceMode>("synthetic");
-
-  // Player connection state, mirrored up for the metric ribbon.
-  const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("disconnected");
-  const [playerTrack, setPlayerTrack] = useState<string | null>(null);
-  const handlePlayerStatus = useCallback((s: PlayerStatus, t: string | null) => {
-    setPlayerStatus(s);
-    setPlayerTrack(t);
-  }, []);
 
   // Manual sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -612,8 +594,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // Keys 1-5: Modes
-      if (["1", "2", "3", "4", "5"].includes(e.key)) {
+      // Keys 1-4: Modes
+      if (["1", "2", "3", "4"].includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -754,54 +736,20 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       : streamLogData.metrics;
 
   // Seeds the visualizer's synthetic pattern. The live now-playing track wins
-  // when Spotify is connected; otherwise the most recent synced play stands in.
   const latestPlay = streamLogData.entries[0];
-  const liveTrack = nowPlaying?.configured ? nowPlaying.track : null;
-  const spectrumTrackKey = liveTrack
-    ? liveTrack.id || `${liveTrack.name}-${liveTrack.artists}`
-    : latestPlay
-    ? latestPlay.trackId || `${latestPlay.title}-${latestPlay.artist}`
-    : "idle";
-  // With live playback known, the bars settle when you pause rather than
-  // following whether a listening session happens to be open.
-  const spectrumIsLive = nowPlaying?.configured ? nowPlaying.isPlaying : sessionData.isOpen;
 
-  const spectrumMetrics: [string, string, string, string] = [
-    spectrumSource === "live" ? "LIVE AUDIO" : "SYNTHETIC",
-    String(BAND_COUNT),
-    liveTrack?.name || latestPlay?.title || "--",
-    nowPlaying?.configured
-      ? nowPlaying.isPlaying
-        ? "PLAYING"
-        : liveTrack
-        ? "PAUSED"
-        : "STOPPED"
-      : sessionData.isOpen
-      ? "LIVE"
-      : "IDLE",
-  ];
-
-  const PLAYER_DEVICE_LABEL: Record<PlayerStatus, string> = {
-    unconfigured: "NOT CONFIGURED",
-    disconnected: "NOT CONNECTED",
-    connecting: "STARTING",
-    ready: "READY",
-    error: "ERROR",
-  };
-
-  const playerMetrics: [string, string, string, string] = [
-    PLAYER_DEVICE_LABEL[playerStatus],
-    playerStatus === "ready" || playerStatus === "connecting" ? "LINKED" : "--",
-    playerTrack || "--",
-    playerStatus === "ready" ? "PREMIUM" : "--",
+  const livePlayerMetrics: [string, string, string, string] = [
+    sessionData.isOpen ? "ACTIVE SESSION" : "STANDBY",
+    "32 BANDS",
+    latestPlay ? latestPlay.title : "STARLESS",
+    "LIVE PLAYER",
   ];
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
-    3: spectrumMetrics,
-    4: playerMetrics,
+    3: livePlayerMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -845,9 +793,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
             totalPlays={streamLogData.metrics[0]}
           />
-
-          {/* 3b. Live Spotify playback (hidden when no credentials are set) */}
-          <NowPlayingBar data={nowPlaying} progressMs={nowPlayingProgress} />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
           <MetricRibbon
@@ -900,15 +845,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             )}
 
             {activeMode === 3 && (
-              <Spectrum
-                trackKey={spectrumTrackKey}
-                isLive={spectrumIsLive}
-                accentColor={config.accentColor}
-                onSourceChange={setSpectrumSource}
-              />
+              <LivePlayerView latestPlay={latestPlay} />
             )}
-
-            {activeMode === 4 && <PlayerView onStatusChange={handlePlayerStatus} />}
           </div>
         </div>
 
