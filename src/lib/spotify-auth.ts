@@ -131,10 +131,7 @@ export function clearToken() {
 
 /** Sends the visitor to Spotify's consent screen. Does not return. */
 export async function beginLogin(): Promise<void> {
-  const clientId = getClientId();
-  if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
-
-  window.location.href = await buildAuthUrl();
+  window.location.href = "/api/player/login";
 }
 
 /**
@@ -145,7 +142,7 @@ export async function beginLogin(): Promise<void> {
  * back to the full-page redirect.
  */
 export async function beginLoginPopup(): Promise<boolean | null> {
-  const url = await buildAuthUrl();
+  const url = "/api/player/login";
   const w = 480;
   const h = 720;
   // Center on the window the visitor is actually looking at.
@@ -179,10 +176,11 @@ export async function beginLoginPopup(): Promise<boolean | null> {
       finish(Boolean(e.data.ok));
     };
     window.addEventListener("message", onMessage);
-    // A closed popup is the only signal when the visitor backs out, since
-    // no message is ever posted in that case.
+    // A closed popup is the signal when the visitor backs out
     const poll = setInterval(() => {
-      if (popup.closed) finish(Boolean(readToken()));
+      if (popup.closed) {
+        setTimeout(() => finish(false), 200);
+      }
     }, 400);
   });
 }

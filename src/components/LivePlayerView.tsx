@@ -14,7 +14,6 @@ import {
   beginLoginPopup,
   clearToken,
   getClientId,
-  readToken,
   setConfiguredClientId,
 } from "@/lib/spotify-auth";
 
@@ -434,21 +433,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
         setIsLinked(true);
         void connectPlayer();
       } else {
-        // Check if there is an existing refresh token in localStorage from PKCE that we can link
-        const stored = readToken();
-        if (stored?.refreshToken && isAuthenticated) {
-          const linkRes = await fetch("/api/player/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: stored.refreshToken }),
-          });
-          const linkData = await linkRes.json().catch(() => ({}));
-          if (linkRes.ok && linkData?.linked) {
-            setIsLinked(true);
-            void connectPlayer();
-            return;
-          }
-        }
         setIsLinked(false);
         setPlayerStatus("unlinked");
       }
@@ -457,7 +441,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
       setPlayerStatus("unlinked");
       console.warn("[PLAYER] Failed to check token status:", err);
     }
-  }, [connectPlayer, isAuthenticated]);
+  }, [connectPlayer]);
 
   useEffect(() => {
     void checkTokenStatus();
@@ -503,24 +487,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
       }
 
       if (popupResult) {
-        // Popup reported success, check stored tokens
-        const stored = readToken();
-        if (stored?.refreshToken) {
-          const res = await fetch("/api/player/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken: stored.refreshToken }),
-          });
-
-          if (res.ok) {
-            setIsLinked(true);
-            void connectPlayer();
-            return;
-          } else {
-            const err = await res.json().catch(() => ({}));
-            setErrorMessage(err.error || "Failed to persist token to server.");
-          }
-        }
         await checkTokenStatus();
       } else {
         setErrorMessage("Spotify authorization window closed before completion.");
@@ -530,7 +496,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
     } finally {
       setIsAuthorizing(false);
     }
-  }, [isAuthenticated, openModal, connectPlayer, checkTokenStatus]);
+  }, [isAuthenticated, openModal, checkTokenStatus]);
 
   // Unlink Spotify handler
   const handleUnlink = useCallback(async () => {
