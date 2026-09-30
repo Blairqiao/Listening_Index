@@ -1,0 +1,88 @@
+/**
+ * MongoDB connection for a serverless runtime.
+ *
+ * Postgres here talks over HTTP via `neon()`, so there is no connection to
+ * keep alive. The MongoDB driver is the opposite: it opens real TCP sockets
+ * and expects a long-lived client with its own pool.
+ *
+ * In a serverless function that is a trap. A new MongoClient per invocation
+ * means a new TCP handshake plus TLS plus auth on every request, and under
+ * load it exhausts the cluster's connection limit. The fix is to create the
+ * client once and reuse it: a warm function instance keeps the pool, and a
+ * cold one pays the handshake a single time.
+ *
+ * The global cache matters in development too — Next.js hot reload re-evaluates
+ * modules on every edit, so a module-level variable alone would leak a new
+ * client per save until the cluster refused connections.
+ */
+
+import { MongoClient, Db } from "mongodb";
+
+const DB_NAME = process.env.MONGODB_DB || "listening_index";
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __listeningIndexMongo: Promise<MongoClient> | undefined;
+}
+
+export function getMongoUri(): string {
+  const uri = process.env.MONGODB_URI;
+  if (!uri || !uri.trim()) {
+    throw new Error(
+      "MONGODB_URI is not configured. Set it in .env.local (development) " +
+        "or your deployment environment variables."
+    );
+  }
+  return uri;
+}
+
+function createClient(): Promise<MongoClient> {
+  return new MongoClient(getMongoUri(), {
+    // Serverless invocations are short; failing fast beats hanging a request.
+    serverSelectionTimeoutMS: 8000,
+    // One instance handles few concurrent queries, so a large pool is waste.
+    maxPoolSize: 10,
+  }).connect();
+}
+
+export function getMongoClient(): Promise<MongoClient> {
+  if (process.env.NODE_ENV === "development") {
+    // Survives hot reload, which would otherwise leak a client per edit.
+    if (!global.__listeningIndexMongo) {
+      global.__listeningIndexMongo = forgetOnFailure(createClient(), () => {
+        global.__listeningIndexMongo = undefined;
+      });
+    }
+    return global.__listeningIndexMongo;
+  }
+  if (!cachedClient) {
+    cachedClient = forgetOnFailure(createClient(), () => {
+      cachedClient = null;
+    });
+  }
+  return cachedClient;
+}
+
+/**
+ * Caching the connection promise is what makes the client shared, but a
+ * rejected promise must not be cached: one transient failure (a network
+ * blip, a cold cluster, an allowlist change) would otherwise fail every
+ * later request until the process restarted. On failure the cache is
+ * cleared, so the next request tries again.
+ */
+function forgetOnFailure(
+  pending: Promise<MongoClient>,
+  forget: () => void
+): Promise<MongoClient> {
+  return pending.catch((error) => {
+    forget();
+    throw error;
+  });
+}
+
+let cachedClient: Promise<MongoClient> | null = null;
+
+export async function getMongoDb(): Promise<Db> {
+  const client = await getMongoClient();
+  return client.db(DB_NAME);
+}

@@ -56,6 +56,20 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             <span className="hidden sm:inline">[ SESSION ]</span>
           </>
         );
+      case 3:
+        return (
+          <>
+            <span className="sm:hidden">[ SPC ]</span>
+            <span className="hidden sm:inline">[ SPECTRUM ]</span>
+          </>
+        );
+      case 4:
+        return (
+          <>
+            <span className="sm:hidden">[ PLY ]</span>
+            <span className="hidden sm:inline">[ PLAYER ]</span>
+          </>
+        );
     }
   };
 
@@ -130,6 +144,13 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               : `[ CLOSED ${sessionTagTime} AGO ]`}
           </button>
         );
+      case 3:
+        // The spectrum has no range or sync control of its own; its only
+        // control (the live-audio toggle) lives on the visualizer itself.
+        return null;
+      case 4:
+        // Transport controls live on the player panel itself.
+        return null;
     }
   };
 

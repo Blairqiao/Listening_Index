@@ -19,6 +19,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
+    spotifyClientId: siteConfig.spotifyClientId || "",
   };
 
   if (!isDbConfigured()) {
@@ -30,7 +31,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
       await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
-        SELECT title, owner_name, accent_color, site_url, github_url, timezone
+        SELECT title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
@@ -45,12 +46,15 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           siteUrl: row.site_url || fallback.siteUrl,
           githubUrl: row.github_url || fallback.githubUrl,
           timezone: row.timezone || fallback.timezone,
+          // Empty string is a legitimate value here (player disabled), so
+          // fall back only when the column is absent or null.
+          spotifyClientId: row.spotify_client_id ?? fallback.spotifyClientId,
         };
       }
 
       // Auto-seed table on first cold start with default config
       await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, updated_at)
+        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, updated_at)
         VALUES (
           'active',
           ${fallback.title},
@@ -59,6 +63,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           ${fallback.siteUrl},
           ${fallback.githubUrl},
           ${fallback.timezone},
+          ${fallback.spotifyClientId},
           NOW()
         )
         ON CONFLICT (id) DO NOTHING;
@@ -84,7 +89,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, updated_at)
       VALUES (
         'active',
         ${config.title},
@@ -93,6 +98,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         ${config.siteUrl},
         ${config.githubUrl},
         ${config.timezone},
+        ${config.spotifyClientId},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -102,6 +108,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         site_url = EXCLUDED.site_url,
         github_url = EXCLUDED.github_url,
         timezone = EXCLUDED.timezone,
+        spotify_client_id = EXCLUDED.spotify_client_id,
         updated_at = NOW();
     `;
     siteConfigCache.invalidate();
@@ -123,6 +130,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
+    spotifyClientId: siteConfig.spotifyClientId || "",
   };
 
   if (isDbConfigured()) {
