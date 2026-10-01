@@ -19,13 +19,50 @@ import {
   RangeKey,
   SittingSession,
 } from "@/lib/mock-listening-data";
-import { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
+import {
+  OverviewData,
+  StreamLogData,
+  SessionData,
+  type TrackTelemetryStats,
+} from "@/lib/db/queries";
 import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
+  formatRankDisplay,
+  formatPlaysDisplay,
   type OverviewMetricsRaw,
   type StreamLogMetricsRaw,
 } from "@/lib/format-utils";
+
+export function getTrackStatsCacheKey(params: {
+  trackId?: string | null;
+  title?: string | null;
+  artist?: string | null;
+}): string {
+  return `${params.trackId || ""}:${params.title || ""}:${params.artist || ""}`;
+}
+
+export function computeLivePlayerMetrics(
+  trackStats: TrackTelemetryStats | null,
+  trackRankFormat: "rank" | "percentile" = "rank",
+  artistRankFormat: "rank" | "percentile" = "rank",
+  fallbackPlays = "0 PLAYS"
+): [string, string, string, string] {
+  return [
+    formatRankDisplay(
+      trackStats?.track?.rank ?? null,
+      trackStats?.track?.totalTracks ?? 0,
+      trackRankFormat
+    ),
+    trackStats ? formatPlaysDisplay(trackStats.track.plays) : fallbackPlays,
+    formatRankDisplay(
+      trackStats?.artist?.rank ?? null,
+      trackStats?.artist?.totalArtists ?? 0,
+      artistRankFormat
+    ),
+    trackStats ? formatPlaysDisplay(trackStats.artist.plays) : fallbackPlays,
+  ];
+}
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
@@ -73,6 +110,11 @@ interface ListeningViewProps {
   initialStreamLog?: StreamLogData | null;
   initialSession?: SessionData | null;
   initialConfig?: SiteConfigState | null;
+  initialTrack?: {
+    id?: string;
+    name?: string;
+    artist?: string;
+  } | null;
   isDbConfigured?: boolean;
 }
 
@@ -80,12 +122,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialOverview,
   initialStreamLog,
   initialSession,
+  initialTrack,
   isDbConfigured = true,
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
-  const { playerStatus, activeDevice, previousTrack, nextTrack, contextName, currentTrack } = usePlayer();
+  const { currentTrack } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
@@ -96,6 +139,43 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       setActiveMode(0);
     }
   }, [isAuthenticated, activeMode]);
+
+  // Mode 3 rank format state: "rank" | "percentile", default "rank"
+  const [trackRankFormat, setTrackRankFormat] = useState<"rank" | "percentile">("rank");
+  const [artistRankFormat, setArtistRankFormat] = useState<"rank" | "percentile">("rank");
+
+  useEffect(() => {
+    try {
+      const savedTrack = localStorage.getItem("listening_track_rank_format");
+      if (savedTrack === "rank" || savedTrack === "percentile") {
+        setTrackRankFormat(savedTrack);
+      }
+      const savedArtist = localStorage.getItem("listening_artist_rank_format");
+      if (savedArtist === "rank" || savedArtist === "percentile") {
+        setArtistRankFormat(savedArtist);
+      }
+    } catch {}
+  }, []);
+
+  const handleToggleTrackRank = useCallback(() => {
+    setTrackRankFormat((prev) => {
+      const next = prev === "rank" ? "percentile" : "rank";
+      try {
+        localStorage.setItem("listening_track_rank_format", next);
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const handleToggleArtistRank = useCallback(() => {
+    setArtistRankFormat((prev) => {
+      const next = prev === "rank" ? "percentile" : "rank";
+      try {
+        localStorage.setItem("listening_artist_rank_format", next);
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all", default "1d"
   const [activeRange, setActiveRange] = useState<RangeKey>("1w");
@@ -162,6 +242,63 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [sessionState, setSessionState] = useState<SessionData | null>(() => {
     return initialSession || null;
   });
+
+  // In-memory track stats cache to avoid re-fetching on already-seen tracks
+  const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
+  const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
+
+  // Active track identification: currentTrack from PlayerContext -> latestPlay -> initialTrack
+  const activeTrackId = currentTrack?.id || streamLogState?.entries?.[0]?.trackId || initialTrack?.id || undefined;
+  const activeTrackTitle = currentTrack?.name || streamLogState?.entries?.[0]?.title || initialTrack?.name || undefined;
+  const activeTrackArtist =
+    currentTrack?.artists?.map((a) => a.name).join(", ") ||
+    currentTrack?.artists?.[0]?.name ||
+    streamLogState?.entries?.[0]?.artist ||
+    initialTrack?.artist ||
+    undefined;
+
+  useEffect(() => {
+    if (!activeTrackId && !activeTrackTitle && !activeTrackArtist) {
+      setTrackStats(null);
+      return;
+    }
+
+    const key = getTrackStatsCacheKey({
+      trackId: activeTrackId,
+      title: activeTrackTitle,
+      artist: activeTrackArtist,
+    });
+
+    const cached = trackStatsCacheRef.current.get(key);
+    if (cached) {
+      setTrackStats(cached);
+      return;
+    }
+
+    let isSubscribed = true;
+    const params = new URLSearchParams();
+    if (activeTrackId) params.set("trackId", activeTrackId);
+    if (activeTrackTitle) params.set("title", activeTrackTitle);
+    if (activeTrackArtist) params.set("artist", activeTrackArtist);
+
+    fetch(`/api/listening/track-stats?${params.toString()}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<TrackTelemetryStats>;
+      })
+      .then((data) => {
+        if (!isSubscribed) return;
+        trackStatsCacheRef.current.set(key, data);
+        setTrackStats(data);
+      })
+      .catch((err) => {
+        console.error("[TRACK STATS FETCH] Error loading stats:", err);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTrackId, activeTrackTitle, activeTrackArtist]);
 
   const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
 
@@ -760,15 +897,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Seeds the visualizer's synthetic pattern. The live now-playing track wins
   const latestPlay = streamLogData.entries[0];
 
-  const livePlayerMetrics: [string, string, string, string] = [
-    activeDevice?.isThisBrowser
-      ? "THIS BROWSER"
-      : activeDevice?.name?.toUpperCase() ||
-        (playerStatus === "ready" ? "READY" : playerStatus === "connecting" ? "CONNECTING" : "OFFLINE"),
-    previousTrack?.name || "--",
-    nextTrack?.name || "--",
-    contextName || currentTrack?.album?.name || "COLLECTION",
-  ];
+  const livePlayerMetrics: [string, string, string, string] = computeLivePlayerMetrics(
+    trackStats,
+    trackRankFormat,
+    artistRankFormat
+  );
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
@@ -825,6 +958,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             metrics={currentMetrics}
             overviewTimeUnit={overviewTimeUnit}
             onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
+            trackRankFormat={trackRankFormat}
+            artistRankFormat={artistRankFormat}
+            onToggleTrackRank={handleToggleTrackRank}
+            onToggleArtistRank={handleToggleArtistRank}
           />
 
           {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
