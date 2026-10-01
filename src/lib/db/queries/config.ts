@@ -20,6 +20,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: siteConfig.spotifyClientId || "",
+    livePlayerLayout: "split",
   };
 
   if (!isDbConfigured()) {
@@ -31,7 +32,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
       await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
-        SELECT title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id
+        SELECT title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
@@ -49,12 +50,16 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           // Empty string is a legitimate value here (player disabled), so
           // fall back only when the column is absent or null.
           spotifyClientId: row.spotify_client_id ?? fallback.spotifyClientId,
+          livePlayerLayout:
+            row.live_player_layout === "stacked" || row.live_player_layout === "split"
+              ? row.live_player_layout
+              : fallback.livePlayerLayout,
         };
       }
 
       // Auto-seed table on first cold start with default config
       await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, updated_at)
+        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
         VALUES (
           'active',
           ${fallback.title},
@@ -64,6 +69,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           ${fallback.githubUrl},
           ${fallback.timezone},
           ${fallback.spotifyClientId},
+          ${fallback.livePlayerLayout},
           NOW()
         )
         ON CONFLICT (id) DO NOTHING;
@@ -89,7 +95,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
       VALUES (
         'active',
         ${config.title},
@@ -99,6 +105,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         ${config.githubUrl},
         ${config.timezone},
         ${config.spotifyClientId},
+        ${config.livePlayerLayout || "split"},
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -109,6 +116,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         github_url = EXCLUDED.github_url,
         timezone = EXCLUDED.timezone,
         spotify_client_id = EXCLUDED.spotify_client_id,
+        live_player_layout = EXCLUDED.live_player_layout,
         updated_at = NOW();
     `;
     siteConfigCache.invalidate();
@@ -131,6 +139,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: siteConfig.spotifyClientId || "",
+    livePlayerLayout: "split",
   };
 
   if (isDbConfigured()) {
@@ -138,7 +147,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
       await ensureTablesExist();
       const sql = getDb();
       await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, updated_at)
+        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, live_player_layout, updated_at)
         VALUES (
           'active',
           ${defaults.title},
@@ -147,6 +156,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
           ${defaults.siteUrl},
           ${defaults.githubUrl},
           ${defaults.timezone},
+          ${defaults.livePlayerLayout},
           NOW()
         )
         ON CONFLICT (id) DO UPDATE SET
@@ -156,6 +166,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
           site_url = EXCLUDED.site_url,
           github_url = EXCLUDED.github_url,
           timezone = EXCLUDED.timezone,
+          live_player_layout = EXCLUDED.live_player_layout,
           updated_at = NOW();
       `;
       siteConfigCache.invalidate();

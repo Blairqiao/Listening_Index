@@ -243,13 +243,15 @@ export async function ensureTablesExist(): Promise<void> {
             timezone TEXT NOT NULL,
             spotify_client_id TEXT NOT NULL DEFAULT '',
             owner_playback_token TEXT,
+            live_player_layout TEXT NOT NULL DEFAULT 'split',
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           );
 
           -- Added after the table shipped, so existing databases need it too.
           ALTER TABLE site_settings
             ADD COLUMN IF NOT EXISTS spotify_client_id TEXT NOT NULL DEFAULT '',
-            ADD COLUMN IF NOT EXISTS owner_playback_token TEXT;
+            ADD COLUMN IF NOT EXISTS owner_playback_token TEXT,
+            ADD COLUMN IF NOT EXISTS live_player_layout TEXT NOT NULL DEFAULT 'split';
 
           -- Drop legacy guest user table
           DROP TABLE IF EXISTS player_users;
