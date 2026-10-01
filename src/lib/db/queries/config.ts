@@ -19,7 +19,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
-    spotifyClientId: siteConfig.spotifyClientId || "",
+    spotifyClientId: "",
     livePlayerLayout: "split",
   };
 
@@ -138,7 +138,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
-    spotifyClientId: siteConfig.spotifyClientId || "",
+    spotifyClientId: "",
     livePlayerLayout: "split",
   };
 
@@ -226,7 +226,7 @@ export async function saveOwnerPlaybackToken(token: string): Promise<void> {
         ${siteConfig.siteUrl},
         ${siteConfig.githubUrl},
         ${siteConfig.timezone || "America/Chicago"},
-        ${siteConfig.spotifyClientId || ""},
+        ${""},
         ${token},
         NOW()
       )
