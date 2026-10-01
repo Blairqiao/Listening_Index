@@ -354,6 +354,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
               <button
                 type="button"
                 onClick={handleToggleLayout}
+                aria-label="Toggle player layout between split and stacked"
                 className="font-mono text-[9px] px-1.5 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-music-accent hover:border-music-accent cursor-pointer transition-colors"
                 title="Toggle between Split Console and Stacked Stage"
               >
