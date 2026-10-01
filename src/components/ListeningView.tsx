@@ -5,25 +5,103 @@ import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
 import { MetricRibbon } from "@/components/MetricRibbon";
+import { LivePlayerView } from "@/components/LivePlayerView";
 import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
 import { CustomizationModal } from "@/components/CustomizationModal";
 import { UploadModal } from "@/components/UploadModal";
+import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
+import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import {
   Mode,
   RangeKey,
   SittingSession,
 } from "@/lib/mock-listening-data";
-import { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
+import {
+  OverviewData,
+  StreamLogData,
+  SessionData,
+  type TrackTelemetryStats,
+} from "@/lib/db/queries";
 import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
+  formatRankDisplay,
+  formatPlaysDisplay,
   type OverviewMetricsRaw,
   type StreamLogMetricsRaw,
 } from "@/lib/format-utils";
+
+export function getTrackStatsCacheKey(params: {
+  trackId?: string | null;
+  title?: string | null;
+  artist?: string | null;
+}): string {
+  return `${params.trackId || ""}:${params.title || ""}:${params.artist || ""}`;
+}
+
+export interface ActiveEntityCandidate {
+  id?: string;
+  title?: string;
+  artist?: string;
+}
+
+export function resolveActiveEntity(
+  currentTrack?: { id?: string | null; name?: string; artists?: Array<{ name: string }> } | null,
+  streamLogLatest?: { trackId?: string | null; title?: string | null; artist?: string | null } | null,
+  initialTrack?: { id?: string | null; name?: string | null; artist?: string | null } | null
+): ActiveEntityCandidate | null {
+  if (currentTrack) {
+    return {
+      id: currentTrack.id || undefined,
+      title: currentTrack.name || undefined,
+      artist:
+        currentTrack.artists?.map((a) => a.name).join(", ") ||
+        currentTrack.artists?.[0]?.name ||
+        undefined,
+    };
+  }
+  if (streamLogLatest) {
+    return {
+      id: streamLogLatest.trackId || undefined,
+      title: streamLogLatest.title || undefined,
+      artist: streamLogLatest.artist || undefined,
+    };
+  }
+  if (initialTrack) {
+    return {
+      id: initialTrack.id || undefined,
+      title: initialTrack.name || undefined,
+      artist: initialTrack.artist || undefined,
+    };
+  }
+  return null;
+}
+
+export function computeLivePlayerMetrics(
+  trackStats: TrackTelemetryStats | null,
+  trackRankFormat: "rank" | "percentile" = "rank",
+  artistRankFormat: "rank" | "percentile" = "rank",
+  fallbackPlays = "--"
+): [string, string, string, string] {
+  return [
+    formatRankDisplay(
+      trackStats?.track?.rank ?? null,
+      trackStats?.track?.totalTracks ?? 0,
+      trackRankFormat
+    ),
+    trackStats ? formatPlaysDisplay(trackStats.track.plays) : fallbackPlays,
+    formatRankDisplay(
+      trackStats?.artist?.rank ?? null,
+      trackStats?.artist?.totalArtists ?? 0,
+      artistRankFormat
+    ),
+    trackStats ? formatPlaysDisplay(trackStats.artist.plays) : fallbackPlays,
+  ];
+}
 
 const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
@@ -55,11 +133,27 @@ function setCachedStreamLogDepth(count: number) {
   } catch {}
 }
 
+export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
+  if (mode === 3 && !isAuthenticated) {
+    return 0;
+  }
+  return mode;
+}
+
+export function getAllowedShortcutKeys(isAuthenticated: boolean): string[] {
+  return isAuthenticated ? ["1", "2", "3", "4"] : ["1", "2", "3"];
+}
+
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
   initialSession?: SessionData | null;
   initialConfig?: SiteConfigState | null;
+  initialTrack?: {
+    id?: string;
+    name?: string;
+    artist?: string;
+  } | null;
   isDbConfigured?: boolean;
 }
 
@@ -67,14 +161,96 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialOverview,
   initialStreamLog,
   initialSession,
+  initialTrack,
   isDbConfigured = true,
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { config, openModal, closeModal, isModalOpen } = useConfig();
+  const {
+    config,
+    updateConfig,
+    openModal,
+    closeModal,
+    isModalOpen,
+    isAuthenticated,
+    isAdminLoginModalOpen,
+    openAdminLoginModal,
+    closeAdminLoginModal,
+    logout,
+  } = useConfig();
+  const {
+    currentTrack,
+    isLinked,
+    isAuthorizing,
+    handleLinkSpotify,
+    handleUnlink,
+  } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
-  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session
-  const [activeMode, setActiveMode] = useState<Mode>(0);
+  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
+  const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
+
+  // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
+  const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
+  const handleToggleSourceMode = useCallback(() => {
+    setSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
+  }, []);
+
+  const handleToggleLayout = useCallback(() => {
+    const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
+    updateConfig({ livePlayerLayout: next });
+    void fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ livePlayerLayout: next }),
+    }).catch(() => {});
+  }, [config.livePlayerLayout, updateConfig]);
+
+  // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsUploadModalOpen(false);
+      if (activeMode === 3) {
+        setActiveMode(0);
+      }
+    }
+  }, [isAuthenticated, activeMode]);
+
+  // Mode 3 rank format state: "rank" | "percentile", default "rank"
+  const [trackRankFormat, setTrackRankFormat] = useState<"rank" | "percentile">("rank");
+  const [artistRankFormat, setArtistRankFormat] = useState<"rank" | "percentile">("rank");
+
+  useEffect(() => {
+    try {
+      const savedTrack = localStorage.getItem("listening_track_rank_format");
+      if (savedTrack === "rank" || savedTrack === "percentile") {
+        setTrackRankFormat(savedTrack);
+      }
+      const savedArtist = localStorage.getItem("listening_artist_rank_format");
+      if (savedArtist === "rank" || savedArtist === "percentile") {
+        setArtistRankFormat(savedArtist);
+      }
+    } catch {}
+  }, []);
+
+  const handleToggleTrackRank = useCallback(() => {
+    setTrackRankFormat((prev) => {
+      const next = prev === "rank" ? "percentile" : "rank";
+      try {
+        localStorage.setItem("listening_track_rank_format", next);
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const handleToggleArtistRank = useCallback(() => {
+    setArtistRankFormat((prev) => {
+      const next = prev === "rank" ? "percentile" : "rank";
+      try {
+        localStorage.setItem("listening_artist_rank_format", next);
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all", default "1d"
   const [activeRange, setActiveRange] = useState<RangeKey>("1w");
@@ -142,6 +318,66 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return initialSession || null;
   });
 
+  // In-memory track stats cache to avoid re-fetching on already-seen tracks
+  const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
+  const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
+
+  // Active track identification resolved atomically across currentTrack -> streamLog -> initialTrack
+  const activeEntity = resolveActiveEntity(
+    currentTrack,
+    streamLogState?.entries?.[0],
+    initialTrack
+  );
+  const activeTrackId = activeEntity?.id;
+  const activeTrackTitle = activeEntity?.title;
+  const activeTrackArtist = activeEntity?.artist;
+
+  useEffect(() => {
+    if (!activeTrackId && !activeTrackTitle && !activeTrackArtist) {
+      setTrackStats(null);
+      return;
+    }
+
+    const key = getTrackStatsCacheKey({
+      trackId: activeTrackId,
+      title: activeTrackTitle,
+      artist: activeTrackArtist,
+    });
+
+    const cached = trackStatsCacheRef.current.get(key);
+    if (cached) {
+      setTrackStats(cached);
+      return;
+    }
+
+    // Reset track stats on cache miss when initiating a new fetch so stale stats from the previous song don't linger while loading
+    setTrackStats(null);
+
+    let isSubscribed = true;
+    const params = new URLSearchParams();
+    if (activeTrackId) params.set("trackId", activeTrackId);
+    if (activeTrackTitle) params.set("title", activeTrackTitle);
+    if (activeTrackArtist) params.set("artist", activeTrackArtist);
+
+    fetch(`/api/listening/track-stats?${params.toString()}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<TrackTelemetryStats>;
+      })
+      .then((data) => {
+        if (!isSubscribed) return;
+        trackStatsCacheRef.current.set(key, data);
+        setTrackStats(data);
+      })
+      .catch((err) => {
+        console.error("[TRACK STATS FETCH] Error loading stats:", err);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTrackId, activeTrackTitle, activeTrackArtist]);
+
   const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
 
   // Dynamic sync telemetry tracking
@@ -193,8 +429,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2") {
-        setActiveMode(parseInt(m, 10) as Mode);
+      if (m === "0" || m === "1" || m === "2" || m === "3") {
+        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
       }
       const r = params.get("range");
       if (r && RANGE_KEYS.includes(r as RangeKey)) {
@@ -211,7 +447,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         openModal();
       }
     }
-  }, [openModal]);
+  }, [openModal, isAuthenticated]);
 
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
@@ -535,9 +771,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
-      setActiveMode(mode);
+      setActiveMode(sanitizeActiveMode(mode, isAuthenticated));
     },
-    [isSyncing]
+    [isSyncing, isAuthenticated]
   );
 
   const handleSelectRange = useCallback(
@@ -560,7 +796,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   );
 
   // Keyboard navigation
-  // Keys 1-3: Switch modes
+  // Keys 1-3 (or 1-4 for admin): Switch modes
   // ArrowLeft / ArrowRight: Step range in Mode 0 (clamped at 1D and ALL, no wrap)
   // Key C: Open / Toggle config panel
   useEffect(() => {
@@ -575,8 +811,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // If either modal is open, strictly isolate shortcut handling
-      if (isUploadModalOpen || isModalOpen) {
+      // If any modal is open, strictly isolate shortcut handling
+      if (isUploadModalOpen || isModalOpen || isAdminLoginModalOpen) {
+        if (isAdminLoginModalOpen && (e.key === "l" || e.key === "L" || e.key === "Escape")) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          closeAdminLoginModal();
+          return;
+        }
         if (isUploadModalOpen && (e.key === "u" || e.key === "U")) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -589,12 +831,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           closeModal();
           return;
         }
-        // Block all other shortcut keys (1-3, arrows, C, U) while a modal is active
+        // Block all other shortcut keys while a modal is active
         return;
       }
 
-      // Keys 1-3: Modes
-      if (["1", "2", "3"].includes(e.key)) {
+      // Keys 1-3 (or 1-4 for authenticated admin): Modes
+      const allowedKeys = getAllowedShortcutKeys(isAuthenticated);
+      if (allowedKeys.includes(e.key)) {
         e.preventDefault();
         e.stopImmediatePropagation();
         if (document.activeElement instanceof HTMLElement) {
@@ -640,11 +883,23 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // Key U: Open / Toggle upload modal
-      if (e.key === "u" || e.key === "U") {
+      // Key U: Open / Toggle upload modal (admin only)
+      if ((e.key === "u" || e.key === "U") && isAuthenticated) {
         e.preventDefault();
         e.stopImmediatePropagation();
         setIsUploadModalOpen(true);
+        return;
+      }
+
+      // Key L: Toggle admin authentication modal / logout
+      if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (isAuthenticated) {
+          void logout();
+        } else {
+          openAdminLoginModal();
+        }
         return;
       }
     };
@@ -661,6 +916,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     openModal,
     closeModal,
     isUploadModalOpen,
+    isAuthenticated,
+    isAdminLoginModalOpen,
+    openAdminLoginModal,
+    closeAdminLoginModal,
+    logout,
   ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
@@ -734,16 +994,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       ? formatStreamLogMetrics(streamLogData.rawMetrics)
       : streamLogData.metrics;
 
+  // Seeds the visualizer's synthetic pattern. The live now-playing track wins
+  const latestPlay = streamLogData.entries[0];
+
+  const livePlayerMetrics: [string, string, string, string] = computeLivePlayerMetrics(
+    trackStats,
+    trackRankFormat,
+    artistRankFormat
+  );
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
+    3: livePlayerMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
   const sessionTagTime =
     activeSitting?.tagTime || sessionData.tagTime || (sessionData.isOpen ? "LIVE" : "--");
   const isSystemLive = sessionData.isOpen;
+
 
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
@@ -779,6 +1050,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
             totalPlays={streamLogData.metrics[0]}
+            layout={config.livePlayerLayout}
+            onToggleLayout={handleToggleLayout}
+            isLinked={isLinked}
+            isAuthorizing={isAuthorizing}
+            onLinkSpotify={handleLinkSpotify}
+            onUnlinkSpotify={handleUnlink}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
@@ -787,6 +1064,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             metrics={currentMetrics}
             overviewTimeUnit={overviewTimeUnit}
             onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
+            trackRankFormat={trackRankFormat}
+            artistRankFormat={artistRankFormat}
+            onToggleTrackRank={handleToggleTrackRank}
+            onToggleArtistRank={handleToggleArtistRank}
           />
 
           {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
@@ -830,6 +1111,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 onSelectSitting={(id) => setSelectedSittingId(id)}
               />
             )}
+
+            {activeMode === 3 && (
+              <LivePlayerView
+                latestPlay={latestPlay}
+                sourceMode={sourceMode}
+                onToggleSourceMode={handleToggleSourceMode}
+              />
+            )}
           </div>
         </div>
 
@@ -853,6 +1142,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         onUploadComplete={handleUploadComplete}
         isDbConfigured={isDbConfigured}
       />
+
+      {/* 9. Dedicated Admin Login Modal */}
+      <AdminLoginModal />
     </div>
   );
 };
@@ -864,7 +1156,9 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
 }) => {
   return (
     <ConfigProvider initialConfig={initialConfig || undefined} isDbConfigured={isDbConfigured}>
-      <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
+      <PlayerProvider>
+        <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
+      </PlayerProvider>
     </ConfigProvider>
   );
 };

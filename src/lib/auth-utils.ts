@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
+import { ADMIN_COOKIE_NAME, verifySessionToken, verifyAdminPassword } from "@/lib/admin-auth";
 
 /**
  * Validates whether an incoming HTTP request originated from the same host,
@@ -22,5 +22,18 @@ export function isSameOriginRequest(request: NextRequest): boolean {
 
 export function isAuthorizedAdminRequest(request: NextRequest): boolean {
   const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-  return verifySessionToken(cookie);
+  if (cookie && verifySessionToken(cookie)) {
+    return true;
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const bearer = authHeader.slice(7).trim();
+    if (verifySessionToken(bearer) || verifyAdminPassword(bearer)) {
+      return true;
+    }
+  }
+
+  return false;
 }
+

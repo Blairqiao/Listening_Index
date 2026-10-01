@@ -15,6 +15,15 @@ interface ControlRowProps {
   onTriggerSync?: () => void;
   streamLogCount?: number;
   totalPlays?: string;
+  // Mode 3: Live Player page-level controls
+  layout?: "split" | "stacked";
+  onToggleLayout?: () => void;
+  sourceMode?: "synthetic" | "live";
+  onToggleSourceMode?: () => void;
+  isLinked?: boolean | null;
+  isAuthorizing?: boolean;
+  onLinkSpotify?: () => void;
+  onUnlinkSpotify?: () => void;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -37,6 +46,14 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   onTriggerSync,
   streamLogCount,
   totalPlays,
+  layout = "split",
+  onToggleLayout,
+  sourceMode = "synthetic",
+  onToggleSourceMode,
+  isLinked = false,
+  isAuthorizing = false,
+  onLinkSpotify,
+  onUnlinkSpotify,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
@@ -54,6 +71,13 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           <>
             <span className="sm:hidden">[ SES ]</span>
             <span className="hidden sm:inline">[ SESSION ]</span>
+          </>
+        );
+      case 3:
+        return (
+          <>
+            <span className="sm:hidden">[ LIVE ]</span>
+            <span className="hidden sm:inline">[ LIVE PLAYER ]</span>
           </>
         );
     }
@@ -129,6 +153,43 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
               : `[ CLOSED ${sessionTagTime} AGO ]`}
           </button>
+        );
+      case 3:
+        return (
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={onToggleLayout}
+              aria-label="Toggle player layout between split and stacked"
+              className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
+              title="Toggle between Split Console and Stacked Stage"
+            >
+              <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
+              <span className="hidden sm:inline">{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
+            </button>
+            {isLinked ? (
+              <button
+                type="button"
+                onClick={onUnlinkSpotify}
+                className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
+                title="Unlink Spotify"
+              >
+                [ UNLINK ]
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isAuthorizing}
+                onClick={onLinkSpotify}
+                className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 transition-none focus-visible:outline-none focus-visible:text-music-accent ${
+                  isAuthorizing ? "text-music-accent cursor-wait opacity-60" : "text-music-accent hover:text-[#EDEDE8]"
+                }`}
+                title="Link Spotify for Web Playback"
+              >
+                {isAuthorizing ? "[ WAITING... ]" : "[ LINK ]"}
+              </button>
+            )}
+          </div>
         );
     }
   };

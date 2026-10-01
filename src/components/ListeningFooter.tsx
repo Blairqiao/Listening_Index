@@ -22,7 +22,7 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
     <footer className="h-10 sm:h-11 md:h-12 flex items-center justify-between border-t border-[#1C1C1A] bg-[#080808] select-none mt-4 md:mt-3">
       {/* Keyboard Shortcuts Hint */}
       <span className="hidden sm:inline font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-        {mode === 0 ? "KEYS [1-3] VIEW / [←→] RANGE" : "KEYS [1-3] VIEW"}
+        {mode === 0 ? "KEYS [1-4] VIEW / [←→] RANGE" : "KEYS [1-4] VIEW"}
       </span>
 
       {/* System Telemetry Status (Clickable manual sync on [ SYNCED X AGO ]) */}

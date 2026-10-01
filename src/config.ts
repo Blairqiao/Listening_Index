@@ -5,4 +5,5 @@ export const siteConfig = {
   siteUrl: "https://open.spotify.com/",
   githubUrl: "https://github.com/Blairqiao/listening_index",
   timezone: "America/Chicago",
+  livePlayerLayout: "split" as const,
 };
