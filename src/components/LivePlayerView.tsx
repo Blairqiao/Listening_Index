@@ -466,7 +466,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             } bg-transparent`}
             title="Toggle Shuffle"
           >
-            [SHUF]
+            [SHUFFLE]
           </button>
 
           <button

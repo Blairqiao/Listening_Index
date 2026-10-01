@@ -112,7 +112,7 @@ test("LivePlayerView - Uniform text transport buttons and dynamic play highlight
   assert.match(source, /\[PLAY\]/, "Must render [PLAY] text button when paused");
   assert.match(source, /\[PAUSE\]/, "Must render [PAUSE] text button when playing");
   assert.match(source, /\[NEXT\]/, "Must render [NEXT] text button");
-  assert.match(source, /\[SHUF\]/, "Must render [SHUF] text button");
+  assert.match(source, /\[SHUFFLE\]/, "Must render [SHUFFLE] text button");
   assert.match(source, /\[REP:\s*OFF\]/, "Must support [REP: OFF] text label");
   assert.match(source, /\[REP:\s*ALL\]/, "Must support [REP: ALL] text label");
   assert.match(source, /\[REP:\s*1\]/, "Must support [REP: 1] text label");
