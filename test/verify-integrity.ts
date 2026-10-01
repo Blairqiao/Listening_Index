@@ -332,6 +332,7 @@ test("AsyncLatchCache Deep Module Concurrency & Invalidation", async () => {
     siteUrl: "",
     githubUrl: "",
     timezone: "UTC",
+    livePlayerLayout: "split",
   });
 
   assert.ok(lastSyncCache.peek());

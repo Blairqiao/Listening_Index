@@ -26,7 +26,7 @@ export function getStoredVolume(defaultVolume = 0.35): number {
 export function setStoredVolume(slider: number): void {
   if (typeof window === "undefined") return;
   try {
-    const clamped = Math.max(0, Math.min(1, slider));
+    const clamped = Math.max(0, Math.min(1, Number.isFinite(slider) ? slider : 0));
     localStorage.setItem(VOLUME_STORAGE_KEY, clamped.toString());
   } catch {}
 }

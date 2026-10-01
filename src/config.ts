@@ -9,4 +9,5 @@ export const siteConfig = {
   // design: the PKCE flow never sends a client secret to the browser.
   // Can also be set in the customization menu without touching this file.
   spotifyClientId: "",
+  livePlayerLayout: "split" as const,
 };
