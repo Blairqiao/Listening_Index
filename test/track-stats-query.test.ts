@@ -61,6 +61,20 @@ test("Track & Artist Telemetry Stats - Red/Green TDD Verification", async (t) =>
     assert.ok(stats.artist.totalArtists >= 200, `Expected totalArtists >= 200, got ${stats.artist.totalArtists}`);
   });
 
+  await t.test("getTrackTelemetryStats - adopts canonical artist group key when caller passes featured/compound artist string", async () => {
+    // 1VY48jCBWuapKl0N5MXoJD is Karen Mok in seed DB, but player SDK might send "Karen Mok, Featured Artist"
+    const stats = await getTrackTelemetryStats({
+      trackId: "1VY48jCBWuapKl0N5MXoJD",
+      title: "忽然之間",
+      artist: "Karen Mok, Featured Artist",
+    });
+
+    assert.equal(stats.track.plays, 11);
+    assert.equal(stats.artist.name, "Karen Mok");
+    assert.equal(stats.artist.plays, 45);
+    assert.equal(stats.artist.rank, 4);
+  });
+
   await t.test("getTrackTelemetryStats - fallback to title and artist lookup when trackId is missing or unmatched", async () => {
     // Case 1: no trackId provided, but title and artist provided
     const statsNoId = await getTrackTelemetryStats({
