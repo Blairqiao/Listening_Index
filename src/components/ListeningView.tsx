@@ -12,6 +12,7 @@ import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
 import { CustomizationModal } from "@/components/CustomizationModal";
 import { UploadModal } from "@/components/UploadModal";
+import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import {
@@ -165,7 +166,18 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { config, updateConfig, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
+  const {
+    config,
+    updateConfig,
+    openModal,
+    closeModal,
+    isModalOpen,
+    isAuthenticated,
+    isAdminLoginModalOpen,
+    openAdminLoginModal,
+    closeAdminLoginModal,
+    logout,
+  } = useConfig();
   const {
     currentTrack,
     isLinked,
@@ -193,10 +205,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }).catch(() => {});
   }, [config.livePlayerLayout, updateConfig]);
 
-  // Safeguard: mode 3 is strictly restricted to authenticated admin
+  // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
   useEffect(() => {
-    if (!isAuthenticated && activeMode === 3) {
-      setActiveMode(0);
+    if (!isAuthenticated) {
+      setIsUploadModalOpen(false);
+      if (activeMode === 3) {
+        setActiveMode(0);
+      }
     }
   }, [isAuthenticated, activeMode]);
 
@@ -796,8 +811,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // If either modal is open, strictly isolate shortcut handling
-      if (isUploadModalOpen || isModalOpen) {
+      // If any modal is open, strictly isolate shortcut handling
+      if (isUploadModalOpen || isModalOpen || isAdminLoginModalOpen) {
+        if (isAdminLoginModalOpen && (e.key === "l" || e.key === "L" || e.key === "Escape")) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          closeAdminLoginModal();
+          return;
+        }
         if (isUploadModalOpen && (e.key === "u" || e.key === "U")) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -810,7 +831,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           closeModal();
           return;
         }
-        // Block all other shortcut keys (1-5, arrows, C, U) while a modal is active
+        // Block all other shortcut keys while a modal is active
         return;
       }
 
@@ -862,11 +883,23 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
 
-      // Key U: Open / Toggle upload modal
-      if (e.key === "u" || e.key === "U") {
+      // Key U: Open / Toggle upload modal (admin only)
+      if ((e.key === "u" || e.key === "U") && isAuthenticated) {
         e.preventDefault();
         e.stopImmediatePropagation();
         setIsUploadModalOpen(true);
+        return;
+      }
+
+      // Key L: Toggle admin authentication modal / logout
+      if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (isAuthenticated) {
+          void logout();
+        } else {
+          openAdminLoginModal();
+        }
         return;
       }
     };
@@ -884,6 +917,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     closeModal,
     isUploadModalOpen,
     isAuthenticated,
+    isAdminLoginModalOpen,
+    openAdminLoginModal,
+    closeAdminLoginModal,
+    logout,
   ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
@@ -1105,6 +1142,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         onUploadComplete={handleUploadComplete}
         isDbConfigured={isDbConfigured}
       />
+
+      {/* 9. Dedicated Admin Login Modal */}
+      <AdminLoginModal />
     </div>
   );
 };
