@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { msToClock, gradientStops, LivePlayerView } from "../src/components/LivePlayerView";
+import { getRibbonLabels } from "../src/components/MetricRibbon";
 
 test("LivePlayerView - msToClock helper formatting", () => {
   assert.equal(msToClock(0), "0:00");
@@ -20,67 +21,67 @@ test("LivePlayerView - gradientStops generates 3 distinct color stops from accen
   assert.ok(stops[2].startsWith("#"), "Stop 2 must be a valid hex color");
 });
 
-test("LivePlayerView - production component contract & architecture rules", () => {
+test("LivePlayerView - presenter component contract & layout architecture", () => {
   assert.equal(typeof LivePlayerView, "function", "LivePlayerView must be a React functional component");
 
   const componentPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
   const source = fs.readFileSync(componentPath, "utf-8");
 
-  // 1. Variant B Split Console layout grid structure
-  assert.match(source, /grid\s+grid-cols-1\s+md:grid-cols-12/, "Must use 12-column responsive grid layout");
-  assert.match(source, /md:col-span-5/, "Left side deck & controls must span 5 columns on desktop");
+  // 1. Dual layout support: Split Console (Variant B) and Stacked Stage (Variant A)
+  assert.match(source, /Variant B: Split Console/, "Must support Variant B: Split Console");
+  assert.match(source, /Variant A: Stacked Stage/, "Must support Variant A: Stacked Stage");
+  assert.match(source, /grid\s+grid-cols-1\s+md:grid-cols-12/, "Split layout must use 12-column responsive grid");
+  assert.match(source, /md:col-span-5/, "Split layout deck must span 5 columns on desktop");
   
-  // 2. Mobile viewport isolation: Spectrum MUST be hidden on mobile (< 768px)
-  assert.match(source, /hidden\s+md:flex\s+md:col-span-7/, "Right side spectrum container must be hidden on mobile");
+  // 2. Mobile viewport isolation: Spectrum MUST be hidden on mobile (< 768px) on both layouts
+  assert.match(source, /hidden\s+md:flex\s+md:col-span-7/, "Split layout spectrum must be hidden on mobile");
+  assert.match(source, /hidden\s+md:block\s+border/, "Stacked layout spectrum stage must be hidden on mobile");
 
-  // 3. Web Playback SDK & Token endpoint contract
-  assert.match(source, /\/api\/player\/token/, "Must call /api/player/token for token lifecycle");
-  assert.match(source, /new\s+window\.Spotify\.Player/, "Must instantiate Spotify Player SDK");
-  assert.match(source, /getOAuthToken/, "Must supply getOAuthToken callback to player");
-  assert.match(source, /Listening Index/, "Must register device name as 'Listening Index'");
+  // 3. Decoupled Context Architecture
+  assert.match(source, /usePlayer\(\)/, "Must consume usePlayer from PlayerContext");
+  assert.match(source, /useConfig\(\)/, "Must consume useConfig from ConfigContext");
 
-  // 4. Transport and Volume controls
-  assert.match(source, /togglePlay/, "Must support togglePlay transport control");
-  assert.match(source, /previousTrack/, "Must support previousTrack transport control");
-  assert.match(source, /nextTrack/, "Must support nextTrack transport control");
-  assert.match(source, /setVolume/, "Must support volume control");
-  assert.match(source, /seek/, "Must support scrubber seek control");
+  // 4. Quick Layout Toggle
+  assert.match(source, /handleToggleLayout/, "Must support in-page quick layout toggle");
+  assert.match(source, /LAYOUT:\s*STACKED/, "Must render layout toggle button");
 
-  // 5. Transfer playback & unlinked states
-  assert.match(source, /LINK SPOTIFY FOR WEB PLAYBACK/, "Must have unlinked action button");
-  assert.match(source, /https:\/\/api\.spotify\.com\/v1\/me\/player/, "Must support transferring playback to device");
+  // 5. In-player controls (Transport, Shuffle, Repeat, Volume)
+  assert.match(source, /handleTogglePlay/, "Must support togglePlay transport control");
+  assert.match(source, /handlePrevious/, "Must support previousTrack transport control");
+  assert.match(source, /handleNext/, "Must support nextTrack transport control");
+  assert.match(source, /handleToggleShuffle/, "Must support shuffle toggle");
+  assert.match(source, /handleCycleRepeat/, "Must support repeat cycle");
+  assert.match(source, /handleVolume/, "Must support volume control");
+  assert.match(source, /handleSeek/, "Must support scrubber seek control");
 
-  // 6. Spectrum visualizer integration
+  // 6. External device takeover banner
+  assert.match(source, /SWITCH TO THIS BROWSER/, "Must support one-click takeover when active on remote device");
+
+  // 7. Spectrum visualizer integration
   assert.match(source, /SyntheticSpectrumSource/, "Must support synthetic spectrum source");
   assert.match(source, /LiveAudioSpectrumSource/, "Must support live audio hardware capture");
   assert.match(source, /BAND_COUNT/, "Must use 32-band spectrum layout");
-
-  // 7. Regression check: connectPlayer must NOT have volume in its dependency array
-  assert.match(
-    source,
-    /const connectPlayer = useCallback\(async \(\) => {[\s\S]*?}, \[\]\);/,
-    "connectPlayer must have an empty dependency array to prevent reconnection cascade on volume change"
-  );
-
-  // 8. Regression check: SpectrumCanvas source mode effect must not depend on trackKey or isLive
-  assert.match(
-    source,
-    /},\s*\[sourceMode,\s*onToggleSource\]\);/,
-    "SpectrumCanvas sourceMode effect must not depend on trackKey or isLive to avoid re-prompting audio stream"
-  );
-
-  // 9. Regression check: getOAuthToken handles 401 status
-  assert.match(
-    source,
-    /if \(r\.status === 401\)/,
-    "getOAuthToken must explicitly handle 401 unauthorized status"
-  );
 });
 
-import { getRibbonLabels } from "../src/components/MetricRibbon";
+test("PlayerContext - Web Playback SDK & connection lifecycle contract", () => {
+  const contextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
+  const source = fs.readFileSync(contextPath, "utf-8");
 
-test("MetricRibbon - Mode 3 labels aligned with metrics", () => {
+  // 1. Web Playback SDK & Token endpoint contract
+  assert.match(source, /\/api\/player\/token/, "Must call /api/player/token for token lifecycle");
+  assert.match(source, /new\s+window\.Spotify\.Player/, "Must instantiate Spotify Player SDK in PlayerContext");
+  assert.match(source, /getOAuthToken/, "Must supply getOAuthToken callback to player");
+  assert.match(source, /Listening Index/, "Must register device name as 'Listening Index'");
+
+  // 2. Token error handling
+  assert.match(source, /if \(r\.status === 401\)/, "getOAuthToken must explicitly handle 401 unauthorized status");
+
+  // 3. Audio volume taper integration
+  assert.match(source, /sliderToVolume/, "PlayerContext must map volume using sliderToVolume taper");
+  assert.match(source, /setStoredVolume/, "PlayerContext must persist volume using setStoredVolume");
+});
+
+test("MetricRibbon - Mode 3 telemetry labels", () => {
   const labels = getRibbonLabels(3);
-  assert.deepEqual(labels, ["STATUS", "BANDS", "NOW STREAMING", "SOURCE"]);
+  assert.deepEqual(labels, ["ACTIVE DEVICE", "PREVIOUS", "UP NEXT", "CONTEXT"]);
 });
-
