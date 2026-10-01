@@ -22,6 +22,7 @@ export {
   lastSyncCache,
   catalogStatusCache,
   siteConfigCache,
+  catalogTotalsCache,
 } from "./cache";
 
 // Schema
@@ -77,3 +78,6 @@ export { getCurrentSession } from "./session";
 
 // Composite Initial Music Data
 export { getInitialMusicData } from "./initial-data";
+
+// Live Player Personal Archive Telemetry
+export { getTrackTelemetryStats, type TrackTelemetryStats } from "./track-stats";
