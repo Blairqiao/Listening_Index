@@ -15,7 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Page() {
-  const isConfigured = isDbConfigured();
+  const isForceMock = process.env.FORCE_MOCK_DATA === "true";
+  const isConfigured = isDbConfigured() && !isForceMock;
 
   const [initialData, activeConfig] = await Promise.all([
     isConfigured
@@ -25,7 +26,18 @@ export default async function Page() {
           streamLog: MOCK_DATA.streamLog,
           session: MOCK_DATA.session,
         }),
-    getActiveSiteConfig(),
+    isForceMock
+      ? Promise.resolve({
+          title: "Listening Index",
+          ownerName: "YOUR NAME",
+          accentColor: "#1DB954",
+          siteUrl: "https://open.spotify.com/",
+          githubUrl: "https://github.com/Blairqiao/listening_index",
+          timezone: "America/Chicago",
+          spotifyClientId: "",
+          livePlayerLayout: "split" as const,
+        })
+      : getActiveSiteConfig(),
   ]);
 
   return (
@@ -34,7 +46,8 @@ export default async function Page() {
       initialStreamLog={initialData.streamLog}
       initialSession={initialData.session}
       initialConfig={activeConfig}
-      isDbConfigured={isConfigured}
+      isDbConfigured={isDbConfigured()}
     />
   );
 }
+

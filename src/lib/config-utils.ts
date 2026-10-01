@@ -1,6 +1,8 @@
 import { siteConfig } from "@/config";
 import { normalizeHex } from "@/lib/color-utils";
 
+export type LivePlayerLayout = "split" | "stacked";
+
 export interface SiteConfigState {
   title: string;
   ownerName: string;
@@ -8,6 +10,8 @@ export interface SiteConfigState {
   siteUrl: string;
   githubUrl: string;
   timezone: string;
+  spotifyClientId?: string;
+  livePlayerLayout: LivePlayerLayout;
 }
 
 export const DEFAULT_SITE_CONFIG: SiteConfigState = {
@@ -17,6 +21,8 @@ export const DEFAULT_SITE_CONFIG: SiteConfigState = {
   siteUrl: siteConfig.siteUrl,
   githubUrl: siteConfig.githubUrl,
   timezone: siteConfig.timezone || "America/Chicago",
+  spotifyClientId: (siteConfig as { spotifyClientId?: string }).spotifyClientId || "",
+  livePlayerLayout: "split",
 };
 
 /**
@@ -29,6 +35,10 @@ export function normalizeSiteConfig(
 ): SiteConfigState {
   if (!patch) return { ...base };
 
+  const layout = patch.livePlayerLayout;
+  const validLayout: LivePlayerLayout =
+    layout === "stacked" || layout === "split" ? layout : base.livePlayerLayout || "split";
+
   return {
     title: patch.title !== undefined ? String(patch.title).trim() : base.title,
     ownerName: patch.ownerName !== undefined ? String(patch.ownerName).trim() : base.ownerName,
@@ -36,6 +46,11 @@ export function normalizeSiteConfig(
     siteUrl: patch.siteUrl !== undefined ? String(patch.siteUrl).trim() : base.siteUrl,
     githubUrl: patch.githubUrl !== undefined ? String(patch.githubUrl).trim() : base.githubUrl,
     timezone: patch.timezone !== undefined ? String(patch.timezone).trim() : base.timezone,
+    spotifyClientId:
+      patch.spotifyClientId !== undefined
+        ? String(patch.spotifyClientId).trim()
+        : base.spotifyClientId || "",
+    livePlayerLayout: validLayout,
   };
 }
 
@@ -49,7 +64,9 @@ export function areSiteConfigsEqual(a: SiteConfigState, b: SiteConfigState): boo
     normalizeHex(a.accentColor) === normalizeHex(b.accentColor) &&
     a.siteUrl === b.siteUrl &&
     a.githubUrl === b.githubUrl &&
-    a.timezone === b.timezone
+    a.timezone === b.timezone &&
+    (a.spotifyClientId || "") === (b.spotifyClientId || "") &&
+    a.livePlayerLayout === b.livePlayerLayout
   );
 }
 
@@ -64,6 +81,7 @@ export function generateConfigTsCode(config: SiteConfigState): string {
   siteUrl: ${JSON.stringify(config.siteUrl)},
   githubUrl: ${JSON.stringify(config.githubUrl)},
   timezone: ${JSON.stringify(config.timezone)},
+  livePlayerLayout: ${JSON.stringify(config.livePlayerLayout)},
 };
 `;
 }

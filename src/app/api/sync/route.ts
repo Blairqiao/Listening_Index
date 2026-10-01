@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncSpotify } from "../../../../scripts/sync-spotify";
 import { clearServerCache } from "@/lib/db/server-cache";
-import { isConfigured, isDbConfigured } from "@/lib/db";
+import { isDbConfigured } from "@/lib/db";
+import { isOwnerSpotifyConfigured } from "@/lib/spotify";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
@@ -40,11 +41,12 @@ async function handleSync(request: NextRequest) {
   }
 
   // Gracefully handle unconfigured credentials/database when deployed in demo mode
-  if (!isDbConfigured() || !isConfigured(process.env.SPOTIFY_REFRESH_TOKEN)) {
+  // Spotify may be connected by env var or from the settings menu.
+  if (!isDbConfigured() || !(await isOwnerSpotifyConfigured())) {
     return NextResponse.json(
       {
         success: false,
-        message: "Sync not executed: DATABASE_URL or SPOTIFY_REFRESH_TOKEN is not configured yet (currently set to 'todo'). Connect your database and configure Spotify credentials to enable real ingestion.",
+        message: "Sync not executed: the database or Spotify is not connected yet. Connect your database, then connect Spotify from the settings menu (or set SPOTIFY_REFRESH_TOKEN).",
       },
       { status: 200 }
     );

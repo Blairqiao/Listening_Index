@@ -22,6 +22,7 @@ export {
   lastSyncCache,
   catalogStatusCache,
   siteConfigCache,
+  catalogTotalsCache,
 } from "./cache";
 
 // Schema
@@ -65,6 +66,9 @@ export {
   getActiveSiteConfig,
   saveActiveSiteConfig,
   resetActiveSiteConfig,
+  getOwnerPlaybackToken,
+  saveOwnerPlaybackToken,
+  deleteOwnerPlaybackToken,
 } from "./config";
 
 // Analytical Dashboard Queries (Modes 1, 2, 3)
@@ -74,3 +78,6 @@ export { getCurrentSession } from "./session";
 
 // Composite Initial Music Data
 export { getInitialMusicData } from "./initial-data";
+
+// Live Player Personal Archive Telemetry
+export { getTrackTelemetryStats, type TrackTelemetryStats } from "./track-stats";

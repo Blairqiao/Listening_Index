@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
     const range = rangeParam as RangeKey;
     const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
     
-    // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
-    if (!isDbConfigured()) {
+    // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
+    if (!isDbConfigured() || process.env.FORCE_MOCK_DATA === "true") {
       return NextResponse.json(MOCK_DATA.overview[range], {
         status: 200,
         headers: {

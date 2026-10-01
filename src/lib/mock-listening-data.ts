@@ -1,6 +1,6 @@
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
 
-export type Mode = 0 | 1 | 2; // 0 = Overview, 1 = Stream Log, 2 = Session
+export type Mode = 0 | 1 | 2 | 3; // 0 = Overview, 1 = Stream Log, 2 = Session, 3 = Live Player
 export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
 
 export interface TrackSummary {
@@ -29,6 +29,7 @@ export interface StreamLogItem {
   artist: string;
   album: string;
   duration: string;
+  durationMs?: number;
   albumImageUrl?: string | null;
   swatchColor?: string;
   status?: string;
@@ -955,6 +956,7 @@ export const MOCK_DATA: MockListeningData = {
         album: CATALOG.radiohead_weird_fishes.album,
         albumId: CATALOG.radiohead_weird_fishes.albumId,
         duration: CATALOG.radiohead_weird_fishes.duration,
+        durationMs: 318000,
         albumImageUrl: CATALOG.radiohead_weird_fishes.albumImageUrl,
         dayGroup: "09 SEP",
       },
