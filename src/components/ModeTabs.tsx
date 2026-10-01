@@ -3,7 +3,7 @@
 import React from "react";
 import { Mode } from "@/lib/mock-listening-data";
 import { useConfig } from "@/context/ConfigContext";
-import { Menu, Upload } from "lucide-react";
+import { Menu, Upload, Lock, Unlock } from "lucide-react";
 
 interface ModeTabsProps {
   activeMode: Mode;
@@ -33,7 +33,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
   onOpenUpload,
   isSyncing = false,
 }) => {
-  const { openModal, isAuthenticated } = useConfig();
+  const { openModal, isAuthenticated, openAdminLoginModal, logout } = useConfig();
   const modes = getAvailableModes(isAuthenticated);
 
   return (
@@ -69,36 +69,58 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
         })}
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-4">
-        {onOpenUpload && (
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {isAuthenticated && onOpenUpload && (
           <button
             type="button"
             onClick={onOpenUpload}
             title="Import Spotify Extended Streaming History (.zip / .json) [Key: U]"
-            className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            aria-label="Import Spotify Extended Streaming History"
+            className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <span className="min-[800px]:hidden inline-flex items-center gap-1">
-              <span>[</span>
-              <Upload className="w-3 h-3" />
-              <span>]</span>
-            </span>
-            <span className="hidden min-[800px]:inline">[ U · UPLOAD ]</span>
+            <span>[</span>
+            <Upload className="w-3 h-3" />
+            <span>]</span>
           </button>
         )}
 
         <button
           type="button"
           onClick={openModal}
-          title="Open Customization GUI (Accent color, title, timezone, links) [Key: C]"
-          className="group inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          title={isAuthenticated ? "Open configuration settings [Key: C]" : "Open appearance settings [Key: C]"}
+          aria-label="Appearance and configuration settings"
+          className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
         >
-          <span className="min-[800px]:hidden inline-flex items-center gap-1">
-            <span>[</span>
-            <Menu className="w-3 h-3" />
-            <span>]</span>
-          </span>
-          <span className="hidden min-[800px]:inline">[ C · CONFIG ]</span>
+          <span>[</span>
+          <Menu className="w-3 h-3" />
+          <span>]</span>
         </button>
+
+        {isAuthenticated ? (
+          <button
+            type="button"
+            onClick={logout}
+            title="Admin session active · click to lock [Key: L]"
+            aria-label="Lock admin session"
+            className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          >
+            <span>[</span>
+            <Unlock className="w-3 h-3 text-music-accent" />
+            <span>]</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={openAdminLoginModal}
+            title="Admin login [Key: L]"
+            aria-label="Admin login"
+            className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          >
+            <span>[</span>
+            <Lock className="w-3 h-3" />
+            <span>]</span>
+          </button>
+        )}
       </div>
     </nav>
   );
