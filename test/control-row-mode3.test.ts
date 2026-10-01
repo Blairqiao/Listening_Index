@@ -29,19 +29,7 @@ test("ControlRow - Mode 3 contract for page-level Live Player controls", () => {
     "ControlRow must render split layout label for Mode 3"
   );
 
-  // 3. Must render Visualizer audio mode toggle (Synthetic vs Real Live audio)
-  assert.match(
-    source,
-    /LIVE AUDIO/,
-    "ControlRow must render live audio button for Mode 3"
-  );
-  assert.match(
-    source,
-    /SYNTHETIC/,
-    "ControlRow must render synthetic audio button for Mode 3"
-  );
-
-  // 4. Must render Link / Unlink button
+  // 3. Must render Link / Unlink button
   assert.match(
     source,
     /UNLINK/,
@@ -52,15 +40,29 @@ test("ControlRow - Mode 3 contract for page-level Live Player controls", () => {
     /LINK/,
     "ControlRow must render link button when unlinked in Mode 3"
   );
+
+  // 4. Visualizer audio toggle moved to spectrum visualizer box header in LivePlayerView
+  const playerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const playerSource = fs.readFileSync(playerPath, "utf-8");
+  assert.match(
+    playerSource,
+    /toggleSourceMode[\s\S]*?\[ LIVE AUDIO \][\s\S]*?\[ SYNTHETIC \]/,
+    "LivePlayerView must render interactive visualizer audio toggle button on spectrum box header"
+  );
 });
 
-test("ListeningView - wires ControlRow with Mode 3 layout, sourceMode, and link props", () => {
+test("ListeningView - wires ControlRow with Mode 3 layout and link props, and LivePlayerView with audio mode", () => {
   const listeningViewPath = path.resolve(__dirname, "../src/components/ListeningView.tsx");
   const source = fs.readFileSync(listeningViewPath, "utf-8");
 
   assert.match(
     source,
-    /<ControlRow[\s\S]*?layout=\{[\s\S]*?onToggleLayout=\{[\s\S]*?sourceMode=\{[\s\S]*?onToggleSourceMode=\{/,
-    "ListeningView must pass layout and sourceMode props and handlers to ControlRow"
+    /<ControlRow[\s\S]*?layout=\{[\s\S]*?onToggleLayout=\{[\s\S]*?isLinked=\{/,
+    "ListeningView must pass layout and link props and handlers to ControlRow"
+  );
+  assert.match(
+    source,
+    /<LivePlayerView[\s\S]*?sourceMode=\{[\s\S]*?onToggleSourceMode=\{/,
+    "ListeningView must pass sourceMode and onToggleSourceMode to LivePlayerView"
   );
 });
