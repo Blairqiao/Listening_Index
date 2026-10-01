@@ -42,11 +42,12 @@ test("formatRankDisplay returns NEW for unranked or non-positive rank", () => {
   assert.equal(formatRankDisplay(-5, 1000, "rank"), "NEW");
 });
 
-test("formatRankDisplay formats rank with # prefix when format is rank", () => {
-  assert.equal(formatRankDisplay(1, 1000, "rank"), "#1");
-  assert.equal(formatRankDisplay(42, 1000, "rank"), "#42");
-  assert.equal(formatRankDisplay(350, 1000, "rank"), "#350");
+test("formatRankDisplay formats rank as rank / total without # prefix when format is rank", () => {
+  assert.equal(formatRankDisplay(1, 1000, "rank"), "1 / 1,000");
+  assert.equal(formatRankDisplay(42, 1000, "rank"), "42 / 1,000");
+  assert.equal(formatRankDisplay(350, 1000, "rank"), "350 / 1,000");
 });
+
 
 test("formatRankDisplay delegates to formatCatalogPercentile when format is percentile", () => {
   assert.equal(formatRankDisplay(4, 1000, "percentile"), "TOP 0.4%");

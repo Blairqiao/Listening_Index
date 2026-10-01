@@ -9,16 +9,17 @@ test("getRibbonLabels returns archive telemetry labels for Mode 3 by default", (
   assert.deepStrictEqual(labels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 });
 
-test("getRibbonLabels returns percentile labels for Mode 3 when toggled", () => {
+test("getRibbonLabels maintains TRACK RANK and ARTIST RANK labels for Mode 3 even when toggled to percentile", () => {
   const trackPercentileLabels = getRibbonLabels(3, "minutes", "percentile", "rank");
-  assert.deepStrictEqual(trackPercentileLabels, ["TRACK TOP %", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
+  assert.deepStrictEqual(trackPercentileLabels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 
   const artistPercentileLabels = getRibbonLabels(3, "minutes", "rank", "percentile");
-  assert.deepStrictEqual(artistPercentileLabels, ["TRACK RANK", "TRACK PLAYS", "ARTIST TOP %", "ARTIST PLAYS"]);
+  assert.deepStrictEqual(artistPercentileLabels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 
   const bothPercentileLabels = getRibbonLabels(3, "minutes", "percentile", "percentile");
-  assert.deepStrictEqual(bothPercentileLabels, ["TRACK TOP %", "TRACK PLAYS", "ARTIST TOP %", "ARTIST PLAYS"]);
+  assert.deepStrictEqual(bothPercentileLabels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 });
+
 
 test("getRibbonLabels preserves labels for Mode 0, 1, 2", () => {
   assert.deepStrictEqual(getRibbonLabels(0, "minutes"), ["MINUTES", "TRACKS", "ARTISTS", "DAILY AVG"]);

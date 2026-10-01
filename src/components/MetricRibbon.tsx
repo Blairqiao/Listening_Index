@@ -34,13 +34,14 @@ export const getRibbonLabels = (
       return ["SESSION RUNTIME", "TOTAL TRACKS", "UNIQUE ARTISTS", "START TIME"];
     case 3:
       return [
-        trackRankFormat === "percentile" ? "TRACK TOP %" : "TRACK RANK",
+        "TRACK RANK",
         "TRACK PLAYS",
-        artistRankFormat === "percentile" ? "ARTIST TOP %" : "ARTIST RANK",
+        "ARTIST RANK",
         "ARTIST PLAYS",
       ];
   }
 };
+
 
 export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   mode,
