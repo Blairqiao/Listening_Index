@@ -25,6 +25,8 @@ export interface LivePlayerProps {
     imageUrl?: string;
     durationMs: number;
   };
+  sourceMode?: "synthetic" | "live";
+  onToggleSourceMode?: () => void;
 }
 
 const DEFAULT_FALLBACK_TRACK = {
@@ -246,7 +248,12 @@ const SpectrumCanvas: React.FC<{
   );
 };
 
-export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialTrack }) => {
+export const LivePlayerView: React.FC<LivePlayerProps> = ({
+  latestPlay,
+  initialTrack,
+  sourceMode: externalSourceMode,
+  onToggleSourceMode,
+}) => {
   const { config, updateConfig } = useConfig();
   const {
     playerStatus,
@@ -274,10 +281,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
     handleCycleRepeat,
   } = usePlayer();
 
-  const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
-
-  const toggleSourceMode = useCallback(() => {
-    setSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
+  const [internalSourceMode, setInternalSourceMode] = useState<"synthetic" | "live">("synthetic");
+  const sourceMode = externalSourceMode ?? internalSourceMode;
+  const toggleSourceMode = onToggleSourceMode ?? useCallback(() => {
+    setInternalSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
   }, []);
 
   const handleToggleLayout = useCallback(() => {
@@ -449,120 +456,67 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({ latestPlay, initialT
         />
       </div>
 
-      {/* Transport & Control Bar */}
-      <div className="pt-2 border-t border-[#161614] space-y-2 text-[11px]">
-        {/* Row 1: Playback Transport & Volume */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
-            >
-              [PREV]
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleTogglePlay()}
-              className="px-2.5 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold"
-            >
-              {isPlaying ? "[PAUSE]" : "[PLAY]"}
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
-            >
-              [NEXT]
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleToggleShuffle()}
-              className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${
-                shuffle
-                  ? "border-music-accent text-music-accent font-bold"
-                  : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
-              }`}
-              title="Toggle Shuffle"
-            >
-              [SHUF]
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleCycleRepeat()}
-              className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${
-                repeatMode > 0
-                  ? "border-music-accent text-music-accent font-bold"
-                  : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
-              }`}
-              title="Cycle Repeat Mode"
-            >
-              {repeatLabel}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0">
-            <span>VOL</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => handleVolume(Number(e.target.value))}
-              className="w-[60px] accent-[var(--music-accent)] cursor-pointer h-1 bg-[#1C1C1A]"
-            />
-          </div>
+      {/* Transport & Volume Controls */}
+      <div className="flex items-center justify-between pt-2 border-t border-[#161614] text-[11px] gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+          >
+            [PREV]
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleTogglePlay()}
+            className="px-2.5 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold"
+          >
+            {isPlaying ? "[PAUSE]" : "[PLAY]"}
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+          >
+            [NEXT]
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleToggleShuffle()}
+            className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${
+              shuffle
+                ? "border-music-accent text-music-accent font-bold"
+                : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
+            }`}
+            title="Toggle Shuffle"
+          >
+            [SHUF]
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCycleRepeat()}
+            className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${
+              repeatMode > 0
+                ? "border-music-accent text-music-accent font-bold"
+                : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
+            }`}
+            title="Cycle Repeat Mode"
+          >
+            {repeatLabel}
+          </button>
         </div>
 
-        {/* Row 2: Deck System Controls (Layout, Visualizer Audio Mode, Spotify Link) */}
-        <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-[#141412] text-[10px]">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={handleToggleLayout}
-              aria-label="Toggle player layout between split and stacked"
-              className="px-1.5 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-music-accent hover:border-music-accent cursor-pointer transition-colors"
-              title="Toggle between Split Console and Stacked Stage"
-            >
-              {config.livePlayerLayout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}
-            </button>
-            <button
-              type="button"
-              onClick={toggleSourceMode}
-              className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${
-                sourceMode === "live"
-                  ? "border-music-accent text-music-accent font-bold"
-                  : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8]"
-              }`}
-              title="Toggle audio visualizer source: synthetic oscillator or real live audio"
-            >
-              {sourceMode === "live" ? "[ LIVE AUDIO ]" : "[ SYNTHETIC ]"}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isLinked ? (
-              <button
-                type="button"
-                onClick={() => void handleUnlink()}
-                className="px-1.5 py-0.5 border border-[#22221E] text-[#5A5A55] hover:text-[#EDEDE8] bg-transparent cursor-pointer transition-colors"
-                title="Unlink Spotify"
-              >
-                [UNLINK]
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={isAuthorizing}
-                onClick={() => void handleLinkSpotify()}
-                className="px-1.5 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold transition-colors disabled:opacity-50"
-                title="Link Spotify for Web Playback"
-              >
-                {isAuthorizing ? "[WAITING...]" : "[LINK]"}
-              </button>
-            )}
-          </div>
+        <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0">
+          <span>VOL</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            onChange={(e) => handleVolume(Number(e.target.value))}
+            className="w-[60px] accent-[var(--music-accent)] cursor-pointer h-1 bg-[#1C1C1A]"
+          />
         </div>
       </div>
     </div>
