@@ -87,9 +87,9 @@ export async function getTrackTelemetryStats(params: {
         resolvedTrackId = trackRows[0].id;
         resolvedTrackName = trackRows[0].name ?? cleanTitle;
         trackPlays = Number(trackRows[0].plays) || 0;
-        if (!resolvedArtistGroupKey && trackRows[0].artist_group_key) {
+        if (trackRows[0].artist_group_key) {
           resolvedArtistGroupKey = trackRows[0].artist_group_key;
-          resolvedArtistName = trackRows[0].artist_name || "";
+          resolvedArtistName = trackRows[0].artist_name || resolvedArtistName;
         }
       }
     }
@@ -121,9 +121,9 @@ export async function getTrackTelemetryStats(params: {
         resolvedTrackId = fallbackRows[0].id;
         resolvedTrackName = fallbackRows[0].name ?? cleanTitle;
         trackPlays = Number(fallbackRows[0].plays) || 0;
-        if (!resolvedArtistGroupKey && fallbackRows[0].artist_group_key) {
+        if (fallbackRows[0].artist_group_key) {
           resolvedArtistGroupKey = fallbackRows[0].artist_group_key;
-          resolvedArtistName = fallbackRows[0].artist_name || "";
+          resolvedArtistName = fallbackRows[0].artist_name || resolvedArtistName;
         }
       }
     }
