@@ -88,6 +88,7 @@ export class AsyncLatchCache<T> {
 export const lastSyncCache = new AsyncLatchCache<string | undefined>(15_000);
 export const catalogStatusCache = new AsyncLatchCache<boolean>(60_000);
 export const siteConfigCache = new AsyncLatchCache<SiteConfigState>(60_000);
+export const catalogTotalsCache = new AsyncLatchCache<{ totalTracks: number; totalArtists: number }>(300_000);
 
 /**
  * Purges all database query in-memory caches.
@@ -96,6 +97,7 @@ export function clearDbQueryCaches(): void {
   lastSyncCache.invalidate();
   catalogStatusCache.invalidate();
   siteConfigCache.invalidate();
+  catalogTotalsCache.invalidate();
 }
 
 registerCacheClearListener(clearDbQueryCaches);
