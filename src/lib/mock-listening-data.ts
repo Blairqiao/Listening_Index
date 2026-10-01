@@ -29,6 +29,7 @@ export interface StreamLogItem {
   artist: string;
   album: string;
   duration: string;
+  durationMs?: number;
   albumImageUrl?: string | null;
   swatchColor?: string;
   status?: string;
