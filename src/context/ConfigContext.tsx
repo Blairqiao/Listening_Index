@@ -24,6 +24,9 @@ interface ConfigContextType {
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
+  isAdminLoginModalOpen: boolean;
+  openAdminLoginModal: () => void;
+  closeAdminLoginModal: () => void;
   isAuthenticated: boolean;
   isPasswordConfigured: boolean;
   login: (password: string) => Promise<{ success: boolean; error?: string }>;
@@ -79,6 +82,7 @@ export const ConfigProvider: React.FC<{
 
   const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
 
   // Track configuration as persisted on the server/database
   const [deployedConfig, setDeployedConfig] = useState<SiteConfigState>(() => {
@@ -278,6 +282,8 @@ export const ConfigProvider: React.FC<{
 
   const openModal = useCallback(() => setIsModalOpen(true), []);
   const closeModal = useCallback(() => setIsModalOpen(false), []);
+  const openAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(true), []);
+  const closeAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(false), []);
 
   return (
     <ConfigContext.Provider
@@ -294,6 +300,9 @@ export const ConfigProvider: React.FC<{
         isModalOpen,
         openModal,
         closeModal,
+        isAdminLoginModalOpen,
+        openAdminLoginModal,
+        closeAdminLoginModal,
         isAuthenticated,
         isPasswordConfigured,
         login,
