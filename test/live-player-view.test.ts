@@ -102,3 +102,35 @@ test("MetricRibbon - Mode 3 archive telemetry labels", () => {
   const labels = getRibbonLabels(3);
   assert.deepEqual(labels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 });
+
+test("LivePlayerView - Uniform text transport buttons and dynamic play highlight", () => {
+  const componentPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const source = fs.readFileSync(componentPath, "utf-8");
+
+  // Text labels used for transport buttons
+  assert.match(source, /\[PREV\]/, "Must render [PREV] text button");
+  assert.match(source, /\[PLAY\]/, "Must render [PLAY] text button when paused");
+  assert.match(source, /\[PAUSE\]/, "Must render [PAUSE] text button when playing");
+  assert.match(source, /\[NEXT\]/, "Must render [NEXT] text button");
+  assert.match(source, /\[SHUF\]/, "Must render [SHUF] text button");
+  assert.match(source, /\[REP:\s*OFF\]/, "Must support [REP: OFF] text label");
+  assert.match(source, /\[REP:\s*ALL\]/, "Must support [REP: ALL] text label");
+  assert.match(source, /\[REP:\s*1\]/, "Must support [REP: 1] text label");
+
+  // Uniform padding across transport controls (px-2 py-0.5)
+  assert.doesNotMatch(source, /px-2\.5/, "Should not use non-uniform px-2.5 padding");
+  assert.doesNotMatch(source, /px-1\.5/, "Should not use non-uniform px-1.5 padding");
+
+  // Dynamic play highlight (neutral when paused, accent when playing)
+  assert.match(
+    source,
+    /isPlaying\s*\?\s*["'][^"']*border-music-accent\s+text-music-accent[^"']*["']\s*:\s*["'][^"']*border-\[#22221E\][^"']*text-\[#8A8A82\]/,
+    "Play button must be neutral when paused and highlighted with accent when playing"
+  );
+  assert.doesNotMatch(
+    source,
+    /className="px-2\.5 py-0\.5 border border-music-accent text-music-accent/,
+    "Play button must not be statically hardcoded with permanent accent highlight"
+  );
+});
+
