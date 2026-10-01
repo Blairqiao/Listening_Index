@@ -61,6 +61,23 @@ test("LivePlayerView - presenter component contract & layout architecture", () =
   assert.match(source, /SyntheticSpectrumSource/, "Must support synthetic spectrum source");
   assert.match(source, /LiveAudioSpectrumSource/, "Must support live audio hardware capture");
   assert.match(source, /BAND_COUNT/, "Must use 32-band spectrum layout");
+
+  // 8. Control row placement: Layout, Link/Unlink, and Synthetic/Real audio buttons in control area
+  assert.doesNotMatch(
+    source,
+    /NOW STREAMING[\s\S]*?<button[\s\S]*?<\/div>\s*<div className="text-[^"]*">\s*\{displayTrack\.name\}/,
+    "Layout and unlink buttons must not be placed in top deck title header"
+  );
+  assert.doesNotMatch(
+    source,
+    /<canvas ref=\{canvasRef\}[\s\S]*?<button[\s\S]*?<\/div>\s*\);\s*};/,
+    "Synthetic/real audio toggle button must not be overlaid inside canvas"
+  );
+  assert.match(
+    source,
+    /toggleSourceMode/,
+    "Synthetic/real audio toggle must be wired to toggleSourceMode in controls"
+  );
 });
 
 test("PlayerContext - Web Playback SDK & connection lifecycle contract", () => {

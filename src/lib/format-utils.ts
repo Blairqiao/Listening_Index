@@ -184,10 +184,13 @@ export function formatRankDisplay(
     return "NEW";
   }
   if (format === "rank") {
-    return `#${rank}`;
+    return total > 0
+      ? `${rank.toLocaleString()} / ${total.toLocaleString()}`
+      : `${rank.toLocaleString()}`;
   }
   return formatCatalogPercentile(rank, total);
 }
+
 
 export function formatPlaysDisplay(plays: number): string {
   const countStr = plays.toLocaleString();

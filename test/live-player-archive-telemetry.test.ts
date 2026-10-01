@@ -44,9 +44,9 @@ const zeroStats: TrackTelemetryStats = {
   },
 };
 
-test("Mode 3 output with trackStats present (default rank format: #14, 42 PLAYS, #3, 280 PLAYS)", () => {
+test("Mode 3 output with trackStats present (default rank format: 14 / 1,400, 42 PLAYS, 3 / 600, 280 PLAYS)", () => {
   const metrics = computeLivePlayerMetrics(sampleStats, "rank", "rank");
-  assert.deepEqual(metrics, ["#14", "42 PLAYS", "#3", "280 PLAYS"]);
+  assert.deepEqual(metrics, ["14 / 1,400", "42 PLAYS", "3 / 600", "280 PLAYS"]);
 });
 
 test("Mode 3 output with toggled percentile format (TOP 1%, 42 PLAYS, TOP 0.5%, 280 PLAYS)", () => {
@@ -58,8 +58,9 @@ test("Mode 3 output with toggled percentile format (TOP 1%, 42 PLAYS, TOP 0.5%, 
 
 test("Mode 3 output with mixed rank format (track percentile, artist rank)", () => {
   const metrics = computeLivePlayerMetrics(sampleStats, "percentile", "rank");
-  assert.deepEqual(metrics, ["TOP 1%", "42 PLAYS", "#3", "280 PLAYS"]);
+  assert.deepEqual(metrics, ["TOP 1%", "42 PLAYS", "3 / 600", "280 PLAYS"]);
 });
+
 
 test("Mode 3 output when trackStats is null (unloaded/loading shows -- for plays)", () => {
   const metricsNull = computeLivePlayerMetrics(null, "rank", "rank");
@@ -166,12 +167,13 @@ test("MetricRibbon integration with live player telemetry metrics and format tog
   );
 
   assert.match(html, /TRACK RANK/);
-  assert.match(html, /#14/);
+  assert.match(html, /14 \/ 1,400/);
   assert.match(html, /42 PLAYS/);
-  assert.match(html, /ARTIST TOP %/);
+  assert.match(html, /ARTIST RANK/);
   assert.match(html, /TOP 0.5%/);
   assert.match(html, /280 PLAYS/);
 });
+
 
 test("ListeningView source contract for telemetry state, fetch API, and localStorage persistence", () => {
   const listeningViewSrc = fs.readFileSync(
