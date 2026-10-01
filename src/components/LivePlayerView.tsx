@@ -358,22 +358,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
         </div>
       </div>
 
-      {/* External Device Takeover Banner */}
-      {activeDevice && !activeDevice.isThisBrowser && (
-        <div className="flex items-center justify-between p-2 bg-[#121210] border border-[#22221E] text-[11px]">
-          <span className="text-[#8A8A82] truncate max-w-[200px] sm:max-w-[300px]">
-            ACTIVE: {activeDevice.name.toUpperCase()}
-          </span>
-          <button
-            type="button"
-            onClick={() => void handleTransferPlayback()}
-            className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold"
-          >
-            [ SWITCH TO THIS BROWSER ]
-          </button>
-        </div>
-      )}
-
       {/* Connection & Device State Banner */}
       <div className="text-[10px] tracking-[0.12em] py-1 border-y border-[#161614] flex items-center justify-between min-h-[30px]">
         {playerStatus === "checking" && (

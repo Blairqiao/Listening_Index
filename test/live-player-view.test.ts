@@ -54,8 +54,8 @@ test("LivePlayerView - presenter component contract & layout architecture", () =
   assert.match(source, /handleVolume/, "Must support volume control");
   assert.match(source, /handleSeek/, "Must support scrubber seek control");
 
-  // 6. External device takeover banner
-  assert.match(source, /SWITCH TO THIS BROWSER/, "Must support one-click takeover when active on remote device");
+  // 6. External device takeover
+  assert.match(source, /TRANSFER HERE/, "Must support transfer playback when active on remote device");
 
   // 7. Spectrum visualizer integration
   assert.match(source, /SyntheticSpectrumSource/, "Must support synthetic spectrum source");
