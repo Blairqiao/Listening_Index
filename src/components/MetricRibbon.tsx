@@ -8,11 +8,17 @@ interface MetricRibbonProps {
   metrics: [string, string, string, string];
   overviewTimeUnit?: "minutes" | "hours";
   onToggleTimeUnit?: () => void;
+  trackRankFormat?: "rank" | "percentile";
+  artistRankFormat?: "rank" | "percentile";
+  onToggleTrackRank?: () => void;
+  onToggleArtistRank?: () => void;
 }
 
 export const getRibbonLabels = (
   mode: Mode,
-  overviewTimeUnit: "minutes" | "hours" = "minutes"
+  overviewTimeUnit: "minutes" | "hours" = "minutes",
+  trackRankFormat: "rank" | "percentile" = "rank",
+  artistRankFormat: "rank" | "percentile" = "rank"
 ): [string, string, string, string] => {
   switch (mode) {
     case 0:
@@ -27,7 +33,12 @@ export const getRibbonLabels = (
     case 2:
       return ["SESSION RUNTIME", "TOTAL TRACKS", "UNIQUE ARTISTS", "START TIME"];
     case 3:
-      return ["ACTIVE DEVICE", "PREVIOUS", "UP NEXT", "CONTEXT"];
+      return [
+        trackRankFormat === "percentile" ? "TRACK TOP %" : "TRACK RANK",
+        "TRACK PLAYS",
+        artistRankFormat === "percentile" ? "ARTIST TOP %" : "ARTIST RANK",
+        "ARTIST PLAYS",
+      ];
   }
 };
 
@@ -36,8 +47,17 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   metrics,
   overviewTimeUnit = "minutes",
   onToggleTimeUnit,
+  trackRankFormat = "rank",
+  artistRankFormat = "rank",
+  onToggleTrackRank,
+  onToggleArtistRank,
 }) => {
-  const labels = getRibbonLabels(mode, overviewTimeUnit);
+  const labels = getRibbonLabels(
+    mode,
+    overviewTimeUnit,
+    trackRankFormat,
+    artistRankFormat
+  );
 
   return (
     <section
@@ -45,30 +65,46 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
       className="grid grid-cols-2 sm:grid-cols-4 gap-[1px] bg-[#1C1C1A] border-t border-b border-[#1C1C1A] my-1 sm:my-1.5 md:my-2"
     >
       {labels.map((label, i) => {
-        const isToggleable = mode === 0 && i === 0 && Boolean(onToggleTimeUnit);
+        let isToggleable = false;
+        let onToggle: (() => void) | undefined;
+        let ariaLabel: string | undefined;
+        let title: string | undefined;
+
+        if (mode === 0 && i === 0 && onToggleTimeUnit) {
+          isToggleable = true;
+          onToggle = onToggleTimeUnit;
+          ariaLabel = "Toggle time unit between minutes and hours";
+          title = "Click to toggle between minutes and hours";
+        } else if (mode === 3 && i === 0 && onToggleTrackRank) {
+          isToggleable = true;
+          onToggle = onToggleTrackRank;
+          ariaLabel = "Toggle track rank format between rank position and percentile";
+          title = "Click to toggle between rank and percentile";
+        } else if (mode === 3 && i === 2 && onToggleArtistRank) {
+          isToggleable = true;
+          onToggle = onToggleArtistRank;
+          ariaLabel = "Toggle artist rank format between rank position and percentile";
+          title = "Click to toggle between rank and percentile";
+        }
 
         return (
           <div
             key={i}
             role={isToggleable ? "button" : undefined}
             tabIndex={isToggleable ? 0 : undefined}
-            aria-label={
-              isToggleable
-                ? "Toggle time unit between minutes and hours"
-                : undefined
-            }
-            onClick={isToggleable ? onToggleTimeUnit : undefined}
+            aria-label={ariaLabel}
+            onClick={isToggleable ? onToggle : undefined}
             onKeyDown={
               isToggleable
                 ? (e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      onToggleTimeUnit?.();
+                      onToggle?.();
                     }
                   }
                 : undefined
             }
-            title={isToggleable ? "Click to toggle between minutes and hours" : undefined}
+            title={title}
             className={`bg-[#080808] px-3.5 sm:px-4 py-2.5 md:py-3 flex flex-col justify-between select-none ${
               isToggleable
                 ? "cursor-pointer hover:bg-[#121210] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#333330]"

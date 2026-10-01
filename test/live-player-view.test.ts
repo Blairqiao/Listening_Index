@@ -81,7 +81,7 @@ test("PlayerContext - Web Playback SDK & connection lifecycle contract", () => {
   assert.match(source, /setStoredVolume/, "PlayerContext must persist volume using setStoredVolume");
 });
 
-test("MetricRibbon - Mode 3 telemetry labels", () => {
+test("MetricRibbon - Mode 3 archive telemetry labels", () => {
   const labels = getRibbonLabels(3);
-  assert.deepEqual(labels, ["ACTIVE DEVICE", "PREVIOUS", "UP NEXT", "CONTEXT"]);
+  assert.deepEqual(labels, ["TRACK RANK", "TRACK PLAYS", "ARTIST RANK", "ARTIST PLAYS"]);
 });
