@@ -42,11 +42,49 @@ export function getTrackStatsCacheKey(params: {
   return `${params.trackId || ""}:${params.title || ""}:${params.artist || ""}`;
 }
 
+export interface ActiveEntityCandidate {
+  id?: string;
+  title?: string;
+  artist?: string;
+}
+
+export function resolveActiveEntity(
+  currentTrack?: { id?: string | null; name?: string; artists?: Array<{ name: string }> } | null,
+  streamLogLatest?: { trackId?: string | null; title?: string | null; artist?: string | null } | null,
+  initialTrack?: { id?: string | null; name?: string | null; artist?: string | null } | null
+): ActiveEntityCandidate | null {
+  if (currentTrack) {
+    return {
+      id: currentTrack.id || undefined,
+      title: currentTrack.name || undefined,
+      artist:
+        currentTrack.artists?.map((a) => a.name).join(", ") ||
+        currentTrack.artists?.[0]?.name ||
+        undefined,
+    };
+  }
+  if (streamLogLatest) {
+    return {
+      id: streamLogLatest.trackId || undefined,
+      title: streamLogLatest.title || undefined,
+      artist: streamLogLatest.artist || undefined,
+    };
+  }
+  if (initialTrack) {
+    return {
+      id: initialTrack.id || undefined,
+      title: initialTrack.name || undefined,
+      artist: initialTrack.artist || undefined,
+    };
+  }
+  return null;
+}
+
 export function computeLivePlayerMetrics(
   trackStats: TrackTelemetryStats | null,
   trackRankFormat: "rank" | "percentile" = "rank",
   artistRankFormat: "rank" | "percentile" = "rank",
-  fallbackPlays = "0 PLAYS"
+  fallbackPlays = "--"
 ): [string, string, string, string] {
   return [
     formatRankDisplay(
@@ -247,15 +285,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
   const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
 
-  // Active track identification: currentTrack from PlayerContext -> latestPlay -> initialTrack
-  const activeTrackId = currentTrack?.id || streamLogState?.entries?.[0]?.trackId || initialTrack?.id || undefined;
-  const activeTrackTitle = currentTrack?.name || streamLogState?.entries?.[0]?.title || initialTrack?.name || undefined;
-  const activeTrackArtist =
-    currentTrack?.artists?.map((a) => a.name).join(", ") ||
-    currentTrack?.artists?.[0]?.name ||
-    streamLogState?.entries?.[0]?.artist ||
-    initialTrack?.artist ||
-    undefined;
+  // Active track identification resolved atomically across currentTrack -> streamLog -> initialTrack
+  const activeEntity = resolveActiveEntity(
+    currentTrack,
+    streamLogState?.entries?.[0],
+    initialTrack
+  );
+  const activeTrackId = activeEntity?.id;
+  const activeTrackTitle = activeEntity?.title;
+  const activeTrackArtist = activeEntity?.artist;
 
   useEffect(() => {
     if (!activeTrackId && !activeTrackTitle && !activeTrackArtist) {
@@ -274,6 +312,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       setTrackStats(cached);
       return;
     }
+
+    // Reset track stats on cache miss when initiating a new fetch so stale stats from the previous song don't linger while loading
+    setTrackStats(null);
 
     let isSubscribed = true;
     const params = new URLSearchParams();
