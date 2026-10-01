@@ -18,6 +18,15 @@ interface SpotifyPlaybackTrack {
   };
 }
 
+interface SpotifyPlaybackContext {
+  uri: string | null;
+  metadata?: {
+    name?: string;
+    context_description?: string;
+    [key: string]: any;
+  } | null;
+}
+
 interface SpotifyPlaybackState {
   paused: boolean;
   position: number;
@@ -29,6 +38,7 @@ interface SpotifyPlaybackState {
     next_tracks: SpotifyPlaybackTrack[];
     previous_tracks: SpotifyPlaybackTrack[];
   };
+  context?: SpotifyPlaybackContext;
 }
 
 interface SpotifyPlayerError {
