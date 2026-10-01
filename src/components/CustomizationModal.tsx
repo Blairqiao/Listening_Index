@@ -10,11 +10,6 @@ import {
   ExternalLink,
   Search,
   ChevronDown,
-  ShieldCheck,
-  ShieldAlert,
-  Eye,
-  EyeOff,
-  Lock,
 } from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
@@ -69,9 +64,6 @@ export const CustomizationModal: React.FC = () => {
     isModalOpen,
     closeModal,
     isAuthenticated,
-    isPasswordConfigured,
-    login,
-    logout,
   } = useConfig();
 
   // Local draft state while modal is open
@@ -81,12 +73,6 @@ export const CustomizationModal: React.FC = () => {
   const [currentTimeStr, setCurrentTimeStr] = useState<string>("");
   const [isTzOpen, setIsTzOpen] = useState<boolean>(false);
   const tzContainerRef = useRef<HTMLDivElement>(null);
-
-  // In-modal admin authentication state
-  const [adminPassword, setAdminPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [isUnlocking, setIsUnlocking] = useState<boolean>(false);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   // Animation transition state for smooth open and close
   const [shouldRender, setShouldRender] = useState<boolean>(isModalOpen);
@@ -103,9 +89,6 @@ export const CustomizationModal: React.FC = () => {
       timer = setTimeout(() => {
         setShouldRender(false);
         setDraft(config);
-        setAdminPassword("");
-        setShowPassword(false);
-        setAuthError(null);
       }, 200);
     }
 
@@ -122,9 +105,6 @@ export const CustomizationModal: React.FC = () => {
       setCopiedCode(false);
       setTzSearch("");
       setIsTzOpen(false);
-      setAdminPassword("");
-      setShowPassword(false);
-      setAuthError(null);
     }
     prevIsOpenRef.current = isModalOpen;
   }, [isModalOpen, config]);
@@ -242,32 +222,16 @@ export const CustomizationModal: React.FC = () => {
     }
   }, [canSave]);
 
-  // Admin password unlock handler
-  const handleUnlock = async () => {
-    if (!adminPassword.trim() || isUnlocking) return;
-    setIsUnlocking(true);
-    setAuthError(null);
-    try {
-      const res = await login(adminPassword);
-      if (res.success) {
-        setAdminPassword("");
-        setAuthError(null);
-      } else {
-        setAuthError(res.error || "Authentication failed");
-      }
-    } catch (e: unknown) {
-      setAuthError(e instanceof Error ? e.message : "Authentication error");
-    } finally {
-      setIsUnlocking(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-  };
-
   // Save and apply changes to site (persists to Neon DB if authenticated, or local fallback)
   const handleSave = async () => {
+    // For unauthenticated visitors: save accent color locally to DOM & localStorage and close modal
+    if (!isAuthenticated) {
+      applyAccentColorToDom(draft.accentColor);
+      updateConfig({ accentColor: draft.accentColor });
+      closeModal();
+      return;
+    }
+
     if (!canSave && !isSaving) return;
 
     setSaveError(null);
@@ -284,12 +248,7 @@ export const CustomizationModal: React.FC = () => {
       updateConfig(draft);
     }
 
-    // 3. If not authenticated, do not send request to /api/config (local cache only)
-    if (!isAuthenticated) {
-      return;
-    }
-
-    // 4. Persist to Neon DB in the background
+    // 3. Persist to Neon DB in the background
     setIsSaving(true);
     try {
       const res = await fetch("/api/config", {
@@ -311,7 +270,15 @@ export const CustomizationModal: React.FC = () => {
     }
   };
 
-  // Reset draft form to factory defaults (does not apply to site until Save & Apply is clicked)
+  // Reset accent color to factory default (#1DB954) for visitor
+  const handleResetColor = () => {
+    const defaultColor = DEFAULT_SITE_CONFIG.accentColor;
+    setDraft((prev) => ({ ...prev, accentColor: defaultColor }));
+    applyAccentColorToDom(defaultColor);
+    updateConfig({ accentColor: defaultColor });
+  };
+
+  // Reset draft form to factory defaults for admin (does not apply to site until Save is clicked)
   const handleReset = () => {
     setDraft({ ...DEFAULT_SITE_CONFIG });
     setSaveError(null);
@@ -357,21 +324,10 @@ export const CustomizationModal: React.FC = () => {
               id="customization-modal-title"
               className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
             >
-              [ ACTIVE CONFIGURATION ]
+              {isAuthenticated ? "[ ACTIVE CONFIGURATION ]" : "[ APPEARANCE ]"}
             </h2>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={handleLogout}
-                title="Log out (lock database access)"
-                className="font-mono text-[10px] tracking-[0.08em] text-[#8A8A82] hover:text-music-accent px-2 py-1 border border-[#26261F] hover:border-music-accent/40 bg-transparent transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none inline-flex items-center gap-1.5"
-              >
-                <Lock className="w-3 h-3" />
-                LOCK
-              </button>
-            )}
             <button
               type="button"
               onClick={handleCancel}
@@ -386,42 +342,43 @@ export const CustomizationModal: React.FC = () => {
         {/* Modal Scrollable Body */}
         <div className="overflow-y-auto p-5 sm:p-6 space-y-6 scrollbar-hidden">
           {/* Section 1: Identity */}
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-              <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                [ 01 · IDENTITY ]
-              </span>
-
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="space-y-1">
-                <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                  SITE TITLE
-                </label>
-                <input
-                  type="text"
-                  value={draft.title}
-                  onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                  placeholder="Listening Index"
-                  className="w-full bg-[#141413] border border-[#26261F] text-[#EDEDE8] font-sans text-[13px] px-3 py-1.5 focus:border-music-accent focus:outline-none"
-                />
+          {isAuthenticated && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
+                <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
+                  [ 01 · IDENTITY ]
+                </span>
               </div>
 
-              <div className="space-y-1">
-                <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                  DISPLAY NAME (HEADER)
-                </label>
-                <input
-                  type="text"
-                  value={draft.ownerName}
-                  onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })}
-                  placeholder="YOUR NAME"
-                  className="w-full bg-[#141413] border border-[#26261F] text-[#EDEDE8] font-sans text-[13px] px-3 py-1.5 focus:border-music-accent focus:outline-none"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-1">
+                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                    SITE TITLE
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.title}
+                    onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                    placeholder="Listening Index"
+                    className="w-full bg-[#141413] border border-[#26261F] text-[#EDEDE8] font-sans text-[13px] px-3 py-1.5 focus:border-music-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                    DISPLAY NAME (HEADER)
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.ownerName}
+                    onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })}
+                    placeholder="YOUR NAME"
+                    className="w-full bg-[#141413] border border-[#26261F] text-[#EDEDE8] font-sans text-[13px] px-3 py-1.5 focus:border-music-accent focus:outline-none"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Section 2: Accent Color (Photo-App Color Picker) */}
           <div className="space-y-3">
@@ -435,305 +392,280 @@ export const CustomizationModal: React.FC = () => {
           </div>
 
           {/* Section 3: Timezone */}
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-              <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                [ 03 · TIMEZONE ]
-              </span>
-              {currentTimeStr && (
-                <span className="font-mono text-[10px] tracking-[0.08em] text-[#A0A09A] flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-music-accent" />
-                  <span>{currentTimeStr}</span>
+          {isAuthenticated && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
+                <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
+                  [ 03 · TIMEZONE ]
                 </span>
-              )}
-            </div>
-
-            <div ref={tzContainerRef} className="relative space-y-2">
-              <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
-                <Search className="w-3.5 h-3.5 text-[#6A6A64] ml-3 flex-shrink-0" />
-                <input
-                  type="text"
-                  value={tzSearch}
-                  onChange={(e) => {
-                    setTzSearch(e.target.value);
-                    setIsTzOpen(true);
-                  }}
-                  onFocus={() => setIsTzOpen(true)}
-                  placeholder="Search timezones (e.g. Chicago, London, Tokyo, UTC)..."
-                  className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-2.5 py-2 focus:outline-none"
-                />
-                {tzSearch ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTzSearch("");
-                      setIsTzOpen(true);
-                    }}
-                    className="px-3 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer"
-                    title="Clear search"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsTzOpen((prev) => !prev)}
-                    className="px-3 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer"
-                    title={isTzOpen ? "Close list" : "Browse all timezones"}
-                  >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isTzOpen ? "rotate-180" : ""}`} />
-                  </button>
+                {currentTimeStr && (
+                  <span className="font-mono text-[10px] tracking-[0.08em] text-[#A0A09A] flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-music-accent" />
+                    <span>{currentTimeStr}</span>
+                  </span>
                 )}
               </div>
 
-              {/* Collapsed dropdown menu - opens when search bar is focused or clicked */}
-              {isTzOpen && (
-                <div className="absolute z-30 left-0 right-0 top-[38px] max-h-52 overflow-y-auto bg-[#141413] border border-[#26261F] shadow-2xl divide-y divide-[#1C1C1A] scrollbar-hidden">
-                  {filteredTimezones.length === 0 ? (
-                    <div className="p-3 font-mono text-[11px] text-[#6A6A64] text-center">
-                      NO MATCHING TIMEZONES FOUND
-                    </div>
+              <div ref={tzContainerRef} className="relative space-y-2">
+                <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
+                  <Search className="w-3.5 h-3.5 text-[#6A6A64] ml-3 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={tzSearch}
+                    onChange={(e) => {
+                      setTzSearch(e.target.value);
+                      setIsTzOpen(true);
+                    }}
+                    onFocus={() => setIsTzOpen(true)}
+                    placeholder="Search timezones (e.g. Chicago, London, Tokyo, UTC)..."
+                    className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-2.5 py-2 focus:outline-none"
+                  />
+                  {tzSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTzSearch("");
+                        setIsTzOpen(true);
+                      }}
+                      className="px-3 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   ) : (
-                    filteredTimezones.map((tz) => {
-                      const isActive = draft.timezone === tz;
-                      return (
-                        <button
-                          key={tz}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setDraft((prev) => ({ ...prev, timezone: tz }));
-                            setIsTzOpen(false);
-                            setTzSearch("");
-                          }}
-                          className={`w-full text-left font-mono text-[12px] px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
-                            isActive
-                              ? "bg-[#1C1C19] text-music-accent font-medium"
-                              : "text-[#EDEDE8] hover:bg-[#1A1A18] hover:text-white"
-                          }`}
-                        >
-                          <span>{tz}</span>
-                          {isActive && (
-                            <span className="text-[10px] text-music-accent tracking-widest">[ACTIVE]</span>
-                          )}
-                        </button>
-                      );
-                    })
+                    <button
+                      type="button"
+                      onClick={() => setIsTzOpen((prev) => !prev)}
+                      className="px-3 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer"
+                      title={isTzOpen ? "Close list" : "Browse all timezones"}
+                    >
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isTzOpen ? "rotate-180" : ""}`} />
+                    </button>
                   )}
                 </div>
-              )}
 
-              {/* Active Timezone Indicator */}
-              <div className="flex items-center justify-between pt-0.5 font-mono text-[10px] tracking-[0.08em]">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#6A6A64]">ACTIVE:</span>
-                  <span className="text-music-accent font-medium">{draft.timezone}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsTzOpen((prev) => !prev)}
-                  className="text-[#6A6A64] hover:text-[#EDEDE8] underline text-[9px] cursor-pointer"
-                >
-                  {isTzOpen ? "COLLAPSE LIST" : "BROWSE ALL"}
-                </button>
-              </div>
-            </div>
-          </div>
+                {/* Collapsed dropdown menu - opens when search bar is focused or clicked */}
+                {isTzOpen && (
+                  <div className="absolute z-30 left-0 right-0 top-[38px] max-h-52 overflow-y-auto bg-[#141413] border border-[#26261F] shadow-2xl divide-y divide-[#1C1C1A] scrollbar-hidden">
+                    {filteredTimezones.length === 0 ? (
+                      <div className="p-3 font-mono text-[11px] text-[#6A6A64] text-center">
+                        NO MATCHING TIMEZONES FOUND
+                      </div>
+                    ) : (
+                      filteredTimezones.map((tz) => {
+                        const isActive = draft.timezone === tz;
+                        return (
+                          <button
+                            key={tz}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setDraft((prev) => ({ ...prev, timezone: tz }));
+                              setIsTzOpen(false);
+                              setTzSearch("");
+                            }}
+                            className={`w-full text-left font-mono text-[12px] px-3 py-2 flex items-center justify-between transition-colors cursor-pointer ${
+                              isActive
+                                ? "bg-[#1C1C19] text-music-accent font-medium"
+                                : "text-[#EDEDE8] hover:bg-[#1A1A18] hover:text-white"
+                            }`}
+                          >
+                            <span>{tz}</span>
+                            {isActive && (
+                              <span className="text-[10px] text-music-accent tracking-widest">[ACTIVE]</span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
 
-          {/* Section 4: External Links */}
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-              <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                [ 04 · LINKS ]
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="space-y-1">
-                <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                  SPOTIFY OR PROFILE URL
-                </label>
-                <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
-                  <input
-                    type="text"
-                    value={draft.siteUrl}
-                    onChange={(e) => setDraft({ ...draft, siteUrl: e.target.value })}
-                    placeholder="https://open.spotify.com/..."
-                    className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
-                  />
-                  <a
-                    href={draft.siteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#6A6A64] hover:text-music-accent ml-2"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-
-              <div className="space-y-1 mb-[-10]">
-                <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                  GITHUB REPOSITORY URL
-                </label>
-                <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
-                  <input
-                    type="text"
-                    value={draft.githubUrl}
-                    onChange={(e) => setDraft({ ...draft, githubUrl: e.target.value })}
-                    placeholder="https://github.com/..."
-                    className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
-                  />
-                  <a
-                    href={draft.githubUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#6A6A64] hover:text-music-accent ml-2"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* In-Modal Minimal Password Strip (when locked) */}
-          {!isAuthenticated && (
-            <div className="pt-3 border-t border-[#1F1F1C] space-y-2">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleUnlock();
-                }}
-                className="flex items-center gap-2"
-              >
-                <div className="relative flex-1 flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={adminPassword}
-                    onChange={(e) => {
-                      setAdminPassword(e.target.value);
-                      if (authError) setAuthError(null);
-                    }}
-                    placeholder="Admin password to deploy globally to database..."
-                    className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-3 py-1.5 focus:outline-none placeholder:text-[#52524C]"
-                    autoComplete="current-password"
-                  />
+                {/* Active Timezone Indicator */}
+                <div className="flex items-center justify-between pt-0.5 font-mono text-[10px] tracking-[0.08em]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#6A6A64]">ACTIVE:</span>
+                    <span className="text-music-accent font-medium">{draft.timezone}</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
-                    title={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setIsTzOpen((prev) => !prev)}
+                    className="text-[#6A6A64] hover:text-[#EDEDE8] underline text-[9px] cursor-pointer"
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-3.5 h-3.5" />
-                    ) : (
-                      <Eye className="w-3.5 h-3.5" />
-                    )}
+                    {isTzOpen ? "COLLAPSE LIST" : "BROWSE ALL"}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
 
-                <button
-                  type="submit"
-                  disabled={isUnlocking || !adminPassword.trim()}
-                  className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent text-[#EDEDE8] hover:text-music-accent bg-[#171715] hover:bg-music-accent/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap cursor-pointer select-none"
-                >
-                  {isUnlocking ? "UNLOCKING..." : "UNLOCK"}
-                </button>
-              </form>
+          {/* Section 4: External Links */}
+          {isAuthenticated && (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
+                <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
+                  [ 04 · LINKS ]
+                </span>
+              </div>
 
-              {authError && (
-                <div className="font-mono text-[10px] tracking-[0.06em] text-red-400">
-                  [ {authError.toUpperCase()} ]
+              <div className="space-y-2.5">
+                <div className="space-y-1">
+                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                    SPOTIFY OR PROFILE URL
+                  </label>
+                  <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
+                    <input
+                      type="text"
+                      value={draft.siteUrl}
+                      onChange={(e) => setDraft({ ...draft, siteUrl: e.target.value })}
+                      placeholder="https://open.spotify.com/..."
+                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
+                    />
+                    <a
+                      href={draft.siteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#6A6A64] hover:text-music-accent ml-2"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
-              )}
+
+                <div className="space-y-1 mb-[-10]">
+                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                    GITHUB REPOSITORY URL
+                  </label>
+                  <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
+                    <input
+                      type="text"
+                      value={draft.githubUrl}
+                      onChange={(e) => setDraft({ ...draft, githubUrl: e.target.value })}
+                      placeholder="https://github.com/..."
+                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
+                    />
+                    <a
+                      href={draft.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#6A6A64] hover:text-music-accent ml-2"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
 
         {/* Modal Footer Controls */}
         <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-t border-[#26261F] bg-[#121211] select-none overflow-x-auto scrollbar-hidden">
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleReset}
-              title="Revert all settings to defaults from src/config.ts"
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span className="sm:hidden">RESET</span>
-              <span className="hidden sm:inline">RESET DEFAULTS</span>
-            </button>
+          {!isAuthenticated ? (
+            <>
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleResetColor}
+                  title="Reset color to factory default (#1DB954)"
+                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>[ RESET COLOR ]</span>
+                </button>
+              </div>
 
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              title="Copy code snippet to paste into src/config.ts"
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
-            >
-              {copiedCode ? (
-                <>
-                  <Check className="w-3 h-3 text-music-accent" />
-                  <span className="text-music-accent">COPIED!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3" />
-                  <span className="sm:hidden">COPY</span>
-                  <span className="hidden sm:inline">COPY CONFIG.TS</span>
-                </>
-              )}
-            </button>
-          </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
+                >
+                  <span>[ SAVE LOCALLY ]</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  title="Revert all settings to defaults from src/config.ts"
+                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="sm:hidden">RESET</span>
+                  <span className="hidden sm:inline">RESET DEFAULTS</span>
+                </button>
 
-          <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || !canSave}
-              className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
-                isSaving
-                  ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
-                  : saveError
-                  ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
-                  : canSave
-                  ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
-                  : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
-              }`}
-            >
-              {isSaving ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-music-accent animate-pulse" />
-                  <span>DEPLOYING...</span>
-                </>
-              ) : saveError ? (
-                <span>SAVE FAILED · RETRY</span>
-              ) : canSave ? (
-                <span>
-                  {isAuthenticated
-                    ? hasLocalEdits
-                      ? isDbConfigured
-                        ? "SAVE & DEPLOY TO DATABASE"
-                        : "SAVE & APPLY TO CONFIG.TS"
-                      : isDbConfigured
-                      ? "DEPLOY TO DATABASE"
-                      : "SAVE TO CONFIG.TS"
-                    : "SAVE LOCALLY"}
-                </span>
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5 text-music-accent" />
-                  <span>
-                    {isAuthenticated
-                      ? isDbConfigured
-                        ? "DEPLOYED TO DATABASE"
-                        : "SAVED TO CONFIG.TS"
-                      : "SAVED LOCALLY"}
-                  </span>
-                </>
-              )}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  title="Copy code snippet to paste into src/config.ts"
+                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="w-3 h-3 text-music-accent" />
+                      <span className="text-music-accent">COPIED!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span className="sm:hidden">COPY</span>
+                      <span className="hidden sm:inline">COPY CONFIG.TS</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={isSaving || !canSave}
+                  className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+                    isSaving
+                      ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
+                      : saveError
+                      ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
+                      : canSave
+                      ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
+                      : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
+                  }`}
+                >
+                  {isSaving ? (
+                    <>
+                      <span className="w-1.5 h-1.5 rounded-full bg-music-accent animate-pulse" />
+                      <span>DEPLOYING...</span>
+                    </>
+                  ) : saveError ? (
+                    <span>SAVE FAILED · RETRY</span>
+                  ) : canSave ? (
+                    <span>
+                      {hasLocalEdits
+                        ? isDbConfigured
+                          ? "SAVE & DEPLOY TO DATABASE"
+                          : "SAVE & APPLY TO CONFIG.TS"
+                        : isDbConfigured
+                        ? "DEPLOY TO DATABASE"
+                        : "SAVE TO CONFIG.TS"}
+                    </span>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-music-accent" />
+                      <span>
+                        {isDbConfigured
+                          ? "DEPLOYED TO DATABASE"
+                          : "SAVED TO CONFIG.TS"}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
