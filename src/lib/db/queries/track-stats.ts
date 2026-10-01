@@ -46,6 +46,24 @@ export async function getTrackTelemetryStats(params: {
     },
   };
 
+  if (process.env.FORCE_MOCK_DATA === "true") {
+    return {
+      track: {
+        id: cleanTrackId,
+        name: cleanTitle || "Weird Fishes / Arpeggi",
+        plays: 42,
+        rank: 14,
+        totalTracks: 1400,
+      },
+      artist: {
+        name: cleanArtist || "Radiohead",
+        plays: 280,
+        rank: 3,
+        totalArtists: 600,
+      },
+    };
+  }
+
   if (!isDbConfigured()) {
     return defaultEmptyStats;
   }

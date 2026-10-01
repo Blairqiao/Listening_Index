@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     const prevDayGroup = searchParams.get("prevDayGroup") || undefined;
     const prevPlayedAt = searchParams.get("prevPlayedAt") || undefined;
 
-    // Zero-config preview fallback when DATABASE_URL is not configured or set to "todo"
-    if (!isDbConfigured()) {
+    // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
+    if (!isDbConfigured() || process.env.FORCE_MOCK_DATA === "true") {
       const mockData = getMockStreamLog(limit, cursor, cursorId, prevDayGroup, prevPlayedAt);
       return NextResponse.json(mockData, {
         status: 200,
