@@ -8,6 +8,7 @@ import { MetricRibbon } from "../src/components/MetricRibbon";
 import {
   computeLivePlayerMetrics,
   getTrackStatsCacheKey,
+  resolveActiveEntity,
 } from "../src/components/ListeningView";
 import type { TrackTelemetryStats } from "../src/lib/db/queries";
 
@@ -60,15 +61,73 @@ test("Mode 3 output with mixed rank format (track percentile, artist rank)", () 
   assert.deepEqual(metrics, ["TOP 1%", "42 PLAYS", "#3", "280 PLAYS"]);
 });
 
-test("Mode 3 output when trackStats is null or 0 plays (NEW, 0 PLAYS, NEW, 0 PLAYS)", () => {
+test("Mode 3 output when trackStats is null (unloaded/loading shows -- for plays)", () => {
   const metricsNull = computeLivePlayerMetrics(null, "rank", "rank");
-  assert.deepEqual(metricsNull, ["NEW", "0 PLAYS", "NEW", "0 PLAYS"]);
+  assert.deepEqual(metricsNull, ["NEW", "--", "NEW", "--"]);
 
+  const metricsNullPercentile = computeLivePlayerMetrics(null, "percentile", "percentile");
+  assert.deepEqual(metricsNullPercentile, ["NEW", "--", "NEW", "--"]);
+});
+
+test("Mode 3 output when trackStats is loaded with 0 plays (NEW, 0 PLAYS, NEW, 0 PLAYS)", () => {
   const metricsZero = computeLivePlayerMetrics(zeroStats, "rank", "rank");
   assert.deepEqual(metricsZero, ["NEW", "0 PLAYS", "NEW", "0 PLAYS"]);
 
-  const metricsNullPercentile = computeLivePlayerMetrics(null, "percentile", "percentile");
-  assert.deepEqual(metricsNullPercentile, ["NEW", "0 PLAYS", "NEW", "0 PLAYS"]);
+  const metricsZeroPercentile = computeLivePlayerMetrics(zeroStats, "percentile", "percentile");
+  assert.deepEqual(metricsZeroPercentile, ["NEW", "0 PLAYS", "NEW", "0 PLAYS"]);
+});
+
+test("resolveActiveEntity - candidate resolution without cross-source entity pollution", () => {
+  // 1. When currentTrack has no ID, it must NOT steal trackId from the previous stream log entry
+  const entityNoId = resolveActiveEntity(
+    { id: null, name: "Live Song", artists: [{ name: "Live Band" }] },
+    { trackId: "stale-track-id", title: "Previous Song", artist: "Previous Band" },
+    null
+  );
+  assert.deepEqual(entityNoId, {
+    id: undefined,
+    title: "Live Song",
+    artist: "Live Band",
+  });
+
+  // 2. Current track with multiple artists preserves compound artist string
+  const entityCompound = resolveActiveEntity(
+    { id: "trk-1", name: "Song", artists: [{ name: "Artist A" }, { name: "Artist B" }] },
+    undefined,
+    undefined
+  );
+  assert.deepEqual(entityCompound, {
+    id: "trk-1",
+    title: "Song",
+    artist: "Artist A, Artist B",
+  });
+
+  // 3. Fallback to stream log when currentTrack is null
+  const entityStreamLog = resolveActiveEntity(
+    null,
+    { trackId: "log-1", title: "Archive Track", artist: "Archive Artist" },
+    { id: "init-1", name: "Initial Track", artist: "Initial Artist" }
+  );
+  assert.deepEqual(entityStreamLog, {
+    id: "log-1",
+    title: "Archive Track",
+    artist: "Archive Artist",
+  });
+
+  // 4. Fallback to initialTrack when both currentTrack and streamLog are absent
+  const entityInitial = resolveActiveEntity(
+    null,
+    undefined,
+    { id: "init-1", name: "Initial Track", artist: "Initial Artist" }
+  );
+  assert.deepEqual(entityInitial, {
+    id: "init-1",
+    title: "Initial Track",
+    artist: "Initial Artist",
+  });
+
+  // 5. Returns null when all sources are absent
+  assert.equal(resolveActiveEntity(null, undefined, null), null);
 });
 
 test("In-memory track stats cache key and map caching logic", () => {
@@ -154,5 +213,15 @@ test("ListeningView source contract for telemetry state, fetch API, and localSto
     listeningViewSrc,
     /onToggleArtistRank/,
     "Must pass onToggleArtistRank to MetricRibbon"
+  );
+  assert.match(
+    listeningViewSrc,
+    /resolveActiveEntity/,
+    "Must resolve active entity candidate atomically via resolveActiveEntity"
+  );
+  assert.match(
+    listeningViewSrc,
+    /setTrackStats\(null\)/,
+    "Must reset trackStats on cache miss when fetching"
   );
 });
