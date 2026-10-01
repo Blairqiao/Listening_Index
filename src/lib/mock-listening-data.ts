@@ -956,6 +956,7 @@ export const MOCK_DATA: MockListeningData = {
         album: CATALOG.radiohead_weird_fishes.album,
         albumId: CATALOG.radiohead_weird_fishes.albumId,
         duration: CATALOG.radiohead_weird_fishes.duration,
+        durationMs: 318000,
         albumImageUrl: CATALOG.radiohead_weird_fishes.albumImageUrl,
         dayGroup: "09 SEP",
       },
