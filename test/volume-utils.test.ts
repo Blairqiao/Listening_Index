@@ -24,3 +24,15 @@ test("volume clamping handles out-of-range inputs", () => {
   assert.strictEqual(sliderToVolume(-0.5), 0);
   assert.strictEqual(sliderToVolume(1.5), 1);
 });
+
+test("getStoredVolume returns default when window/localStorage is undefined", () => {
+  assert.strictEqual(getStoredVolume(), 0.35);
+  assert.strictEqual(getStoredVolume(0.5), 0.5);
+});
+
+test("setStoredVolume does not throw in SSR environment", () => {
+  assert.doesNotThrow(() => {
+    setStoredVolume(0.8);
+    setStoredVolume(NaN);
+  });
+});
