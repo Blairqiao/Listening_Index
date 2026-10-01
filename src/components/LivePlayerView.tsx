@@ -384,7 +384,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                 <button
                   type="button"
                   onClick={() => void handleTransferPlayback()}
-                  className="px-1.5 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer"
+                  className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer"
                 >
                   [ TRANSFER HERE ]
                 </button>
@@ -401,7 +401,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             <button
               type="button"
               onClick={() => void checkTokenStatus()}
-              className="px-1.5 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+              className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
             >
               [ RETRY ]
             </button>
@@ -431,50 +431,60 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           <button
             type="button"
             onClick={handlePrevious}
-            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
           >
             [PREV]
           </button>
+
           <button
             type="button"
             onClick={() => void handleTogglePlay()}
-            className="px-2.5 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold"
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              isPlaying
+                ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
           >
             {isPlaying ? "[PAUSE]" : "[PLAY]"}
           </button>
+
           <button
             type="button"
             onClick={handleNext}
-            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
           >
             [NEXT]
           </button>
+
           <button
             type="button"
             onClick={() => void handleToggleShuffle()}
-            className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${shuffle
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              shuffle
                 ? "border-music-accent text-music-accent font-bold"
-                : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
-              }`}
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
             title="Toggle Shuffle"
           >
             [SHUF]
           </button>
+
           <button
             type="button"
             onClick={() => void handleCycleRepeat()}
-            className={`px-1.5 py-0.5 border transition-colors cursor-pointer ${repeatMode > 0
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              repeatMode > 0
                 ? "border-music-accent text-music-accent font-bold"
-                : "border-[#22221E] text-[#5A5A55] hover:text-[#8A8A82]"
-              }`}
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
             title="Cycle Repeat Mode"
           >
             {repeatLabel}
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0">
-          <span>VOL</span>
+        <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0 font-mono">
+          <span className="tracking-wider">VOL</span>
           <input
             type="range"
             min={0}
