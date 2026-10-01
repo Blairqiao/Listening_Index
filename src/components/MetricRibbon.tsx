@@ -27,7 +27,7 @@ export const getRibbonLabels = (
     case 2:
       return ["SESSION RUNTIME", "TOTAL TRACKS", "UNIQUE ARTISTS", "START TIME"];
     case 3:
-      return ["STATUS", "BANDS", "NOW STREAMING", "SOURCE"];
+      return ["ACTIVE DEVICE", "PREVIOUS", "UP NEXT", "CONTEXT"];
   }
 };
 

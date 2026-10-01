@@ -13,6 +13,7 @@ import { ListeningFooter } from "@/components/ListeningFooter";
 import { CustomizationModal } from "@/components/CustomizationModal";
 import { UploadModal } from "@/components/UploadModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
+import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import {
   Mode,
   RangeKey,
@@ -84,6 +85,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
+  const { playerStatus, activeDevice, previousTrack, nextTrack, contextName, currentTrack } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
@@ -759,10 +761,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const latestPlay = streamLogData.entries[0];
 
   const livePlayerMetrics: [string, string, string, string] = [
-    sessionData.isOpen ? "ACTIVE SESSION" : "STANDBY",
-    "32 BANDS",
-    latestPlay ? latestPlay.title : "STARLESS",
-    "LIVE PLAYER",
+    activeDevice?.isThisBrowser
+      ? "THIS BROWSER"
+      : activeDevice?.name?.toUpperCase() ||
+        (playerStatus === "ready" ? "READY" : playerStatus === "connecting" ? "CONNECTING" : "OFFLINE"),
+    previousTrack?.name || "--",
+    nextTrack?.name || "--",
+    contextName || currentTrack?.album?.name || "COLLECTION",
   ];
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
@@ -901,7 +906,9 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
 }) => {
   return (
     <ConfigProvider initialConfig={initialConfig || undefined} isDbConfigured={isDbConfigured}>
-      <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
+      <PlayerProvider>
+        <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
+      </PlayerProvider>
     </ConfigProvider>
   );
 };
