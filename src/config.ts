@@ -5,9 +5,5 @@ export const siteConfig = {
   siteUrl: "https://open.spotify.com/",
   githubUrl: "https://github.com/Blairqiao/listening_index",
   timezone: "America/Chicago",
-  // Your Spotify app's client id, for the in-browser player. Public by
-  // design: the PKCE flow never sends a client secret to the browser.
-  // Can also be set in the customization menu without touching this file.
-  spotifyClientId: "",
   livePlayerLayout: "split" as const,
 };

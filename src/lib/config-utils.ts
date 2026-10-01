@@ -10,7 +10,7 @@ export interface SiteConfigState {
   siteUrl: string;
   githubUrl: string;
   timezone: string;
-  spotifyClientId: string;
+  spotifyClientId?: string;
   livePlayerLayout: LivePlayerLayout;
 }
 
@@ -21,7 +21,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfigState = {
   siteUrl: siteConfig.siteUrl,
   githubUrl: siteConfig.githubUrl,
   timezone: siteConfig.timezone || "America/Chicago",
-  spotifyClientId: siteConfig.spotifyClientId || "",
+  spotifyClientId: (siteConfig as { spotifyClientId?: string }).spotifyClientId || "",
   livePlayerLayout: "split",
 };
 
@@ -49,7 +49,7 @@ export function normalizeSiteConfig(
     spotifyClientId:
       patch.spotifyClientId !== undefined
         ? String(patch.spotifyClientId).trim()
-        : base.spotifyClientId,
+        : base.spotifyClientId || "",
     livePlayerLayout: validLayout,
   };
 }
@@ -65,7 +65,7 @@ export function areSiteConfigsEqual(a: SiteConfigState, b: SiteConfigState): boo
     a.siteUrl === b.siteUrl &&
     a.githubUrl === b.githubUrl &&
     a.timezone === b.timezone &&
-    a.spotifyClientId === b.spotifyClientId &&
+    (a.spotifyClientId || "") === (b.spotifyClientId || "") &&
     a.livePlayerLayout === b.livePlayerLayout
   );
 }
@@ -81,7 +81,6 @@ export function generateConfigTsCode(config: SiteConfigState): string {
   siteUrl: ${JSON.stringify(config.siteUrl)},
   githubUrl: ${JSON.stringify(config.githubUrl)},
   timezone: ${JSON.stringify(config.timezone)},
-  spotifyClientId: ${JSON.stringify(config.spotifyClientId)},
   livePlayerLayout: ${JSON.stringify(config.livePlayerLayout)},
 };
 `;

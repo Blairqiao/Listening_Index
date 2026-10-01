@@ -30,6 +30,15 @@ Groups continuous listening into sessions, marks first-time plays, and tracks se
 
 ![Sessions](public/screenshots/sessions.png)
 
+### Live player (Admin / Owner)
+
+A personal playback console with an in-browser Spotify Web Playback SDK player, a 64-band frequency spectrum visualizer (with synthetic audio and live display media capture modes), dual layouts (Split Console and Stacked Stage), seamless device handover, and real-time personal archive telemetry reporting career plays and catalog rank/percentile for the current track and artist.
+
+> [!NOTE]
+> The Live Player is exclusively available to the admin (owner). It is unlocked by entering your `ADMIN_PASSWORD` in the customization menu or when prompted. Public visitors browse modes 1–3 (Overview, Stream Log, and Sessions).
+
+![Live player](public/screenshots/live-player.png)
+
 ### Customization menu
 
 Change the accent color, page title, timezone, and links directly in the browser.
@@ -75,13 +84,13 @@ Change the accent color, page title, timezone, and links directly in the browser
 2. Click **Create App**:
    - App name: `Listening Index`
    - App description: `Personal music tracking dashboard`
-   - Redirect URIs: `http://127.0.0.1:8888/callback`
-   - Select **Web API**
+   - Redirect URIs: `http://127.0.0.1:8888/callback` and `https://<your-app>.vercel.app/callback`
+   - Select **Web API** and **Web Playback SDK**
 3. Save the app, open **Settings**, and copy:
    - Client ID (`SPOTIFY_CLIENT_ID`)
    - Client Secret (`SPOTIFY_CLIENT_SECRET`)
 
-Spotify redirects back to `http://127.0.0.1:8888/callback` during the login step so the local script can capture your auth code.
+Spotify redirects back to `http://127.0.0.1:8888/callback` during the login step so the local script can capture your auth code. In production, the Live Player authenticates via `https://<your-app>.vercel.app/callback`.
 
 ---
 
@@ -142,13 +151,14 @@ Spotify only keeps your last 50 played tracks, so a regular sync keeps your hist
 
 ### Step 6: Configure Admin Password
 
-Your Listening Index is designed to be public so friends and visitors can browse your music stats. To prevent unauthorized visitors from modifying your site or database, configure an administrative password:
+Your Listening Index is designed to be public so friends and visitors can browse your music stats. To prevent unauthorized visitors from modifying your site or database, and to protect your personal playback controls, configure an administrative password:
 
 1. In your Vercel project dashboard, go to **Settings -> Environment Variables**.
 2. Add a new variable:
    - **Name**: `ADMIN_PASSWORD`
    - **Value**: Any strong, secure passphrase of your choice
 3. What this protects:
+   - **Live Player (`4` key / `[ 4 · LIVE PLAYER ]` tab)**: Unlocks the full in-browser Spotify Web Playback SDK player, live frequency spectrum visualizer, and personal archive telemetry for the site owner. Public visitors only see modes 1–3 (Overview, Stream Log, and Sessions).
    - **Customization (`C` key)**: Unlocks the ability to save custom site settings, titles, links, and accent colors permanently to your Neon database for all visitors.
    - **History Ingestion (`U` key)**: Authorizes uploading extended streaming history JSON/ZIP archives into the database.
    - **Manual Sync**: Allows triggering instant Spotify synchronizations directly from the web interface.
@@ -248,6 +258,7 @@ export const siteConfig = {
 | `1` | Switch to overview |
 | `2` | Switch to stream log |
 | `3` | Switch to sessions |
+| `4` | Switch to live player (Admin only) |
 | `←` / `→` | Change time range |
 | `C` | Open customization menu |
 | `U` | Open upload history modal |
@@ -287,7 +298,7 @@ export const siteConfig = {
 - [Next.js 16](https://nextjs.org/)
 - [Neon](https://neon.tech/) Serverless PostgreSQL
 - [Tailwind CSS v4](https://tailwindcss.com/)
-- Spotify Web API
+- Spotify Web API & Spotify Web Playback SDK
 
 ---
 
