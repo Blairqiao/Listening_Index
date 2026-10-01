@@ -160,3 +160,37 @@ export function formatCadenceTooltip(
   }).format(startDate);
   return `${hour} — ${playsLabel}`;
 }
+
+export function formatCatalogPercentile(
+  rank: number | null,
+  total: number
+): string {
+  if (rank == null || rank <= 0 || total <= 0) {
+    return "NEW";
+  }
+  const p = (rank / total) * 100;
+  if (p < 1) {
+    return `TOP ${p.toFixed(1)}%`;
+  }
+  return `TOP ${Math.round(p)}%`;
+}
+
+export function formatRankDisplay(
+  rank: number | null,
+  total: number,
+  format: "rank" | "percentile"
+): string {
+  if (rank == null || rank <= 0) {
+    return "NEW";
+  }
+  if (format === "rank") {
+    return `#${rank}`;
+  }
+  return formatCatalogPercentile(rank, total);
+}
+
+export function formatPlaysDisplay(plays: number): string {
+  const countStr = plays.toLocaleString();
+  return `${countStr} ${plays === 1 ? "PLAY" : "PLAYS"}`;
+}
+
