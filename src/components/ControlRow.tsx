@@ -15,6 +15,15 @@ interface ControlRowProps {
   onTriggerSync?: () => void;
   streamLogCount?: number;
   totalPlays?: string;
+  // Mode 3: Live Player page-level controls
+  layout?: "split" | "stacked";
+  onToggleLayout?: () => void;
+  sourceMode?: "synthetic" | "live";
+  onToggleSourceMode?: () => void;
+  isLinked?: boolean | null;
+  isAuthorizing?: boolean;
+  onLinkSpotify?: () => void;
+  onUnlinkSpotify?: () => void;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -37,6 +46,14 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   onTriggerSync,
   streamLogCount,
   totalPlays,
+  layout = "split",
+  onToggleLayout,
+  sourceMode = "synthetic",
+  onToggleSourceMode,
+  isLinked = false,
+  isAuthorizing = false,
+  onLinkSpotify,
+  onUnlinkSpotify,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
@@ -138,8 +155,53 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           </button>
         );
       case 3:
-        // Integrated live player controls live on the panel itself.
-        return null;
+        return (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={onToggleLayout}
+              aria-label="Toggle player layout between split and stacked"
+              className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-[#26261F] text-[#8A8A82] hover:text-music-accent hover:border-music-accent cursor-pointer transition-colors"
+              title="Toggle between Split Console and Stacked Stage"
+            >
+              <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
+              <span className="hidden sm:inline">{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onToggleSourceMode}
+              className={`font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border transition-colors cursor-pointer ${
+                sourceMode === "live"
+                  ? "border-music-accent text-music-accent font-bold"
+                  : "border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+              }`}
+              title="Toggle audio visualizer source: synthetic oscillator or real live audio"
+            >
+              <span className="sm:hidden">{sourceMode === "live" ? "[ LIVE ]" : "[ SYNTH ]"}</span>
+              <span className="hidden sm:inline">{sourceMode === "live" ? "[ LIVE AUDIO ]" : "[ SYNTHETIC ]"}</span>
+            </button>
+            {isLinked ? (
+              <button
+                type="button"
+                onClick={onUnlinkSpotify}
+                className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-[#26261F] text-[#5A5A55] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors"
+                title="Unlink Spotify"
+              >
+                [UNLINK]
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isAuthorizing}
+                onClick={onLinkSpotify}
+                className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold transition-colors disabled:opacity-50"
+                title="Link Spotify for Web Playback"
+              >
+                {isAuthorizing ? "[WAITING...]" : "[LINK]"}
+              </button>
+            )}
+          </div>
+        );
     }
   };
 

@@ -41,9 +41,9 @@ test("LivePlayerView - presenter component contract & layout architecture", () =
   assert.match(source, /usePlayer\(\)/, "Must consume usePlayer from PlayerContext");
   assert.match(source, /useConfig\(\)/, "Must consume useConfig from ConfigContext");
 
-  // 4. Quick Layout Toggle
-  assert.match(source, /handleToggleLayout/, "Must support in-page quick layout toggle");
-  assert.match(source, /LAYOUT:\s*STACKED/, "Must render layout toggle button");
+  // 4. Dual Layout Selection
+  assert.match(source, /config\.livePlayerLayout === "split"/, "Must select layout based on config.livePlayerLayout");
+  assert.match(source, /handleToggleLayout/, "Must support layout toggle handler");
 
   // 5. In-player controls (Transport, Shuffle, Repeat, Volume)
   assert.match(source, /handleTogglePlay/, "Must support togglePlay transport control");

@@ -165,11 +165,33 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const { config, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
-  const { currentTrack } = usePlayer();
+  const { config, updateConfig, openModal, closeModal, isModalOpen, isAuthenticated } = useConfig();
+  const {
+    currentTrack,
+    isLinked,
+    isAuthorizing,
+    handleLinkSpotify,
+    handleUnlink,
+  } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
+
+  // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
+  const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
+  const handleToggleSourceMode = useCallback(() => {
+    setSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
+  }, []);
+
+  const handleToggleLayout = useCallback(() => {
+    const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
+    updateConfig({ livePlayerLayout: next });
+    void fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ livePlayerLayout: next }),
+    }).catch(() => {});
+  }, [config.livePlayerLayout, updateConfig]);
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin
   useEffect(() => {
@@ -991,6 +1013,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
             totalPlays={streamLogData.metrics[0]}
+            layout={config.livePlayerLayout}
+            onToggleLayout={handleToggleLayout}
+            sourceMode={sourceMode}
+            onToggleSourceMode={handleToggleSourceMode}
+            isLinked={isLinked}
+            isAuthorizing={isAuthorizing}
+            onLinkSpotify={handleLinkSpotify}
+            onUnlinkSpotify={handleUnlink}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
@@ -1048,7 +1078,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             )}
 
             {activeMode === 3 && (
-              <LivePlayerView latestPlay={latestPlay} />
+              <LivePlayerView
+                latestPlay={latestPlay}
+                sourceMode={sourceMode}
+                onToggleSourceMode={handleToggleSourceMode}
+              />
             )}
           </div>
         </div>
