@@ -346,7 +346,7 @@ export const CustomizationModal: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  [ 01 · IDENTITY ]
+                  [ IDENTITY ]
                 </span>
               </div>
 
@@ -384,7 +384,7 @@ export const CustomizationModal: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
               <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                [ 02 · ACCENT COLOR ]
+                [ ACCENT COLOR ]
               </span>
             </div>
 
@@ -396,7 +396,7 @@ export const CustomizationModal: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  [ 03 · TIMEZONE ]
+                  [ TIMEZONE ]
                 </span>
                 {currentTimeStr && (
                   <span className="font-mono text-[10px] tracking-[0.08em] text-[#A0A09A] flex items-center gap-1">
@@ -504,7 +504,7 @@ export const CustomizationModal: React.FC = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  [ 04 · LINKS ]
+                  [ LINKS ]
                 </span>
               </div>
 

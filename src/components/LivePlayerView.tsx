@@ -17,6 +17,8 @@ export interface LivePlayerProps {
     artist: string;
     album: string;
     albumImageUrl?: string | null;
+    durationMs?: number;
+    duration?: string;
   } | null;
   initialTrack?: {
     name: string;
@@ -29,13 +31,82 @@ export interface LivePlayerProps {
   onToggleSourceMode?: () => void;
 }
 
-const DEFAULT_FALLBACK_TRACK = {
-  name: "Starless",
-  artist: "King Crimson",
-  album: "Red",
-  imageUrl: "https://i.scdn.co/image/ab67616d0000b2734a7428cead5a49479b8c0a87",
-  durationMs: 738000,
+export const DEFAULT_FALLBACK_TRACK = {
+  name: "Weird Fishes / Arpeggi",
+  artist: "Radiohead",
+  album: "In Rainbows",
+  imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/50/c7/dd50c790-99ac-d3d0-5ab8-e3891fb8fd52/634904032463.png/600x600bb.jpg",
+  durationMs: 318000,
 };
+
+export function clockToMs(clock?: string | null): number {
+  if (!clock) return 0;
+  const parts = clock.split(":").map(Number);
+  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+    return (parts[0] * 60 + parts[1]) * 1000;
+  }
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+  }
+  return 0;
+}
+
+export interface DisplayTrackParams {
+  currentTrack?: {
+    id?: string | null;
+    name?: string;
+    artists?: Array<{ name: string }>;
+    album?: { name?: string; images?: Array<{ url: string }> };
+  } | null;
+  duration?: number;
+  latestPlay?: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    albumImageUrl?: string | null;
+    durationMs?: number;
+    duration?: string;
+  } | null;
+  initialTrack?: {
+    name?: string;
+    artist?: string;
+    album?: string;
+    imageUrl?: string;
+    durationMs?: number;
+  } | null;
+}
+
+export function resolveDisplayTrack(params: DisplayTrackParams) {
+  const { currentTrack, duration = 0, latestPlay, initialTrack } = params;
+  return {
+    name:
+      currentTrack?.name ||
+      latestPlay?.title ||
+      initialTrack?.name ||
+      DEFAULT_FALLBACK_TRACK.name,
+    artist:
+      currentTrack?.artists?.map((a) => a.name).join(", ") ||
+      latestPlay?.artist ||
+      initialTrack?.artist ||
+      DEFAULT_FALLBACK_TRACK.artist,
+    album:
+      currentTrack?.album?.name ||
+      latestPlay?.album ||
+      initialTrack?.album ||
+      DEFAULT_FALLBACK_TRACK.album,
+    imageUrl:
+      currentTrack?.album?.images?.[0]?.url ||
+      latestPlay?.albumImageUrl ||
+      initialTrack?.imageUrl ||
+      DEFAULT_FALLBACK_TRACK.imageUrl,
+    durationMs:
+      (duration > 0 ? duration : undefined) ||
+      latestPlay?.durationMs ||
+      (latestPlay?.duration ? clockToMs(latestPlay.duration) : undefined) ||
+      initialTrack?.durationMs ||
+      DEFAULT_FALLBACK_TRACK.durationMs,
+  };
+}
 
 export function msToClock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -294,29 +365,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     }).catch(() => { });
   }, [config.livePlayerLayout, updateConfig]);
 
-  const displayTrack = {
-    name:
-      currentTrack?.name ||
-      latestPlay?.title ||
-      initialTrack?.name ||
-      DEFAULT_FALLBACK_TRACK.name,
-    artist:
-      currentTrack?.artists?.map((a) => a.name).join(", ") ||
-      latestPlay?.artist ||
-      initialTrack?.artist ||
-      DEFAULT_FALLBACK_TRACK.artist,
-    album:
-      currentTrack?.album?.name ||
-      latestPlay?.album ||
-      initialTrack?.album ||
-      DEFAULT_FALLBACK_TRACK.album,
-    imageUrl:
-      currentTrack?.album?.images?.[0]?.url ||
-      latestPlay?.albumImageUrl ||
-      initialTrack?.imageUrl ||
-      DEFAULT_FALLBACK_TRACK.imageUrl,
-    durationMs: duration || DEFAULT_FALLBACK_TRACK.durationMs,
-  };
+  const displayTrack = resolveDisplayTrack({
+    currentTrack,
+    duration,
+    latestPlay,
+    initialTrack,
+  });
 
   const repeatLabel =
     repeatMode === 2 ? "[REP: 1]" : repeatMode === 1 ? "[REP: ALL]" : "[REP: OFF]";

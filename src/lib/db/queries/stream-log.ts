@@ -299,6 +299,7 @@ export async function getStreamLog(
       artist: row.artist,
       album: row.album,
       duration: formatDurationMs(row.duration_ms),
+      durationMs: row.duration_ms,
       status: row.status,
       dayGroup: isNewDay ? dayGroup : undefined,
       sessionGap,
