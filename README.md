@@ -30,20 +30,30 @@ Groups continuous listening into sessions, marks first-time plays, and tracks se
 
 ![Sessions](public/screenshots/sessions.png)
 
-### Live player (Admin / Owner)
+### Live player
 
-A personal playback console with an in-browser Spotify Web Playback SDK player, a 64-band frequency spectrum visualizer (with synthetic audio and live display media capture modes), dual layouts (Split Console and Stacked Stage), seamless device handover, and real-time personal archive telemetry reporting career plays and catalog rank/percentile for the current track and artist.
+Controls Spotify playback with a 32-band frequency visualizer, split console and stacked stage layouts, and device switching. Shows total plays and archive rank for the current track and artist.
 
-> [!NOTE]
-> The Live Player is exclusively available to the admin (owner). It is unlocked by entering your `ADMIN_PASSWORD` in the customization menu or when prompted. Public visitors browse modes 1–3 (Overview, Stream Log, and Sessions).
+Unlocked with `ADMIN_PASSWORD` via the dedicated admin login modal (`[ <Lock /> ]` button or `L` key). Public visitors only see modes 1–3.
 
 ![Live player](public/screenshots/live-player.png)
 
-### Customization menu
+### Appearance & configuration
 
-Change the accent color, page title, timezone, and links directly in the browser.
+Listening Index decouples visitor personalization from administrative configuration:
 
-![Customization modal](public/screenshots/config-modal.png)
+- **Visitor Appearance**: Guests can customize their accent color locally in their browser with zero database calls or write permissions.
+- **Admin Configuration**: Unlocking admin access allows configuring site title, owner name, timezone, external links, and deploying settings permanently to the database.
+
+| Visitor Appearance (`[ APPEARANCE ]`) | Admin Configuration (`[ ACTIVE CONFIGURATION ]`) |
+| :---: | :---: |
+| ![Appearance modal](public/screenshots/appearance-modal.png) | ![Configuration modal](public/screenshots/config-modal.png) |
+
+### Admin authentication & history upload
+
+| Dedicated Admin Login (`L` key) | Direct History Import (`U` key) |
+| :---: | :---: |
+| ![Admin login](public/screenshots/admin-login.png) | ![Upload modal](public/screenshots/upload-modal.png) |
 
 ---
 
@@ -158,9 +168,10 @@ Your Listening Index is designed to be public so friends and visitors can browse
    - **Name**: `ADMIN_PASSWORD`
    - **Value**: Any strong, secure passphrase of your choice
 3. What this protects:
-   - **Live Player (`4` key / `[ 4 · LIVE PLAYER ]` tab)**: Unlocks the full in-browser Spotify Web Playback SDK player, live frequency spectrum visualizer, and personal archive telemetry for the site owner. Public visitors only see modes 1–3 (Overview, Stream Log, and Sessions).
-   - **Customization (`C` key)**: Unlocks the ability to save custom site settings, titles, links, and accent colors permanently to your Neon database for all visitors.
-   - **History Ingestion (`U` key)**: Authorizes uploading extended streaming history JSON/ZIP archives into the database.
+   - **Dedicated Admin Authentication (`L` key / `[ <Lock /> ]` button)**: Click the lock icon in the navigation bar or press `L` to open the Admin Authentication modal. Entering your `ADMIN_PASSWORD` elevates the session; clicking the unlocked icon `[ <Unlock /> ]` or pressing `L` again instantly logs out.
+   - **Live Player (`4` key / `[ 4 · LIVE PLAYER ]` tab)**: Appears in navigation upon login. Unlocks the full in-browser Spotify Web Playback SDK player, live frequency spectrum visualizer, and personal archive telemetry. Public visitors only see modes 1–3 (Overview, Stream Log, and Sessions).
+   - **Extended History Ingestion (`U` key / `[ <Upload /> ]` button)**: Upload icon appears in navigation upon login. Unlocks direct drag-and-drop ingestion of Spotify extended streaming history archives into your database.
+   - **Full Configuration & Database Deployment (`C` key / `[ <Menu /> ]` button)**: Elevates the appearance menu into the full configuration modal with options to update site title, timezone, links, and click **Deploy to Database** (`/api/config`).
    - **Manual Sync**: Allows triggering instant Spotify synchronizations directly from the web interface.
 
 ---
@@ -183,8 +194,8 @@ Your Listening Index is designed to be public so friends and visitors can browse
 To backfill your entire Spotify listening history:
 
 1. Request your **Extended streaming history** from the [Spotify Privacy Settings](https://www.spotify.com/account/privacy/) page (takes a few days to prepare).
-2. Press `U` or click **[ U · UPLOAD ]** in the top navigation bar.
-3. Enter your `ADMIN_PASSWORD` when prompted to unlock ingestion access.
+2. Log in as admin by pressing `L` or clicking the lock icon `[ <Lock /> ]` in the top navigation bar.
+3. Once authenticated, press `U` or click the upload icon `[ <Upload /> ]` in the top navigation bar.
 4. Drag and drop the downloaded `.zip` file (or individual `endsong_*.json` files).
 5. The client extracts audio plays directly in your browser, streams them to your database, and begins progressive metadata enrichment.
 
@@ -229,12 +240,20 @@ Open `http://localhost:3000`.
 
 ## Customization
 
-Press `C` or click **[ C · CONFIG ]** in the top navigation to open the customization menu:
-- Change the accent color with a color picker or preset swatches.
-- Select your timezone to match your daily activity graph.
-- Update your display title, name, Spotify link, and GitHub repository link.
-- Click **Save & Apply**. When connected to Neon, entering your `ADMIN_PASSWORD` saves the settings permanently to the database for all visitors. Unauthorized visitors or guests can still customize settings locally in their browser session.
-- Click **Reset Defaults** to restore values from `src/config.ts`.
+Listening Index features a decoupled customization architecture separating visitor appearance from administrative configuration:
+
+### For visitors (Appearance)
+Press `C` or click the menu icon `[ <Menu /> ]` in the top navigation:
+- Select an accent color using the color picker or preset swatches. The page repaints in real time.
+- Click **[ SAVE LOCALLY ]** to store your choice in browser `localStorage`. No database calls or admin passwords are required.
+- Click **[ RESET COLOR ]** to restore the default accent color.
+
+### For administrators (Active configuration)
+Log in via `L` or `[ <Lock /> ]`, then press `C` or click `[ <Menu /> ]`:
+- Update your display title, owner name, Spotify link, and GitHub repository link.
+- Select your timezone from the searchable IANA list to match your daily activity graph.
+- Click **[ DEPLOY TO DATABASE ]** to save configuration permanently to Neon so all visitors see your customized settings.
+- Click **[ RESET DEFAULTS ]** to restore values from `src/config.ts`, or click **[ COPY CONFIG.TS ]** to export your active settings as static TypeScript code.
 
 To set permanent defaults in code, edit `src/config.ts`:
 
@@ -253,16 +272,17 @@ export const siteConfig = {
 
 ## Keyboard shortcuts
 
-| Key | Action |
-| :--- | :--- |
-| `1` | Switch to overview |
-| `2` | Switch to stream log |
-| `3` | Switch to sessions |
-| `4` | Switch to live player (Admin only) |
-| `←` / `→` | Change time range |
-| `C` | Open customization menu |
-| `U` | Open upload history modal |
-| `Esc` | Close modal |
+| Key | Action | Availability |
+| :--- | :--- | :--- |
+| `1` | Switch to overview | All visitors |
+| `2` | Switch to stream log | All visitors |
+| `3` | Switch to sessions | All visitors |
+| `4` | Switch to live player | Admin only |
+| `←` / `→` | Change time range | All visitors |
+| `C` | Open appearance / configuration modal | All visitors |
+| `U` | Open upload history modal | Admin only |
+| `L` | Admin login / lock session | All visitors |
+| `Esc` | Close modal | All visitors |
 
 ---
 
