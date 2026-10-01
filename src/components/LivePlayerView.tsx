@@ -267,10 +267,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     volume,
     shuffle,
     repeatMode,
-    isAuthorizing,
     checkTokenStatus,
-    handleLinkSpotify,
-    handleUnlink,
     handleTransferPlayback,
     handleTogglePlay,
     handlePrevious,
@@ -384,19 +381,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
         )}
 
         {playerStatus === "unlinked" && (
-          <div className="flex flex-wrap items-center justify-between w-full gap-2">
-            <span className="text-[#8A8A82]">[ UNLINKED ]</span>
-            <button
-              type="button"
-              disabled={isAuthorizing}
-              onClick={() => void handleLinkSpotify()}
-              className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold"
-            >
-              {isAuthorizing
-                ? "[ WAITING FOR SPOTIFY... ]"
-                : "[ LINK SPOTIFY FOR WEB PLAYBACK ]"}
-            </button>
-          </div>
+          <span className="text-[#8A8A82]">[ UNLINKED ]</span>
         )}
 
         {playerStatus === "connecting" && (

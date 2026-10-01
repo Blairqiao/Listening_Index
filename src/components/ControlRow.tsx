@@ -156,12 +156,12 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         );
       case 3:
         return (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onToggleLayout}
               aria-label="Toggle player layout between split and stacked"
-              className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-[#26261F] text-[#8A8A82] hover:text-music-accent hover:border-music-accent cursor-pointer transition-colors"
+              className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
               title="Toggle between Split Console and Stacked Stage"
             >
               <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
@@ -170,10 +170,10 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             <button
               type="button"
               onClick={onToggleSourceMode}
-              className={`font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border transition-colors cursor-pointer ${
+              className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 transition-none focus-visible:outline-none focus-visible:text-music-accent ${
                 sourceMode === "live"
-                  ? "border-music-accent text-music-accent font-bold"
-                  : "border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+                  ? "text-music-accent hover:text-[#EDEDE8]"
+                  : "text-[#6A6A64] hover:text-[#EDEDE8]"
               }`}
               title="Toggle audio visualizer source: synthetic oscillator or real live audio"
             >
@@ -184,20 +184,22 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               <button
                 type="button"
                 onClick={onUnlinkSpotify}
-                className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-[#26261F] text-[#5A5A55] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors"
+                className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
                 title="Unlink Spotify"
               >
-                [UNLINK]
+                [ UNLINK ]
               </button>
             ) : (
               <button
                 type="button"
                 disabled={isAuthorizing}
                 onClick={onLinkSpotify}
-                className="font-mono text-[10px] sm:text-[11px] tracking-[0.08em] whitespace-nowrap px-1.5 sm:px-2 py-0.5 sm:py-[3px] border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-bold transition-colors disabled:opacity-50"
+                className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 transition-none focus-visible:outline-none focus-visible:text-music-accent ${
+                  isAuthorizing ? "text-music-accent cursor-wait opacity-60" : "text-music-accent hover:text-[#EDEDE8]"
+                }`}
                 title="Link Spotify for Web Playback"
               >
-                {isAuthorizing ? "[WAITING...]" : "[LINK]"}
+                {isAuthorizing ? "[ WAITING... ]" : "[ LINK ]"}
               </button>
             )}
           </div>
