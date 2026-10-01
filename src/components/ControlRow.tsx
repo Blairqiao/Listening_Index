@@ -167,19 +167,6 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
               <span className="hidden sm:inline">{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
             </button>
-            <button
-              type="button"
-              onClick={onToggleSourceMode}
-              className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 transition-none focus-visible:outline-none focus-visible:text-music-accent ${
-                sourceMode === "live"
-                  ? "text-music-accent hover:text-[#EDEDE8]"
-                  : "text-[#6A6A64] hover:text-[#EDEDE8]"
-              }`}
-              title="Toggle audio visualizer source: synthetic oscillator or real live audio"
-            >
-              <span className="sm:hidden">{sourceMode === "live" ? "[ LIVE ]" : "[ SYNTH ]"}</span>
-              <span className="hidden sm:inline">{sourceMode === "live" ? "[ LIVE AUDIO ]" : "[ SYNTHETIC ]"}</span>
-            </button>
             {isLinked ? (
               <button
                 type="button"
