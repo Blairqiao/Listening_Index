@@ -176,7 +176,7 @@ export function parseHistoryRecords(records: unknown[]): CompactPlayEvent[] {
 export interface DebouncePlayItem {
   playedAt: string | Date;
   trackId: string;
-  [key: string]: any;
+  // [key: string]: any;
 }
 
 /** Canonical domain alias: stream events prior to meeting the Play Threshold */

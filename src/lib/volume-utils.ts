@@ -28,5 +28,7 @@ export function setStoredVolume(slider: number): void {
   try {
     const clamped = Math.max(0, Math.min(1, Number.isFinite(slider) ? slider : 0));
     localStorage.setItem(VOLUME_STORAGE_KEY, clamped.toString());
-  } catch {}
+  } catch (_error) {
+    return;
+  }
 }

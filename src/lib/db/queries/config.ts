@@ -36,7 +36,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
-      `) as any);
+      `));
 
       if (rows && rows.length > 0 && rows[0]) {
         const row = rows[0];
@@ -194,7 +194,7 @@ export async function getOwnerPlaybackToken(): Promise<string | null> {
       FROM site_settings
       WHERE id = 'active'
       LIMIT 1;
-    `) as any);
+    `));
 
     if (rows && rows.length > 0 && rows[0]?.owner_playback_token) {
       return rows[0].owner_playback_token;

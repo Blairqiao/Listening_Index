@@ -1,7 +1,6 @@
 import { getDb } from "../index";
 import { getLastSync } from "./ingestion";
 import {
-  getTimezone,
   sanitizeTimezone,
   formatDayGroupTz,
   formatHHmmTz,
@@ -78,7 +77,7 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
     rawPlaysPromise,
     lastSyncPromise,
   ]);
-  const rawPlays: SessionPlayRow[] = rawPlaysResult as any;
+  const rawPlays: SessionPlayRow[] = rawPlaysResult as SessionPlayRow[];
 
   if (rawPlays.length === 0) {
     return {
@@ -144,7 +143,7 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
       k === 0 &&
       Date.now() - new Date(sittingLatest.played_at).getTime() <= 30 * 60 * 1000;
 
-    let tagTime = "--";
+    let tagTime: string;
     if (k === 0 && isThisOpen) {
       tagTime = formatTimeTz(new Date(sittingLatest.played_at), tz);
     } else {

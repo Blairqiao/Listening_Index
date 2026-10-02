@@ -26,6 +26,17 @@ const nextConfig: NextConfig = {
       realValue(process.env.SPOTIFY_CLIENT_ID) ??
       "",
   },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "i.scdn.co",
+        port: "",
+        pathname: "/image/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

@@ -19,7 +19,7 @@ export async function getEnrichmentProgress(): Promise<{
       0::int AS delisted,
       COUNT(*)::int AS total
     FROM tracks;
-  `) as any);
+  `));
   return {
     pending: rows[0]?.pending ?? 0,
     enriched: rows[0]?.enriched ?? 0,
@@ -134,9 +134,9 @@ export async function getPendingTracksForEnrichment(
     WHERE t.enrichment_status = 'pending' AND ${trackFilter}
     ORDER BY lp.max_played_at DESC NULLS LAST, t.id ASC
     LIMIT ${batchSize};
-  `) as any);
+  `));
 
-  return rows.map((r: any) => ({
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     artistName: r.artist_name,
@@ -150,7 +150,6 @@ export async function getPendingTracksForEnrichment(
  * Consolidated into daily_api_usage.
  */
 export async function recordApiCooldown(
-  provider: string,
   cooldownSeconds: number,
   reason: string
 ): Promise<void> {
@@ -171,7 +170,7 @@ export async function recordApiCooldown(
  * Checks if an active API cooldown exists.
  * Queries daily_api_usage for any active cooldown.
  */
-export async function getActiveApiCooldown(provider: string = "spotify"): Promise<{
+export async function getActiveApiCooldown(_: string = "spotify"): Promise<{
   active: boolean;
   cooldownUntil?: string;
   reason?: string;
@@ -185,7 +184,7 @@ export async function getActiveApiCooldown(provider: string = "spotify"): Promis
       WHERE cooldown_until > NOW()
       ORDER BY cooldown_until DESC
       LIMIT 1;
-    `) as any);
+    `));
     if (rows && rows.length > 0) {
       return {
         active: true,
@@ -208,8 +207,8 @@ export async function getPendingTracksInAlbum(
     SELECT id, name, artist_name FROM tracks
     WHERE album_group_key = ${albumGroupKey}
       AND enrichment_status = 'pending';
-  `) as any);
-  return rows.map((r: any) => ({
+  `));
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     artistName: r.artist_name,
@@ -242,7 +241,7 @@ export async function checkAndIncrementApiQuota(
     ON CONFLICT (usage_date) DO UPDATE SET updated_at = NOW()
     RETURNING cron_count, dynamic_count, total_count,
       (SELECT cooldown_until FROM daily_api_usage WHERE cooldown_until > NOW() ORDER BY cooldown_until DESC LIMIT 1) AS active_cooldown;
-  `) as any);
+  `));
 
   const currentCron = Number(existing?.cron_count || 0);
   const currentDynamic = Number(existing?.dynamic_count || 0);
@@ -290,7 +289,7 @@ export async function checkAndIncrementApiQuota(
       updated_at = NOW()
     WHERE usage_date = ${todayUtc}::date
     RETURNING cron_count, dynamic_count, total_count;
-  `) as any);
+  `));
 
   const updated = updatedRows[0];
   const newTotal = Number(updated.total_count);
@@ -322,7 +321,7 @@ export async function getDailyApiQuotaStatus(): Promise<{
     FROM daily_api_usage
     WHERE usage_date = ${todayUtc}::date
     LIMIT 1;
-  `) as any);
+  `));
 
   const cron = Number(rows[0]?.cron_count || 0);
   const dynamic = Number(rows[0]?.dynamic_count || 0);
@@ -351,7 +350,7 @@ export async function isCatalogFullyEnriched(): Promise<boolean> {
         SELECT 1 FROM tracks
         WHERE enrichment_status = 'pending'
         LIMIT 1;
-      `) as any);
+      `));
       return rows.length === 0;
     } catch {
       return false;
@@ -372,7 +371,7 @@ export async function cleanupOrphanedSyntheticEntities(): Promise<{
     WHERE id LIKE 'alb_%'
       AND id NOT IN (SELECT album_id FROM tracks WHERE album_id IS NOT NULL)
     RETURNING id;
-  `) as any);
+  `));
 
   const deletedArtistsResult = ((await sql`
     DELETE FROM artists
@@ -380,7 +379,7 @@ export async function cleanupOrphanedSyntheticEntities(): Promise<{
       AND id NOT IN (SELECT artist_id FROM tracks WHERE artist_id IS NOT NULL)
       AND id NOT IN (SELECT artist_id FROM albums WHERE artist_id IS NOT NULL)
     RETURNING id;
-  `) as any);
+  `));
 
   return {
     deletedAlbums: deletedAlbumsResult.length,

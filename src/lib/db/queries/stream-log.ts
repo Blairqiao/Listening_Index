@@ -1,7 +1,6 @@
 import { getDb } from "../index";
 import { getLastSync } from "./ingestion";
 import {
-  getTimezone,
   sanitizeTimezone,
   formatDayGroupTz,
   formatHHmmTz,
@@ -111,16 +110,16 @@ export async function getStreamLog(
         lastSyncPromise,
       ]);
 
-    const totalsRow = (totalsResult as any)[0];
-    const dateRows = dateRowsResult as any;
-    streamRows = streamRowsResult as any;
+    const totalsRow = (totalsResult)[0];
+    const dateRows = dateRowsResult;
+    streamRows = streamRowsResult as StreamRow[];
     lastSync = lastSyncResult;
 
     // Streak calculation
     let currentStreak = 0;
     if (dateRows.length > 0) {
       const playDateStrs = new Set(
-        dateRows.map((r: any) => {
+        dateRows.map((r: Record<string, string>) => {
           const d = new Date(r.play_date);
           return d.toISOString().slice(0, 10);
         })
@@ -175,7 +174,7 @@ export async function getStreamLog(
       streamRowsPromise,
       lastSyncPromise,
     ]);
-    streamRows = streamRowsResult as any;
+    streamRows = streamRowsResult as StreamRow[];
     lastSync = lastSyncResult;
   }
 

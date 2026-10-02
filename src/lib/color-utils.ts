@@ -101,9 +101,9 @@ export function hsvToRgb(h: number, s: number, v: number): RGB {
   const x = c * (1 - Math.abs(((normH / 60) % 2) - 1));
   const m = normV - c;
 
-  let rPrime = 0;
-  let gPrime = 0;
-  let bPrime = 0;
+  let rPrime: number;
+  let gPrime: number;
+  let bPrime: number;
 
   if (normH >= 0 && normH < 60) {
     rPrime = c;
@@ -167,9 +167,9 @@ export function hsvToHex(h: number, s: number, v: number): string {
 export function hexToRgb(hex: string): RGB | null {
   if (!isValidHex(hex)) return null;
   const clean = hex.trim().replace(/^#/, "");
-  let r = 0;
-  let g = 0;
-  let b = 0;
+  let r: number;
+  let g: number;
+  let b: number;
 
   if (clean.length === 3) {
     r = parseInt(clean[0] + clean[0], 16);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 
 interface ArtworkProps {
   src?: string | null;
@@ -59,9 +60,12 @@ export const Artwork: React.FC<ArtworkProps> = ({
   }
 
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
+      width={size}
+      height={size}
+      onLoad={() => setHasError(false)}
       onError={() => setHasError(true)}
       style={{ width: `${size}px`, height: `${size}px` }}
       className={`block object-cover flex-none rounded-none select-none ${className}`}

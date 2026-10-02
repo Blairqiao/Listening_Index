@@ -44,7 +44,7 @@ export function closePopup(
   messageType: string
 ): NextResponse {
   const payload = scriptSafeJson({ type: messageType, ok, message });
-  const target = scriptSafeJson(origin);
+  // const target = scriptSafeJson(origin);
   // Only the script carrying this nonce may run, so even if markup were ever
   // injected into this page it could not execute.
   const nonce = crypto.randomBytes(16).toString("base64");

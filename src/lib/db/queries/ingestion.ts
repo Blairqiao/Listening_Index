@@ -122,7 +122,7 @@ export async function insertPlay(
       AND played_at >= ${minTime}::timestamptz
       AND played_at <= ${maxTime}::timestamptz
     LIMIT 1;
-  `) as any;
+  `);
   if (existing.length > 0) {
     return false;
   }
@@ -132,7 +132,7 @@ export async function insertPlay(
     VALUES (${timestamp}::timestamptz, ${trackId}, ${msPlayed})
     ON CONFLICT (played_at, track_id) DO NOTHING
     RETURNING id;
-  `) as any);
+  `));
   return rows.length > 0;
 }
 
@@ -160,7 +160,7 @@ export async function getExistingPlayKeys(
     FROM plays
     WHERE played_at >= ${minDate}::timestamptz 
       AND played_at <= ${maxDate}::timestamptz;
-  `) as any);
+  `));
 
   const existingKeys = new Set<string>();
   for (const row of existingRows) {
@@ -200,19 +200,19 @@ export async function getExistingEntityIds(params: {
     artistsPromise,
     albumsPromise,
     tracksPromise,
-  ])) as any;
+  ])) ;
 
   return {
-    existingArtistIds: new Set<string>(artists.map((r: any) => r.id)),
-    existingAlbumIds: new Set<string>(albums.map((r: any) => r.id)),
-    existingTrackIds: new Set<string>(tracks.map((r: any) => r.id)),
+    existingArtistIds: new Set<string>(artists.map((r) => r.id)),
+    existingAlbumIds: new Set<string>(albums.map((r) => r.id)),
+    existingTrackIds: new Set<string>(tracks.map((r) => r.id)),
   };
 }
 
 /**
  * 7. Records the most recent sync execution timestamp in daily_api_usage.
  */
-export async function recordLastSync(key: string = "spotify"): Promise<Date> {
+export async function recordLastSync(_: string = "spotify"): Promise<Date> {
   await ensureTablesExist();
   const sql = getDb();
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -223,7 +223,7 @@ export async function recordLastSync(key: string = "spotify"): Promise<Date> {
       last_synced_at = NOW(),
       updated_at = NOW()
     RETURNING last_synced_at;
-  `) as any);
+  `) );
   lastSyncCache.invalidate();
   return new Date(rows[0].last_synced_at);
 }
@@ -232,14 +232,14 @@ export async function recordLastSync(key: string = "spotify"): Promise<Date> {
  * 8. Retrieves the most recent sync execution timestamp from daily_api_usage.
  * Deduplicates concurrent calls via in-flight promise latch and caches for 15 seconds.
  */
-export async function getLastSync(key: string = "spotify"): Promise<string | undefined> {
+export async function getLastSync(_: string = "spotify"): Promise<string | undefined> {
   return lastSyncCache.get(async () => {
     try {
       await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
         SELECT last_synced_at FROM daily_api_usage WHERE last_synced_at IS NOT NULL ORDER BY last_synced_at DESC LIMIT 1;
-      `) as any);
+      `) );
       return rows && rows.length > 0 && rows[0].last_synced_at
         ? new Date(rows[0].last_synced_at).toISOString()
         : undefined;
@@ -450,8 +450,8 @@ export async function bulkInsertPlays(
     ON CONFLICT (played_at, track_id) DO UPDATE SET
       ms_played = EXCLUDED.ms_played
     RETURNING (xmax = 0) AS was_inserted;
-  `) as any);
+  `));
 
-  const insertedCount = inserted.filter((r: any) => Boolean(r.was_inserted)).length;
+  const insertedCount = inserted.filter((r) => Boolean(r.was_inserted)).length;
   return { insertedCount };
 }
