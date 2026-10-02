@@ -47,9 +47,15 @@ export const SessionView: React.FC<SessionViewProps> = ({
   selectedSittingId: externalSelectedSittingId,
   selectedSessionId: externalSelectedSessionIdProp,
 }) => {
-  const effectiveSessionTracks = sessionTracks || sittingTracks || [];
-  const previousSittings = rawPreviousSessions || rawPreviousSittings || [];
-  const sittings = rawSessions || rawSittings || [];
+  const effectiveSessionTracks = useMemo(() => {
+    return sessionTracks || sittingTracks || [];
+  }, [sessionTracks, sittingTracks]);
+  const previousSittings = useMemo(() => {
+    return rawPreviousSessions || rawPreviousSittings || [];
+  }, [rawPreviousSessions, rawPreviousSittings]);
+  const sittings = useMemo(() => {
+    return rawSessions || rawSittings || [];
+  }, [rawSessions, rawSittings]);
   const onSelect = onSelectSession || onSelectSitting;
   const externalSelectedSessionId = externalSelectedSessionIdProp ?? externalSelectedSittingId;
 
@@ -214,7 +220,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
         topAlbumEntry = [album, count];
       }
     }
-    let topAlbum: { title: string; count: number; id?: string; artist?: string } | null = null;
+    let topAlbum: { title: string; count: number; id?: string; artist?: string } | null;
     if (topAlbumEntry) {
       const matchTrack = activeTracks.find((t) => t.album === topAlbumEntry![0]);
       topAlbum = {
@@ -240,7 +246,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
         topArtistEntry = [artist, count];
       }
     }
-    let topArtist: { name: string; count: number; id?: string } | null = null;
+    let topArtist: { name: string; count: number; id?: string } | null;
     if (topArtistEntry) {
       const matchTrack = activeTracks.find((t) => t.artist === topArtistEntry![0]);
       topArtist = {
@@ -581,7 +587,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               {visibleSits.map((sitting, idx) => {
                 const sittingId = sitting.id || `s${idx + 1}`;
                 const isSelected = sittingId === selectedSittingId;
-                const isHovered = sittingId === hoveredSittingId;
+                // const isHovered = sittingId === hoveredSittingId;
                 const rawCount = sitting.tracksCountStr
                   .replace(" tracks", "")
                   .replace(" track", "");

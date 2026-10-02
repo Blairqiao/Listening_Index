@@ -35,6 +35,20 @@ export interface EnrichmentBatchResult {
   };
 }
 
+interface EnrichmentRequestResult {
+  id: string;
+  name: string;
+  duration_ms: number;
+  isTransient: boolean;
+  album?: {
+    id: string;
+    name: string;
+    images?: Array<{ url: string; width?: number; height?: number }>;
+  };
+  artists?: Array<{ id: string; name: string }>;
+  error?: string;
+}
+
 /**
  * Runs a quota-budgeted batch of metadata enrichment.
  * In 'cron' mode: applies Density-Gated Fan-Out for album clusters (up to 14 calls).
@@ -97,7 +111,7 @@ export async function runEnrichmentBatch(
     };
   }
 
-  let token = await getAccessToken();
+  const token = await getAccessToken();
   const enrichedItems: EnrichedTrackItem[] = [];
   const delistedIds: string[] = [];
   const resolvedTrackIds = new Set<string>();
@@ -136,7 +150,7 @@ export async function runEnrichmentBatch(
 
           if (seedRes.status === 429) {
             const retryAfter = parseInt(seedRes.headers.get("Retry-After") || "10", 10);
-            await recordApiCooldown("spotify", retryAfter, "HTTP 429 Too Many Requests");
+            await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
             if (enrichedItems.length > 0 || delistedIds.length > 0) {
               await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
             }
@@ -152,7 +166,7 @@ export async function runEnrichmentBatch(
           }
 
           if (seedRes.ok) {
-            const seedData = (await seedRes.json()) as any;
+            const seedData = (await seedRes.json()) as EnrichmentRequestResult;
             const albumObj = seedData.album;
             const albumId = albumObj?.id;
             const albumImageUrl = albumObj?.images?.[0]?.url || null;
@@ -198,7 +212,7 @@ export async function runEnrichmentBatch(
 
                 if (albumTracksRes.status === 429) {
                   const retryAfter = parseInt(albumTracksRes.headers.get("Retry-After") || "10", 10);
-                  await recordApiCooldown("spotify", retryAfter, "HTTP 429 Too Many Requests");
+                  await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
                   break;
                 }
 
@@ -206,8 +220,8 @@ export async function runEnrichmentBatch(
                   break;
                 }
 
-                const albumTracksData = (await albumTracksRes.json()) as any;
-                const items: any[] = albumTracksData.items || [];
+                const albumTracksData = (await albumTracksRes.json()) as { items: EnrichmentRequestResult[], next?: string | null };
+                const items: EnrichmentRequestResult[] = albumTracksData.items || [];
 
                 for (const item of items) {
                   if (!item?.id) continue;
@@ -283,15 +297,16 @@ export async function runEnrichmentBatch(
 
           const trackData = await res.json();
           return { id: t.id, track: trackData };
-        } catch (err: any) {
-          return { id: t.id, isTransient: true, error: err?.message || "Network error" };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return { id: t.id, isTransient: true, error: message || "Network error" };
         }
       })
     );
 
     for (const r of results) {
       if ("rateLimited" in r && r.rateLimited) {
-        await recordApiCooldown("spotify", r.retryAfterSeconds, "HTTP 429 Too Many Requests");
+        await recordApiCooldown(r.retryAfterSeconds, "HTTP 429 Too Many Requests");
         if (enrichedItems.length > 0 || delistedIds.length > 0) {
           await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
         }
@@ -315,7 +330,7 @@ export async function runEnrichmentBatch(
         continue;
       }
 
-      const spTrack = (r as any).track;
+      const spTrack = r.track;
       if (!spTrack) {
         delistedIds.push(r.id);
         continue;

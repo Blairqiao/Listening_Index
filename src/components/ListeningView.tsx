@@ -18,7 +18,6 @@ import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import {
   Mode,
   RangeKey,
-  SittingSession,
 } from "@/lib/mock-listening-data";
 import {
   OverviewData,
@@ -31,8 +30,6 @@ import {
   formatStreamLogMetrics,
   formatRankDisplay,
   formatPlaysDisplay,
-  type OverviewMetricsRaw,
-  type StreamLogMetricsRaw,
 } from "@/lib/format-utils";
 
 export function getTrackStatsCacheKey(params: {
@@ -119,7 +116,9 @@ function getCachedStreamLogDepth(): number {
         return Math.max(50, parsed.count);
       }
     }
-  } catch {}
+  } catch (error) {
+    console.error("[STREAM LOG DEPTH] Error reading cached depth:", error);
+  }
   return 50;
 }
 
@@ -130,7 +129,9 @@ function setCachedStreamLogDepth(count: number) {
       STREAM_LOG_DEPTH_KEY,
       JSON.stringify({ count, timestamp: Date.now() })
     );
-  } catch {}
+  } catch (error) {
+    console.error("[STREAM LOG DEPTH] Error setting cached depth:", error);
+  }
 }
 
 export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
@@ -229,7 +230,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (savedArtist === "rank" || savedArtist === "percentile") {
         setArtistRankFormat(savedArtist);
       }
-    } catch {}
+    } catch (error) {
+      console.error("[LISTENING VIEW] Error reading cached rank formats:", error);
+    }
   }, []);
 
   const handleToggleTrackRank = useCallback(() => {
@@ -237,7 +240,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const next = prev === "rank" ? "percentile" : "rank";
       try {
         localStorage.setItem("listening_track_rank_format", next);
-      } catch {}
+      } catch (error) {
+        console.error("[LISTENING VIEW] Error setting cached track rank format:", error);
+      }
       return next;
     });
   }, []);
@@ -247,7 +252,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const next = prev === "rank" ? "percentile" : "rank";
       try {
         localStorage.setItem("listening_artist_rank_format", next);
-      } catch {}
+      } catch (error) {
+        console.error("[LISTENING VIEW] Error setting cached artist rank format:", error);
+      }
       return next;
     });
   }, []);
@@ -266,7 +273,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (saved === "hours" || saved === "minutes") {
         setOverviewTimeUnit(saved);
       }
-    } catch {}
+    } catch (error) {
+      console.error("[LISTENING VIEW] Error reading cached overview time unit:", error);
+    }
   }, []);
 
   const handleToggleTimeUnit = useCallback(() => {
@@ -274,7 +283,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const next = prev === "minutes" ? "hours" : "minutes";
       try {
         localStorage.setItem("listening_overview_time_unit", next);
-      } catch {}
+      } catch (error) {
+        console.error("[LISTENING VIEW] Error setting cached overview time unit:", error);
+      }
       return next;
     });
   }, []);
@@ -636,7 +647,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
       try {
-        const promises: Promise<any>[] = [];
+        const promises: Promise<unknown>[] = [];
         if (!hasOverview) promises.push(fetchOverview(activeRange));
         if (!hasStreamLog) promises.push(fetchStreamLog());
         if (!hasSession) promises.push(fetchSession());
@@ -1049,7 +1060,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSyncing={isSyncing}
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
-            totalPlays={streamLogData.metrics[0]}
+            // totalPlays={streamLogData.metrics[0]}
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
             isLinked={isLinked}

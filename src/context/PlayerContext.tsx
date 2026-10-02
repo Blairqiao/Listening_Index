@@ -59,9 +59,17 @@ export interface PlayerContextValue {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
+interface PlaybackState {
+  is_playing: boolean;
+  device: {
+    id: string;
+    name: string;
+  };
+}
+
 /** Pure helper to resolve whether playback is active locally or on a remote device */
 export function resolveActiveDevice(
-  playback: any,
+  playback: PlaybackState,
   localDeviceId: string | null
 ): ActiveDevice | null {
   if (!playback || !playback.device) return null;
@@ -139,7 +147,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (res.status === 200) {
-        const data = await res.json();
+        const data: PlaybackState = await res.json();
         const resolved = resolveActiveDevice(data, localId);
         setActiveDevice(resolved);
       } else if (res.status === 204 || res.status === 404) {
@@ -361,7 +369,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleUnlink = useCallback(async () => {
     try {
       await fetch("/api/player/token", { method: "DELETE" });
-    } catch {}
+    } catch (e) {
+      console.warn("[PLAYER] Failed to unlink Spotify:", e);
+    }
     playerRef.current?.disconnect();
     playerRef.current = null;
     deviceIdRef.current = null;
@@ -426,8 +436,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (playerRef.current) {
       try {
         await playerRef.current.togglePlay();
-      } catch (e: any) {
-        setErrorMessage(e?.message || "Playback toggle failed");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Playback toggle failed";
+        setErrorMessage(message || "Playback toggle failed");
       }
     }
   }, []);

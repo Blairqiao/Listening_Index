@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, isDbConfigured } from "@/lib/db";
+import { isDbConfigured } from "@/lib/db";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import {
   bulkUpsertTracks,

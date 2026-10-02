@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
       realValue(process.env.SPOTIFY_CLIENT_ID) ??
       "",
   },
+
+  images: {
+    domains: ["i.scdn.co", "seeded-session-images.scdn.co"],
+  },
 };
 
 export default nextConfig;

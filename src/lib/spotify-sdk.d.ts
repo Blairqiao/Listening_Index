@@ -23,7 +23,7 @@ interface SpotifyPlaybackContext {
   metadata?: {
     name?: string;
     context_description?: string;
-    [key: string]: any;
+    // [key: string]: any;
   } | null;
 }
 

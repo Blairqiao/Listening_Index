@@ -6,7 +6,6 @@ import {
   PreviousSitting,
   SittingSession,
   SessionHistogramData,
-  SessionHistogramBar,
   RangeKey,
   ActivityDay,
   ActivityBucket,
