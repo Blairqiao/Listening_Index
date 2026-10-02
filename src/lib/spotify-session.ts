@@ -43,7 +43,9 @@ export async function fetchAccessToken(): Promise<string | null> {
 export async function signOut(): Promise<void> {
   try {
     await fetch("/api/spotify/session", { method: "DELETE" });
-  } catch {}
+  } catch (_error) {
+    return;
+  }
 }
 
 /**

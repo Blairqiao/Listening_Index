@@ -10,7 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { extractAudioHistoryEntries, isAudioHistoryFilename } from "@/lib/zip-utils";
-import { parseHistoryRecords, CompactPlayEvent } from "@/lib/history-parser";
+import { parseHistoryRecords } from "@/lib/history-parser";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -41,7 +41,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // Ingestion Progress
   const [stage1Current, setStage1Current] = useState<number>(0);
   const [stage1Total, setStage1Total] = useState<number>(0);
-  const [totalNewPlays, setTotalNewPlays] = useState<number>(0);
+  // const [totalNewPlays, setTotalNewPlays] = useState<number>(0);
 
   // Overall Database Catalog Enrichment Status
   const [enrichmentProgress, setEnrichmentProgress] = useState<EnrichmentProgress | null>(null);
@@ -147,7 +147,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setErrorMessage("");
     setStage1Current(0);
     setStage1Total(0);
-    setTotalNewPlays(0);
+    // setTotalNewPlays(0);
 
     try {
       const tasks: Array<{ name: string; getText: () => Promise<string> }> = [];
@@ -191,7 +191,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         setStatusMessage(`Reading ${task.name} (${i + 1}/${tasks.length})...`);
         const jsonText = await task.getText();
 
-        let rawItems: any[];
+        let rawItems: { [key: string]: unknown }[];
         try {
           rawItems = JSON.parse(jsonText);
           if (!Array.isArray(rawItems)) {
@@ -227,7 +227,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           const resJson = await response.json();
           totalNew += resJson.newPlays || 0;
           setStage1Current((prev) => prev + chunk.length);
-          setTotalNewPlays(totalNew);
+          // setTotalNewPlays(totalNew);
         }
       }
 
@@ -251,7 +251,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setErrorMessage("");
     setStage1Current(0);
     setStage1Total(0);
-    setTotalNewPlays(0);
+    // setTotalNewPlays(0);
   };
 
   if (!shouldRender) return null;

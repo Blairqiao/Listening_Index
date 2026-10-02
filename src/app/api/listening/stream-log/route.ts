@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStreamLog } from "@/lib/db/queries";
 import { getOrFetchStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { MOCK_DATA, getMockStreamLog } from "@/lib/mock-data";
+import { getMockStreamLog } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 

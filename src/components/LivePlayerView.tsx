@@ -325,7 +325,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
   sourceMode: externalSourceMode,
   onToggleSourceMode,
 }) => {
-  const { config, updateConfig } = useConfig();
+  const config = useConfig().config;
   const {
     playerStatus,
     errorMessage,
@@ -355,15 +355,15 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     setInternalSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
   }, []);
 
-  const handleToggleLayout = useCallback(() => {
-    const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
-    updateConfig({ livePlayerLayout: next });
-    void fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ livePlayerLayout: next }),
-    }).catch(() => { });
-  }, [config.livePlayerLayout, updateConfig]);
+  // const handleToggleLayout = useCallback(() => {
+  //   const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
+  //   updateConfig({ livePlayerLayout: next });
+  //   void fetch("/api/config", {
+  //     method: "POST",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify({ livePlayerLayout: next }),
+  //   }).catch(() => { });
+  // }, [config.livePlayerLayout, updateConfig]);
 
   const displayTrack = resolveDisplayTrack({
     currentTrack,

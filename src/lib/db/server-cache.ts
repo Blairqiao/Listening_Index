@@ -113,7 +113,9 @@ export function clearServerCache(): void {
   for (const listener of cacheClearListeners) {
     try {
       listener();
-    } catch {}
+    } catch (_error) {
+      return;
+    }
   }
   console.log("[SERVER CACHE] All server listening caches purged.");
 

@@ -36,9 +36,10 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ success: true, message: "Authorized successfully" });
     response.headers.set("Set-Cookie", cookieHeader);
     return response;
-  } catch (err: unknown) {
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { success: false, error: "Authentication failed unexpectedly" },
+      { success: false, error: "Authentication failed unexpectedly: " + error },
       { status: 500 }
     );
   }

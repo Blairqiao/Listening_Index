@@ -88,29 +88,29 @@ export function getRedirectUri(request?: NextRequest): string {
   return "http://127.0.0.1:8888/callback";
 }
 
-function randomString(length: number): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  // Unreserved characters only, so the verifier survives the round trip.
-  const alphabet =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
-}
+// function randomString(length: number): string {
+//   const bytes = new Uint8Array(length);
+//   crypto.getRandomValues(bytes);
+//   // Unreserved characters only, so the verifier survives the round trip.
+//   const alphabet =
+//     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+//   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+// }
 
-function base64Url(buffer: ArrayBuffer): string {
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+// function base64Url(buffer: ArrayBuffer): string {
+//   let binary = "";
+//   const bytes = new Uint8Array(buffer);
+//   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+//   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+// }
 
-async function challengeFor(verifier: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier)
-  );
-  return base64Url(digest);
-}
+// async function challengeFor(verifier: string): Promise<string> {
+//   const digest = await crypto.subtle.digest(
+//     "SHA-256",
+//     new TextEncoder().encode(verifier)
+//   );
+//   return base64Url(digest);
+// }
 
 export function readToken(): StoredToken | null {
   try {
@@ -127,13 +127,17 @@ export function readToken(): StoredToken | null {
 function writeToken(token: StoredToken) {
   try {
     localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
-  } catch {}
+  } catch (_error) {
+    return;
+  }
 }
 
 export function clearToken() {
   try {
     localStorage.removeItem(TOKEN_KEY);
-  } catch {}
+  } catch (_error) {
+    return;
+  }
 }
 
 /** Sends the visitor to Spotify's consent screen. Does not return. */
@@ -192,29 +196,31 @@ export async function beginLoginPopup(): Promise<boolean | null> {
   });
 }
 
-async function buildAuthUrl(): Promise<string> {
-  const clientId = getClientId();
-  if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
+// async function buildAuthUrl(): Promise<string> {
+//   const clientId = getClientId();
+//   if (!clientId) throw new Error("NEXT_PUBLIC_SPOTIFY_CLIENT_ID is not set");
 
-  const verifier = randomString(64);
-  const challenge = await challengeFor(verifier);
-  try {
-    // localStorage rather than sessionStorage: the popup is its own context.
-    localStorage.setItem(VERIFIER_KEY, verifier);
-    localStorage.setItem(FLOW_CLIENT_ID_KEY, clientId);
-    sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search);
-  } catch {}
+//   const verifier = randomString(64);
+//   const challenge = await challengeFor(verifier);
+//   try {
+//     // localStorage rather than sessionStorage: the popup is its own context.
+//     localStorage.setItem(VERIFIER_KEY, verifier);
+//     localStorage.setItem(FLOW_CLIENT_ID_KEY, clientId);
+//     sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search);
+//   } catch (_error) {
+//     console.error("Error setting return path:", _error);
+//   }
 
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: "code",
-    redirect_uri: getRedirectUri(),
-    scope: PLAYER_SCOPES,
-    code_challenge_method: "S256",
-    code_challenge: challenge,
-  });
-  return `https://accounts.spotify.com/authorize?${params}`;
-}
+//   const params = new URLSearchParams({
+//     client_id: clientId,
+//     response_type: "code",
+//     redirect_uri: getRedirectUri(),
+//     scope: PLAYER_SCOPES,
+//     code_challenge_method: "S256",
+//     code_challenge: challenge,
+//   });
+//   return `https://accounts.spotify.com/authorize?${params}`;
+// }
 
 export function consumeReturnPath(): string {
   try {
@@ -269,7 +275,9 @@ async function exchangeCode(code: string): Promise<StoredToken> {
   try {
     verifier = localStorage.getItem(VERIFIER_KEY) || "";
     localStorage.removeItem(VERIFIER_KEY);
-  } catch {}
+  } catch (_error) {
+    console.error("Error reading PKCE verifier:", _error);
+  }
   if (!verifier) throw new Error("Missing PKCE verifier — start the login again");
 
   const token = await postToken({

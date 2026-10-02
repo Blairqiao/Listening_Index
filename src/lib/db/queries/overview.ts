@@ -2,7 +2,6 @@ import { getDb } from "../index";
 import { isCatalogFullyEnriched } from "./enrichment";
 import { getLastSync } from "./ingestion";
 import {
-  getTimezone,
   sanitizeTimezone,
   formatLogStartDate,
   formatDayGroupTz,
@@ -169,6 +168,14 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     `;
   });
 
+  // interface CadenceRow {
+  //   day?: string;
+  //   block?: number;
+  //   hour_key?: string;
+  //   ym?: string;
+  //   count: number;
+  // }
+
   // 6. Activity cadence query
   let cadenceQueryPromise;
   if (range === "1d") {
@@ -248,7 +255,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     topAlbumsPromise,
     cadenceQueryPromise,
     lastSyncPromise,
-  ])) as any;
+  ]));
 
   // Format log start date
   const logStartDate = minDateRow?.log_start_date
@@ -292,7 +299,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   ];
 
   // Process top tracks
-  const topTracks: TrackSummary[] = (rawTopTracks as any[]).map((row) => ({
+  const topTracks: TrackSummary[] = rawTopTracks.map((row) => ({
     id: row.track_id,
     rank: String(row.rank).padStart(2, "0"),
     drift: (row.drift as TrackSummary["drift"]) || "·",
@@ -308,7 +315,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   }));
 
   // Process top artists
-  const topArtists = (rawTopArtists as any[]).map((row, idx) => ({
+  const topArtists = rawTopArtists.map((row, idx) => ({
     id: row.id || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
@@ -316,7 +323,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   }));
 
   // Process top albums
-  const topAlbums: AlbumSummary[] = (rawTopAlbums as any[]).map((row, idx) => ({
+  const topAlbums: AlbumSummary[] = rawTopAlbums.map((row, idx) => ({
     id: row.id || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
@@ -333,7 +340,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 
   if (range === "1d") {
     const hourMap = new Map<string, number>(
-      (cadenceRows as any[]).map((r) => [r.hour_key, Number(r.count)])
+      cadenceRows.map((r) => [r.hour_key, Number(r.count)])
     );
     clockBuckets = new Array(24).fill(0);
 
@@ -365,7 +372,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     }
   } else if (range === "1w") {
     const blockMap = new Map<string, number>(
-      (cadenceRows as any[]).map((r: any) => [`${r.day}_${r.block}`, Number(r.count)])
+      cadenceRows.map((r) => [`${r.day}_${r.block}`, Number(r.count)])
     );
     const BLOCK_TIMES = [
       "00:00–06:00",
@@ -406,7 +413,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     }
   } else if (range === "1m") {
     const countMap = new Map<string, number>(
-      (cadenceRows as any[]).map((r: any) => [String(r.day), Number(r.count)])
+      cadenceRows.map((r) => [String(r.day), Number(r.count)])
     );
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 86400000);
@@ -434,7 +441,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     }
   } else if (range === "6m") {
     const countMap = new Map<string, number>(
-      (cadenceRows as any[]).map((r: any) => [String(r.day), Number(r.count)])
+      cadenceRows.map((r) => [String(r.day), Number(r.count)])
     );
     let lastMonth = "";
     for (let w = 25; w >= 0; w--) {
@@ -479,7 +486,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     }
   } else if (range === "1y") {
     const countMap = new Map<string, number>(
-      (cadenceRows as any[]).map((r: any) => [String(r.ym), Number(r.count)])
+      cadenceRows.map((r) => [String(r.ym), Number(r.count)])
     );
     for (let m = 11; m >= 0; m--) {
       const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
@@ -504,23 +511,23 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   } else {
     // range === "all"
     const countMap = new Map<number, number>(
-      (cadenceRows as any[]).map((r: any) => [Number(r.play_year), Number(r.count)])
+      cadenceRows.map((r) => [Number(r.play_year), Number(r.count)])
     );
     const minRowYear = minDateRow?.log_start_date
       ? new Date(minDateRow.log_start_date).getFullYear()
       : now.getFullYear() - 1;
 
     let minYear = minRowYear;
-    if (cadenceRows && (cadenceRows as any[]).length > 0) {
-      const minPlayYear = Math.min(...(cadenceRows as any[]).map((r: any) => Number(r.play_year)));
+    if (cadenceRows && cadenceRows.length > 0) {
+      const minPlayYear = Math.min(...cadenceRows.map((r) => Number(r.play_year)));
       if (Number.isFinite(minPlayYear)) {
         minYear = Math.min(minYear, minPlayYear);
       }
     }
     const currentYear = now.getFullYear();
     const startYear = Math.min(minYear, currentYear);
-    const maxPlayYear = (cadenceRows as any[]).length > 0
-      ? Math.max(...(cadenceRows as any[]).map((r: any) => Number(r.play_year)))
+    const maxPlayYear = cadenceRows.length > 0
+      ? Math.max(...cadenceRows.map((r) => Number(r.play_year)))
       : currentYear;
     const endYear = Math.max(currentYear, Number.isFinite(maxPlayYear) ? maxPlayYear : currentYear);
 
