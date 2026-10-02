@@ -29,7 +29,9 @@ export const OwnerSpotifyConnect: React.FC<OwnerSpotifyConnectProps> = ({ hasSav
     try {
       const res = await fetch("/api/owner/spotify", { cache: "no-store" });
       if (res.ok) setStatus((await res.json()) as Status);
-    } catch {}
+    } catch (_error) {
+      return;
+    }
   }, []);
 
   useEffect(() => {

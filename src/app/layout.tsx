@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
-import { siteConfig } from "@/config";
 import { getActiveSiteConfig } from "@/lib/db/queries";
 import "./globals.css";
 

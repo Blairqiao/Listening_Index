@@ -3,7 +3,7 @@ dotenv.config();
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: "spotify.env" });
 
-import { getAccessToken } from "../src/lib/spotify";
+import { getAccessToken, SpotifyApiError } from "../src/lib/spotify";
 import { getDb, isDbConfigured } from "../src/lib/db";
 
 async function testRateLimit() {
@@ -42,10 +42,15 @@ async function testRateLimit() {
   try {
     token = await getAccessToken();
     console.log("      ✓ Access token acquired successfully.\n");
-  } catch (err: any) {
-    console.error("      ✗ Failed to obtain access token:", err.message);
-    if (err.status === 429) {
-      console.error(`      ⚠️ Spotify Auth endpoint is rate-limited! Retry after ${err.retryAfter ?? "unknown"}s`);
+  } catch (error) {
+    if (error instanceof SpotifyApiError) {
+      const message = error.message;
+      console.error("      ✗ Failed to obtain access token:", message);
+      if (error.status === 429) {
+        console.error(`      ⚠️ Spotify Auth endpoint is rate-limited! Retry after ${error.retryAfter ?? "unknown"}s`);
+      }
+    } else {
+      console.error("      ✗ Failed to obtain access token:", error);
     }
     process.exit(1);
   }
@@ -64,8 +69,16 @@ async function testRateLimit() {
   console.log(`HTTP Status: ${response.status} ${response.statusText} (${latency}ms)`);
   console.log(`------------------------------------------------------------\n`);
 
+  interface SpotifyTrackResponse {
+    name: string;
+    artists: {
+      [index: number]: { name: string };
+    };
+    album: { name: string };
+  }
+
   if (response.status === 200) {
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as SpotifyTrackResponse;
     const trackName = data.name;
     const artistName = data.artists?.[0]?.name || "Unknown";
     const albumName = data.album?.name || "Unknown";

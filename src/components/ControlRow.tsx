@@ -45,11 +45,11 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   isSyncing = false,
   onTriggerSync,
   streamLogCount,
-  totalPlays,
+  // totalPlays,
   layout = "split",
   onToggleLayout,
-  sourceMode = "synthetic",
-  onToggleSourceMode,
+  // sourceMode = "synthetic",
+  // onToggleSourceMode,
   isLinked = false,
   isAuthorizing = false,
   onLinkSpotify,
@@ -120,7 +120,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         );
       case 1: {
         const count = streamLogCount || 50;
-        const total = totalPlays || "--";
+        // const total = totalPlays || "--";
         return (
           <>
             <span className="sm:hidden font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
