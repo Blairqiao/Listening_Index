@@ -28,7 +28,14 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    domains: ["i.scdn.co", "seeded-session-images.scdn.co"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "i.scdn.co",
+        port: "",
+        pathname: "/image/**",
+      },
+    ],
   },
 };
 
