@@ -16,6 +16,7 @@ interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUploadComplete?: () => void;
+  onProcessingChange?: (isProcessing: boolean) => void;
   isDbConfigured: boolean;
 }
 
@@ -32,6 +33,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   onUploadComplete,
+  onProcessingChange,
   isDbConfigured,
 }) => {
   const [step, setStep] = useState<UploadStep>("idle");
@@ -142,6 +144,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
    */
   const processFiles = async (files: File[]) => {
     isProcessingRef.current = true;
+    if (onProcessingChange) onProcessingChange(true);
     setStep("inspecting");
     setStatusMessage("Inspecting uploaded files...");
     setErrorMessage("");
@@ -242,6 +245,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setErrorMessage(err instanceof Error ? err.message : "Upload failed unexpectedly");
     } finally {
       isProcessingRef.current = false;
+      if (onProcessingChange) onProcessingChange(false);
     }
   };
 

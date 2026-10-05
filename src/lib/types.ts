@@ -1,0 +1,670 @@
+import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
+
+export type Mode = 0 | 1 | 2 | 3; // 0 = Overview, 1 = Stream Log, 2 = Session, 3 = Live Player
+export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
+
+export interface TrackSummary {
+  id: string;
+  rank: string; // '01'
+  drift: "·" | "+1" | "-1" | "+2" | "-2" | "NEW";
+  name: string;
+  artist: string;
+  artistId?: string;
+  album: string;
+  albumId?: string;
+  duration: string; // '5:18'
+  plays: number;
+  swatchColor: string;
+  albumImageUrl?: string | null;
+}
+
+export interface StreamLogItem {
+  id: string;
+  trackId?: string;
+  artistId?: string;
+  albumId?: string;
+  playedAt?: string;
+  timeStr: string; // '21:02'
+  title: string;
+  artist: string;
+  album: string;
+  duration: string;
+  durationMs?: number;
+  albumImageUrl?: string | null;
+  swatchColor?: string;
+  status?: string;
+  dayGroup?: string; // '09 SEP'
+  sessionGap?: {
+    durationStr: string;
+    sittingLabel: string;
+  };
+}
+
+export interface SittingItem {
+  id: string;
+  artistId?: string;
+  albumId?: string;
+  timestamp: string; // '23:47'
+  title: string;
+  artist: string;
+  album: string;
+  swatchColor: string;
+  albumImageUrl?: string | null;
+  status?: string;
+  isActive?: boolean;
+  isFirstPlay?: boolean;
+  duration?: string;
+}
+
+export type SessionTrackItem = SittingItem;
+
+export interface PreviousSitting {
+  id?: string;
+  dateStr: string; // '09 SEP'
+  durationStr: string; // '1h 14m'
+  tracksCountStr: string; // '18 tracks'
+  runtimeMinutes?: number;
+  trackCount?: number;
+}
+
+export type PreviousSession = PreviousSitting;
+
+export interface SittingAnalysis {
+  firstPlaysCount: number;
+  totalTracks: number;
+  topTrack?: { title: string; count: number; id?: string; artist?: string } | null;
+  topSong: { title: string; count: number; id?: string; artist?: string } | null;
+  topAlbum: { title: string; count: number; id?: string; artist?: string };
+  topArtist: { name: string; count: number; id?: string };
+}
+
+export type SessionAnalysis = SittingAnalysis;
+
+export interface SittingSession {
+  id: string;
+  dateStr: string;
+  runtimeMinutes: number;
+  runtimeStr: string;
+  trackCount: number;
+  uniqueArtistsCount: number;
+  startTime: string;
+  tagTime?: string;
+  isOpen: boolean;
+  tracks: SittingItem[];
+  analysis: SittingAnalysis;
+}
+
+export type SessionBlock = SittingSession;
+
+export interface SessionHistogramBar {
+  id: string;
+  runtimeMinutes: number;
+  dateStr: string;
+  title: string;
+}
+
+export interface SessionHistogramData {
+  avgRuntimeMinutes: number;
+  oldestDate: string;
+  newestDate: string;
+  bars: SessionHistogramBar[];
+}
+
+export interface SessionData {
+  isOpen: boolean;
+  tagTime: string; // '22:15 CDT' or '18M'
+  metrics: [string, string, string, string]; // Runtime, Tracks, Unique Artists, Start Time
+  sittingTracks: SittingItem[];
+  previousSittings: PreviousSitting[];
+  lastSyncedAt?: string;
+  sittings?: SittingSession[];
+  sessions?: SittingSession[];
+  histogram?: SessionHistogramData;
+}
+
+export interface AlbumSummary {
+  id?: string;
+  rank: string; // '01', '02', etc.
+  name: string; // e.g., 'Blonde'
+  artist: string; // e.g., 'Frank Ocean'
+  artistId?: string;
+  count: number; // e.g., 241
+}
+
+export interface ActivityBucket {
+  startTime: string; // ISO 8601 string
+  endTime: string; // ISO 8601 string
+  count: number;
+  isMarker?: boolean;
+  markerLabel?: string;
+  date: string;
+}
+
+export type ActivityDay = ActivityBucket;
+
+export interface OverviewData {
+  logStartDate: string;
+  rawMetrics: OverviewMetricsRaw;
+  metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
+  topTracks: TrackSummary[];
+  topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
+  topAlbums: AlbumSummary[];
+  clockBuckets?: number[]; // 24 values
+  activityCadence: ActivityBucket[]; // Multi-scale activity distribution
+  lastSyncedAt?: string;
+}
+
+export interface MockListeningData {
+  overview: Record<RangeKey, OverviewData>;
+  streamLog: {
+    rawMetrics: StreamLogMetricsRaw;
+    metrics: [string, string, string, string]; // Plays, Unique Tracks, Artists, Streak
+    entries: StreamLogItem[];
+    nextCursor?: string | null;
+    nextCursorId?: string | null;
+    hasMore?: boolean;
+    lastSyncedAt?: string;
+  };
+  session: SessionData;
+}
+
+// ---------------------------------------------------------------------------
+// Canonical Music Catalog (Curated English Tracks with Verified Spotify Metadata)
+// ---------------------------------------------------------------------------
+
+export const CATALOG = {
+  radiohead_weird_fishes: {
+    id: "4clD00s1c0rVqP9Ld0vV48",
+    name: "Weird Fishes / Arpeggi",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "In Rainbows",
+    albumId: "7vd91cWv27mKrnG67vR4iR",
+    duration: "5:18",
+    swatchColor: "#3A2A1A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/50/c7/dd50c790-99ac-d3d0-5ab8-e3891fb8fd52/634904032463.png/600x600bb.jpg",
+  },
+  radiohead_15_step: {
+    id: "4I2JA4Z53b01a14oH4pD2t",
+    name: "15 Step",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "In Rainbows",
+    albumId: "7vd91cWv27mKrnG67vR4iR",
+    duration: "3:57",
+    swatchColor: "#3A2A1A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/50/c7/dd50c790-99ac-d3d0-5ab8-e3891fb8fd52/634904032463.png/600x600bb.jpg",
+  },
+  radiohead_nude: {
+    id: "35YyxFtlUBloXIwtav7Ch5",
+    name: "Nude",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "In Rainbows",
+    albumId: "7vd91cWv27mKrnG67vR4iR",
+    duration: "4:15",
+    swatchColor: "#3A2A1A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/50/c7/dd50c790-99ac-d3d0-5ab8-e3891fb8fd52/634904032463.png/600x600bb.jpg",
+  },
+  radiohead_reckoner: {
+    id: "3zXh2r4hL4QhZ6qV6s0V8r",
+    name: "Reckoner",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "In Rainbows",
+    albumId: "7vd91cWv27mKrnG67vR4iR",
+    duration: "4:50",
+    swatchColor: "#3A2A1A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/50/c7/dd50c790-99ac-d3d0-5ab8-e3891fb8fd52/634904032463.png/600x600bb.jpg",
+  },
+  radiohead_paranoid_android: {
+    id: "6LgJvl0Xdtc73RJ1mmpotq",
+    name: "Paranoid Android",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "OK Computer",
+    albumId: "6dVIqQ8qmQ5GBnJ9shOYGE",
+    duration: "6:23",
+    swatchColor: "#283C4A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/07/60/ba/0760ba0f-148c-b18f-d0ff-169ee96f3af5/634904078164.png/600x600bb.jpg",
+  },
+  radiohead_karma_police: {
+    id: "63OQupATfueENZJaC0gNm1",
+    name: "Karma Police",
+    artist: "Radiohead",
+    artistId: "4Z8W4fKeB5YxbusRsdQVPb",
+    album: "OK Computer",
+    albumId: "6dVIqQ8qmQ5GBnJ9shOYGE",
+    duration: "4:21",
+    swatchColor: "#283C4A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/07/60/ba/0760ba0f-148c-b18f-d0ff-169ee96f3af5/634904078164.png/600x600bb.jpg",
+  },
+  frank_ocean_pink_white: {
+    id: "3xKsf9qdS1CyvXS5sb08b8",
+    name: "Pink + White",
+    artist: "Frank Ocean",
+    artistId: "2h93pZq0e7k5yf4Y40u9UR",
+    album: "Blonde",
+    albumId: "3mH6qwIy9crq0I9YQbOuDf",
+    duration: "3:04",
+    swatchColor: "#3B4A3A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/42/62/50/426250f9-7e39-f907-687c-442caa436636/dj.nhptxziz.jpg/600x600bb.jpg",
+  },
+  frank_ocean_nikes: {
+    id: "19YKaevk2bce41UVk7RAum",
+    name: "Nikes",
+    artist: "Frank Ocean",
+    artistId: "2h93pZq0e7k5yf4Y40u9UR",
+    album: "Blonde",
+    albumId: "3mH6qwIy9crq0I9YQbOuDf",
+    duration: "5:14",
+    swatchColor: "#3B4A3A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/42/62/50/426250f9-7e39-f907-687c-442caa436636/dj.nhptxziz.jpg/600x600bb.jpg",
+  },
+  frank_ocean_ivy: {
+    id: "2ZWlPOoWh0626oTaHRnl2A",
+    name: "Ivy",
+    artist: "Frank Ocean",
+    artistId: "2h93pZq0e7k5yf4Y40u9UR",
+    album: "Blonde",
+    albumId: "3mH6qwIy9crq0I9YQbOuDf",
+    duration: "4:09",
+    swatchColor: "#3B4A3A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/42/62/50/426250f9-7e39-f907-687c-442caa436636/dj.nhptxziz.jpg/600x600bb.jpg",
+  },
+  frank_ocean_nights: {
+    id: "7eqoqGkKwgOaWNNHx90uEZ",
+    name: "Nights",
+    artist: "Frank Ocean",
+    artistId: "2h93pZq0e7k5yf4Y40u9UR",
+    album: "Blonde",
+    albumId: "3mH6qwIy9crq0I9YQbOuDf",
+    duration: "5:07",
+    swatchColor: "#3B4A3A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/42/62/50/426250f9-7e39-f907-687c-442caa436636/dj.nhptxziz.jpg/600x600bb.jpg",
+  },
+  kendrick_alright: {
+    id: "3iVcQ50DCVupKAh0DxnZ1z",
+    name: "Alright",
+    artist: "Kendrick Lamar",
+    artistId: "2YZyLoL8N0Wb9xBt1NhZWg",
+    album: "To Pimp a Butterfly",
+    albumId: "7ycBtnsMtyVbbw3fMwR2nM",
+    duration: "3:39",
+    swatchColor: "#222222",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/b5/a6/91/b5a69171-5232-3d5b-9c15-8963802f83dd/15UMGIM15814.rgb.jpg/600x600bb.jpg",
+  },
+  kendrick_king_kunta: {
+    id: "0N3W5qLeLqETRpyPheLGR5",
+    name: "King Kunta",
+    artist: "Kendrick Lamar",
+    artistId: "2YZyLoL8N0Wb9xBt1NhZWg",
+    album: "To Pimp a Butterfly",
+    albumId: "7ycBtnsMtyVbbw3fMwR2nM",
+    duration: "3:54",
+    swatchColor: "#222222",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/b5/a6/91/b5a69171-5232-3d5b-9c15-8963802f83dd/15UMGIM15814.rgb.jpg/600x600bb.jpg",
+  },
+  kendrick_money_trees: {
+    id: "74tLlkN3pmQwBvaMRA4oxE",
+    name: "Money Trees",
+    artist: "Kendrick Lamar",
+    artistId: "2YZyLoL8N0Wb9xBt1NhZWg",
+    album: "good kid, m.A.A.d city",
+    albumId: "748dEZwhgnyspuaWIvlyx9",
+    duration: "6:26",
+    swatchColor: "#3D352E",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/36/86/ec/3686ec99-dec4-0a01-8b74-2d8a9a0263a7/12UMGIM52988.rgb.jpg/600x600bb.jpg",
+  },
+  phoebe_kyoto: {
+    id: "49UDv3b5B1bQx4K43Q486h",
+    name: "Kyoto",
+    artist: "Phoebe Bridgers",
+    artistId: "1r1uxoy19fzMxunt3ONAkG",
+    album: "Punisher",
+    albumId: "2xGQEAlDAw7whm4vvt3WvX",
+    duration: "3:04",
+    swatchColor: "#3A1E22",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/5a/5d/1f/5a5d1fde-7f6f-9997-3bca-d75f1e799464/656605154565.jpg/600x600bb.jpg",
+  },
+  phoebe_motion_sickness: {
+    id: "5xo8RrjJ9CVNrtRg2S3tyW",
+    name: "Motion Sickness",
+    artist: "Phoebe Bridgers",
+    artistId: "1r1uxoy19fzMxunt3ONAkG",
+    album: "Stranger in the Alps",
+    albumId: "0AkFsgr2q1t75h8aV6uLpC",
+    duration: "3:49",
+    swatchColor: "#282A32",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/20/4c/6e/204c6ef3-8e95-4cee-2256-202ca62aebed/60220.jpg/600x600bb.jpg",
+  },
+  phoebe_i_know_the_end: {
+    id: "3CRDbSIZ4r5MsZ0YwxuEkn",
+    name: "I Know The End",
+    artist: "Phoebe Bridgers",
+    artistId: "1r1uxoy19fzMxunt3ONAkG",
+    album: "Punisher",
+    albumId: "2xGQEAlDAw7whm4vvt3WvX",
+    duration: "5:44",
+    swatchColor: "#3A1E22",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/5a/5d/1f/5a5d1fde-7f6f-9997-3bca-d75f1e799464/656605154565.jpg/600x600bb.jpg",
+  },
+  fleetwood_dreams: {
+    id: "0ofHAoxe9vBkTCp2UQIavz",
+    name: "Dreams",
+    artist: "Fleetwood Mac",
+    artistId: "08GQAI4e5rBaRujQwE7AVn",
+    album: "Rumours",
+    albumId: "1BZhsjlBYzDbKyJdYBMxev",
+    duration: "4:17",
+    swatchColor: "#3A3428",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4d/13/ba/4d13bac3-d3d5-7581-2c74-034219eadf2b/081227970949.jpg/600x600bb.jpg",
+  },
+  fleetwood_the_chain: {
+    id: "5e9TFT0nj3YegNVJE4uus4",
+    name: "The Chain",
+    artist: "Fleetwood Mac",
+    artistId: "08GQAI4e5rBaRujQwE7AVn",
+    album: "Rumours",
+    albumId: "1BZhsjlBYzDbKyJdYBMxev",
+    duration: "4:30",
+    swatchColor: "#3A3428",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4d/13/ba/4d13bac3-d3d5-7581-2c74-034219eadf2b/081227970949.jpg/600x600bb.jpg",
+  },
+  pink_floyd_time: {
+    id: "3TO7mKlbtik89FRIYod0Ij",
+    name: "Time",
+    artist: "Pink Floyd",
+    artistId: "0k17h0D3J5VfsdmQ1iZtE9",
+    album: "The Dark Side of the Moon",
+    albumId: "4LH4d3cOWNNXdsqFd42wzg",
+    duration: "6:53",
+    swatchColor: "#141414",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/3e/17/ec/3e17ec6d-f980-c64f-19e0-a6fd8bbf0c10/886445635850.jpg/600x600bb.jpg",
+  },
+  pink_floyd_money: {
+    id: "0vFOzaXqCYFJvnudGii36Q",
+    name: "Money",
+    artist: "Pink Floyd",
+    artistId: "0k17h0D3J5VfsdmQ1iZtE9",
+    album: "The Dark Side of the Moon",
+    albumId: "4LH4d3cOWNNXdsqFd42wzg",
+    duration: "6:22",
+    swatchColor: "#141414",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/3e/17/ec/3e17ec6d-f980-c64f-19e0-a6fd8bbf0c10/886445635850.jpg/600x600bb.jpg",
+  },
+  daft_punk_get_lucky: {
+    id: "2Foc5Q5nqNiosCNqttzHof",
+    name: "Get Lucky",
+    artist: "Daft Punk",
+    artistId: "4tZwfgrHOc3mvqYxwDoOD1",
+    album: "Random Access Memories",
+    albumId: "4m2880jivSbbyEGAKfITCa",
+    duration: "6:09",
+    swatchColor: "#2A2A2A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/600x600bb.jpg",
+  },
+  daft_punk_instant_crush: {
+    id: "2cGxRwrMygjFu8KiMF1PFR",
+    name: "Instant Crush",
+    artist: "Daft Punk",
+    artistId: "4tZwfgrHOc3mvqYxwDoOD1",
+    album: "Random Access Memories",
+    albumId: "4m2880jivSbbyEGAKfITCa",
+    duration: "5:37",
+    swatchColor: "#2A2A2A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e8/43/5f/e8435ffa-b6b9-b171-40ab-4ff3959ab661/886443919266.jpg/600x600bb.jpg",
+  },
+  beatles_come_together: {
+    id: "2EqlS6tkEnglzr77vAhx2b",
+    name: "Come Together",
+    artist: "The Beatles",
+    artistId: "3WrFJ7ztbogyGnTHbHJFl2",
+    album: "Abbey Road",
+    albumId: "0ETFjACtuP2ADo6LFhL6HN",
+    duration: "4:19",
+    swatchColor: "#2D3E35",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/48/53/43/485343e3-dd6a-0034-faec-f4b6403f8108/13UMGIM63890.rgb.jpg/600x600bb.jpg",
+  },
+  beatles_here_comes_the_sun: {
+    id: "6dGnYIeXmYdcikdzNNDMm2",
+    name: "Here Comes The Sun",
+    artist: "The Beatles",
+    artistId: "3WrFJ7ztbogyGnTHbHJFl2",
+    album: "Abbey Road",
+    albumId: "0ETFjACtuP2ADo6LFhL6HN",
+    duration: "3:05",
+    swatchColor: "#2D3E35",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/48/53/43/485343e3-dd6a-0034-faec-f4b6403f8108/13UMGIM63890.rgb.jpg/600x600bb.jpg",
+  },
+  taylor_swift_cardigan: {
+    id: "4R2kfaDFslZEMLoQUTosRH",
+    name: "cardigan",
+    artist: "Taylor Swift",
+    artistId: "06HL4z0CvFAxyc27GXpf02",
+    album: "folklore",
+    albumId: "2fenSS68JI1h4Fo296JfGr",
+    duration: "3:59",
+    swatchColor: "#303030",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/8c/ef/c2/8cefc23a-61b7-05ff-b52a-bb1e4922087c/20UMGIM64216.rgb.jpg/600x600bb.jpg",
+  },
+  taylor_swift_exile: {
+    id: "4pvb0WLRcMtbPGm22F8N0P",
+    name: "exile (feat. Bon Iver)",
+    artist: "Taylor Swift",
+    artistId: "06HL4z0CvFAxyc27GXpf02",
+    album: "folklore",
+    albumId: "2fenSS68JI1h4Fo296JfGr",
+    duration: "4:45",
+    swatchColor: "#303030",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/8c/ef/c2/8cefc23a-61b7-05ff-b52a-bb1e4922087c/20UMGIM64216.rgb.jpg/600x600bb.jpg",
+  },
+  billie_eilish_bad_guy: {
+    id: "2Fxmhks0bxGSBdJ92v442m",
+    name: "bad guy",
+    artist: "Billie Eilish",
+    artistId: "6qqNVTkY8uBg9cP3Jd7DAH",
+    album: "WHEN WE ALL FALL ASLEEP, WHERE DO WE GO?",
+    albumId: "0S0KGZnfBGSI3F0irHgAC0",
+    duration: "3:14",
+    swatchColor: "#303028",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/1a/37/d1/1a37d1b1-8508-54f2-f541-bf4e437dda76/19UMGIM05028.rgb.jpg/600x600bb.jpg",
+  },
+  arctic_monkeys_do_i_wanna_know: {
+    id: "5FVbvFqU2sU5r0fI2b8Q7B",
+    name: "Do I Wanna Know?",
+    artist: "Arctic Monkeys",
+    artistId: "7Ln80lUS6He07XvHI8qqHH",
+    album: "AM",
+    albumId: "78bpIziExqiI91ztvVJ5nR",
+    duration: "4:32",
+    swatchColor: "#1A1A1A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/69/9c/b5/699cb5d6-115c-ff73-9d26-e57ea4350d72/887828031795.png/600x600bb.jpg",
+  },
+  beach_house_space_song: {
+    id: "7H0ya83CMmgFcOhw0UB6ow",
+    name: "Space Song",
+    artist: "Beach House",
+    artistId: "56ZTgzPBDge0OvCGgMO3OY",
+    album: "Depression Cherry",
+    albumId: "7vK5a287L67hEw6pWbQvL8",
+    duration: "5:20",
+    swatchColor: "#4A1525",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/09/e0/d5/09e0d559-0682-f0f0-5e0c-3cd11e3114fd/beachhouse_depressioncherry_2400_300.jpg/600x600bb.jpg",
+  },
+  tame_impala_less_i_know: {
+    id: "6K4t31amVTZDgR3sKmwUJJ",
+    name: "The Less I Know The Better",
+    artist: "Tame Impala",
+    artistId: "5INjqkS1o8h1imAzPqGZBb",
+    album: "Currents",
+    albumId: "79dL7FLiJFOO0EoehTaA1m",
+    duration: "3:36",
+    swatchColor: "#3F2B48",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/64/48/5c/64485cc9-968c-68cc-764e-9a7c71733def/00602567155454.rgb.jpg/600x600bb.jpg",
+  },
+  nirvana_teen_spirit: {
+    id: "5ghIWrUSR7jAjEY0rRI7np",
+    name: "Smells Like Teen Spirit",
+    artist: "Nirvana",
+    artistId: "6olE6TJLqED3rqDCT0FyPh",
+    album: "Nevermind",
+    albumId: "2guIrUQVRq0VmsvBpJR297",
+    duration: "5:01",
+    swatchColor: "#1A3548",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/19/7a/58/197a5870-618b-446f-a193-ca4a84502adc/190295781163.jpg/600x600bb.jpg",
+  },
+  david_bowie_heroes: {
+    id: "72Z17vmmeQKAg8bptWvpVG",
+    name: "\"Heroes\"",
+    artist: "David Bowie",
+    artistId: "0oSGxfWSnnOXhD2fKuz2Gy",
+    album: "\"Heroes\"",
+    albumId: "4I5zzKY1sp4neTeiU0W2Vw",
+    duration: "6:11",
+    swatchColor: "#2C2C2C",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e2/65/b2/e265b2ae-48d5-9dd8-0251-6cd6c6c4eb53/190295842826.jpg/600x600bb.jpg",
+  },
+  michael_jackson_billie_jean: {
+    id: "5UbUbS5bU6xM5yYVqN6sZl",
+    name: "Billie Jean",
+    artist: "Michael Jackson",
+    artistId: "3fMbdgg4jU18AjLCKBvRSm",
+    album: "Thriller",
+    albumId: "2noRn2Aes5aoQ6vUvt4mhu",
+    duration: "4:54",
+    swatchColor: "#352E2A",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/32/4f/fd/324ffda2-9e51-8f6a-0c2d-c6fd2b41ac55/074643811224.jpg/600x600bb.jpg",
+  },
+  queen_bohemian_rhapsody: {
+    id: "4u7EnebtmKWzUH433cf5Qv",
+    name: "Bohemian Rhapsody",
+    artist: "Queen",
+    artistId: "1dfeR4HaWDbWqFssioeoL2",
+    album: "A Night at the Opera",
+    albumId: "1GbtB4zTqAsyfZEsm1RZSZ",
+    duration: "5:54",
+    swatchColor: "#282828",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/b1/a9/84/b1a984dc-8dce-e8cb-1a0e-20293f7c500a/14DMGIM05548.rgb.jpg/600x600bb.jpg",
+  },
+  lorde_ribs: {
+    id: "0TEekvbt0ZYRucMEC0roYI",
+    name: "Ribs",
+    artist: "Lorde",
+    artistId: "163tK9Wjr9P9DmM0AVK7lm",
+    album: "Pure Heroine",
+    albumId: "0rmhj0uqT3lP906w3C0123",
+    duration: "4:18",
+    swatchColor: "#181818",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/dd/5a/b3/dd5ab3da-e351-ec32-6c01-f008af3c61e1/artwork.jpg/600x600bb.jpg",
+  },
+  beach_boys_god_only_knows: {
+    id: "0z9jsZt7g2t7m4FqF32r8j",
+    name: "God Only Knows",
+    artist: "The Beach Boys",
+    artistId: "3pkZyq0Zl0aUe8vFhA0w2v",
+    album: "Pet Sounds",
+    albumId: "6DuBaIuxuE2Mv39R4B9jYn",
+    duration: "2:53",
+    swatchColor: "#2C3A24",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/35/bb/c4/35bbc4eb-9387-97b0-b138-64b7a949ea43/13UABIM03512.rgb.jpg/600x600bb.jpg",
+  },
+  led_zeppelin_stairway: {
+    id: "5CQ30WqJwcep0pYcV4AMNc",
+    name: "Stairway to Heaven",
+    artist: "Led Zeppelin",
+    artistId: "36QJfgBno56YwhRGFKX9Cr",
+    album: "Led Zeppelin IV",
+    albumId: "5EyIDBAqhnAH9Kc4qvPpeq",
+    duration: "8:02",
+    swatchColor: "#3D3528",
+    albumImageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/5c/15/9b/5c159b27-95ca-b9a7-84e3-28e795fffd39/dj.kvkrpptq.jpg/600x600bb.jpg",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Top 10 Ranked Tracks Across Ranges (Showcasing all 6 drift types: ·, +1, +2, -1, -2, NEW)
+// ---------------------------------------------------------------------------
+
+const TOP_TRACKS_1D: TrackSummary[] = [
+  { ...CATALOG.radiohead_weird_fishes, rank: "01", drift: "·", plays: 38 },
+  { ...CATALOG.frank_ocean_pink_white, rank: "02", drift: "+1", plays: 34 },
+  { ...CATALOG.kendrick_alright, rank: "03", drift: "-1", plays: 31 },
+  { ...CATALOG.phoebe_kyoto, rank: "04", drift: "+2", plays: 28 },
+  { ...CATALOG.fleetwood_dreams, rank: "05", drift: "-2", plays: 24 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "06", drift: "NEW", plays: 22 },
+  { ...CATALOG.pink_floyd_time, rank: "07", drift: "·", plays: 19 },
+  { ...CATALOG.beatles_come_together, rank: "08", drift: "+1", plays: 17 },
+  { ...CATALOG.taylor_swift_cardigan, rank: "09", drift: "-1", plays: 15 },
+  { ...CATALOG.billie_eilish_bad_guy, rank: "10", drift: "NEW", plays: 13 },
+];
+
+const TOP_TRACKS_1W: TrackSummary[] = [
+  { ...CATALOG.radiohead_weird_fishes, rank: "01", drift: "·", plays: 64 },
+  { ...CATALOG.kendrick_alright, rank: "02", drift: "+1", plays: 58 },
+  { ...CATALOG.frank_ocean_pink_white, rank: "03", drift: "-1", plays: 52 },
+  { ...CATALOG.pink_floyd_time, rank: "04", drift: "+2", plays: 46 },
+  { ...CATALOG.fleetwood_dreams, rank: "05", drift: "·", plays: 43 },
+  { ...CATALOG.phoebe_kyoto, rank: "06", drift: "-2", plays: 39 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "07", drift: "+1", plays: 35 },
+  { ...CATALOG.beatles_come_together, rank: "08", drift: "-1", plays: 32 },
+  { ...CATALOG.arctic_monkeys_do_i_wanna_know, rank: "09", drift: "NEW", plays: 28 },
+  { ...CATALOG.beach_house_space_song, rank: "10", drift: "NEW", plays: 25 },
+];
+
+const TOP_TRACKS_1M: TrackSummary[] = [
+  { ...CATALOG.frank_ocean_pink_white, rank: "01", drift: "+2", plays: 184 },
+  { ...CATALOG.radiohead_weird_fishes, rank: "02", drift: "-1", plays: 172 },
+  { ...CATALOG.kendrick_alright, rank: "03", drift: "-1", plays: 156 },
+  { ...CATALOG.pink_floyd_time, rank: "04", drift: "·", plays: 142 },
+  { ...CATALOG.phoebe_kyoto, rank: "05", drift: "+1", plays: 128 },
+  { ...CATALOG.tame_impala_less_i_know, rank: "06", drift: "+2", plays: 114 },
+  { ...CATALOG.fleetwood_dreams, rank: "07", drift: "-2", plays: 106 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "08", drift: "·", plays: 98 },
+  { ...CATALOG.beatles_come_together, rank: "09", drift: "-1", plays: 89 },
+  { ...CATALOG.nirvana_teen_spirit, rank: "10", drift: "NEW", plays: 82 },
+];
+
+const TOP_TRACKS_6M: TrackSummary[] = [
+  { ...CATALOG.radiohead_weird_fishes, rank: "01", drift: "·", plays: 890 },
+  { ...CATALOG.frank_ocean_pink_white, rank: "02", drift: "+1", plays: 840 },
+  { ...CATALOG.kendrick_alright, rank: "03", drift: "-1", plays: 760 },
+  { ...CATALOG.pink_floyd_time, rank: "04", drift: "+1", plays: 690 },
+  { ...CATALOG.tame_impala_less_i_know, rank: "05", drift: "+2", plays: 620 },
+  { ...CATALOG.beatles_come_together, rank: "06", drift: "-2", plays: 580 },
+  { ...CATALOG.fleetwood_dreams, rank: "07", drift: "-1", plays: 540 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "08", drift: "·", plays: 490 },
+  { ...CATALOG.nirvana_teen_spirit, rank: "09", drift: "+1", plays: 450 },
+  { ...CATALOG.david_bowie_heroes, rank: "10", drift: "NEW", plays: 410 },
+];
+
+const TOP_TRACKS_1Y: TrackSummary[] = [
+  { ...CATALOG.radiohead_weird_fishes, rank: "01", drift: "·", plays: 1940 },
+  { ...CATALOG.frank_ocean_pink_white, rank: "02", drift: "·", plays: 1820 },
+  { ...CATALOG.pink_floyd_time, rank: "03", drift: "+1", plays: 1650 },
+  { ...CATALOG.kendrick_alright, rank: "04", drift: "-1", plays: 1580 },
+  { ...CATALOG.beatles_come_together, rank: "05", drift: "+2", plays: 1420 },
+  { ...CATALOG.tame_impala_less_i_know, rank: "06", drift: "-1", plays: 1310 },
+  { ...CATALOG.fleetwood_dreams, rank: "07", drift: "-1", plays: 1220 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "08", drift: "·", plays: 1140 },
+  { ...CATALOG.nirvana_teen_spirit, rank: "09", drift: "+1", plays: 980 },
+  { ...CATALOG.michael_jackson_billie_jean, rank: "10", drift: "NEW", plays: 890 },
+];
+
+const TOP_TRACKS_ALL: TrackSummary[] = [
+  { ...CATALOG.radiohead_weird_fishes, rank: "01", drift: "·", plays: 4120 },
+  { ...CATALOG.frank_ocean_pink_white, rank: "02", drift: "·", plays: 3890 },
+  { ...CATALOG.pink_floyd_time, rank: "03", drift: "·", plays: 3410 },
+  { ...CATALOG.kendrick_alright, rank: "04", drift: "+1", plays: 3120 },
+  { ...CATALOG.beatles_come_together, rank: "05", drift: "-1", plays: 2940 },
+  { ...CATALOG.fleetwood_dreams, rank: "06", drift: "+1", plays: 2680 },
+  { ...CATALOG.tame_impala_less_i_know, rank: "07", drift: "-1", plays: 2450 },
+  { ...CATALOG.daft_punk_get_lucky, rank: "08", drift: "·", plays: 2210 },
+  { ...CATALOG.led_zeppelin_stairway, rank: "09", drift: "+2", plays: 1980 },
+  { ...CATALOG.queen_bohemian_rhapsody, rank: "10", drift: "NEW", plays: 1840 },
+];
+
+// ---------------------------------------------------------------------------
+// Exported MOCK_DATA
+// ---------------------------------------------------------------------------
+

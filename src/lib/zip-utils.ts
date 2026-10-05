@@ -1,5 +1,3 @@
-import JSZip from "jszip";
-
 export interface ZipAudioHistoryEntry {
   filename: string;
   relativePath: string;
@@ -36,6 +34,7 @@ export function isAudioHistoryFilename(fullPath: string): boolean {
 export async function extractAudioHistoryEntries(
   zipInput: ArrayBuffer | Uint8Array | Buffer
 ): Promise<ZipAudioHistoryEntry[]> {
+  const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(zipInput);
   const matchedEntries: ZipAudioHistoryEntry[] = [];
 
