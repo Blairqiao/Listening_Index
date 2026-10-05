@@ -209,7 +209,7 @@ test("patchSessionWithEnrichment - patches sittingTracks and active sittings", (
         uniqueArtistsCount: 1,
         runtimeMinutes: 45,
         runtimeStr: "45m",
-        isOpen: true,
+        isOpen: true, analysis: { firstPlaysCount: 0, totalTracks: 0, topSong: null, topAlbum: { title: "", count: 0 }, topArtist: { name: "", count: 0 } },
         tracks: [
           {
             id: "track-30",
