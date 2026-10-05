@@ -8,20 +8,32 @@ import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
 
+import crypto from "crypto";
+
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 let isSyncInProgress = false;
 
 function isAuthorized(request: NextRequest): boolean {
   // 1. External machine-to-machine calls via CRON_SECRET
   const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
-    return true;
-  }
+  if (cronSecret) {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      if (safeCompare(token, cronSecret)) return true;
+    }
 
-  const url = new URL(request.url);
-  const keyParam = url.searchParams.get("key") || url.searchParams.get("secret");
-  if (cronSecret && keyParam === cronSecret) {
-    return true;
+    const url = new URL(request.url);
+    const keyParam = url.searchParams.get("key") || url.searchParams.get("secret");
+    if (keyParam && safeCompare(keyParam, cronSecret)) {
+      return true;
+    }
   }
 
   // 2. Browser-initiated requests from UI require admin authorization session

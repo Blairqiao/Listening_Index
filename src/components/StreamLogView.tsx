@@ -3,7 +3,6 @@
 import React from "react";
 import { StreamLogItem } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
-import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 
 interface StreamLogViewProps {
   entries: StreamLogItem[];
@@ -57,29 +56,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
     prevEntriesLenRef.current = entries.length;
   }, [entries.length]);
 
-  const [enrichmentOverlay, setEnrichmentOverlay] = React.useState<
-    Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string; isDelisted?: boolean }>
-  >(new Map());
-
-  // Merge entries with any local enrichment overlay
-  const displayEntries = React.useMemo(() => {
-    if (enrichmentOverlay.size === 0) return entries;
-    return entries.map((entry) => {
-      const trackId = entry.trackId || entry.id;
-      const overlay = enrichmentOverlay.get(trackId);
-      if (!overlay) return entry;
-      return {
-        ...entry,
-        albumImageUrl: overlay.albumImageUrl ?? entry.albumImageUrl,
-        artistId: overlay.artistId ?? entry.artistId,
-        albumId: overlay.albumId ?? entry.albumId,
-        status: overlay.isDelisted ? "[DELISTED]" : entry.status,
-      };
-    });
-  }, [entries, enrichmentOverlay]);
-
-  const renderedEntries = isMobile ? displayEntries.slice(0, mobileVisibleCount) : displayEntries;
-  const canLoadMore = hasMore || (isMobile && mobileVisibleCount < displayEntries.length);
+  const renderedEntries = isMobile ? entries.slice(0, mobileVisibleCount) : entries;
+  const canLoadMore = hasMore || (isMobile && mobileVisibleCount < entries.length);
 
   const handleScrollToTop = () => {
     if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
@@ -90,35 +68,12 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
 
   const handleLoadMore = () => {
     if (isLoadingMore) return;
-    if (isMobile && mobileVisibleCount < displayEntries.length) {
+    if (isMobile && mobileVisibleCount < entries.length) {
       setMobileVisibleCount((prev) => prev + 25);
     } else {
       onLoadMore?.();
     }
   };
-
-  useDeferredEnrichment({
-    items: displayEntries,
-    onEnriched: (enriched, delistedIds) => {
-      setEnrichmentOverlay((prev) => {
-        const next = new Map(prev);
-        for (const item of enriched) {
-          next.set(item.requestedId, {
-            albumImageUrl: item.albumImageUrl,
-            artistId: item.artistId,
-            albumId: item.albumId,
-          });
-        }
-        for (const id of delistedIds) {
-          next.set(id, {
-            albumImageUrl: null,
-            isDelisted: true,
-          });
-        }
-        return next;
-      });
-    },
-  });
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}

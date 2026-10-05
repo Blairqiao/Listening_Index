@@ -488,18 +488,34 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     const countMap = new Map<string, number>(
       cadenceRows.map((r) => [String(r.ym), Number(r.count)])
     );
+
+    // Derive current year and month in target timezone
+    const nowParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+      month: "numeric",
+    }).formatToParts(now);
+    const curYear = Number(nowParts.find((p) => p.type === "year")?.value || now.getUTCFullYear());
+    const curMonth = Number(nowParts.find((p) => p.type === "month")?.value || (now.getUTCMonth() + 1));
+
     for (let m = 11; m >= 0; m--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
-      const ymKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      // Step backwards m months from current (curYear, curMonth)
+      let targetMonth = curMonth - m;
+      let targetYear = curYear;
+      while (targetMonth <= 0) {
+        targetMonth += 12;
+        targetYear -= 1;
+      }
+
+      const ymKey = `${targetYear}-${String(targetMonth).padStart(2, "0")}`;
+      const bucketDateUtc = new Date(Date.UTC(targetYear, targetMonth - 1, 15, 12, 0, 0));
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
         month: "short",
-      }).format(d).toUpperCase();
+      }).format(bucketDateUtc).toUpperCase();
 
-      const yr = d.getFullYear();
-      const mo = d.getMonth();
-      const startTime = new Date(Date.UTC(yr, mo, 1, 0, 0, 0, 0)).toISOString();
-      const endTime = new Date(Date.UTC(yr, mo + 1, 0, 23, 59, 59, 999)).toISOString();
+      const startTime = new Date(Date.UTC(targetYear, targetMonth - 1, 1, 0, 0, 0, 0)).toISOString();
+      const endTime = new Date(Date.UTC(targetYear, targetMonth, 0, 23, 59, 59, 999)).toISOString();
 
       activityCadence.push({
         date: monthAbbr,

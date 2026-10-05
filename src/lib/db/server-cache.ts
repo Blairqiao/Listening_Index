@@ -46,8 +46,8 @@ if (!globalForCache.__serverListeningCache) {
 const cacheStore: ServerListeningCache = globalForCache.__serverListeningCache;
 
 
-export function getCachedOverview(range: RangeKey, tz = ""): OverviewData | undefined {
-  const key = `${range}:${tz}`;
+export function getCachedOverview(range: RangeKey): OverviewData | undefined {
+  const key = range;
   const entry = cacheStore.overview.get(key);
   if (!entry) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
@@ -57,13 +57,13 @@ export function getCachedOverview(range: RangeKey, tz = ""): OverviewData | unde
   return entry.data;
 }
 
-export function setCachedOverview(range: RangeKey, data: OverviewData, tz = ""): void {
-  const key = `${range}:${tz}`;
+export function setCachedOverview(range: RangeKey, data: OverviewData): void {
+  const key = range;
   cacheStore.overview.set(key, { data, timestamp: Date.now() });
 }
 
-export function getCachedStreamLog(limit: number, tz = ""): StreamLogData | undefined {
-  const key = `${limit}:${tz}`;
+export function getCachedStreamLog(limit: number): StreamLogData | undefined {
+  const key = String(limit);
   const entry = cacheStore.streamLog.get(key);
   if (!entry) return undefined;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
@@ -73,13 +73,13 @@ export function getCachedStreamLog(limit: number, tz = ""): StreamLogData | unde
   return entry.data;
 }
 
-export function setCachedStreamLog(limit: number, data: StreamLogData, tz = ""): void {
-  const key = `${limit}:${tz}`;
+export function setCachedStreamLog(limit: number, data: StreamLogData): void {
+  const key = String(limit);
   cacheStore.streamLog.set(key, { data, timestamp: Date.now() });
 }
 
-export function getCachedSession(tz = ""): SessionData | null {
-  const key = tz || "default";
+export function getCachedSession(): SessionData | null {
+  const key = "session";
   const entry = cacheStore.session.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
@@ -89,8 +89,8 @@ export function getCachedSession(tz = ""): SessionData | null {
   return entry.data;
 }
 
-export function setCachedSession(data: SessionData, tz = ""): void {
-  const key = tz || "default";
+export function setCachedSession(data: SessionData): void {
+  const key = "session";
   cacheStore.session.set(key, { data, timestamp: Date.now() });
 }
 
@@ -131,28 +131,18 @@ export function clearServerCache(): void {
  */
 export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
   range: RangeKey,
-  tz: string,
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
-  range: RangeKey,
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
-  range: RangeKey,
   tzOrFetcher: string | (() => Promise<T>),
   maybeFetcher?: () => Promise<T>
 ): Promise<T> {
-  const tz = typeof tzOrFetcher === "string" ? tzOrFetcher : "";
   const fetcher = (typeof tzOrFetcher === "function" ? tzOrFetcher : maybeFetcher) as () => Promise<T>;
   if (!fetcher) {
     throw new Error("[SERVER CACHE] No fetcher provided for getOrFetchOverview");
   }
 
-  const cached = getCachedOverview(range, tz);
+  const cached = getCachedOverview(range);
   if (cached) return cached as T;
 
-  const key = `${range}:${tz}`;
+  const key = range;
   let inFlight = cacheStore.inFlightOverview.get(key) as Promise<T> | undefined;
   if (!inFlight) {
     const fetchEpoch = cacheEpoch;
@@ -160,7 +150,7 @@ export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
       try {
         const data = await fetcher();
         if (fetchEpoch === cacheEpoch) {
-          setCachedOverview(range, data, tz);
+          setCachedOverview(range, data);
         }
         return data;
       } finally {
@@ -177,28 +167,18 @@ export async function getOrFetchOverview<T extends OverviewData = OverviewData>(
  */
 export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogData>(
   limit: number,
-  tz: string,
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogData>(
-  limit: number,
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogData>(
-  limit: number,
   tzOrFetcher: string | (() => Promise<T>),
   maybeFetcher?: () => Promise<T>
 ): Promise<T> {
-  const tz = typeof tzOrFetcher === "string" ? tzOrFetcher : "";
   const fetcher = (typeof tzOrFetcher === "function" ? tzOrFetcher : maybeFetcher) as () => Promise<T>;
   if (!fetcher) {
     throw new Error("[SERVER CACHE] No fetcher provided for getOrFetchStreamLog");
   }
 
-  const cached = getCachedStreamLog(limit, tz);
+  const cached = getCachedStreamLog(limit);
   if (cached) return cached as T;
 
-  const key = `${limit}:${tz}`;
+  const key = String(limit);
   let inFlight = cacheStore.inFlightStreamLog.get(key) as Promise<T> | undefined;
   if (!inFlight) {
     const fetchEpoch = cacheEpoch;
@@ -206,7 +186,7 @@ export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogDat
       try {
         const data = await fetcher();
         if (fetchEpoch === cacheEpoch) {
-          setCachedStreamLog(limit, data, tz);
+          setCachedStreamLog(limit, data);
         }
         return data;
       } finally {
@@ -222,26 +202,18 @@ export async function getOrFetchStreamLog<T extends StreamLogData = StreamLogDat
  * Retrieves cached Session data, or invokes fetcher with concurrent in-flight deduplication.
  */
 export async function getOrFetchSession<T extends SessionData = SessionData>(
-  tz: string,
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchSession<T extends SessionData = SessionData>(
-  fetcher: () => Promise<T>
-): Promise<T>;
-export async function getOrFetchSession<T extends SessionData = SessionData>(
   tzOrFetcher?: string | (() => Promise<T>),
   maybeFetcher?: () => Promise<T>
 ): Promise<T> {
-  const tz = typeof tzOrFetcher === "string" ? tzOrFetcher : "";
   const fetcher = (typeof tzOrFetcher === "function" ? tzOrFetcher : maybeFetcher) as () => Promise<T>;
   if (!fetcher) {
     throw new Error("[SERVER CACHE] No fetcher provided for getOrFetchSession");
   }
 
-  const cached = getCachedSession(tz);
+  const cached = getCachedSession();
   if (cached) return cached as T;
 
-  const key = tz || "default";
+  const key = "session";
   let inFlight = cacheStore.inFlightSession.get(key) as Promise<T> | undefined;
   if (!inFlight) {
     const fetchEpoch = cacheEpoch;
@@ -249,7 +221,7 @@ export async function getOrFetchSession<T extends SessionData = SessionData>(
       try {
         const data = await fetcher();
         if (fetchEpoch === cacheEpoch) {
-          setCachedSession(data, tz);
+          setCachedSession(data);
         }
         return data;
       } finally {

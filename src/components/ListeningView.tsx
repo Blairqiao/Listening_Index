@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { ListeningHeader } from "@/components/ListeningHeader";
 import { ModeTabs } from "@/components/ModeTabs";
 import { ControlRow } from "@/components/ControlRow";
@@ -10,21 +11,33 @@ import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
-import { CustomizationModal } from "@/components/CustomizationModal";
-import { UploadModal } from "@/components/UploadModal";
+import dynamic from "next/dynamic";
+const CustomizationModal = dynamic(
+  () => import("@/components/CustomizationModal").then((mod) => mod.CustomizationModal),
+  { ssr: false }
+);
+const UploadModal = dynamic(
+  () => import("@/components/UploadModal").then((mod) => mod.UploadModal),
+  { ssr: false }
+);
 import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
-import {
-  Mode,
-  RangeKey,
-} from "@/lib/mock-listening-data";
+import type { Mode, RangeKey } from "@/lib/types";
 import {
   OverviewData,
   StreamLogData,
   SessionData,
   type TrackTelemetryStats,
+  type EnrichedTrackItem,
 } from "@/lib/db/queries";
+import {
+  patchOverviewCacheWithEnrichment,
+  patchStreamLogWithEnrichment,
+  patchSessionWithEnrichment,
+  type EnrichmentPatchData,
+} from "@/lib/enrichment-patch";
+import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
@@ -156,6 +169,8 @@ interface ListeningViewProps {
     artist?: string;
   } | null;
   isDbConfigured?: boolean;
+  initialMode?: Mode;
+  initialRange?: RangeKey;
 }
 
 const ListeningViewInner: React.FC<ListeningViewProps> = ({
@@ -164,8 +179,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialSession,
   initialTrack,
   isDbConfigured = true,
+  initialMode = 0,
+  initialRange = "1w",
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
 
   const {
     config,
@@ -187,8 +205,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     handleUnlink,
   } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
-  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
-  const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(0, isAuthenticated));
+// Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
+  const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(initialMode, isAuthenticated));
 
   // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
   const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
@@ -259,10 +277,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     });
   }, []);
 
-  // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all", default "1d"
-  const [activeRange, setActiveRange] = useState<RangeKey>("1w");
+  // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all"
+  const [activeRange, setActiveRange] = useState<RangeKey>(initialRange);
   // Displayed range stays frozen until the new range dataset has been fetched and cached
-  const [displayedRange, setDisplayedRange] = useState<RangeKey>("1w");
+  const [displayedRange, setDisplayedRange] = useState<RangeKey>(initialRange);
 
   // Overview time unit state: "minutes" | "hours", initialized to "minutes" for SSR consistency
   const [overviewTimeUnit, setOverviewTimeUnit] = useState<"minutes" | "hours">("minutes");
@@ -297,7 +315,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if ("1d" in initialOverview || "1w" in initialOverview) {
         return { ...(initialOverview as Record<RangeKey, OverviewData>) };
       }
-      initial["1w"] = initialOverview as OverviewData;
+      initial[initialRange] = initialOverview as OverviewData;
     }
     return initial;
   });
@@ -329,7 +347,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return initialSession || null;
   });
 
-  // In-memory track stats cache to avoid re-fetching on already-seen tracks
+// In-memory track stats cache to avoid re-fetching on already-seen tracks
   const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
   const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
 
@@ -389,6 +407,53 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     };
   }, [activeTrackId, activeTrackTitle, activeTrackArtist]);
 
+  // Session-accumulated enrichment overlays and delisted IDs to persist artwork across mode and range switches
+  const enrichmentOverlayRef = useRef<Map<string, EnrichmentPatchData>>(new Map());
+  const delistedSetRef = useRef<Set<string>>(new Set());
+
+  const handleCentralEnriched = useCallback(
+    (enriched: EnrichedTrackItem[], delistedIds: string[]) => {
+      if (enriched.length === 0 && delistedIds.length === 0) return;
+
+      for (const item of enriched) {
+        enrichmentOverlayRef.current.set(item.requestedId, {
+          albumImageUrl: item.albumImageUrl,
+          artistId: item.artistId,
+          albumId: item.albumId,
+        });
+      }
+      for (const id of delistedIds) {
+        delistedSetRef.current.add(id);
+      }
+
+      setOverviewCache((prev) => {
+        const { updatedCache, changed } = patchOverviewCacheWithEnrichment(
+          prev,
+          enrichmentOverlayRef.current,
+          delistedSetRef.current
+        );
+        return changed ? updatedCache : prev;
+      });
+
+      setStreamLogState((prev) =>
+        patchStreamLogWithEnrichment(
+          prev,
+          enrichmentOverlayRef.current,
+          delistedSetRef.current
+        )
+      );
+
+      setSessionState((prev) =>
+        patchSessionWithEnrichment(
+          prev,
+          enrichmentOverlayRef.current,
+          delistedSetRef.current
+        )
+      );
+    },
+    []
+  );
+
   const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
 
   // Dynamic sync telemetry tracking
@@ -435,7 +500,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active session sitting state for Mode 3
   const [selectedSittingId, setSelectedSittingId] = useState<string | undefined>(undefined);
 
-  // Support query params for direct URL inspection of all modes and states
+// Support query params for direct URL inspection of all modes and states
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -459,7 +524,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       }
     }
   }, [openModal, isAuthenticated]);
-
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
     try {
@@ -472,7 +536,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (res.ok) {
         const data = (await res.json()) as OverviewData;
         if (data && data.metrics) {
-          setOverviewCache((prev) => ({ ...prev, [rangeToFetch]: data }));
+          setOverviewCache((prev) => {
+            const next = { ...prev, [rangeToFetch]: data };
+            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
+              return patchOverviewCacheWithEnrichment(
+                next,
+                enrichmentOverlayRef.current,
+                delistedSetRef.current
+              ).updatedCache;
+            }
+            return next;
+          });
           if (activeRangeRef.current === rangeToFetch) {
             setDisplayedRange(rangeToFetch);
           }
@@ -493,10 +567,40 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return null;
   }, []);
 
+  // Support query params for direct URL inspection of all modes and states
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const m = params.get("mode");
+      if (m === "0" || m === "1" || m === "2") {
+        setActiveMode(parseInt(m, 10) as Mode);
+      }
+      const r = params.get("range");
+      if (r && RANGE_KEYS.includes(r as RangeKey)) {
+        setActiveRange(r as RangeKey);
+        activeRangeRef.current = r as RangeKey;
+        if (overviewCache[r as RangeKey]) {
+          setDisplayedRange(r as RangeKey);
+        } else {
+          fetchOverview(r as RangeKey);
+        }
+      }
+      const sit = params.get("sitting");
+      if (sit) {
+        setSelectedSittingId(sit);
+      }
+      const configParam = params.get("config");
+      if (configParam === "true" || configParam === "1") {
+        openModal();
+      }
+    }
+  }, [openModal, overviewCache, fetchOverview]);
+
   // Fetch Stream Log from server (cached on server, reset on sync)
   const fetchStreamLog = useCallback(async (countToFetch?: number) => {
     try {
-      const depth = countToFetch || loadedPlaysCountRef.current || 50;
+      // Background / revalidation fetches only head slice (50) to prevent downloading hundreds of historical rows
+      const depth = countToFetch || 50;
       const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
       const url = `/api/listening/stream-log?limit=${depth}${tzQuery}`;
       const res = await fetch(url, {
@@ -506,9 +610,32 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (res.ok) {
         const data = (await res.json()) as StreamLogData;
         if (data && data.entries) {
-          setStreamLogState(data);
-          setLoadedPlaysCount(data.entries.length);
-          setCachedStreamLogDepth(data.entries.length);
+          setStreamLogState((prev) => {
+            let next: StreamLogData;
+            if (!prev || countToFetch) {
+              next = data;
+            } else {
+              // Merge head slice entries with existing entries by ID
+              const existingIds = new Set(data.entries.map((e) => e.id));
+              const retained = prev.entries.filter((e) => !existingIds.has(e.id));
+              next = {
+                ...data,
+                entries: [...data.entries, ...retained],
+                hasMore: prev.hasMore,
+                nextCursor: prev.nextCursor,
+                nextCursorId: prev.nextCursorId,
+              };
+            }
+            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
+              return patchStreamLogWithEnrichment(
+                next,
+                enrichmentOverlayRef.current,
+                delistedSetRef.current
+              );
+            }
+            return next;
+          });
+          setLoadedPlaysCount((prev) => (countToFetch ? data.entries.length : Math.max(prev, data.entries.length)));
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -577,7 +704,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         if (data && data.entries) {
           setStreamLogState((prev) => {
             if (!prev) return data;
-            return {
+            const next: StreamLogData = {
               ...prev,
               entries: [...prev.entries, ...data.entries],
               nextCursor: data.nextCursor,
@@ -585,6 +712,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               hasMore: data.hasMore,
               lastSyncedAt: data.lastSyncedAt || prev.lastSyncedAt,
             };
+            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
+              return patchStreamLogWithEnrichment(
+                next,
+                enrichmentOverlayRef.current,
+                delistedSetRef.current
+              );
+            }
+            return next;
           });
 
           setLoadedPlaysCount((prev) => {
@@ -613,7 +748,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (res.ok) {
         const data = (await res.json()) as SessionData;
         if (data && (data.sittingTracks || data.previousSittings)) {
-          setSessionState(data);
+          setSessionState(() => {
+            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
+              return patchSessionWithEnrichment(
+                data,
+                enrichmentOverlayRef.current,
+                delistedSetRef.current
+              );
+            }
+            return data;
+          });
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -761,11 +905,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [refetchActiveData]);
 
   // Tab visibility and focus revalidation: if user returns to tab after a cron window has passed, refetch silently
+  // Protected with a 60-second client-side timestamp check to eliminate duplicate network calls
+  const lastFocusRefetchRef = useRef<number>(0);
   useEffect(() => {
     const handleVisibilityOrFocus = () => {
+      const now = Date.now();
       if (document.visibilityState === "visible") {
+        if (now - lastFocusRefetchRef.current < 60_000) return;
         // If lastSyncedAt is more than 30 minutes ago or missing, check and refresh
-        if (!lastSyncedAt || Date.now() - lastSyncedAt.getTime() >= 30 * 60 * 1000) {
+        if (!lastSyncedAt || now - lastSyncedAt.getTime() >= 30 * 60 * 1000) {
+          lastFocusRefetchRef.current = now;
           refetchActiveData();
         }
       }
@@ -831,9 +980,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           return;
         }
         if (isUploadModalOpen && (e.key === "u" || e.key === "U")) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          setIsUploadModalOpen(false);
+          if (!isUploadProcessing) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            setIsUploadModalOpen(false);
+          }
           return;
         }
         if (isModalOpen && (e.key === "c" || e.key === "C")) {
@@ -932,6 +1083,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     openAdminLoginModal,
     closeAdminLoginModal,
     logout,
+    isUploadProcessing,
   ]);
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
@@ -968,7 +1120,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       isOpen: initialSession?.isOpen ?? false,
       tagTime: "--",
       metrics: ["--", "--", "--", "--"],
+      sessionTracks: [],
       sittingTracks: [],
+      previousSessions: [],
       previousSittings: [],
     };
 
@@ -980,6 +1134,47 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       sessionData.sittings[0]
     );
   }, [sessionData.sittings, selectedSittingId]);
+
+  // Active enrichment candidates for viewport micro-enrichment across modes
+  const activeEnrichmentCandidates = React.useMemo(() => {
+    if (activeMode === 0) {
+      return currentOverview.topTracks.map((t) => ({
+        id: t.id,
+        trackId: t.spotifyTrackId || t.id,
+        albumImageUrl: t.albumImageUrl,
+      }));
+    }
+    if (activeMode === 1) {
+      return streamLogData.entries.map((e) => ({
+        id: e.id,
+        trackId: e.trackId || e.id,
+        albumImageUrl: e.albumImageUrl,
+        status: e.status,
+      }));
+    }
+    if (activeMode === 2) {
+      const tracks = activeSitting?.tracks || sessionData.sittingTracks || [];
+      return tracks.map((t) => ({
+        id: t.id,
+        trackId: t.trackId || t.id,
+        albumImageUrl: t.albumImageUrl,
+        status: t.status,
+      }));
+    }
+    return [];
+  }, [
+    activeMode,
+    currentOverview.topTracks,
+    streamLogData.entries,
+    activeSitting,
+    sessionData.sittingTracks,
+  ]);
+
+  useDeferredEnrichment({
+    items: activeEnrichmentCandidates,
+    onEnriched: handleCentralEnriched,
+    enabled: isDbConfigured,
+  });
 
   // Derived session metrics for Mode 3
   const currentSessionMetrics = React.useMemo((): [string, string, string, string] => {
@@ -1151,6 +1346,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadComplete={handleUploadComplete}
+        onProcessingChange={setIsUploadProcessing}
         isDbConfigured={isDbConfigured}
       />
 

@@ -7,13 +7,13 @@ import {
 import { getOverviewData } from "./overview";
 import { getStreamLog } from "./stream-log";
 import { getCurrentSession } from "./session";
-import type { OverviewData, StreamLogData, SessionData } from "./types";
+import type { OverviewData, StreamLogData, SessionData, RangeKey } from "./types";
 
 /**
  * Concurrently orchestrates initial listening data queries for server-side hydration.
  * Returns null placeholders gracefully if database is unconfigured or unreachable.
  */
-export async function getInitialMusicData(): Promise<{
+export async function getInitialMusicData(initialRange: RangeKey = "1w"): Promise<{
   overview: OverviewData | null;
   streamLog: StreamLogData | null;
   session: SessionData | null;
@@ -23,7 +23,7 @@ export async function getInitialMusicData(): Promise<{
   }
 
   try {
-    const overviewPromise = getOrFetchOverview("1w", () => getOverviewData("1w"));
+    const overviewPromise = getOrFetchOverview(initialRange, () => getOverviewData(initialRange));
     const streamLogPromise = getOrFetchStreamLog(50, () => getStreamLog(50));
     const sessionPromise = getOrFetchSession(() => getCurrentSession());
 

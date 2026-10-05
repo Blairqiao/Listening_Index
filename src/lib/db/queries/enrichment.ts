@@ -123,14 +123,15 @@ export async function getPendingTracksForEnrichment(
       : sql`TRUE`;
 
   const rows = ((await sql`
-    WITH latest_plays AS (
-      SELECT track_id, MAX(played_at) AS max_played_at
-      FROM plays
-      GROUP BY track_id
-    )
     SELECT t.id, t.name, t.artist_name, t.album_name, t.album_group_key
     FROM tracks t
-    LEFT JOIN latest_plays lp ON t.id = lp.track_id
+    LEFT JOIN LATERAL (
+      SELECT played_at AS max_played_at
+      FROM plays
+      WHERE track_id = t.id
+      ORDER BY played_at DESC
+      LIMIT 1
+    ) lp ON TRUE
     WHERE t.enrichment_status = 'pending' AND ${trackFilter}
     ORDER BY lp.max_played_at DESC NULLS LAST, t.id ASC
     LIMIT ${batchSize};
@@ -155,10 +156,15 @@ export async function recordApiCooldown(
 ): Promise<void> {
   await ensureTablesExist();
   const sql = getDb();
+  const safeSeconds =
+    Number.isFinite(cooldownSeconds) && cooldownSeconds > 0
+      ? Math.floor(cooldownSeconds)
+      : 10;
+
   const todayUtc = new Date().toISOString().slice(0, 10);
   await sql`
     INSERT INTO daily_api_usage (usage_date, cron_count, dynamic_count, total_count, cooldown_until, cooldown_reason, updated_at)
-    VALUES (${todayUtc}::date, 0, 0, 0, NOW() + (${cooldownSeconds} || ' seconds')::interval, ${reason}, NOW())
+    VALUES (${todayUtc}::date, 0, 0, 0, NOW() + (${safeSeconds} || ' seconds')::interval, ${reason}, NOW())
     ON CONFLICT (usage_date) DO UPDATE SET
       cooldown_until = GREATEST(daily_api_usage.cooldown_until, EXCLUDED.cooldown_until),
       cooldown_reason = EXCLUDED.cooldown_reason,
@@ -268,7 +274,25 @@ export async function checkAndIncrementApiQuota(
     };
   }
 
-  if (currentTotal + requestedCount > DAILY_API_QUOTA_TOTAL || currentBucket + requestedCount > bucketLimit) {
+  // Atomically check active cooldown and increment quota in a single statement
+  const updatedRows = ((await sql`
+    UPDATE daily_api_usage
+    SET
+      cron_count = CASE WHEN ${bucket} = 'cron' THEN cron_count + ${requestedCount} ELSE cron_count END,
+      dynamic_count = CASE WHEN ${bucket} = 'dynamic' THEN dynamic_count + ${requestedCount} ELSE dynamic_count END,
+      total_count = total_count + ${requestedCount},
+      updated_at = NOW()
+    WHERE usage_date = ${todayUtc}::date
+      AND (cooldown_until IS NULL OR cooldown_until <= NOW())
+      AND total_count + ${requestedCount} <= ${DAILY_API_QUOTA_TOTAL}
+      AND (
+        (${bucket} = 'cron' AND cron_count + ${requestedCount} <= ${DAILY_API_QUOTA_CRON}) OR
+        (${bucket} = 'dynamic' AND dynamic_count + ${requestedCount} <= ${DAILY_API_QUOTA_DYNAMIC})
+      )
+    RETURNING cron_count, dynamic_count, total_count;
+  `) as any);
+
+  if (!updatedRows || updatedRows.length === 0) {
     const remainingInBucket = Math.max(0, bucketLimit - currentBucket);
     const remainingInTotal = Math.max(0, DAILY_API_QUOTA_TOTAL - currentTotal);
     return {
@@ -278,18 +302,6 @@ export async function checkAndIncrementApiQuota(
       bucketToday: currentBucket,
     };
   }
-
-  // Atomically increment
-  const updatedRows = ((await sql`
-    UPDATE daily_api_usage
-    SET
-      cron_count = CASE WHEN ${bucket} = 'cron' THEN cron_count + ${requestedCount} ELSE cron_count END,
-      dynamic_count = CASE WHEN ${bucket} = 'dynamic' THEN dynamic_count + ${requestedCount} ELSE dynamic_count END,
-      total_count = total_count + ${requestedCount},
-      updated_at = NOW()
-    WHERE usage_date = ${todayUtc}::date
-    RETURNING cron_count, dynamic_count, total_count;
-  `));
 
   const updated = updatedRows[0];
   const newTotal = Number(updated.total_count);

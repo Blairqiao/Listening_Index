@@ -152,12 +152,6 @@ export async function ensureTablesExist(): Promise<void> {
               FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL;
           END IF;
 
-          -- Purge legacy delisted tracks
-          IF EXISTS (SELECT 1 FROM tracks WHERE enrichment_status = 'delisted' LIMIT 1) THEN
-            DELETE FROM plays WHERE track_id IN (SELECT id FROM tracks WHERE enrichment_status = 'delisted');
-            DELETE FROM tracks WHERE enrichment_status = 'delisted';
-          END IF;
-
           -- 2. Plays Ledger
           CREATE TABLE IF NOT EXISTS plays (
             id BIGSERIAL PRIMARY KEY,
@@ -202,6 +196,7 @@ export async function ensureTablesExist(): Promise<void> {
           -- 3. Indexes
           CREATE INDEX IF NOT EXISTS idx_plays_played_at ON plays(played_at DESC);
           CREATE INDEX IF NOT EXISTS idx_plays_track_id ON plays(track_id);
+          CREATE INDEX IF NOT EXISTS idx_plays_track_played_at ON plays(track_id, played_at DESC);
           CREATE INDEX IF NOT EXISTS idx_tracks_artist_group_key ON tracks(artist_group_key);
           CREATE INDEX IF NOT EXISTS idx_tracks_album_group_key ON tracks(album_group_key);
           CREATE INDEX IF NOT EXISTS idx_tracks_enrichment_status ON tracks(enrichment_status)

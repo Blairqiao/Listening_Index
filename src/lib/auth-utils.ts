@@ -9,15 +9,30 @@ export function isSameOriginRequest(request: NextRequest): boolean {
   if (process.env.NODE_ENV === "development") return true;
 
   const secFetchSite = request.headers.get("sec-fetch-site");
-  const origin = request.headers.get("origin");
-  const referer = request.headers.get("referer");
-  const host = request.headers.get("host") || request.nextUrl.host;
+  if (secFetchSite === "same-origin") return true;
 
-  return (
-    secFetchSite === "same-origin" ||
-    Boolean(origin && host && origin.includes(host)) ||
-    Boolean(referer && host && referer.includes(host))
-  );
+  const host = request.headers.get("host") || request.nextUrl.host;
+  if (!host) return false;
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  }
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).host === host;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 export function isAuthorizedAdminRequest(request: NextRequest): boolean {

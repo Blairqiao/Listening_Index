@@ -285,30 +285,53 @@ export const ConfigProvider: React.FC<{
   const openAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(true), []);
   const closeAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(false), []);
 
+  const contextValue = React.useMemo(
+    () => ({
+      config,
+      deployedConfig,
+      markAsDeployed,
+      updateConfig,
+      resetToDefaults,
+      applyAccentColorLive,
+      generateConfigTsCode,
+      isCustomized,
+      isDbConfigured: isDb,
+      isModalOpen,
+      openModal,
+      closeModal,
+      isAdminLoginModalOpen,
+      openAdminLoginModal,
+      closeAdminLoginModal,
+      isAuthenticated,
+      isPasswordConfigured,
+      login,
+      logout,
+    }),
+    [
+      config,
+      deployedConfig,
+      markAsDeployed,
+      updateConfig,
+      resetToDefaults,
+      applyAccentColorLive,
+      generateConfigTsCode,
+      isCustomized,
+      isDb,
+      isModalOpen,
+      openModal,
+      closeModal,
+      isAdminLoginModalOpen,
+      openAdminLoginModal,
+      closeAdminLoginModal,
+      isAuthenticated,
+      isPasswordConfigured,
+      login,
+      logout,
+    ]
+  );
+
   return (
-    <ConfigContext.Provider
-      value={{
-        config,
-        deployedConfig,
-        markAsDeployed,
-        updateConfig,
-        resetToDefaults,
-        applyAccentColorLive,
-        generateConfigTsCode,
-        isCustomized,
-        isDbConfigured: isDb,
-        isModalOpen,
-        openModal,
-        closeModal,
-        isAdminLoginModalOpen,
-        openAdminLoginModal,
-        closeAdminLoginModal,
-        isAuthenticated,
-        isPasswordConfigured,
-        login,
-        logout,
-      }}
-    >
+    <ConfigContext.Provider value={contextValue}>
       {children}
     </ConfigContext.Provider>
   );

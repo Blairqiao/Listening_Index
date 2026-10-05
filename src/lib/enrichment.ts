@@ -212,8 +212,19 @@ export async function runEnrichmentBatch(
 
                 if (albumTracksRes.status === 429) {
                   const retryAfter = parseInt(albumTracksRes.headers.get("Retry-After") || "10", 10);
-                  await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
-                  break;
+await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
+                  if (enrichedItems.length > 0 || delistedIds.length > 0) {
+                    await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+                  }
+                  const progress = await getEnrichmentProgress();
+                  return {
+                    enrichedCount: enrichedItems.length,
+                    delistedCount: delistedIds.length,
+                    rateLimited: true,
+                    retryAfterSeconds: retryAfter,
+                    isComplete: false,
+                    progress,
+                  };
                 }
 
                 if (!albumTracksRes.ok) {
@@ -332,7 +343,6 @@ export async function runEnrichmentBatch(
 
       const spTrack = r.track;
       if (!spTrack) {
-        delistedIds.push(r.id);
         continue;
       }
 
@@ -340,7 +350,6 @@ export async function runEnrichmentBatch(
       const album = spTrack.album;
 
       if (!primaryArtist?.id || !album?.id) {
-        delistedIds.push(r.id);
         continue;
       }
 

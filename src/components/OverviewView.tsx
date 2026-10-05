@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
-import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import { formatCadenceTooltip } from "@/lib/format-utils";
 
 interface OverviewViewProps {
@@ -32,40 +31,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   activityCadence = [],
   isLoading = false,
 }) => {
-  const [enrichmentOverlay, setEnrichmentOverlay] = useState<
-    Map<string, { albumImageUrl: string | null; artistId?: string; albumId?: string }>
-  >(new Map());
-
-  const displayTracks = useMemo(() => {
-    if (enrichmentOverlay.size === 0) return topTracks;
-    return topTracks.map((t) => {
-      const overlay = enrichmentOverlay.get(t.id);
-      if (!overlay) return t;
-      return {
-        ...t,
-        albumImageUrl: overlay.albumImageUrl ?? t.albumImageUrl,
-        artistId: overlay.artistId ?? t.artistId,
-        albumId: overlay.albumId ?? t.albumId,
-      };
-    });
-  }, [topTracks, enrichmentOverlay]);
-
-  useDeferredEnrichment({
-    items: displayTracks,
-    onEnriched: (enriched) => {
-      setEnrichmentOverlay((prev) => {
-        const next = new Map(prev);
-        for (const item of enriched) {
-          next.set(item.requestedId, {
-            albumImageUrl: item.albumImageUrl,
-            artistId: item.artistId,
-            albumId: item.albumId,
-          });
-        }
-        return next;
-      });
-    },
-  });
+  const displayTracks = topTracks;
 
   const maxCadence = useMemo(() => {
     if (activityCadence.length === 0) return 1;
