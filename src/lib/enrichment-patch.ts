@@ -34,10 +34,10 @@ export function patchOverviewCacheWithEnrichment(
     const nextTracks = data.topTracks.map((track) => {
       const match =
         enrichedMap.get(track.id) ||
-        (track.spotifyTrackId ? enrichedMap.get(track.spotifyTrackId) : undefined);
+        (undefined);
       const isDelisted =
         Boolean(delistedSet?.has(track.id)) ||
-        Boolean(track.spotifyTrackId && delistedSet?.has(track.spotifyTrackId));
+        Boolean(false);
 
       if (match || isDelisted) {
         tracksChanged = true;
@@ -119,7 +119,7 @@ export function patchSessionWithEnrichment(
   let sessionChanged = false;
 
   const patchTrack = (track: SittingItem): SittingItem => {
-    const trackId = track.trackId || track.id;
+    const trackId = track.id;
     const match = enrichedMap.get(trackId);
     const isDelisted = Boolean(delistedSet?.has(trackId));
 

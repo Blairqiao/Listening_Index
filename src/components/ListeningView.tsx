@@ -11,7 +11,6 @@ import { OverviewView } from "@/components/OverviewView";
 import { StreamLogView } from "@/components/StreamLogView";
 import { SessionView } from "@/components/SessionView";
 import { ListeningFooter } from "@/components/ListeningFooter";
-import dynamic from "next/dynamic";
 const CustomizationModal = dynamic(
   () => import("@/components/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
@@ -1120,9 +1119,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       isOpen: initialSession?.isOpen ?? false,
       tagTime: "--",
       metrics: ["--", "--", "--", "--"],
-      sessionTracks: [],
       sittingTracks: [],
-      previousSessions: [],
       previousSittings: [],
     };
 
@@ -1140,7 +1137,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (activeMode === 0) {
       return currentOverview.topTracks.map((t) => ({
         id: t.id,
-        trackId: t.spotifyTrackId || t.id,
+        trackId: t.id,
         albumImageUrl: t.albumImageUrl,
       }));
     }
@@ -1156,7 +1153,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const tracks = activeSitting?.tracks || sessionData.sittingTracks || [];
       return tracks.map((t) => ({
         id: t.id,
-        trackId: t.trackId || t.id,
+        trackId: t.id,
         albumImageUrl: t.albumImageUrl,
         status: t.status,
       }));
