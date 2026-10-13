@@ -461,8 +461,8 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   {/* Unified Status Card */}
                   <div className="bg-[#141413] border border-[#26261F] p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-music-accent font-bold uppercase">
-                        [ CONNECTED ]
+                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
+                        CONNECTED
                       </span>
                       <a
                         href={profileUrl}
@@ -531,8 +531,8 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   {/* Unified Status Card */}
                   <div className="bg-[#141413] border border-amber-500/30 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-amber-400 font-bold uppercase">
-                        [ EXPIRING IN {effectiveDaysRemaining}D ]
+                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
+                        CONNECTED
                       </span>
                       <a
                         href={profileUrl}
