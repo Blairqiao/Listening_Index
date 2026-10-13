@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requestOrigin } from "@/lib/request-origin";
-import { isConfigured } from "@/lib/db";
 import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/auth-utils";
-import { canStoreOwnerCredential, clearOwnerCredential, getOwnerCredential } from "@/lib/owner-spotify";
+import { getOwnerSpotifyStatus } from "@/lib/db/queries";
+import { canStoreOwnerCredential, clearOwnerCredential } from "@/lib/owner-spotify";
 import { resetSpotifyTokenCache } from "@/lib/spotify";
+import { calculateTokenExpiration, getRedirectUri } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Connection status for the settings menu. Admin-only: which account the
- * dashboard reads is the owner's business, not a visitor's.
+ * Connection status for the settings menu and admin Spotify modal.
+ * Admin-only: which account the dashboard reads is the owner's business, not a visitor's.
  */
 export async function GET(request: NextRequest) {
   if (!isAuthorizedAdminRequest(request)) {
     return NextResponse.json({ error: "Admin sign-in required." }, { status: 401 });
   }
 
-  // Environment variables take precedence over a menu connection, so say
-  // which one is actually in use; otherwise "connected" could describe a
-  // credential the dashboard is ignoring.
-  const viaEnv =
-    isConfigured(process.env.SPOTIFY_CLIENT_ID) && isConfigured(process.env.SPOTIFY_REFRESH_TOKEN);
-  const stored = await getOwnerCredential();
+  const status = await getOwnerSpotifyStatus();
+
+  const { daysRemaining, isExpiringSoon } = status.updatedAt
+    ? calculateTokenExpiration(status.updatedAt)
+    : { daysRemaining: null, isExpiringSoon: false };
 
   return NextResponse.json({
-    connected: viaEnv || Boolean(stored),
-    source: viaEnv ? "environment" : stored ? "menu" : null,
-    displayName: stored?.displayName ?? null,
+    connected: status.connected,
+    source: status.connected ? "database" : null,
+    displayName: status.displayName,
+    profileUrl: status.profileUrl,
+    connectedAt: status.updatedAt,
+    daysRemaining,
+    isExpiringSoon,
+    redirectUri: getRedirectUri(request),
     canConnect: canStoreOwnerCredential(),
-    redirectUri: `${requestOrigin(request)}/api/owner/spotify/callback`,
   });
 }
 

@@ -53,7 +53,11 @@ const POPULAR_TIMEZONES = [
   "UTC",
 ];
 
-export const CustomizationModal: React.FC = () => {
+export interface CustomizationModalProps {
+  // Appearance & administrative customization modal
+}
+
+export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
   const {
     config,
     deployedConfig,
@@ -64,6 +68,7 @@ export const CustomizationModal: React.FC = () => {
     isModalOpen,
     closeModal,
     isAuthenticated,
+    isAdminSpotifyModalOpen,
   } = useConfig();
 
   // Local draft state while modal is open
@@ -176,7 +181,7 @@ export const CustomizationModal: React.FC = () => {
   // Keyboard Escape listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isModalOpen) return;
+      if (!isModalOpen || isAdminSpotifyModalOpen) return;
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
@@ -185,7 +190,7 @@ export const CustomizationModal: React.FC = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isModalOpen, handleCancel]);
+  }, [isModalOpen, isAdminSpotifyModalOpen, handleCancel]);
 
   // Color picker change handler: updates draft state only (static preview within modal)
   const handleColorChange = (hex: string) => {

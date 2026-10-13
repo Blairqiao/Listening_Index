@@ -209,15 +209,17 @@ export async function getOwnerPlaybackToken(): Promise<string | null> {
 /**
  * Persists the owner's Spotify playback refresh token in site_settings.
  */
-export async function saveOwnerPlaybackToken(token: string): Promise<void> {
-  if (!isDbConfigured()) {
-    return;
-  }
+export async function saveOwnerPlaybackToken(
+  token: string,
+  displayName?: string | null,
+  profileUrl?: string | null
+): Promise<void> {
+  if (!isDbConfigured()) return;
   try {
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, owner_playback_token, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
       VALUES (
         'active',
         ${siteConfig.title},
@@ -228,15 +230,57 @@ export async function saveOwnerPlaybackToken(token: string): Promise<void> {
         ${siteConfig.timezone || "America/Chicago"},
         ${""},
         ${token},
+        ${displayName || null},
+        ${profileUrl || null},
+        NOW(),
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
         owner_playback_token = EXCLUDED.owner_playback_token,
+        owner_spotify_name = COALESCE(EXCLUDED.owner_spotify_name, site_settings.owner_spotify_name),
+        owner_spotify_url = COALESCE(EXCLUDED.owner_spotify_url, site_settings.owner_spotify_url),
+        owner_token_updated_at = NOW(),
         updated_at = NOW();
     `;
   } catch (error) {
     console.error("[SITE CONFIG] Failed to save owner playback token to Neon DB:", error);
     throw error;
+  }
+}
+
+/**
+ * Retrieves the owner's Spotify connection status, display name, profile URL, and last token update timestamp.
+ */
+export async function getOwnerSpotifyStatus(): Promise<{
+  connected: boolean;
+  displayName: string | null;
+  profileUrl: string | null;
+  updatedAt: string | null;
+}> {
+  if (!isDbConfigured()) {
+    return { connected: false, displayName: null, profileUrl: null, updatedAt: null };
+  }
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    const rows = (await sql`
+      SELECT owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at
+      FROM site_settings
+      WHERE id = 'active'
+      LIMIT 1;
+    `);
+    if (rows && rows.length > 0 && rows[0]?.owner_playback_token) {
+      return {
+        connected: true,
+        displayName: rows[0].owner_spotify_name || null,
+        profileUrl: rows[0].owner_spotify_url || null,
+        updatedAt: rows[0].owner_token_updated_at ? new Date(rows[0].owner_token_updated_at).toISOString() : null,
+      };
+    }
+    return { connected: false, displayName: null, profileUrl: null, updatedAt: null };
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to get owner Spotify status:", error);
+    return { connected: false, displayName: null, profileUrl: null, updatedAt: null };
   }
 }
 
@@ -253,6 +297,8 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
     await sql`
       UPDATE site_settings
       SET owner_playback_token = NULL,
+          owner_spotify_name = NULL,
+          owner_token_updated_at = NULL,
           updated_at = NOW()
       WHERE id = 'active';
     `;

@@ -68,6 +68,7 @@ export {
   resetActiveSiteConfig,
   getOwnerPlaybackToken,
   saveOwnerPlaybackToken,
+  getOwnerSpotifyStatus,
   deleteOwnerPlaybackToken,
 } from "./config";
 

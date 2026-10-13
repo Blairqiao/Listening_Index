@@ -27,6 +27,9 @@ interface ConfigContextType {
   isAdminLoginModalOpen: boolean;
   openAdminLoginModal: () => void;
   closeAdminLoginModal: () => void;
+  isAdminSpotifyModalOpen: boolean;
+  openAdminSpotifyModal: () => void;
+  closeAdminSpotifyModal: () => void;
   isAuthenticated: boolean;
   isPasswordConfigured: boolean;
   login: (password: string) => Promise<{ success: boolean; error?: string }>;
@@ -83,6 +86,7 @@ export const ConfigProvider: React.FC<{
   const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
+  const [isAdminSpotifyModalOpen, setIsAdminSpotifyModalOpen] = useState<boolean>(false);
 
   // Track configuration as persisted on the server/database
   const [deployedConfig, setDeployedConfig] = useState<SiteConfigState>(() => {
@@ -277,6 +281,7 @@ export const ConfigProvider: React.FC<{
       console.warn("[AUTH] Logout error:", err);
     } finally {
       setIsAuthenticated(false);
+      setIsAdminSpotifyModalOpen(false);
     }
   }, []);
 
@@ -284,6 +289,14 @@ export const ConfigProvider: React.FC<{
   const closeModal = useCallback(() => setIsModalOpen(false), []);
   const openAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(true), []);
   const closeAdminLoginModal = useCallback(() => setIsAdminLoginModalOpen(false), []);
+  const openAdminSpotifyModal = useCallback(() => {
+    if (isAuthenticated) {
+      setIsAdminSpotifyModalOpen(true);
+    } else {
+      setIsAdminLoginModalOpen(true);
+    }
+  }, [isAuthenticated]);
+  const closeAdminSpotifyModal = useCallback(() => setIsAdminSpotifyModalOpen(false), []);
 
   const contextValue = React.useMemo(
     () => ({
@@ -302,6 +315,9 @@ export const ConfigProvider: React.FC<{
       isAdminLoginModalOpen,
       openAdminLoginModal,
       closeAdminLoginModal,
+      isAdminSpotifyModalOpen,
+      openAdminSpotifyModal,
+      closeAdminSpotifyModal,
       isAuthenticated,
       isPasswordConfigured,
       login,
@@ -323,6 +339,9 @@ export const ConfigProvider: React.FC<{
       isAdminLoginModalOpen,
       openAdminLoginModal,
       closeAdminLoginModal,
+      isAdminSpotifyModalOpen,
+      openAdminSpotifyModal,
+      closeAdminSpotifyModal,
       isAuthenticated,
       isPasswordConfigured,
       login,

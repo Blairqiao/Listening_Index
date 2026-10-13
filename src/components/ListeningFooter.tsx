@@ -33,7 +33,7 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
           disabled={isSyncing}
           title="Click to trigger manual Spotify sync"
           onMouseDown={(e) => e.preventDefault()}
-          className={`bg-transparent border-0 p-0 transition-none focus:outline-none focus-visible:outline-none hover:text-[#EDEDE8] ${
+          className={`bg-transparent border-0 p-0 transition-none focus:outline-none focus-visible:outline-none hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
             isSyncing
               ? "text-music-accent cursor-wait"
               : isLive

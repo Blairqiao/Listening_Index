@@ -26,15 +26,38 @@ const RETURN_KEY = "spotify_player_return_to";
  */
 const FLOW_CLIENT_ID_KEY = "spotify_player_client_id";
 
-/** `streaming` is what the Web Playback SDK requires; the read scopes let us
- *  name the account, and the modify scopes drive transport controls. */
-export const PLAYER_SCOPES = [
+/** Unified 7-scope super-set powering both background sync and live playback. */
+export const TOKEN_SCOPES = [
   "streaming",
   "user-read-email",
   "user-read-private",
   "user-read-playback-state",
   "user-modify-playback-state",
+  "user-read-recently-played",
+  "user-read-currently-playing",
 ].join(" ");
+
+export const TOKEN_SCOPE = TOKEN_SCOPES;
+export const Token_Scope = TOKEN_SCOPES;
+
+/** @deprecated Renamed to TOKEN_SCOPES / TOKEN_SCOPE */
+export const PLAYER_SCOPES = TOKEN_SCOPES;
+
+export interface TokenExpirationStatus {
+  daysRemaining: number | null;
+  isExpiringSoon: boolean;
+}
+
+export function calculateTokenExpiration(updatedAt: string | null): TokenExpirationStatus {
+  if (!updatedAt) {
+    return { daysRemaining: null, isExpiringSoon: false };
+  }
+  const updatedTime = new Date(updatedAt).getTime();
+  const elapsedDays = Math.floor((Date.now() - updatedTime) / (1000 * 60 * 60 * 24));
+  const daysRemaining = Math.max(0, 180 - elapsedDays);
+  const isExpiringSoon = daysRemaining <= 14;
+  return { daysRemaining, isExpiringSoon };
+}
 
 export interface StoredToken {
   accessToken: string;
@@ -79,13 +102,55 @@ export function getRedirectUri(request?: NextRequest): string {
   }
   if (typeof window !== "undefined") {
     const origin = window.location.origin;
-    // Spotify strictly rejects "localhost" in redirect URIs and requires the registered loopback: http://127.0.0.1:8888/callback
+    // Spotify strictly rejects "localhost" in redirect URIs and requires 127.0.0.1
     if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
-      return "http://127.0.0.1:8888/callback";
+      return `${origin.replace("://localhost", "://127.0.0.1")}/callback`;
     }
     return `${origin}/callback`;
   }
-  return "http://127.0.0.1:8888/callback";
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/callback`;
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/callback`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/callback`;
+  }
+  return "";
+}
+
+export interface RedirectUriDisplay {
+  productionUri: string;
+  localUri: string;
+  activeEnvironment: "production" | "local";
+}
+
+export function resolveRedirectUriDisplay(
+  activeRedirectUri?: string | null
+): RedirectUriDisplay {
+  const uri = activeRedirectUri || (typeof window !== "undefined" ? getRedirectUri() : "");
+  const isHttps = uri.startsWith("https://");
+
+  let productionUri = "https://<your-app>.vercel.app/callback";
+  if (isHttps) {
+    productionUri = uri;
+  } else if (process.env.NEXT_PUBLIC_SITE_URL?.startsWith("https://")) {
+    productionUri = `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/callback`;
+  } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    productionUri = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}/callback`;
+  }
+
+  let localUri = "http://127.0.0.1:8888/callback";
+  if (uri.startsWith("http://127.0.0.1") || uri.startsWith("http://localhost")) {
+    localUri = uri.replace("://localhost", "://127.0.0.1");
+  }
+
+  return {
+    productionUri,
+    localUri,
+    activeEnvironment: isHttps ? "production" : "local",
+  };
 }
 
 // function randomString(length: number): string {

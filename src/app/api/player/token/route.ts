@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { getRedirectUri } from "@/lib/spotify-auth";
 import {
   getOwnerPlaybackToken,
   saveOwnerPlaybackToken,
@@ -77,7 +78,10 @@ async function exchangeAuthCode(
  */
 export async function GET(request: NextRequest) {
   if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Admin authentication required", code: "ADMIN_AUTH_REQUIRED" },
+      { status: 401 }
+    );
   }
 
   const token = await getOwnerPlaybackToken();
@@ -133,7 +137,10 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Admin authentication required", code: "ADMIN_AUTH_REQUIRED" },
+      { status: 401 }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -182,7 +189,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (code) {
-    const effectiveRedirectUri = redirectUri || body.redirect_uri || "http://127.0.0.1:8888/callback";
+    const effectiveRedirectUri = redirectUri || body.redirect_uri || getRedirectUri(request);
     const response = await exchangeAuthCode(
       code,
       effectiveRedirectUri,
@@ -233,7 +240,10 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Admin authentication required", code: "ADMIN_AUTH_REQUIRED" },
+      { status: 401 }
+    );
   }
 
   await deleteOwnerPlaybackToken();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, isDbConfigured } from "@/lib/db";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { runEnrichmentBatch } from "@/lib/enrichment";
+import { isOwnerSpotifyConfigured } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,15 +24,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const clientId = process.env.SPOTIFY_CLIENT_ID;
-    const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-    const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
-
-    if (!isConfigured(clientId) || !isConfigured(clientSecret) || !isConfigured(refreshToken)) {
+    if (!(await isOwnerSpotifyConfigured())) {
       return NextResponse.json(
         {
           error:
-            "Spotify API credentials not configured. Configure SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, and SPOTIFY_REFRESH_TOKEN before enriching.",
+            "Spotify API credentials not configured. Connect your Spotify account from the settings menu before enriching.",
         },
         { status: 400 }
       );
