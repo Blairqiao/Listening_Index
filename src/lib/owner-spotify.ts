@@ -16,6 +16,7 @@
 import { isDbConfigured } from "@/lib/db";
 import {
   getOwnerPlaybackToken,
+  getOwnerSpotifyStatus,
   saveOwnerPlaybackToken,
   deleteOwnerPlaybackToken,
 } from "@/lib/db/queries/config";
@@ -27,17 +28,29 @@ export interface OwnerCredential {
   refreshToken: string;
 }
 
+let mockOwnerCredential: OwnerCredential | null | undefined = undefined;
+
+export function __setMockOwnerCredentialForTesting(
+  cred: OwnerCredential | null | undefined
+): void {
+  mockOwnerCredential = cred;
+}
+
 /** Storing the owner token needs a configured database. */
 export function canStoreOwnerCredential(): boolean {
   return isDbConfigured();
 }
 
 export async function getOwnerCredential(): Promise<OwnerCredential | null> {
+  if (mockOwnerCredential !== undefined) {
+    return mockOwnerCredential;
+  }
   if (!canStoreOwnerCredential()) return null;
   try {
     const token = await getOwnerPlaybackToken();
     if (!token) return null;
-    return { displayName: null, refreshToken: token };
+    const status = await getOwnerSpotifyStatus();
+    return { displayName: status.displayName, refreshToken: token };
   } catch {
     return null;
   }
@@ -45,9 +58,9 @@ export async function getOwnerCredential(): Promise<OwnerCredential | null> {
 
 export async function saveOwnerCredential(
   refreshToken: string,
-  _displayName: string | null
+  displayName: string | null = null
 ): Promise<void> {
-  await saveOwnerPlaybackToken(refreshToken);
+  await saveOwnerPlaybackToken(refreshToken, displayName);
 }
 
 export async function clearOwnerCredential(): Promise<void> {

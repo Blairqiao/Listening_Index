@@ -193,9 +193,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           fetch("/api/player/token")
             .then((r) => {
               if (r.status === 401) {
-                setIsLinked(false);
-                setPlayerStatus("unlinked");
-                setErrorMessage("Authentication session expired. Please re-link.");
+                setPlayerStatus("error");
+                setErrorMessage("Admin session expired. Press 'L' to log in.");
                 return null;
               }
               return r.json();
@@ -247,7 +246,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("authentication_error", () => {
-        clearToken();
         setIsLinked(false);
         setPlayerStatus("unlinked");
         setErrorMessage("Spotify session expired or token rejected. Please re-link.");
@@ -291,8 +289,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const res = await fetch("/api/player/token");
       if (res.status === 401) {
-        setIsLinked(false);
-        setPlayerStatus("unlinked");
+        setPlayerStatus("error");
+        setErrorMessage("Admin session expired. Press 'L' to log in.");
         return;
       }
 

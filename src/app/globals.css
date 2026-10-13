@@ -55,3 +55,24 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* Slow blinking animation for alert & onboarding indicators */
+@keyframes slow-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.animate-slow-blink {
+  animation: slow-blink 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slow-blink {
+    animation: none;
+  }
+}
+
+

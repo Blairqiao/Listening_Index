@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { getActiveSiteConfig } from "@/lib/db/queries";
 import { challengeFor, createVerifier, playerVerifierCookie } from "@/lib/user-auth";
-import { getRedirectUri, PLAYER_SCOPES } from "@/lib/spotify-auth";
+import { getRedirectUri, TOKEN_SCOPES } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     client_id: clientId,
     response_type: "code",
     redirect_uri: getRedirectUri(request),
-    scope: PLAYER_SCOPES,
+    scope: TOKEN_SCOPES,
     code_challenge_method: "S256",
     code_challenge: challengeFor(verifier),
     show_dialog: "true",

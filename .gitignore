@@ -50,13 +50,14 @@ endsong_*.json
 # worktrees
 .worktrees
 .worktrees/
+.worktrees/*
 worktrees
 worktrees/
 
 # AI agent documentation and scratch artifacts
-docs/
-.superpowers/
-CONTEXT.md
+.agent-docs
+.agent-docs/
+.agent-docs/*
 
 # next.js agent rules (regenerated on every build)
 AGENTS.md

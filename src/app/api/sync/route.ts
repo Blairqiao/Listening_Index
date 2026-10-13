@@ -53,12 +53,12 @@ async function handleSync(request: NextRequest) {
   }
 
   // Gracefully handle unconfigured credentials/database when deployed in demo mode
-  // Spotify may be connected by env var or from the settings menu.
+  // Spotify may be connected from the settings menu or admin prompt.
   if (!isDbConfigured() || !(await isOwnerSpotifyConfigured())) {
     return NextResponse.json(
       {
         success: false,
-        message: "Sync not executed: the database or Spotify is not connected yet. Connect your database, then connect Spotify from the settings menu (or set SPOTIFY_REFRESH_TOKEN).",
+        message: "Sync not executed: the database or Spotify is not connected yet. Connect your database, then connect Spotify from the settings menu or admin prompt.",
       },
       { status: 200 }
     );

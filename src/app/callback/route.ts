@@ -4,6 +4,8 @@ import { getActiveSiteConfig, saveOwnerPlaybackToken } from "@/lib/db/queries";
 import { closePopup as renderPopup, describeOAuthError } from "@/lib/popup-response";
 import { PLAYER_VERIFIER_COOKIE, clearPlayerVerifierCookie } from "@/lib/user-auth";
 import { AUTH_MESSAGE, getRedirectUri } from "@/lib/spotify-auth";
+import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { resetSpotifyTokenCache } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,10 @@ function closePopup(origin: string, ok: boolean, message: string | null) {
  */
 export async function GET(request: NextRequest) {
   const origin = requestOrigin(request);
+
+  if (!isAuthorizedAdminRequest(request)) {
+    return closePopup(origin, false, "Admin sign-in required.");
+  }
 
   const error = request.nextUrl.searchParams.get("error");
   const code = request.nextUrl.searchParams.get("code");
@@ -71,7 +77,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await saveOwnerPlaybackToken(token.refresh_token);
+    let displayName: string | null = null;
+    let profileUrl: string | null = null;
+    try {
+      const meRes = await fetch("https://api.spotify.com/v1/me", {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+      });
+      const me = meRes.ok ? await meRes.json().catch(() => null) : null;
+      displayName = me?.display_name || me?.id || null;
+      profileUrl = me?.external_urls?.spotify || (me?.id ? `https://open.spotify.com/user/${me.id}` : null);
+    } catch {
+      // Proceed even if fetching profile name fails
+    }
+
+    await saveOwnerPlaybackToken(token.refresh_token, displayName, profileUrl);
+    resetSpotifyTokenCache();
     return closePopup(origin, true, null);
   } catch (e) {
     console.error("[PLAYER SPOTIFY] connect failed:", e);

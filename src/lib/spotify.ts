@@ -15,34 +15,34 @@ import { getOwnerCredential, saveOwnerCredential } from "@/lib/owner-spotify";
  * untouched. Without them, the credential saved from the settings menu is
  * used, with the client id the owner entered there.
  */
-async function resolveCredentials(): Promise<{
+export async function resolveCredentials(): Promise<{
   clientId: string;
   clientSecret: string | undefined;
   refreshToken: string;
   fromDatabase: boolean;
   displayName: string | null;
 } | null> {
-  const envId = process.env.SPOTIFY_CLIENT_ID;
-  const envToken = process.env.SPOTIFY_REFRESH_TOKEN;
-  if (isConfigured(envId) && isConfigured(envToken)) {
-    return {
-      clientId: envId!,
-      clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-      refreshToken: envToken!,
-      fromDatabase: false,
-      displayName: null,
-    };
+  // SPOTIFY_REFRESH_TOKEN is fully deprecated as env tokens hold incomplete scopes (no Web Player streaming).
+  // All Spotify access is unified exclusively through the database-backed owner token.
+  if (isConfigured(process.env.SPOTIFY_REFRESH_TOKEN)) {
+    console.warn(
+      "[DEPRECATION] SPOTIFY_REFRESH_TOKEN environment variable is deprecated and ignored because it holds incomplete scopes. " +
+        "Please connect your account via the in-app Spotify Connection Manager."
+    );
   }
 
   const stored = await getOwnerCredential();
   if (!stored) return null;
   const config = await getActiveSiteConfig();
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || config.spotifyClientId;
+  const clientId =
+    process.env.SPOTIFY_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
+    config.spotifyClientId;
   if (!clientId) return null;
-  // Connected through PKCE, so it is redeemed with the client id alone.
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   return {
     clientId,
-    clientSecret: undefined,
+    clientSecret: isConfigured(clientSecret) ? clientSecret : undefined,
     refreshToken: stored.refreshToken,
     fromDatabase: true,
     displayName: stored.displayName,
@@ -162,8 +162,8 @@ export async function getAccessToken(): Promise<string> {
   const creds = await resolveCredentials();
   if (!creds) {
     throw new Error(
-      "Spotify is not connected. Connect it from the settings menu, or set " +
-        "SPOTIFY_CLIENT_ID and SPOTIFY_REFRESH_TOKEN in your environment."
+      "Spotify is not connected. Connect it from the in-app Spotify Connection Manager " +
+        "(press 'C' or click the setup prompt when logged in as admin)."
     );
   }
   const { clientId, clientSecret, refreshToken } = creds;

@@ -78,6 +78,13 @@ async function main() {
   console.log("============================================================");
   console.log("          Spotify OAuth Refresh Token Generator             ");
   console.log("============================================================\n");
+  console.warn(
+    "⚠️  DEPRECATION NOTICE:\n" +
+      "This CLI script generates a token with limited scopes (no Web Player streaming)\n" +
+      "and writes to SPOTIFY_REFRESH_TOKEN, which is now deprecated.\n" +
+      "Instead, please use the in-app 1-Click Refresh Token Generator from the UI:\n" +
+      "Log in as admin (press 'L'), then press 'C' or click the prompt to connect.\n"
+  );
 
   let clientId = process.env.SPOTIFY_CLIENT_ID;
   let clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
