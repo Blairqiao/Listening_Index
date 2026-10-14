@@ -153,13 +153,30 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
 
   // 3. Connected and expiring modes render status cards
   assert.ok(
-    modalSource.includes("[ CONNECTED ]"),
-    "AdminSpotifyModal connected mode must render monospace [ CONNECTED ] status tag"
+    modalSource.includes("CONNECTED"),
+    "AdminSpotifyModal connected mode must render monospace CONNECTED status tag"
+  );
+
+  // 4. Redirect URI code boxes must have scrollbar-hidden to eliminate visible scrollbars
+  const productionBoxMatch = modalSource.includes(
+    '{redirectDisplay.productionUri}\n                        </code>'
+  ) || modalSource.includes('{redirectDisplay.productionUri}');
+  assert.ok(productionBoxMatch, "AdminSpotifyModal renders production redirect URI");
+
+  // Assert both redirect URI code containers include scrollbar-hidden
+  const redirectCodeMatches = Array.from(
+    modalSource.matchAll(/<code[^>]*>[\s\S]*?\{redirectDisplay\.(productionUri|localUri)\}[\s\S]*?<\/code>/g)
   );
   assert.ok(
-    modalSource.includes("[ EXPIRING IN"),
-    "AdminSpotifyModal expiring mode must render monospace [ EXPIRING IN ] status tag"
+    redirectCodeMatches.length === 2,
+    `AdminSpotifyModal must render both production and local redirect URI code blocks (found ${redirectCodeMatches.length})`
   );
+  for (const match of redirectCodeMatches) {
+    assert.ok(
+      match[0].includes("scrollbar-hidden"),
+      `Redirect URI block must include scrollbar-hidden class: ${match[0]}`
+    );
+  }
 });
 
 

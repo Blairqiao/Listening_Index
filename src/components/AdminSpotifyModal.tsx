@@ -215,6 +215,11 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
         setError("Popup was blocked by your browser. Please allow popups for this site.");
       } else if (ok) {
         await refreshStatus();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("spotify-status-changed", { detail: { connected: true } })
+          );
+        }
       } else {
         setError("Spotify authorization was cancelled or closed.");
       }
@@ -232,6 +237,11 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       const res = await fetch("/api/owner/spotify", { method: "DELETE" });
       if (res.ok) {
         await refreshStatus();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("spotify-status-changed", { detail: { connected: false } })
+          );
+        }
       } else {
         const data = await res.json().catch(() => ({}));
         setError(data.error || "Disconnect failed.");
@@ -375,7 +385,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         )}
                       </div>
                       <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
-                        <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all">
+                        <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
                           {redirectDisplay.productionUri}
                         </code>
                         <button
@@ -407,7 +417,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         )}
                       </div>
                       <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
-                        <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all">
+                        <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
                           {redirectDisplay.localUri}
                         </code>
                         <button

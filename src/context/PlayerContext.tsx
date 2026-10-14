@@ -14,6 +14,7 @@ import {
   beginLoginPopup,
   clearToken,
   setConfiguredClientId,
+  AUTH_MESSAGE,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
 
@@ -311,6 +312,42 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     void checkTokenStatus();
+  }, [checkTokenStatus]);
+
+  // Synchronize token status automatically when owner links or unlinks in the Spotify modal
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onAuthMessage = (e: MessageEvent) => {
+      if (e.data?.type === AUTH_MESSAGE && e.data?.ok) {
+        void checkTokenStatus();
+      }
+    };
+
+    const onStatusChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{ connected?: boolean }>;
+      if (customEvent.detail?.connected === false) {
+        playerRef.current?.disconnect();
+        playerRef.current = null;
+        deviceIdRef.current = null;
+        setDeviceId(null);
+        clearToken();
+        setState(null);
+        setActiveDevice(null);
+        setIsLinked(false);
+        setPlayerStatus("unlinked");
+      } else {
+        void checkTokenStatus();
+      }
+    };
+
+    window.addEventListener("message", onAuthMessage);
+    window.addEventListener("spotify-status-changed", onStatusChanged);
+
+    return () => {
+      window.removeEventListener("message", onAuthMessage);
+      window.removeEventListener("spotify-status-changed", onStatusChanged);
+    };
   }, [checkTokenStatus]);
 
   // Cleanup player only when PlayerProvider itself unmounts

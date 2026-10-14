@@ -21,9 +21,6 @@ interface ControlRowProps {
   sourceMode?: "synthetic" | "live";
   onToggleSourceMode?: () => void;
   isLinked?: boolean | null;
-  isAuthorizing?: boolean;
-  onLinkSpotify?: () => void;
-  onUnlinkSpotify?: () => void;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -50,10 +47,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   onToggleLayout,
   // sourceMode = "synthetic",
   // onToggleSourceMode,
-  isLinked = false,
-  isAuthorizing = false,
-  onLinkSpotify,
-  onUnlinkSpotify,
+  isLinked: _isLinked = false,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
@@ -167,28 +161,6 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
               <span className="hidden sm:inline">{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
             </button>
-            {isLinked ? (
-              <button
-                type="button"
-                onClick={onUnlinkSpotify}
-                className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
-                title="Unlink Spotify"
-              >
-                [ UNLINK ]
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={isAuthorizing}
-                onClick={onLinkSpotify}
-                className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 transition-none focus-visible:outline-none focus-visible:text-music-accent ${
-                  isAuthorizing ? "text-music-accent cursor-wait opacity-60" : "text-music-accent hover:text-[#EDEDE8]"
-                }`}
-                title="Link Spotify for Web Playback"
-              >
-                {isAuthorizing ? "[ WAITING... ]" : "[ LINK ]"}
-              </button>
-            )}
           </div>
         );
     }

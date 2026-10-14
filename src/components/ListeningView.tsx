@@ -23,7 +23,6 @@ const AdminSpotifyModal = dynamic(
   () => import("@/components/AdminSpotifyModal").then((mod) => mod.AdminSpotifyModal),
   { ssr: false }
 );
-import type { AdminSpotifyModalMode } from "@/components/AdminSpotifyModal";
 import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
@@ -205,9 +204,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     logout,
   } = useConfig();
 
-  const [demoSpotifyModalMode, setDemoSpotifyModalMode] = useState<AdminSpotifyModalMode | undefined>(undefined);
-  const [isDemoAdmin, setIsDemoAdmin] = useState(false);
-
   const [spotifyStatus, setSpotifyStatus] = useState<{
     connected: boolean;
     isExpiringSoon: boolean;
@@ -217,10 +213,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Fetch owner Spotify status when authenticated
   const fetchSpotifyStatus = useCallback(async () => {
-    if (!isAuthenticated && !isDemoAdmin) {
-      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo_spotify")) {
-        return;
-      }
+    if (!isAuthenticated) {
       setSpotifyStatus(null);
       return;
     }
@@ -238,15 +231,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     } catch (err) {
       console.warn("[SPOTIFY STATUS] Error probing status:", err);
     }
-  }, [isAuthenticated, isDemoAdmin]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
       void fetchSpotifyStatus();
     } else {
-      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo_spotify")) {
-        return;
-      }
       setSpotifyStatus(null);
     }
   }, [isAuthenticated, fetchSpotifyStatus]);
@@ -262,9 +252,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const {
     currentTrack,
     isLinked,
-    isAuthorizing,
-    handleLinkSpotify,
-    handleUnlink,
+    checkTokenStatus,
   } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
 // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
@@ -584,30 +572,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       if (configParam === "true" || configParam === "1") {
         openModal();
       }
-      const demoModal = params.get("demo_spotify_modal");
-      if (demoModal === "onboarding" || demoModal === "connected" || demoModal === "expiring") {
-        setDemoSpotifyModalMode(demoModal as AdminSpotifyModalMode);
-      }
-      const demoAdminParam = params.get("demo_admin");
-      if (demoAdminParam === "true" || demoAdminParam === "1") {
-        setIsDemoAdmin(true);
-      }
-      const demoSpotifyParam = params.get("demo_spotify");
-      if (demoSpotifyParam === "expiring") {
-        setSpotifyStatus({
-          connected: true,
-          displayName: "OWNER",
-          daysRemaining: 6,
-          isExpiringSoon: true,
-        });
-      } else if (demoSpotifyParam === "onboarding") {
-        setSpotifyStatus({
-          connected: false,
-          displayName: null,
-          daysRemaining: null,
-          isExpiringSoon: false,
-        });
-      }
+
     }
   }, [openModal, isAuthenticated]);
   // Fetch Overview data from server (cached on server, reset on sync)
@@ -1017,9 +982,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
-      setActiveMode(sanitizeActiveMode(mode, isAuthenticated));
+      const nextMode = sanitizeActiveMode(mode, isAuthenticated);
+      setActiveMode(nextMode);
+      if (nextMode === 3) {
+        void checkTokenStatus();
+      }
     },
-    [isSyncing, isAuthenticated]
+    [isSyncing, isAuthenticated, checkTokenStatus]
   );
 
   const handleSelectRange = useCallback(
@@ -1341,7 +1310,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onOpenUpload={() => setIsUploadModalOpen(true)}
             onOpenSpotifyModal={openAdminSpotifyModal}
             spotifyStatus={spotifyStatus}
-            isAuthenticated={isAuthenticated || isDemoAdmin}
+            isAuthenticated={isAuthenticated}
             isSyncing={isSyncing}
           />
 
@@ -1360,9 +1329,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
             isLinked={isLinked}
-            isAuthorizing={isAuthorizing}
-            onLinkSpotify={handleLinkSpotify}
-            onUnlinkSpotify={handleUnlink}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
@@ -1455,39 +1421,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       <AdminLoginModal />
 
       {/* 10. Admin Spotify Token & Refresh Generator Modal */}
-      <AdminSpotifyModal
-        initialModeOverride={demoSpotifyModalMode}
-        isOpen={demoSpotifyModalMode ? true : undefined}
-        onClose={demoSpotifyModalMode ? () => setDemoSpotifyModalMode(undefined) : undefined}
-        initialStatus={
-          demoSpotifyModalMode === "connected"
-            ? {
-                connected: true,
-                displayName: "OWNER",
-                profileUrl: "https://open.spotify.com/user/spotify",
-                connectedAt: new Date().toISOString(),
-                daysRemaining: 175,
-                isExpiringSoon: false,
-              }
-            : demoSpotifyModalMode === "expiring"
-            ? {
-                connected: true,
-                displayName: "OWNER",
-                profileUrl: "https://open.spotify.com/user/spotify",
-                connectedAt: new Date(Date.now() - 174 * 24 * 60 * 60 * 1000).toISOString(),
-                daysRemaining: 6,
-                isExpiringSoon: true,
-              }
-            : demoSpotifyModalMode === "onboarding"
-            ? {
-                connected: false,
-                displayName: null,
-                daysRemaining: null,
-                isExpiringSoon: false,
-              }
-            : undefined
-        }
-      />
+      <AdminSpotifyModal />
     </div>
   );
 };
