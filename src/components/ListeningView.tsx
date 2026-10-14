@@ -172,6 +172,7 @@ interface ListeningViewProps {
     artist?: string;
   } | null;
   isDbConfigured?: boolean;
+  initialIsAuthenticated?: boolean;
   initialMode?: Mode;
   initialRange?: RangeKey;
 }
@@ -1429,10 +1430,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 export const ListeningView: React.FC<ListeningViewProps> = ({
   initialConfig,
   isDbConfigured = true,
+  initialIsAuthenticated,
   ...props
 }) => {
   return (
-    <ConfigProvider initialConfig={initialConfig || undefined} isDbConfigured={isDbConfigured}>
+    <ConfigProvider
+      initialConfig={initialConfig || undefined}
+      isDbConfigured={isDbConfigured}
+      initialIsAuthenticated={initialIsAuthenticated}
+    >
       <PlayerProvider>
         <ListeningViewInner isDbConfigured={isDbConfigured} {...props} />
       </PlayerProvider>

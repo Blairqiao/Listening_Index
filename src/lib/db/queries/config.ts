@@ -219,7 +219,7 @@ export async function saveOwnerPlaybackToken(
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
       VALUES (
         'active',
         ${siteConfig.title},
@@ -228,7 +228,6 @@ export async function saveOwnerPlaybackToken(
         ${siteConfig.siteUrl},
         ${siteConfig.githubUrl},
         ${siteConfig.timezone || "America/Chicago"},
-        ${""},
         ${token},
         ${displayName || null},
         ${profileUrl || null},
@@ -298,6 +297,7 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
       UPDATE site_settings
       SET owner_playback_token = NULL,
           owner_spotify_name = NULL,
+          owner_spotify_url = NULL,
           owner_token_updated_at = NULL,
           updated_at = NOW()
       WHERE id = 'active';

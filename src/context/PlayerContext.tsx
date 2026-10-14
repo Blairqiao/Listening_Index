@@ -49,7 +49,7 @@ export interface PlayerContextValue {
   handleLinkSpotify: () => Promise<void>;
   handleUnlink: () => Promise<void>;
   handleTransferPlayback: () => Promise<void>;
-  handleTogglePlay: () => Promise<void>;
+  handleTogglePlay: (trackIdOrUri?: string) => Promise<void>;
   handlePrevious: () => void;
   handleNext: () => void;
   handleSeek: (ms: number) => void;
@@ -60,17 +60,36 @@ export interface PlayerContextValue {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
-interface PlaybackState {
+interface SpotifyApiPlaybackResponse {
   is_playing: boolean;
-  device: {
+  progress_ms?: number;
+  shuffle_state?: boolean;
+  repeat_state?: string;
+  device?: {
     id: string;
     name: string;
+  };
+  context?: {
+    uri: string;
+    type?: string;
+  };
+  item?: {
+    id: string;
+    uri: string;
+    name: string;
+    duration_ms: number;
+    artists?: Array<{ name: string; uri?: string }>;
+    album?: {
+      name: string;
+      uri?: string;
+      images?: Array<{ url: string; height?: number; width?: number }>;
+    };
   };
 }
 
 /** Pure helper to resolve whether playback is active locally or on a remote device */
 export function resolveActiveDevice(
-  playback: PlaybackState,
+  playback: SpotifyApiPlaybackResponse | null,
   localDeviceId: string | null
 ): ActiveDevice | null {
   if (!playback || !playback.device) return null;
@@ -136,7 +155,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [config.spotifyClientId]);
 
   // Query Spotify API for active playback device
-  const probeActivePlayback = useCallback(async (localId: string) => {
+  const probeActivePlayback = useCallback(async (localId: string | null) => {
     try {
       const tokenRes = await fetch("/api/player/token");
       const tokenData = await tokenRes.json().catch(() => ({}));
@@ -148,20 +167,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (res.status === 200) {
-        const data: PlaybackState = await res.json();
+        const data: SpotifyApiPlaybackResponse = await res.json();
         const resolved = resolveActiveDevice(data, localId);
         setActiveDevice(resolved);
       } else if (res.status === 204 || res.status === 404) {
-        // Nothing playing anywhere - automatically transfer to this browser device
-        setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
-        void fetch("https://api.spotify.com/v1/me/player", {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ device_ids: [localId], play: false }),
-        }).catch(() => {});
+        // Nothing playing anywhere
+        if (localId) {
+          setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+        }
       }
     } catch (e) {
       console.warn("[PLAYER] Failed to probe active playback device:", e);
@@ -171,6 +184,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Connect Web Playback SDK
   const connectPlayer = useCallback(async () => {
     if (connectingRef.current) return;
+    if (playerRef.current && deviceIdRef.current) {
+      setPlayerStatus("ready");
+      void probeActivePlayback(deviceIdRef.current);
+      return;
+    }
+
     connectingRef.current = true;
     setErrorMessage(null);
     setPlayerStatus("connecting");
@@ -180,6 +199,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playerRef.current = null;
     deviceIdRef.current = null;
     setDeviceId(null);
+
+    let connectionTimeout: NodeJS.Timeout | null = null;
 
     try {
       await loadSdk();
@@ -223,6 +244,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("ready", ({ device_id }) => {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
         setPlayerStatus("ready");
@@ -242,17 +264,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("account_error", () => {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
         setErrorMessage("Spotify Premium is required for in-browser playback.");
         setPlayerStatus("error");
       });
 
       player.addListener("authentication_error", () => {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
         setIsLinked(false);
         setPlayerStatus("unlinked");
-        setErrorMessage("Spotify session expired or token rejected. Please re-link.");
+        setErrorMessage("Spotify session expired or token rejected. Please re-link via Spotify modal (S).");
       });
 
       player.addListener("initialization_error", (e) => {
+        if (connectionTimeout) clearTimeout(connectionTimeout);
         setErrorMessage(e.message);
         setPlayerStatus("error");
       });
@@ -264,12 +289,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const ok = await player.connect();
       if (ok) {
         playerRef.current = player;
+        connectionTimeout = setTimeout(() => {
+          if (!deviceIdRef.current) {
+            setPlayerStatus("error");
+            setErrorMessage("Spotify SDK connection timed out. A Spotify Premium account is required for in-browser playback.");
+          }
+        }, 10000);
       } else {
         player.disconnect();
         setPlayerStatus("error");
         setErrorMessage("The player could not connect to Spotify.");
       }
     } catch (e) {
+      if (connectionTimeout) clearTimeout(connectionTimeout);
       setPlayerStatus("error");
       setErrorMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -298,6 +330,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const data = await res.json().catch(() => ({}));
       if (data?.linked) {
         setIsLinked(true);
+        void probeActivePlayback(deviceIdRef.current);
         void connectPlayer();
       } else {
         setIsLinked(false);
@@ -308,7 +341,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setPlayerStatus("unlinked");
       console.warn("[PLAYER] Failed to check token status:", err);
     }
-  }, [isAuthenticated, connectPlayer]);
+  }, [isAuthenticated, connectPlayer, probeActivePlayback]);
 
   useEffect(() => {
     void checkTokenStatus();
@@ -467,16 +500,79 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const handleTogglePlay = useCallback(async () => {
-    if (playerRef.current) {
+  const handleTogglePlay = useCallback(
+    async (trackIdOrUri?: string) => {
+      setErrorMessage(null);
+
+      // 1. If local SDK player already has loaded track context in its buffer:
+      if (playerRef.current) {
+        try {
+          const currentState = await playerRef.current.getCurrentState();
+          if (currentState && currentState.track_window?.current_track) {
+            await playerRef.current.togglePlay();
+            return;
+          }
+        } catch (e) {
+          console.warn("[PLAYER] SDK getCurrentState failed, falling back to Web API:", e);
+        }
+      }
+
+      // 2. Local player buffer is empty. Start playback on this browser device via Spotify Web API.
+      const targetDeviceId = deviceIdRef.current;
+      if (!targetDeviceId) {
+        setErrorMessage("Spotify player is not ready yet. Please wait a moment.");
+        return;
+      }
+
       try {
-        await playerRef.current.togglePlay();
+        const tokenRes = await fetch("/api/player/token");
+        const tokenData = await tokenRes.json().catch(() => ({}));
+        const accessToken = tokenData?.accessToken;
+        if (!accessToken) {
+          setErrorMessage("Could not get access token for playback.");
+          return;
+        }
+
+        const targetUri = trackIdOrUri
+          ? trackIdOrUri.startsWith("spotify:")
+            ? trackIdOrUri
+            : `spotify:track:${trackIdOrUri}`
+          : undefined;
+
+        const body = targetUri ? JSON.stringify({ uris: [targetUri] }) : undefined;
+
+        const res = await fetch(
+          `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              ...(body ? { "Content-Type": "application/json" } : {}),
+            },
+            body,
+          }
+        );
+
+        if (res.ok || res.status === 204) {
+          setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const msg =
+            errData?.error?.message ||
+            (res.status === 403
+              ? "Spotify Premium is required for Web Playback."
+              : res.status === 404
+              ? "No track queued to play. Select a track or enter Spotify URL."
+              : `Playback failed (${res.status}).`);
+          setErrorMessage(msg);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Playback toggle failed";
         setErrorMessage(message || "Playback toggle failed");
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleNext = useCallback(() => {
     if (playerRef.current) {
