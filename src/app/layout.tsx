@@ -54,6 +54,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             __html: `(function(){try{var c=localStorage.getItem("listening_index_config");if(c){var parsed=JSON.parse(c);if(parsed.accentColor){document.documentElement.style.setProperty("--music-accent",parsed.accentColor,"important");document.documentElement.style.setProperty("--color-music-accent",parsed.accentColor,"important");}}}catch(e){}})();`,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if(typeof window!=="undefined"&&window.location.hostname==="localhost"){window.location.replace(window.location.href.replace("//localhost","//127.0.0.1"));}})();`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

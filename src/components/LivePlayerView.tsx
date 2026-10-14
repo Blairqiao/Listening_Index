@@ -60,6 +60,8 @@ export interface DisplayTrackParams {
   } | null;
   duration?: number;
   latestPlay?: {
+    id?: string;
+    trackId?: string;
     title?: string;
     artist?: string;
     album?: string;
@@ -68,6 +70,7 @@ export interface DisplayTrackParams {
     duration?: string;
   } | null;
   initialTrack?: {
+    id?: string;
     name?: string;
     artist?: string;
     album?: string;
@@ -79,6 +82,7 @@ export interface DisplayTrackParams {
 export function resolveDisplayTrack(params: DisplayTrackParams) {
   const { currentTrack, duration = 0, latestPlay, initialTrack } = params;
   return {
+    trackId: currentTrack?.id || latestPlay?.trackId || initialTrack?.id || null,
     name:
       currentTrack?.name ||
       latestPlay?.title ||
@@ -419,7 +423,9 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
         )}
 
         {playerStatus === "unlinked" && (
-          <span className="text-[#8A8A82]">[ UNLINKED ]</span>
+          <span className="text-[#8A8A82] truncate">
+            [ SPOTIFY NOT LINKED · OPEN MODAL (S) ]
+          </span>
         )}
 
         {playerStatus === "connecting" && (
@@ -431,7 +437,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             <span className="text-music-accent">
               {activeDevice?.isThisBrowser
                 ? "[ DEVICE: LISTENING INDEX · ACTIVE ]"
-                : `[ REMOTE: ${activeDevice?.name?.toUpperCase() || "EXTERNAL"} ]`}
+                : `[ LISTENING ON: ${activeDevice?.name?.toUpperCase() || "EXTERNAL"} ]`}
             </span>
             <div className="flex items-center gap-2">
               {activeDevice && !activeDevice.isThisBrowser && (
@@ -492,7 +498,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
           <button
             type="button"
-            onClick={() => void handleTogglePlay()}
+            onClick={() => void handleTogglePlay(displayTrack.trackId || undefined)}
             className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
               isPlaying
                 ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"

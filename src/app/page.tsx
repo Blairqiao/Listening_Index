@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { ListeningView } from "@/components/ListeningView";
 import { MOCK_DATA } from "@/lib/mock-data";
 import { getInitialMusicData, getActiveSiteConfig } from "@/lib/db/queries";
 import { isDbConfigured } from "@/lib/db";
+import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 import type { Mode, RangeKey } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,10 @@ interface PageProps {
 }
 
 export default async function Page({ searchParams }: PageProps) {
+  const cookieStore = await cookies();
+  const adminToken = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
+  const initialIsAuthenticated = verifySessionToken(adminToken);
+
   const isForceMock = process.env.FORCE_MOCK_DATA === "true";
   const isConfigured = isDbConfigured() && !isForceMock;
   
@@ -73,6 +79,7 @@ export default async function Page({ searchParams }: PageProps) {
       initialSession={initialData.session}
       initialConfig={activeConfig}
       isDbConfigured={isDbConfigured()}
+      initialIsAuthenticated={initialIsAuthenticated}
       initialMode={initialMode}
       initialRange={initialRange}
     />
