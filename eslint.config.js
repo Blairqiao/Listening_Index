@@ -12,6 +12,8 @@ module.exports = [
 			"out/**",
 			"coverage/**",
 			"public/**",
+			".worktrees/**",
+			".agent-docs/**",
 		],
 	},
 	js.configs.recommended,
@@ -26,6 +28,7 @@ module.exports = [
 			ecmaVersion: "latest",
 			sourceType: "module",
 			parserOptions: {
+				tsconfigRootDir: __dirname,
 				ecmaFeatures: {
 					jsx: true,
 				},

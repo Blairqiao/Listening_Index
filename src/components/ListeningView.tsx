@@ -201,7 +201,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     closeAdminLoginModal,
     isAdminSpotifyModalOpen,
     openAdminSpotifyModal,
-    closeAdminSpotifyModal,
     logout,
   } = useConfig();
 
@@ -377,6 +376,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     activeRangeRef.current = activeRange;
   }, [activeRange]);
 
+  const overviewCacheRef = React.useRef(overviewCache);
+  useEffect(() => {
+    overviewCacheRef.current = overviewCache;
+  }, [overviewCache]);
+
   // Manual sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
@@ -551,31 +555,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active session sitting state for Mode 3
   const [selectedSittingId, setSelectedSittingId] = useState<string | undefined>(undefined);
 
-// Support query params for direct URL inspection of all modes and states
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2" || m === "3") {
-        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
-      }
-      const r = params.get("range");
-      if (r && RANGE_KEYS.includes(r as RangeKey)) {
-        setActiveRange(r as RangeKey);
-        setDisplayedRange(r as RangeKey);
-        activeRangeRef.current = r as RangeKey;
-      }
-      const sit = params.get("sitting");
-      if (sit) {
-        setSelectedSittingId(sit);
-      }
-      const configParam = params.get("config");
-      if (configParam === "true" || configParam === "1") {
-        openModal();
-      }
-
-    }
-  }, [openModal, isAuthenticated]);
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
     try {
@@ -624,17 +603,18 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2") {
-        setActiveMode(parseInt(m, 10) as Mode);
+      if (m === "0" || m === "1" || m === "2" || m === "3") {
+        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
       }
       const r = params.get("range");
       if (r && RANGE_KEYS.includes(r as RangeKey)) {
-        setActiveRange(r as RangeKey);
-        activeRangeRef.current = r as RangeKey;
-        if (overviewCache[r as RangeKey]) {
-          setDisplayedRange(r as RangeKey);
+        const rangeKey = r as RangeKey;
+        setActiveRange(rangeKey);
+        activeRangeRef.current = rangeKey;
+        if (overviewCacheRef.current[rangeKey]) {
+          setDisplayedRange(rangeKey);
         } else {
-          fetchOverview(r as RangeKey);
+          fetchOverview(rangeKey);
         }
       }
       const sit = params.get("sitting");
@@ -646,7 +626,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         openModal();
       }
     }
-  }, [openModal, overviewCache, fetchOverview]);
+  }, [openModal, isAuthenticated, fetchOverview]);
 
   // Fetch Stream Log from server (cached on server, reset on sync)
   const fetchStreamLog = useCallback(async (countToFetch?: number) => {
@@ -857,7 +837,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Manual sync trigger: executes ingestion, purges server cache, and refetches active views
   const handleTriggerSync = useCallback(async () => {
-    if (isSyncing) return;
+    if (!isAuthenticated || isSyncing) return;
     setIsSyncing(true);
     try {
       const res = await fetch("/api/sync", {
@@ -890,7 +870,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     } finally {
       setIsSyncing(false);
     }
-  }, [isSyncing, activeRange, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [isSyncing, isAuthenticated, activeRange, fetchOverview, fetchStreamLog, fetchSession]);
 
   // Background silent refetch helper (used by auto-sync schedule and focus revalidation)
   const refetchActiveData = useCallback(async () => {
@@ -1324,6 +1304,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSessionOpen={sessionData.isOpen}
             sessionTagTime={sessionTagTime}
             isSyncing={isSyncing}
+            isAuthenticated={isAuthenticated}
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
             // totalPlays={streamLogData.metrics[0]}
@@ -1402,6 +1383,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           isLive={isSystemLive}
           syncedAgo={syncedAgoStr}
           isSyncing={isSyncing}
+          isAuthenticated={isAuthenticated}
           onTriggerSync={handleTriggerSync}
         />
       </main>

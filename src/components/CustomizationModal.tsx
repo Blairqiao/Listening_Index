@@ -53,9 +53,7 @@ const POPULAR_TIMEZONES = [
   "UTC",
 ];
 
-export interface CustomizationModalProps {
-  // Appearance & administrative customization modal
-}
+export type CustomizationModalProps = Record<string, never>;
 
 export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
   const {

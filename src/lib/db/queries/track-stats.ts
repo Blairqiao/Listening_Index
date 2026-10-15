@@ -1,5 +1,6 @@
 import { getDb, isDbConfigured } from "../index";
 import { catalogTotalsCache } from "./cache";
+import { isCatalogFullyEnriched } from "./enrichment";
 
 export interface TrackTelemetryStats {
   track: {
@@ -73,10 +74,14 @@ export async function getTrackTelemetryStats(params: {
 
     // Query total distinct tracks and artists with 5-minute in-memory latch cache
     const totalsPromise = catalogTotalsCache.get(async () => {
+      const isEnriched = await isCatalogFullyEnriched();
+      const artistExpr = isEnriched
+        ? sql`COUNT(DISTINCT t.artist_id)::int`
+        : sql`COUNT(DISTINCT t.artist_group_key)::int`;
       const rows = await sql`
         SELECT 
           COUNT(DISTINCT p.track_id)::int AS total_tracks,
-          COUNT(DISTINCT t.artist_group_key)::int AS total_artists
+          ${artistExpr} AS total_artists
         FROM plays p
         JOIN tracks t ON p.track_id = t.id
       `;
@@ -86,20 +91,22 @@ export async function getTrackTelemetryStats(params: {
       };
     });
 
+    const isEnriched = await isCatalogFullyEnriched();
     let resolvedTrackId: string | undefined = cleanTrackId;
     let resolvedTrackName: string | undefined = cleanTitle;
     let resolvedArtistName: string = cleanArtist || "";
     let resolvedArtistGroupKey: string | undefined = cleanArtist ? cleanArtist.trim().toLowerCase() : undefined;
+    let resolvedArtistId: string | undefined = undefined;
     let trackPlays = 0;
 
     // 1. Look up track by trackId if provided
     if (cleanTrackId) {
       const trackRows = await sql`
-        SELECT t.id, t.name, t.artist_name, t.artist_group_key, COUNT(p.id)::int AS plays
+        SELECT t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id, COUNT(p.id)::int AS plays
         FROM tracks t
         LEFT JOIN plays p ON p.track_id = t.id
         WHERE t.id = ${cleanTrackId}
-        GROUP BY t.id, t.name, t.artist_name, t.artist_group_key
+        GROUP BY t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id
       `;
       if (trackRows.length > 0) {
         resolvedTrackId = trackRows[0].id;
@@ -109,6 +116,9 @@ export async function getTrackTelemetryStats(params: {
           resolvedArtistGroupKey = trackRows[0].artist_group_key;
           resolvedArtistName = trackRows[0].artist_name || resolvedArtistName;
         }
+        if (trackRows[0].artist_id) {
+          resolvedArtistId = trackRows[0].artist_id;
+        }
       }
     }
 
@@ -116,21 +126,21 @@ export async function getTrackTelemetryStats(params: {
     if (trackPlays === 0 && cleanTitle) {
       const fallbackRows = cleanArtist
         ? await sql`
-            SELECT t.id, t.name, t.artist_name, t.artist_group_key, COUNT(p.id)::int AS plays
+            SELECT t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id, COUNT(p.id)::int AS plays
             FROM tracks t
             JOIN plays p ON p.track_id = t.id
             WHERE lower(trim(t.name)) = lower(trim(${cleanTitle}))
               AND t.artist_group_key = lower(trim(${cleanArtist}))
-            GROUP BY t.id, t.name, t.artist_name, t.artist_group_key
+            GROUP BY t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id
             ORDER BY plays DESC
             LIMIT 1
           `
         : await sql`
-            SELECT t.id, t.name, t.artist_name, t.artist_group_key, COUNT(p.id)::int AS plays
+            SELECT t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id, COUNT(p.id)::int AS plays
             FROM tracks t
             JOIN plays p ON p.track_id = t.id
             WHERE lower(trim(t.name)) = lower(trim(${cleanTitle}))
-            GROUP BY t.id, t.name, t.artist_name, t.artist_group_key
+            GROUP BY t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id
             ORDER BY plays DESC
             LIMIT 1
           `;
@@ -143,12 +153,23 @@ export async function getTrackTelemetryStats(params: {
           resolvedArtistGroupKey = fallbackRows[0].artist_group_key;
           resolvedArtistName = fallbackRows[0].artist_name || resolvedArtistName;
         }
+        if (fallbackRows[0].artist_id) {
+          resolvedArtistId = fallbackRows[0].artist_id;
+        }
       }
     }
 
-    // 3. Look up artist plays by artist_group_key
+    // 3. Look up artist plays by artist_id (if enriched) or artist_group_key
     let artistPlays = 0;
-    if (resolvedArtistGroupKey) {
+    if (isEnriched && resolvedArtistId) {
+      const artistRows = await sql`
+        SELECT COUNT(p.id)::int AS plays
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        WHERE t.artist_id = ${resolvedArtistId}
+      `;
+      artistPlays = Number(artistRows[0]?.plays) || 0;
+    } else if (resolvedArtistGroupKey) {
       const artistRows = await sql`
         SELECT COUNT(p.id)::int AS plays
         FROM plays p
@@ -159,6 +180,9 @@ export async function getTrackTelemetryStats(params: {
     }
 
     // 4. Compute rankings and resolve cached catalog totals concurrently
+    const artistGroupCol = isEnriched && resolvedArtistId ? sql`t.artist_id` : sql`t.artist_group_key`;
+    const artistFilter = isEnriched && resolvedArtistId ? sql`t.artist_id IS NOT NULL` : sql`t.artist_group_key IS NOT NULL`;
+
     const [trackRankRows, artistRankRows, totals] = await Promise.all([
       trackPlays > 0
         ? sql`
@@ -167,11 +191,12 @@ export async function getTrackTelemetryStats(params: {
             ) sub
           `
         : Promise.resolve(null),
-      artistPlays > 0 && resolvedArtistGroupKey
+      artistPlays > 0 && (resolvedArtistId || resolvedArtistGroupKey)
         ? sql`
             SELECT COUNT(*)::int + 1 AS rank FROM (
               SELECT 1 FROM plays p JOIN tracks t ON p.track_id = t.id 
-              GROUP BY t.artist_group_key HAVING COUNT(*) > ${artistPlays}
+              WHERE ${artistFilter}
+              GROUP BY ${artistGroupCol} HAVING COUNT(*) > ${artistPlays}
             ) sub
           `
         : Promise.resolve(null),

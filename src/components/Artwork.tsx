@@ -65,6 +65,7 @@ export const Artwork: React.FC<ArtworkProps> = ({
       alt={alt}
       width={size}
       height={size}
+      unoptimized={true}
       onLoad={() => setHasError(false)}
       onError={() => setHasError(true)}
       style={{ width: `${size}px`, height: `${size}px` }}

@@ -6,7 +6,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  AlertTriangle,
   Loader2,
   Music2,
 } from "lucide-react";
@@ -279,22 +278,6 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
     }
     return 175;
   }, [currentMode, status?.daysRemaining]);
-
-  const formattedConnectedDate = useMemo(() => {
-    const raw = status?.connectedAt;
-    if (!raw) return null;
-    try {
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return null;
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return null;
-    }
-  }, [status?.connectedAt]);
 
   if (!shouldRender || (!initialModeOverride && !config.isAuthenticated)) return null;
 

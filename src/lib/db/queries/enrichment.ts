@@ -290,7 +290,7 @@ export async function checkAndIncrementApiQuota(
         (${bucket} = 'dynamic' AND dynamic_count + ${requestedCount} <= ${DAILY_API_QUOTA_DYNAMIC})
       )
     RETURNING cron_count, dynamic_count, total_count;
-  `) as any);
+  `) as unknown as Array<{ cron_count: number; dynamic_count: number; total_count: number }>);
 
   if (!updatedRows || updatedRows.length === 0) {
     const remainingInBucket = Math.max(0, bucketLimit - currentBucket);

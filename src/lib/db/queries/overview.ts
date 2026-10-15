@@ -44,17 +44,22 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   `;
 
   // 2. Metrics Ribbon
-  const metricPromise = sql`
-    SELECT 
-      COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
-      COUNT(DISTINCT p.track_id)::bigint AS tracks,
-      COUNT(DISTINCT t.artist_group_key)::bigint AS artists,
-      COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
-      MIN(p.played_at) AS window_min_date
-    FROM plays p
-    JOIN tracks t ON p.track_id = t.id
-    WHERE ${timeFilter};
-  `;
+  const metricPromise = isEnrichedPromise.then((isEnriched) => {
+    const artistExpr = isEnriched
+      ? sql`COUNT(DISTINCT t.artist_id)::bigint`
+      : sql`COUNT(DISTINCT t.artist_group_key)::bigint`;
+    return sql`
+      SELECT 
+        COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
+        COUNT(DISTINCT p.track_id)::bigint AS tracks,
+        ${artistExpr} AS artists,
+        COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
+        MIN(p.played_at) AS window_min_date
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter};
+    `;
+  });
 
   // 3. Top Tracks with Drift
   const topTracksPromise = isAll
