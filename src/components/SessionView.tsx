@@ -275,7 +275,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
         <div className="min-w-0">
           <div className="flex justify-between items-baseline mb-2 select-none">
             <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-              {isOpen ? "[ CURRENT SITTING ]" : "[ LAST SITTING ]"}
+              {isOpen ? "[ CURRENT SESSION ]" : "[ LAST SESSION ]"}
             </span>
             <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] uppercase">
               {activeTracks.length} {activeTracks.length === 1 ? "TRACK" : "TRACKS"}
@@ -421,7 +421,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               </span>
             </div>
 
-            {/* TOP SONG (Always rendered & clickable) */}
+            {/* TOP TRACK (Always rendered & clickable) */}
             <div
               onClick={() => topSongHref && window.open(topSongHref, "_blank", "noopener,noreferrer")}
               className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
@@ -429,7 +429,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               }`}
             >
               <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55] flex-none">
-                TOP SONG
+                TOP TRACK
               </span>
               <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
                 {analysis.topSong ? (

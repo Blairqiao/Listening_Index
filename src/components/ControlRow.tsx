@@ -21,6 +21,7 @@ interface ControlRowProps {
   sourceMode?: "synthetic" | "live";
   onToggleSourceMode?: () => void;
   isLinked?: boolean | null;
+  isAuthenticated?: boolean;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -48,6 +49,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   // sourceMode = "synthetic",
   // onToggleSourceMode,
   isLinked: _isLinked = false,
+  isAuthenticated = false,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
@@ -126,7 +128,25 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           </>
         );
       }
-      case 2:
+      case 2: {
+        const sessionContent = isSyncing
+          ? "[ SYNCING... ]"
+          : isSessionOpen
+          ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
+          : `[ CLOSED ${sessionTagTime} AGO ]`;
+
+        if (!isAuthenticated) {
+          return (
+            <span
+              className={`font-mono text-[11px] tracking-[0.08em] ${
+                isSessionOpen ? "text-music-accent" : "text-[#6A6A64]"
+              }`}
+            >
+              {sessionContent}
+            </span>
+          );
+        }
+
         return (
           <button
             type="button"
@@ -141,13 +161,10 @@ export const ControlRow: React.FC<ControlRowProps> = ({
                 : "text-[#6A6A64]"
             }`}
           >
-            {isSyncing
-              ? "[ SYNCING... ]"
-              : isSessionOpen
-              ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
-              : `[ CLOSED ${sessionTagTime} AGO ]`}
+            {sessionContent}
           </button>
         );
+      }
       case 3:
         return (
           <div className="flex items-center gap-2 sm:gap-3">

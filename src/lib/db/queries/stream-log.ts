@@ -1,5 +1,6 @@
 import { getDb } from "../index";
 import { getLastSync } from "./ingestion";
+import { isCatalogFullyEnriched } from "./enrichment";
 import {
   sanitizeTimezone,
   formatDayGroupTz,
@@ -86,66 +87,65 @@ export async function getStreamLog(
   `;
 
   if (!cursorTimestamp) {
-    const totalsPromise = sql`
-      SELECT 
-        COUNT(*)::bigint AS total_plays,
-        COUNT(DISTINCT p.track_id)::bigint AS unique_tracks,
-        COUNT(DISTINCT t.artist_group_key)::bigint AS unique_artists
-      FROM plays p
-      JOIN tracks t ON p.track_id = t.id;
+    const isEnrichedPromise = isCatalogFullyEnriched();
+
+    const totalsPromise = isEnrichedPromise.then((isEnriched) => {
+      const artistExpr = isEnriched
+        ? sql`COUNT(DISTINCT t.artist_id)::bigint`
+        : sql`COUNT(DISTINCT t.artist_group_key)::bigint`;
+      return sql`
+        SELECT 
+          COUNT(*)::bigint AS total_plays,
+          COUNT(DISTINCT p.track_id)::bigint AS unique_tracks,
+          ${artistExpr} AS unique_artists
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id;
+      `;
+    });
+
+    const streakPromise = sql`
+      WITH RECURSIVE streak_days AS (
+        -- Anchor: check if today or yesterday has any plays
+        SELECT
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM plays 
+              WHERE played_at >= ((NOW() AT TIME ZONE ${tz})::date::timestamp AT TIME ZONE ${tz}) 
+                AND played_at < (((NOW() AT TIME ZONE ${tz})::date + 1)::timestamp AT TIME ZONE ${tz})
+            ) THEN (NOW() AT TIME ZONE ${tz})::date
+            WHEN EXISTS (
+              SELECT 1 FROM plays 
+              WHERE played_at >= (((NOW() AT TIME ZONE ${tz})::date - 1)::timestamp AT TIME ZONE ${tz}) 
+                AND played_at < ((NOW() AT TIME ZONE ${tz})::date::timestamp AT TIME ZONE ${tz})
+            ) THEN (NOW() AT TIME ZONE ${tz})::date - 1
+            ELSE NULL
+          END AS d
+        UNION ALL
+        -- Step backward 1 day as long as that previous day has plays
+        SELECT d - 1
+        FROM streak_days
+        WHERE d IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM plays
+            WHERE played_at >= ((d - 1)::timestamp AT TIME ZONE ${tz})
+              AND played_at < (d::timestamp AT TIME ZONE ${tz})
+          )
+      )
+      SELECT COUNT(*)::int AS streak FROM streak_days WHERE d IS NOT NULL;
     `;
 
-    const dateRowsPromise = sql`
-      SELECT DISTINCT (played_at AT TIME ZONE ${tz})::date AS play_date
-      FROM plays
-      WHERE played_at >= NOW() - INTERVAL '120 days'
-      ORDER BY play_date DESC;
-    `;
-
-    const [totalsResult, dateRowsResult, streamRowsResult, lastSyncResult] =
+    const [totalsResult, streakResult, streamRowsResult, lastSyncResult] =
       await Promise.all([
         totalsPromise,
-        dateRowsPromise,
+        streakPromise,
         streamRowsPromise,
         lastSyncPromise,
       ]);
 
     const totalsRow = (totalsResult)[0];
-    const dateRows = dateRowsResult;
+    const currentStreak = Number((streakResult)[0]?.streak) || 0;
     streamRows = streamRowsResult as StreamRow[];
     lastSync = lastSyncResult;
-
-    // Streak calculation
-    let currentStreak = 0;
-    if (dateRows.length > 0) {
-      const playDateStrs = new Set(
-        dateRows.map((r: Record<string, string>) => {
-          const d = new Date(r.play_date);
-          return d.toISOString().slice(0, 10);
-        })
-      );
-
-      const nowTz = new Intl.DateTimeFormat("en-CA", {
-        timeZone: tz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(new Date());
-
-      const checkDate = new Date(nowTz + "T12:00:00Z");
-      let checkDateStr = nowTz;
-
-      if (!playDateStrs.has(checkDateStr)) {
-        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-        checkDateStr = checkDate.toISOString().slice(0, 10);
-      }
-
-      while (playDateStrs.has(checkDateStr)) {
-        currentStreak++;
-        checkDate.setUTCDate(checkDate.getUTCDate() - 1);
-        checkDateStr = checkDate.toISOString().slice(0, 10);
-      }
-    }
 
     const totalPlays = Number(totalsRow?.total_plays || 0);
     const uniqueTracks = Number(totalsRow?.unique_tracks || 0);

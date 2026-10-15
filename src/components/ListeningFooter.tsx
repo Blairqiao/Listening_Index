@@ -8,6 +8,7 @@ interface ListeningFooterProps {
   isLive: boolean;
   syncedAgo: string;
   isSyncing?: boolean;
+  isAuthenticated?: boolean;
   onTriggerSync?: () => void;
 }
 
@@ -16,6 +17,7 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
   isLive,
   syncedAgo,
   isSyncing = false,
+  isAuthenticated = false,
   onTriggerSync,
 }) => {
   return (
@@ -27,31 +29,48 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
 
       {/* System Telemetry Status (Clickable manual sync on [ SYNCED X AGO ]) */}
       <div className="flex items-center font-mono text-[11px]">
-        <button
-          type="button"
-          onClick={onTriggerSync}
-          disabled={isSyncing}
-          title="Click to trigger manual Spotify sync"
-          onMouseDown={(e) => e.preventDefault()}
-          className={`bg-transparent border-0 p-0 transition-none focus:outline-none focus-visible:outline-none hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
-            isSyncing
-              ? "text-music-accent cursor-wait"
-              : isLive
-              ? "text-music-accent cursor-pointer"
-              : "text-[#5A5A55] cursor-pointer"
-          }`}
-        >
-          {isSyncing ? (
-            <span className="tracking-[0.08em]">[ SYNCING... ]</span>
-          ) : isLive ? (
-            <>
-              <span className="sm:hidden tracking-[0.08em] uppercase">[ ▪ LIVE ]</span>
-              <span className="hidden sm:inline tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
-            </>
-          ) : (
-            <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
-          )}
-        </button>
+        {isAuthenticated ? (
+          <button
+            type="button"
+            onClick={onTriggerSync}
+            disabled={isSyncing}
+            title="Click to trigger manual Spotify sync"
+            onMouseDown={(e) => e.preventDefault()}
+            className={`bg-transparent border-0 p-0 transition-none focus:outline-none focus-visible:outline-none hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
+              isSyncing
+                ? "text-music-accent cursor-wait"
+                : isLive
+                ? "text-music-accent cursor-pointer"
+                : "text-[#5A5A55] cursor-pointer"
+            }`}
+          >
+            {isSyncing ? (
+              <span className="tracking-[0.08em]">[ SYNCING... ]</span>
+            ) : isLive ? (
+              <>
+                <span className="sm:hidden tracking-[0.08em] uppercase">[ ▪ LIVE ]</span>
+                <span className="hidden sm:inline tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
+              </>
+            ) : (
+              <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
+            )}
+          </button>
+        ) : (
+          <span
+            className={`shrink-0 whitespace-nowrap ${
+              isLive ? "text-music-accent" : "text-[#5A5A55]"
+            }`}
+          >
+            {isLive ? (
+              <>
+                <span className="sm:hidden tracking-[0.08em] uppercase">[ ▪ LIVE ]</span>
+                <span className="hidden sm:inline tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
+              </>
+            ) : (
+              <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
+            )}
+          </span>
+        )}
       </div>
     </footer>
   );
