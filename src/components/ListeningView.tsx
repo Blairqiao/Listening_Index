@@ -1325,9 +1325,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onToggleArtistRank={handleToggleArtistRank}
           />
 
-          {/* 5. Mode Views (h-auto on mobile so stacked columns expand, locked h-[584px] on desktop) */}
+          {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player) */}
           <div
-            className={`h-auto md:h-[584px] transition-opacity duration-150 ${
+            className={`h-auto ${
+              activeMode === 3 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+            } transition-opacity duration-150 ${
               isSyncing || (activeMode === 0 && isRangeLoading)
                 ? "opacity-40 pointer-events-none"
                 : "opacity-100"

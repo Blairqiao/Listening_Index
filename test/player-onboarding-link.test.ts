@@ -94,8 +94,12 @@ test("AC-5: handleTogglePlay supports API fallback with track URI when SDK state
   const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
   const liveContent = fs.readFileSync(livePlayerPath, "utf-8");
   assert.ok(
-    liveContent.includes("handleTogglePlay(displayTrack.trackId"),
-    "LivePlayerView must pass displayTrack.trackId to handleTogglePlay"
+    !liveContent.includes("handleTogglePlay(displayTrack.trackId"),
+    "LivePlayerView must not override context by passing displayTrack.trackId to handleTogglePlay"
+  );
+  assert.ok(
+    liveContent.includes("handleTogglePlay()"),
+    "LivePlayerView transport button must invoke handleTogglePlay without arguments"
   );
 });
 
