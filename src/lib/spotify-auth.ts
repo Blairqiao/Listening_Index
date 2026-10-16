@@ -35,6 +35,8 @@ export const TOKEN_SCOPES = [
   "user-modify-playback-state",
   "user-read-recently-played",
   "user-read-currently-playing",
+  "playlist-read-private",
+  "playlist-read-collaborative",
 ].join(" ");
 
 export const TOKEN_SCOPE = TOKEN_SCOPES;

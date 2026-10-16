@@ -17,6 +17,8 @@ import {
   AUTH_MESSAGE,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
+import { resolvePlayRequest, shouldToggleInPlace } from "@/lib/player-playback";
+import { createSingleFlight } from "@/lib/player-connection";
 
 const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
 const DEVICE_NAME = "Listening Index";
@@ -44,8 +46,8 @@ export interface PlayerContextValue {
   shuffle: boolean;
   repeatMode: number; // 0: off, 1: context, 2: track
   isAuthorizing: boolean;
-  connectPlayer: () => Promise<void>;
-  checkTokenStatus: () => Promise<void>;
+  connectPlayer: (forceReconnect?: boolean) => Promise<void>;
+  checkTokenStatus: (forceReconnect?: boolean) => Promise<void>;
   handleLinkSpotify: () => Promise<void>;
   handleUnlink: () => Promise<void>;
   handleTransferPlayback: () => Promise<void>;
@@ -56,6 +58,24 @@ export interface PlayerContextValue {
   handleVolume: (sliderValue: number) => void;
   handleToggleShuffle: () => Promise<void>;
   handleCycleRepeat: () => Promise<void>;
+  selectedContext: PlaybackContextSelection;
+  selectContext: (ctx: PlaybackContextSelection) => Promise<void>;
+  userPlaylists: UserPlaylistSummary[];
+  loadPlaylists: () => Promise<void>;
+}
+
+export interface PlaybackContextSelection {
+  type: "auto" | "playlist";
+  name: string;
+  uri?: string;
+}
+
+export interface UserPlaylistSummary {
+  id: string;
+  name: string;
+  uri: string;
+  trackCount: number;
+  imageUrl?: string;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -135,6 +155,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
   const connectingRef = useRef<boolean>(false);
+  const armedContextRef = useRef<boolean>(true);
+  const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const singleFlightCheckRef = useRef(createSingleFlight<void>());
 
   const [isLinked, setIsLinked] = useState<boolean | null>(null);
   const [playerStatus, setPlayerStatus] = useState<
@@ -149,6 +172,66 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const volumeRef = useRef<number>(volume);
   volumeRef.current = volume;
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
+  const [initialContext, setInitialContext] = useState<{
+    track: {
+      id?: string;
+      name: string;
+      artist: string;
+      album: string;
+      imageUrl?: string;
+      durationMs: number;
+    } | null;
+    context: {
+      type: "auto" | "playlist";
+      name: string;
+      uri?: string;
+    } | null;
+  }>({ track: null, context: null });
+
+  // Query database for current / last-played playback context
+  const loadInitialContext = useCallback(async () => {
+    try {
+      const res = await fetch("/api/player/current-context");
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.track) {
+          setInitialContext({
+            track: data.track,
+            context: data.context || { type: "auto", name: "Recent Favorites" },
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("[PLAYER] Failed to load initial context:", e);
+    }
+  }, []);
+
+  const [selectedContext, setSelectedContext] = useState<PlaybackContextSelection>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("listening_selected_context");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return { type: "auto", name: "Recent Favorites" };
+  });
+
+  const [userPlaylists, setUserPlaylists] = useState<UserPlaylistSummary[]>([]);
+
+  // Fetch owner playlists from Spotify API
+  const loadPlaylists = useCallback(async () => {
+    try {
+      const res = await fetch("/api/player/playlists");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.playlists)) {
+          setUserPlaylists(data.playlists);
+        }
+      }
+    } catch (e) {
+      console.warn("[PLAYER] Failed to load playlists:", e);
+    }
+  }, []);
 
   useEffect(() => {
     setConfiguredClientId(config.spotifyClientId);
@@ -182,9 +265,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   // Connect Web Playback SDK
-  const connectPlayer = useCallback(async () => {
+  const connectPlayer = useCallback(async (forceReconnect = false) => {
     if (connectingRef.current) return;
-    if (playerRef.current && deviceIdRef.current) {
+
+    // In-place reconnect of existing player instance: forces SDK to invoke getOAuthToken with new token
+    if (playerRef.current && (forceReconnect || !deviceIdRef.current)) {
+      connectingRef.current = true;
+      setPlayerStatus("connecting");
+      setErrorMessage(null);
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = setTimeout(() => {
+        if (!deviceIdRef.current) {
+          setPlayerStatus("error");
+          setErrorMessage("Spotify SDK connection timed out. A Spotify Premium account is required for in-browser playback.");
+        }
+      }, 20000);
+      try {
+        playerRef.current.disconnect();
+        const ok = await playerRef.current.connect();
+        if (ok) {
+          if (deviceIdRef.current) {
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+            setPlayerStatus("ready");
+            void probeActivePlayback(deviceIdRef.current);
+          }
+        } else {
+          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+          setPlayerStatus("error");
+          setErrorMessage("Failed to reconnect player with new Spotify token.");
+        }
+      } catch (err) {
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+        setPlayerStatus("error");
+        setErrorMessage(err instanceof Error ? err.message : "Reconnect error");
+      } finally {
+        connectingRef.current = false;
+      }
+      return;
+    }
+
+    if (playerRef.current && deviceIdRef.current && !forceReconnect) {
       setPlayerStatus("ready");
       void probeActivePlayback(deviceIdRef.current);
       return;
@@ -194,13 +314,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setErrorMessage(null);
     setPlayerStatus("connecting");
 
-    // Clean up any existing player instance
-    playerRef.current?.disconnect();
-    playerRef.current = null;
     deviceIdRef.current = null;
     setDeviceId(null);
-
-    let connectionTimeout: NodeJS.Timeout | null = null;
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
 
     try {
       await loadSdk();
@@ -244,7 +363,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("ready", ({ device_id }) => {
-        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
         setPlayerStatus("ready");
@@ -264,20 +383,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("account_error", () => {
-        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setErrorMessage("Spotify Premium is required for in-browser playback.");
         setPlayerStatus("error");
       });
 
       player.addListener("authentication_error", () => {
-        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setIsLinked(false);
         setPlayerStatus("unlinked");
         setErrorMessage("Spotify session expired or token rejected. Please re-link via Spotify modal (S).");
       });
 
       player.addListener("initialization_error", (e) => {
-        if (connectionTimeout) clearTimeout(connectionTimeout);
+        if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setErrorMessage(e.message);
         setPlayerStatus("error");
       });
@@ -289,19 +408,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const ok = await player.connect();
       if (ok) {
         playerRef.current = player;
-        connectionTimeout = setTimeout(() => {
+        connectionTimeoutRef.current = setTimeout(() => {
           if (!deviceIdRef.current) {
             setPlayerStatus("error");
             setErrorMessage("Spotify SDK connection timed out. A Spotify Premium account is required for in-browser playback.");
           }
-        }, 10000);
+        }, 20000);
       } else {
         player.disconnect();
         setPlayerStatus("error");
         setErrorMessage("The player could not connect to Spotify.");
       }
     } catch (e) {
-      if (connectionTimeout) clearTimeout(connectionTimeout);
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       setPlayerStatus("error");
       setErrorMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -309,43 +428,71 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [probeActivePlayback]);
 
+  // Helper to pause, disconnect, and clear player state cleanly
+  const teardownPlayer = useCallback(() => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    if (playerRef.current) {
+      playerRef.current.pause().catch(() => {});
+      playerRef.current.disconnect();
+    }
+    deviceIdRef.current = null;
+    setDeviceId(null);
+    setState(null);
+    setActiveDevice(null);
+    setIsLinked(false);
+    setPlayerStatus("unlinked");
+    armedContextRef.current = true;
+  }, []);
+
   // Initial check of /api/player/token on mount
-  const checkTokenStatus = useCallback(async () => {
-    if (!isAuthenticated) {
-      setIsLinked(false);
-      setPlayerStatus("unlinked");
-      return;
-    }
+  const checkTokenStatus = useCallback(
+    (forceReconnect = false) => {
+      return singleFlightCheckRef.current(async () => {
+        if (!isAuthenticated) {
+          teardownPlayer();
+          return;
+        }
 
-    setPlayerStatus("checking");
-    setErrorMessage(null);
-    try {
-      const res = await fetch("/api/player/token");
-      if (res.status === 401) {
-        setPlayerStatus("error");
-        setErrorMessage("Admin session expired. Press 'L' to log in.");
-        return;
-      }
+        setPlayerStatus("checking");
+        setErrorMessage(null);
+        try {
+          const res = await fetch("/api/player/token");
+          if (res.status === 401) {
+            teardownPlayer();
+            setPlayerStatus("error");
+            setErrorMessage("Admin session expired. Press 'L' to log in.");
+            return;
+          }
 
-      const data = await res.json().catch(() => ({}));
-      if (data?.linked) {
-        setIsLinked(true);
-        void probeActivePlayback(deviceIdRef.current);
-        void connectPlayer();
-      } else {
-        setIsLinked(false);
-        setPlayerStatus("unlinked");
-      }
-    } catch (err) {
-      setIsLinked(false);
-      setPlayerStatus("unlinked");
-      console.warn("[PLAYER] Failed to check token status:", err);
-    }
-  }, [isAuthenticated, connectPlayer, probeActivePlayback]);
+          const data = await res.json().catch(() => ({}));
+          if (data?.linked) {
+            setIsLinked(true);
+            void probeActivePlayback(deviceIdRef.current);
+            void loadInitialContext();
+            void loadPlaylists();
+            await connectPlayer(forceReconnect);
+          } else {
+            teardownPlayer();
+          }
+        } catch (err) {
+          teardownPlayer();
+          console.warn("[PLAYER] Failed to check token status:", err);
+        }
+      });
+    },
+    [isAuthenticated, connectPlayer, probeActivePlayback, teardownPlayer, loadInitialContext, loadPlaylists]
+  );
 
   useEffect(() => {
-    void checkTokenStatus();
-  }, [checkTokenStatus]);
+    if (!isAuthenticated) {
+      teardownPlayer();
+    } else {
+      void checkTokenStatus();
+    }
+  }, [isAuthenticated, checkTokenStatus, teardownPlayer]);
 
   // Synchronize token status automatically when owner links or unlinks in the Spotify modal
   useEffect(() => {
@@ -353,24 +500,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const onAuthMessage = (e: MessageEvent) => {
       if (e.data?.type === AUTH_MESSAGE && e.data?.ok) {
-        void checkTokenStatus();
+        void checkTokenStatus(true);
       }
     };
 
     const onStatusChanged = (e: Event) => {
       const customEvent = e as CustomEvent<{ connected?: boolean }>;
       if (customEvent.detail?.connected === false) {
-        playerRef.current?.disconnect();
-        playerRef.current = null;
-        deviceIdRef.current = null;
-        setDeviceId(null);
-        clearToken();
-        setState(null);
-        setActiveDevice(null);
-        setIsLinked(false);
-        setPlayerStatus("unlinked");
+        teardownPlayer();
       } else {
-        void checkTokenStatus();
+        void checkTokenStatus(true);
       }
     };
 
@@ -504,8 +643,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     async (trackIdOrUri?: string) => {
       setErrorMessage(null);
 
-      // 1. If local SDK player already has loaded track context in its buffer:
-      if (playerRef.current) {
+      // 1. If currently playing and context has not been armed for a new source, toggle pause/resume:
+      const canToggleInPlace = shouldToggleInPlace({
+        isContextArmed: armedContextRef.current,
+        hasPlayer: Boolean(playerRef.current),
+        hasLoadedTrack: Boolean(state?.track_window?.current_track),
+        trackIdOrUri,
+      });
+
+      if (canToggleInPlace && playerRef.current) {
         try {
           const currentState = await playerRef.current.getCurrentState();
           if (currentState && currentState.track_window?.current_track) {
@@ -517,7 +663,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // 2. Local player buffer is empty. Start playback on this browser device via Spotify Web API.
+      // 2. Start playback of armed context or specific track via Spotify Web API.
       const targetDeviceId = deviceIdRef.current;
       if (!targetDeviceId) {
         setErrorMessage("Spotify player is not ready yet. Please wait a moment.");
@@ -533,13 +679,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           return;
         }
 
-        const targetUri = trackIdOrUri
-          ? trackIdOrUri.startsWith("spotify:")
-            ? trackIdOrUri
-            : `spotify:track:${trackIdOrUri}`
-          : undefined;
+        const playReq = await resolvePlayRequest({
+          trackIdOrUri,
+          selectedContext,
+          fallbackTrackUri: initialContext.track?.id || undefined,
+          fetchAutoQueue:
+            selectedContext.type === "auto"
+              ? async () => {
+                  const queueRes = await fetch("/api/player/auto-queue");
+                  if (queueRes.ok) {
+                    const queueData = await queueRes.json();
+                    if (Array.isArray(queueData?.uris) && queueData.uris.length > 0) {
+                      return queueData.uris;
+                    }
+                  }
+                  return null;
+                }
+              : undefined,
+        });
 
-        const body = targetUri ? JSON.stringify({ uris: [targetUri] }) : undefined;
+        const body = playReq ? JSON.stringify(playReq) : undefined;
 
         const res = await fetch(
           `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`,
@@ -554,6 +713,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         );
 
         if (res.ok || res.status === 204) {
+          armedContextRef.current = false;
           setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
         } else {
           const errData = await res.json().catch(() => ({}));
@@ -571,7 +731,58 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setErrorMessage(message || "Playback toggle failed");
       }
     },
-    []
+    [selectedContext, initialContext.track?.id, state?.track_window?.current_track]
+  );
+
+  const selectContext = useCallback(
+    async (ctx: PlaybackContextSelection) => {
+      setSelectedContext(ctx);
+      try {
+        localStorage.setItem("listening_selected_context", JSON.stringify(ctx));
+      } catch {}
+
+      const targetDeviceId = deviceIdRef.current;
+      // Smart trigger: If music is already streaming, immediately switch playback to selected context
+      if (state && !state.paused && targetDeviceId) {
+        try {
+          const tokenRes = await fetch("/api/player/token");
+          const tokenData = await tokenRes.json().catch(() => ({}));
+          const accessToken = tokenData?.accessToken;
+          if (!accessToken) return;
+
+          let body: string | undefined;
+          if (ctx.type === "playlist" && ctx.uri) {
+            body = JSON.stringify({ context_uri: ctx.uri });
+          } else if (ctx.type === "auto") {
+            const queueRes = await fetch("/api/player/auto-queue");
+            if (queueRes.ok) {
+              const queueData = await queueRes.json();
+              if (Array.isArray(queueData?.uris) && queueData.uris.length > 0) {
+                body = JSON.stringify({ uris: queueData.uris });
+              }
+            }
+          }
+
+          if (body) {
+            await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`, {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+              body,
+            });
+            armedContextRef.current = false;
+            setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+          }
+        } catch (e) {
+          console.warn("[PLAYER] Failed to switch playback context:", e);
+        }
+      } else {
+        armedContextRef.current = true;
+      }
+    },
+    [state]
   );
 
   const handleNext = useCallback(() => {
@@ -631,14 +842,35 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [state?.repeat_mode]);
 
-  const currentTrack = state?.track_window.current_track || null;
+  const fallbackTrack: SpotifyPlaybackTrack | null = initialContext.track
+    ? {
+        id: initialContext.track.id || null,
+        uri: initialContext.track.id ? `spotify:track:${initialContext.track.id}` : "",
+        name: initialContext.track.name,
+        duration_ms: initialContext.track.durationMs,
+        artists: [{ name: initialContext.track.artist, uri: "" }],
+        album: {
+          name: initialContext.track.album,
+          uri: "",
+          images: initialContext.track.imageUrl
+            ? [{ url: initialContext.track.imageUrl, height: 300, width: 300 }]
+            : [],
+        },
+      }
+    : null;
+
+  const currentTrack = state?.track_window.current_track || fallbackTrack;
   const previousTrack =
     state?.track_window.previous_tracks && state.track_window.previous_tracks.length > 0
       ? state.track_window.previous_tracks[state.track_window.previous_tracks.length - 1]
       : null;
   const nextTrack = state?.track_window.next_tracks?.[0] || null;
-  const contextName = state?.context?.metadata?.name || null;
-  const duration = state?.duration || currentTrack?.duration_ms || 0;
+  const contextName =
+    state?.context?.metadata?.name ||
+    (selectedContext.type === "playlist"
+      ? selectedContext.name
+      : initialContext.context?.name || "Recent Favorites");
+  const duration = state?.duration || currentTrack?.duration_ms || initialContext.track?.durationMs || 0;
   const isPlaying = state ? !state.paused : false;
   const shuffle = state ? state.shuffle : false;
   const repeatMode = state ? state.repeat_mode : 0;
@@ -673,6 +905,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     handleVolume,
     handleToggleShuffle,
     handleCycleRepeat,
+    selectedContext,
+    selectContext,
+    userPlaylists,
+    loadPlaylists,
   };
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

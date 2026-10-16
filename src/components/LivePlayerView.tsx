@@ -351,8 +351,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     handleVolume,
     handleToggleShuffle,
     handleCycleRepeat,
+    selectedContext,
+    selectContext,
+    userPlaylists,
   } = usePlayer();
 
+  const [isContextSelectorOpen, setIsContextSelectorOpen] = useState(false);
   const [internalSourceMode, setInternalSourceMode] = useState<"synthetic" | "live">("synthetic");
   const sourceMode = externalSourceMode ?? internalSourceMode;
   const toggleSourceMode = onToggleSourceMode ?? useCallback(() => {
@@ -416,30 +420,31 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
         </div>
       </div>
 
-      {/* Connection & Device State Banner */}
-      <div className="text-[10px] tracking-[0.12em] py-1 border-y border-[#161614] flex items-center justify-between min-h-[30px]">
-        {playerStatus === "checking" && (
-          <span className="text-[#5A5A55]">[ CHECKING CONNECTION... ]</span>
-        )}
+      {/* Device & Playback Context Row */}
+      <div className="text-[10px] tracking-[0.12em] py-1 border-y border-[#161614] flex flex-wrap items-center justify-between gap-2 min-h-[30px] font-mono relative">
+        {/* Left Side: Connection & Device State */}
+        <div className="flex items-center gap-2 min-w-0">
+          {playerStatus === "checking" && (
+            <span className="text-[#5A5A55]">[ CHECKING CONNECTION... ]</span>
+          )}
 
-        {playerStatus === "unlinked" && (
-          <span className="text-[#8A8A82] truncate">
-            [ SPOTIFY NOT LINKED · OPEN MODAL (S) ]
-          </span>
-        )}
-
-        {playerStatus === "connecting" && (
-          <span className="text-[#5A5A55]">[ CONNECTING TO SPOTIFY... ]</span>
-        )}
-
-        {playerStatus === "ready" && (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-music-accent">
-              {activeDevice?.isThisBrowser
-                ? "[ DEVICE: LISTENING INDEX · ACTIVE ]"
-                : `[ LISTENING ON: ${activeDevice?.name?.toUpperCase() || "EXTERNAL"} ]`}
+          {playerStatus === "unlinked" && (
+            <span className="text-[#8A8A82] truncate">
+              [ SPOTIFY NOT LINKED · OPEN MODAL (S) ]
             </span>
+          )}
+
+          {playerStatus === "connecting" && (
+            <span className="text-[#5A5A55]">[ CONNECTING TO SPOTIFY... ]</span>
+          )}
+
+          {playerStatus === "ready" && (
             <div className="flex items-center gap-2">
+              <span className="text-music-accent">
+                {activeDevice?.isThisBrowser
+                  ? "[ DEVICE: LISTENING INDEX · ACTIVE ]"
+                  : `[ LISTENING ON: ${activeDevice?.name?.toUpperCase() || "EXTERNAL"} ]`}
+              </span>
               {activeDevice && !activeDevice.isThisBrowser && (
                 <button
                   type="button"
@@ -450,23 +455,110 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                 </button>
               )}
             </div>
-          </div>
-        )}
+          )}
 
-        {playerStatus === "error" && (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-[#FF6B6B] truncate max-w-[200px] sm:max-w-[260px]">
-              {errorMessage || "[ PLAYER ERROR ]"}
-            </span>
+          {playerStatus === "error" && (
+            <div className="flex items-center gap-2">
+              <span className="text-[#FF6B6B] truncate max-w-[160px] sm:max-w-[220px]">
+                {errorMessage || "[ PLAYER ERROR ]"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void checkTokenStatus()}
+                className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+              >
+                [ RETRY ]
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: Playback Context Selector */}
+        <div className="flex items-center gap-1.5 shrink-0 relative">
+          <span className="text-[#6A6A64] uppercase font-bold shrink-0">
+            CONTEXT:
+          </span>
+          <div className="relative">
             <button
               type="button"
-              onClick={() => void checkTokenStatus()}
-              className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+              onClick={() => setIsContextSelectorOpen((prev) => !prev)}
+              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 uppercase font-mono max-w-[220px] sm:max-w-[300px] truncate"
+              title="Select playback context (Auto Play or user playlist)"
             >
-              [ RETRY ]
+              <span className="truncate">
+                {selectedContext.type === "auto"
+                  ? "[⚡ AUTO PLAY · RECENT FAVORITES]"
+                  : `[♫ ${selectedContext.name.toUpperCase()}]`}
+              </span>
+              <span className="text-[8px] text-[#6A6A64]">▼</span>
             </button>
+
+            {isContextSelectorOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setIsContextSelectorOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[10px]">
+                  <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-b border-[#1A1A18]">
+                    CHOOSE PLAYBACK CONTEXT
+                  </div>
+
+                  {/* Auto Play option */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void selectContext({ type: "auto", name: "Recent Favorites" });
+                      setIsContextSelectorOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${
+                      selectedContext.type === "auto" ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
+                    }`}
+                  >
+                    <div className="truncate">
+                      <span>[⚡ AUTO PLAY]</span>
+                      <span className="text-[#6A6A64] ml-1.5 text-[9px]">RECENT FAVORITES (TOP 100)</span>
+                    </div>
+                    {selectedContext.type === "auto" && <span className="text-music-accent text-[9px]">[ACTIVE]</span>}
+                  </button>
+
+                  {/* Playlists section */}
+                  {userPlaylists.length > 0 && (
+                    <>
+                      <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-t border-b border-[#1A1A18] mt-1">
+                        SPOTIFY PLAYLISTS ({userPlaylists.length})
+                      </div>
+                      {userPlaylists.map((pl) => {
+                        const isSelected = selectedContext.type === "playlist" && selectedContext.uri === pl.uri;
+                        return (
+                          <button
+                            key={pl.id}
+                            type="button"
+                            onClick={() => {
+                              void selectContext({ type: "playlist", name: pl.name, uri: pl.uri });
+                              setIsContextSelectorOpen(false);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${
+                              isSelected ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
+                            }`}
+                          >
+                            <span className="truncate pr-2">
+                              [♫ {pl.name.toUpperCase()}]
+                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0 text-[9px] text-[#6A6A64]">
+                              <span>{pl.trackCount} tracks</span>
+                              {isSelected && <span className="text-music-accent">[ACTIVE]</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Scrubber */}
@@ -498,7 +590,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
           <button
             type="button"
-            onClick={() => void handleTogglePlay(displayTrack.trackId || undefined)}
+            onClick={() => void handleTogglePlay()}
             className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
               isPlaying
                 ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"
@@ -616,7 +708,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           accentColor={config.accentColor}
           sourceMode={sourceMode}
           onToggleSource={toggleSourceMode}
-          heightClass="h-[180px] sm:h-[220px]"
+          heightClass="h-[120px] sm:h-[140px] md:h-[160px]"
         />
       </div>
 
