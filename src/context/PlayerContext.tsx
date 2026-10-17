@@ -211,7 +211,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         const saved = localStorage.getItem("listening_selected_context");
         if (saved) return JSON.parse(saved);
-      } catch {}
+      } catch {
+        // Ignore localStorage read or JSON parse errors
+      }
     }
     return { type: "auto", name: "Recent Favorites" };
   });
@@ -520,7 +522,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       window.removeEventListener("message", onAuthMessage);
       window.removeEventListener("spotify-status-changed", onStatusChanged);
     };
-  }, [checkTokenStatus]);
+  }, [checkTokenStatus, teardownPlayer]);
 
   // Cleanup player only when PlayerProvider itself unmounts
   useEffect(() => {
@@ -739,7 +741,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSelectedContext(ctx);
       try {
         localStorage.setItem("listening_selected_context", JSON.stringify(ctx));
-      } catch {}
+      } catch {
+        // Ignore localStorage write errors
+      }
 
       const targetDeviceId = deviceIdRef.current;
       // Smart trigger: If music is already streaming, immediately switch playback to selected context

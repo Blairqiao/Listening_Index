@@ -119,6 +119,11 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
   const [copiedTarget, setCopiedTarget] = useState<"production" | "local" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [syncUrl, setSyncUrl] = useState<string>("");
+  const [cronKey, setCronKey] = useState<string>("");
+  const [copiedSyncUrl, setCopiedSyncUrl] = useState<boolean>(false);
+  const [isRegeneratingKey, setIsRegeneratingKey] = useState<boolean>(false);
+
   const [redirectUri, setRedirectUri] = useState<string>(() => {
     if (initialStatus?.redirectUri) return initialStatus.redirectUri;
     return getRedirectUri();
@@ -151,6 +156,19 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
     }
   }, []);
 
+  const refreshSyncKey = useCallback(async () => {
+    try {
+      const res = await fetch("/api/owner/sync-key", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.syncUrl) setSyncUrl(data.syncUrl);
+        if (data.cronKey) setCronKey(data.cronKey);
+      }
+    } catch (_err) {
+      // Non-blocking sync key fetch
+    }
+  }, []);
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
     const isAllowed = Boolean(initialModeOverride || config.isAuthenticated);
@@ -159,12 +177,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       setIsVisible(true);
       setError(null);
       setCopiedTarget(null);
+      setCopiedSyncUrl(false);
       if (!redirectUri && typeof window !== "undefined") {
         setRedirectUri(getRedirectUri());
       }
       if (!initialStatus) {
         void refreshStatus();
       }
+      void refreshSyncKey();
     } else {
       setIsVisible(false);
       timer = setTimeout(() => {
@@ -180,6 +200,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
     initialStatus,
     redirectUri,
     refreshStatus,
+    refreshSyncKey,
   ]);
 
   // Handle Escape key listener
@@ -249,6 +270,52 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       setError(err instanceof Error ? err.message : "Disconnect failed.");
     } finally {
       setIsBusy(false);
+    }
+  };
+
+  const hasValidSyncKey = Boolean(syncUrl || cronKey);
+  const displaySyncUrl =
+    syncUrl ||
+    (cronKey && typeof window !== "undefined"
+      ? `${window.location.origin}/api/sync?key=${cronKey}`
+      : "");
+  const placeholderSyncUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/sync?key=...`
+      : "https://<your-app>.vercel.app/api/sync?key=...";
+
+  const handleCopySyncUrl = async () => {
+    if (!displaySyncUrl || !hasValidSyncKey || isRegeneratingKey) return;
+    try {
+      await navigator.clipboard.writeText(displaySyncUrl);
+      setCopiedSyncUrl(true);
+      setTimeout(() => setCopiedSyncUrl(false), 2000);
+    } catch {
+      setError("Failed to copy scheduled sync URL to clipboard.");
+    }
+  };
+
+  const handleRegenerateSyncKey = async () => {
+    setIsRegeneratingKey(true);
+    setCopiedSyncUrl(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/owner/sync-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.syncUrl) setSyncUrl(data.syncUrl);
+        if (data.cronKey) setCronKey(data.cronKey);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to regenerate sync key.");
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to regenerate sync key.");
+    } finally {
+      setIsRegeneratingKey(false);
     }
   };
 
@@ -515,6 +582,58 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       </button>
                     )}
                   </div>
+
+                  {/* SCHEDULED SYNC (CRON) */}
+                  <div className="pt-3 border-t border-[#1F1F1A] space-y-2.5">
+                    <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                      <span>SCHEDULED SYNC (CRON)</span>
+                      <button
+                        type="button"
+                        onClick={handleRegenerateSyncKey}
+                        disabled={isBusy || isRegeneratingKey}
+                        className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                        title="Regenerate scheduled sync key"
+                      >
+                        {isRegeneratingKey ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-music-accent" />
+                            <span>[ ROTATING... ]</span>
+                          </>
+                        ) : (
+                          <span>[ REGENERATE ]</span>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
+                      <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
+                        {displaySyncUrl || placeholderSyncUrl}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={handleCopySyncUrl}
+                        disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
+                        className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40"
+                        title="Copy Scheduled Sync URL"
+                      >
+                        {copiedSyncUrl ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400 font-bold">[ COPIED ]</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>[ COPY URL ]</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="font-mono text-[10px] text-[#6A6A64] leading-relaxed">
+                      Scheduled sync URL for cron-job.org or Vercel Cron every 30 minutes.
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -584,6 +703,58 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         [ DISCONNECT ]
                       </button>
                     )}
+                  </div>
+
+                  {/* SCHEDULED SYNC (CRON) */}
+                  <div className="pt-3 border-t border-[#1F1F1A] space-y-2.5">
+                    <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
+                      <span>SCHEDULED SYNC (CRON)</span>
+                      <button
+                        type="button"
+                        onClick={handleRegenerateSyncKey}
+                        disabled={isBusy || isRegeneratingKey}
+                        className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                        title="Regenerate scheduled sync key"
+                      >
+                        {isRegeneratingKey ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+                            <span>[ ROTATING... ]</span>
+                          </>
+                        ) : (
+                          <span>[ REGENERATE ]</span>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-amber-400">
+                      <code className="flex-1 font-mono text-[11px] text-amber-400 px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
+                        {displaySyncUrl || placeholderSyncUrl}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={handleCopySyncUrl}
+                        disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
+                        className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-amber-400 hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40"
+                        title="Copy Scheduled Sync URL"
+                      >
+                        {copiedSyncUrl ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400 font-bold">[ COPIED ]</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>[ COPY URL ]</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="font-mono text-[10px] text-[#6A6A64] leading-relaxed">
+                      Scheduled sync URL for cron-job.org or Vercel Cron every 30 minutes.
+                    </div>
                   </div>
                 </div>
               )}
