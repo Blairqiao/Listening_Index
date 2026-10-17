@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { getDb, isDbConfigured } from "../index";
 import { siteConfig } from "@/config";
 import { ensureTablesExist } from "./schema";
@@ -307,3 +308,92 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Retrieves the scheduled sync key (cron_key) from site_settings.
+ * If null or unseeded on database connection, auto-generates a 32-character hex key and saves it.
+ * Falls back to process.env.CRON_SECRET if the database is unconfigured.
+ */
+export async function getCronKey(): Promise<string | null> {
+  if (!isDbConfigured()) {
+    return process.env.CRON_SECRET || null;
+  }
+
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    const rows = (await sql`
+      SELECT cron_key
+      FROM site_settings
+      WHERE id = 'active'
+      LIMIT 1;
+    `);
+
+    if (rows && rows.length > 0 && rows[0]?.cron_key) {
+      return rows[0].cron_key;
+    }
+
+    // Auto-generate 32-character random hex string if missing on database connection
+    const newKey = crypto.randomBytes(16).toString("hex");
+    await sql`
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, cron_key, updated_at)
+      VALUES (
+        'active',
+        ${siteConfig.title},
+        ${siteConfig.ownerName},
+        ${siteConfig.accentColor},
+        ${siteConfig.siteUrl},
+        ${siteConfig.githubUrl},
+        ${siteConfig.timezone || "America/Chicago"},
+        ${newKey},
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        cron_key = EXCLUDED.cron_key,
+        updated_at = NOW();
+    `;
+    return newKey;
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to get or seed cron key from Neon DB:", error);
+    return process.env.CRON_SECRET || null;
+  }
+}
+
+/**
+ * Rotates the scheduled sync key (cron_key) in site_settings.
+ * Generates a new 32-character hex string, persists it, and returns it.
+ */
+export async function regenerateCronKey(): Promise<string> {
+  const newKey = crypto.randomBytes(16).toString("hex");
+
+  if (!isDbConfigured()) {
+    return newKey;
+  }
+
+  try {
+    await ensureTablesExist();
+    const sql = getDb();
+    await sql`
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, cron_key, updated_at)
+      VALUES (
+        'active',
+        ${siteConfig.title},
+        ${siteConfig.ownerName},
+        ${siteConfig.accentColor},
+        ${siteConfig.siteUrl},
+        ${siteConfig.githubUrl},
+        ${siteConfig.timezone || "America/Chicago"},
+        ${newKey},
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        cron_key = EXCLUDED.cron_key,
+        updated_at = NOW();
+    `;
+    return newKey;
+  } catch (error) {
+    console.error("[SITE CONFIG] Failed to regenerate cron key in Neon DB:", error);
+    throw error;
+  }
+}
+

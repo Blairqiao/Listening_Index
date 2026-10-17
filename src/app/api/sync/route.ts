@@ -4,6 +4,7 @@ import { clearServerCache } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { getCronKey } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
@@ -11,33 +12,44 @@ export const maxDuration = 60; // Up to 60s execution allowance for serverless
 import crypto from "crypto";
 
 function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }
 
 let isSyncInProgress = false;
 
-function isAuthorized(request: NextRequest): boolean {
-  // 1. External machine-to-machine calls via CRON_SECRET
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      if (safeCompare(token, cronSecret)) return true;
-    }
-
-    const url = new URL(request.url);
-    const keyParam = url.searchParams.get("key") || url.searchParams.get("secret");
-    if (keyParam && safeCompare(keyParam, cronSecret)) {
-      return true;
-    }
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  // 1. Browser-initiated requests from UI require admin authorization session
+  if (isAuthorizedAdminRequest(request)) {
+    return true;
   }
 
-  // 2. Browser-initiated requests from UI require admin authorization session
-  if (isAuthorizedAdminRequest(request)) {
+  // 2. Machine-to-machine calls via Bearer token or ?key= / ?secret= query param
+  let token: string | null = null;
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.slice(7).trim();
+  }
+  if (!token) {
+    const url = new URL(request.url);
+    const param = url.searchParams.get("key") || url.searchParams.get("secret");
+    if (param) token = param.trim();
+  }
+
+  if (!token) {
+    return false;
+  }
+
+  // Check against database cron_key
+  const cronKey = await getCronKey();
+  if (cronKey && safeCompare(token, cronKey)) {
+    return true;
+  }
+
+  // Backward-compatibility fallback: check against process.env.CRON_SECRET if defined
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && safeCompare(token, cronSecret)) {
     return true;
   }
 
@@ -45,7 +57,7 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 async function handleSync(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json(
       { error: "Unauthorized. Provide valid Bearer token or ?key= query parameter." },
       { status: 401 }

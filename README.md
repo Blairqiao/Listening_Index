@@ -139,15 +139,15 @@ The script asks for your Client ID and Secret, opens Spotify in your browser, an
 
 ### Step 5: Set up scheduled sync
 
-Spotify only keeps your last 50 played tracks, so a regular sync keeps your history complete.
+Spotify only keeps your last 50 played tracks, so a regular sync keeps your history complete. The application automatically generates a cryptographically secure 32-character sync key in your database upon connecting—no environment variables or redeployments required.
 
-1. Generate a secret key to protect the sync endpoint. Use [generate-secret.vercel.app/32](https://generate-secret.vercel.app/32) or run `npm run generate:cron`.
-2. Add `CRON_SECRET` to your Vercel environment variables.
-3. In [cron-job.org](https://cron-job.org), create a job:
+1. Open your app and log in as admin (`L` key), then open the Spotify Connection Manager (`S` key).
+2. Under **SCHEDULED SYNC (CRON)**, click **[ COPY URL ]** to copy your ready-to-use sync URL (`https://<your-app>.vercel.app/api/sync?key=<cron_key>`).
+3. In [cron-job.org](https://cron-job.org) (or Vercel Cron), create a job:
    - Title: `Listening Index Sync`
-   - URL: `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET`
+   - URL: Paste your copied Scheduled Sync URL
    - Schedule: Every 30 minutes
-4. Save the job.
+4. Save the job. You can rotate this key at any time using the **[ REGENERATE ]** button inside the modal.
 
 ---
 
@@ -161,7 +161,7 @@ Your Listening Index is designed to be public so friends and visitors can browse
    - **Value**: Any strong, secure passphrase of your choice
 3. What this protects:
    - **Dedicated Admin Authentication (`L` key / `[ <Lock /> ]` button)**: Click the lock icon in the navigation bar or press `L` to open the Admin Authentication modal. Entering your `ADMIN_PASSWORD` elevates the session; clicking the unlocked icon `[ <Unlock /> ]` or pressing `L` again instantly logs out.
-   - **Spotify Connection Manager (`S` key / `[ <Music2 /> ]` button)**: Appears in navigation upon login. Generates and renews the unified 7-scope owner refresh token in Neon Postgres with 6-month lifecycle countdown monitoring.
+   - **Spotify Connection Manager (`S` key / `[ <Music2 /> ]` button)**: Appears in navigation upon login. Generates and renews the unified 7-scope owner refresh token in Neon Postgres with 6-month lifecycle countdown monitoring, and displays your scheduled sync key and ready-to-copy sync URL.
    - **Live Player (`4` key / `[ 4 · LIVE PLAYER ]` tab)**: Appears in navigation upon login. Unlocks the full in-browser Spotify Web Playback SDK player, live frequency spectrum visualizer, and personal archive telemetry. Public visitors only see modes 1–3 (Overview, Stream Log, and Sessions).
    - **Extended History Ingestion (`U` key / `[ <Upload /> ]` button)**: Upload icon appears in navigation upon login. Unlocks direct drag-and-drop ingestion of Spotify extended streaming history archives into your database.
    - **Full Configuration & Database Deployment (`C` key / `[ <Menu /> ]` button)**: Elevates the appearance menu into the full configuration modal with options to update site title, timezone, links, and click **Deploy to Database** (`/api/config`).
@@ -171,9 +171,9 @@ Your Listening Index is designed to be public so friends and visitors can browse
 
 ### Step 7: Run your first sync
 
-#### IMPORTANT: Make sure all [environment variables](#environment-variables) (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `CRON_SECRET`, and `ADMIN_PASSWORD`) are present in Vercel and redeployed (and Spotify is connected via Step 4 Option A). Go to the [Vercel dashboard](https://vercel.com/dashboard) and verify your environment variables before testing.
+#### IMPORTANT: Make sure your required [environment variables](#environment-variables) (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, and `ADMIN_PASSWORD`) are present in Vercel and redeployed (and Spotify is connected via Step 4 Option A). Go to the [Vercel dashboard](https://vercel.com/dashboard) and verify your environment variables before testing.
 
-1. Open `https://<your-app>.vercel.app/api/sync?key=YOUR_CRON_SECRET` in your browser.
+1. Copy your scheduled sync URL from the Spotify Connection Manager (`S` key) and open it in your browser (or trigger a sync using the in-app manual sync button).
 2. The endpoint returns a JSON confirmation when complete:
    ```json
    { "success": true, "processed": 50 }
@@ -289,7 +289,7 @@ export const siteConfig = {
 | `SPOTIFY_CLIENT_ID` | Spotify app client ID | Spotify Developer Dashboard |
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret | Spotify Developer Dashboard |
 | `SPOTIFY_REFRESH_TOKEN` | *(Deprecated)* Previously used for user account refresh token. Unified token is now stored securely in Neon Postgres via Option A in-app generator. | Deprecated (managed in-app) |
-| `CRON_SECRET` | Secret token securing `/api/sync` against unauthorized triggers | Generated via `npm run generate:cron` or online generator |
+| `CRON_SECRET` | *(Optional / Legacy)* Fallback secret token securing `/api/sync`. Database sync key is now auto-generated in Neon Postgres and managed via the in-app modal. | Auto-generated in-app (optional legacy env fallback) |
 
 ---
 

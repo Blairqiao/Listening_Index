@@ -242,6 +242,7 @@ export async function ensureTablesExist(): Promise<void> {
             owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
             owner_spotify_name TEXT,
             owner_spotify_url TEXT,
+            cron_key TEXT,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
           );
 
@@ -252,7 +253,8 @@ export async function ensureTablesExist(): Promise<void> {
             ADD COLUMN IF NOT EXISTS live_player_layout TEXT NOT NULL DEFAULT 'split',
             ADD COLUMN IF NOT EXISTS owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
             ADD COLUMN IF NOT EXISTS owner_spotify_name TEXT,
-            ADD COLUMN IF NOT EXISTS owner_spotify_url TEXT;
+            ADD COLUMN IF NOT EXISTS owner_spotify_url TEXT,
+            ADD COLUMN IF NOT EXISTS cron_key TEXT;
 
           -- Drop legacy guest user table
           DROP TABLE IF EXISTS player_users;
