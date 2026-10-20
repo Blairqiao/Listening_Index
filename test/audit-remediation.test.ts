@@ -195,7 +195,11 @@ test("TASK-4: Obsolete files deleted and types.ts deduplicated (F9)", () => {
 
 test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint preserved (F15)", () => {
   const listeningView = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
-  const searchMatches = listeningView.match(/window\.location\.search/g) || [];
+  const urlSyncHook = fs.existsSync(path.join(root, "src/components/listening/useListeningUrlSync.ts"))
+    ? fs.readFileSync(path.join(root, "src/components/listening/useListeningUrlSync.ts"), "utf-8")
+    : "";
+  const combined = listeningView + urlSyncHook;
+  const searchMatches = combined.match(/window\.location\.search/g) || [];
   assert.equal(
     searchMatches.length,
     1,

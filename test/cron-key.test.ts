@@ -167,17 +167,21 @@ test("AC-7: AdminSpotifyModal renders Scheduled Sync section with Copy URL and R
     path.join(root, "src/components/AdminSpotifyModal.tsx"),
     "utf-8"
   );
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"), "utf-8")
+    : "";
+  const combined = modalSource + syncCardSource;
 
   assert.ok(
-    modalSource.includes("SCHEDULED SYNC (CRON)") || modalSource.includes("SCHEDULED SYNC"),
+    combined.includes("SCHEDULED SYNC (CRON)") || combined.includes("SCHEDULED SYNC"),
     "AdminSpotifyModal must render Scheduled Sync section"
   );
   assert.ok(
-    modalSource.includes("COPY URL") || modalSource.includes("COPY"),
+    combined.includes("COPY URL") || combined.includes("COPY"),
     "AdminSpotifyModal must include Copy URL action"
   );
   assert.ok(
-    modalSource.includes("REGENERATE"),
+    combined.includes("REGENERATE"),
     "AdminSpotifyModal must include Regenerate action"
   );
 });
@@ -225,13 +229,17 @@ test("AC-7b: AdminSpotifyModal guards Copy URL button when sync key is not yet l
     path.join(root, "src/components/AdminSpotifyModal.tsx"),
     "utf-8"
   );
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"), "utf-8")
+    : "";
+  const combined = modalSource + syncCardSource;
 
   assert.ok(
-    modalSource.includes("hasValidSyncKey"),
+    modalSource.includes("hasValidSyncKey") || combined.includes("hasValidSyncKey"),
     "AdminSpotifyModal must track whether a valid sync key exists"
   );
   assert.ok(
-    modalSource.includes("disabled={!hasValidSyncKey"),
+    combined.includes("disabled={!hasValidSyncKey"),
     "Copy URL button must be disabled when no valid sync key is loaded"
   );
   assert.ok(
