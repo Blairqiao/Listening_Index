@@ -22,15 +22,6 @@ export async function resolveCredentials(): Promise<{
   fromDatabase: boolean;
   displayName: string | null;
 } | null> {
-  // SPOTIFY_REFRESH_TOKEN is fully deprecated as env tokens hold incomplete scopes (no Web Player streaming).
-  // All Spotify access is unified exclusively through the database-backed owner token.
-  if (isConfigured(process.env.SPOTIFY_REFRESH_TOKEN)) {
-    console.warn(
-      "[DEPRECATION] SPOTIFY_REFRESH_TOKEN environment variable is deprecated and ignored because it holds incomplete scopes. " +
-        "Please connect your account via the in-app Spotify Connection Manager."
-    );
-  }
-
   const stored = await getOwnerCredential();
   if (!stored) return null;
   const config = await getActiveSiteConfig();

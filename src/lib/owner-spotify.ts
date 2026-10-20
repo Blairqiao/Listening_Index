@@ -21,8 +21,6 @@ import {
   deleteOwnerPlaybackToken,
 } from "@/lib/db/queries/config";
 
-export const OWNER_RECORD_ID = "__owner__";
-
 export interface OwnerCredential {
   displayName: string | null;
   refreshToken: string;

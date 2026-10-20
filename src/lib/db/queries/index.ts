@@ -30,10 +30,6 @@ export { ensureTablesExist } from "./schema";
 
 // Ingestion & Sync Ledger
 export {
-  upsertArtist,
-  upsertAlbum,
-  upsertTrack,
-  insertPlay,
   getExistingPlayKeys,
   getExistingEntityIds,
   recordLastSync,
@@ -58,7 +54,6 @@ export {
   checkAndIncrementApiQuota,
   getDailyApiQuotaStatus,
   isCatalogFullyEnriched,
-  cleanupOrphanedSyntheticEntities,
 } from "./enrichment";
 
 // Site Settings Configuration

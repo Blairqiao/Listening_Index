@@ -16,9 +16,7 @@ interface MetricRibbonProps {
 
 export const getRibbonLabels = (
   mode: Mode,
-  overviewTimeUnit: "minutes" | "hours" = "minutes",
-  // trackRankFormat: "rank" | "percentile" = "rank",
-  // artistRankFormat: "rank" | "percentile" = "rank"
+  overviewTimeUnit: "minutes" | "hours" = "minutes"
 ): [string, string, string, string] => {
   switch (mode) {
     case 0:
@@ -48,17 +46,10 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   metrics,
   overviewTimeUnit = "minutes",
   onToggleTimeUnit,
-  // trackRankFormat = "rank",
-  // artistRankFormat = "rank",
   onToggleTrackRank,
   onToggleArtistRank,
 }) => {
-  const labels = getRibbonLabels(
-    mode,
-    overviewTimeUnit,
-    // trackRankFormat,
-    // artistRankFormat
-  );
+  const labels = getRibbonLabels(mode, overviewTimeUnit);
 
   return (
     <section

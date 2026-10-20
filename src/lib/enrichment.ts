@@ -5,7 +5,6 @@ import {
   getPendingTracksInAlbum,
   bulkApplyEnrichment,
   getEnrichmentProgress,
-  cleanupOrphanedSyntheticEntities,
   checkAndIncrementApiQuota,
   EnrichedTrackItem,
 } from "@/lib/db/queries";
@@ -100,7 +99,6 @@ export async function runEnrichmentBatch(
     const progress = await getEnrichmentProgress();
     const isComplete = progress.pending === 0;
     if (isComplete) {
-      await cleanupOrphanedSyntheticEntities();
       clearServerCache();
     }
     return {
@@ -375,9 +373,6 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
   const progress = await getEnrichmentProgress();
   const isComplete = progress.pending === 0;
 
-  if (isComplete) {
-    await cleanupOrphanedSyntheticEntities();
-  }
   clearServerCache();
 
   return {
