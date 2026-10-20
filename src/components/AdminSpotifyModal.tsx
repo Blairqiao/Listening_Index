@@ -15,6 +15,7 @@ import {
   getRedirectUri,
   resolveRedirectUriDisplay,
 } from "@/lib/spotify-auth";
+import { ScheduledSyncCard } from "./admin/ScheduledSyncCard";
 
 export interface SpotifyOwnerStatus {
   connected: boolean;
@@ -584,56 +585,16 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   </div>
 
                   {/* SCHEDULED SYNC (CRON) */}
-                  <div className="pt-3 border-t border-[#1F1F1A] space-y-2.5">
-                    <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                      <span>SCHEDULED SYNC (CRON)</span>
-                      <button
-                        type="button"
-                        onClick={handleRegenerateSyncKey}
-                        disabled={isBusy || isRegeneratingKey}
-                        className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                        title="Regenerate scheduled sync key"
-                      >
-                        {isRegeneratingKey ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin text-music-accent" />
-                            <span>[ ROTATING... ]</span>
-                          </>
-                        ) : (
-                          <span>[ REGENERATE ]</span>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
-                      <code className="flex-1 font-mono text-[11px] text-music-accent px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
-                        {displaySyncUrl || placeholderSyncUrl}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={handleCopySyncUrl}
-                        disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
-                        className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40"
-                        title="Copy Scheduled Sync URL"
-                      >
-                        {copiedSyncUrl ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-emerald-400 font-bold">[ COPIED ]</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>[ COPY URL ]</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="font-mono text-[10px] text-[#6A6A64] leading-relaxed">
-                      Scheduled sync URL for cron-job.org or Vercel Cron every 30 minutes.
-                    </div>
-                  </div>
+                  <ScheduledSyncCard
+                    displaySyncUrl={displaySyncUrl}
+                    placeholderSyncUrl={placeholderSyncUrl}
+                    hasValidSyncKey={hasValidSyncKey}
+                    copiedSyncUrl={copiedSyncUrl}
+                    isBusy={isBusy}
+                    isRegeneratingKey={isRegeneratingKey}
+                    onCopySyncUrl={handleCopySyncUrl}
+                    onRegenerateSyncKey={handleRegenerateSyncKey}
+                  />
                 </div>
               )}
 
@@ -706,56 +667,19 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   </div>
 
                   {/* SCHEDULED SYNC (CRON) */}
-                  <div className="pt-3 border-t border-[#1F1F1A] space-y-2.5">
-                    <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                      <span>SCHEDULED SYNC (CRON)</span>
-                      <button
-                        type="button"
-                        onClick={handleRegenerateSyncKey}
-                        disabled={isBusy || isRegeneratingKey}
-                        className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
-                        title="Regenerate scheduled sync key"
-                      >
-                        {isRegeneratingKey ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
-                            <span>[ ROTATING... ]</span>
-                          </>
-                        ) : (
-                          <span>[ REGENERATE ]</span>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-amber-400">
-                      <code className="flex-1 font-mono text-[11px] text-amber-400 px-3 py-2 overflow-x-auto whitespace-nowrap select-all scrollbar-hidden">
-                        {displaySyncUrl || placeholderSyncUrl}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={handleCopySyncUrl}
-                        disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
-                        className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-amber-400 hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40"
-                        title="Copy Scheduled Sync URL"
-                      >
-                        {copiedSyncUrl ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-emerald-400 font-bold">[ COPIED ]</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>[ COPY URL ]</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="font-mono text-[10px] text-[#6A6A64] leading-relaxed">
-                      Scheduled sync URL for cron-job.org or Vercel Cron every 30 minutes.
-                    </div>
-                  </div>
+                  <ScheduledSyncCard
+                    displaySyncUrl={displaySyncUrl}
+                    placeholderSyncUrl={placeholderSyncUrl}
+                    hasValidSyncKey={hasValidSyncKey}
+                    copiedSyncUrl={copiedSyncUrl}
+                    isBusy={isBusy}
+                    isRegeneratingKey={isRegeneratingKey}
+                    onCopySyncUrl={handleCopySyncUrl}
+                    onRegenerateSyncKey={handleRegenerateSyncKey}
+                    accentColorClass="text-amber-400"
+                    focusBorderClass="focus-within:border-amber-400"
+                    hoverColorClass="hover:text-amber-400"
+                  />
                 </div>
               )}
             </>

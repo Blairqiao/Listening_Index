@@ -68,9 +68,13 @@ test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedica
     !listeningViewContent.includes("http://127.0.0.1:8888/callback"),
     "ListeningView must not hardcode http://127.0.0.1:8888/callback placeholders"
   );
+  const shortcutHookContent = fs.existsSync(path.resolve(__dirname, "../src/components/listening/useKeyboardShortcuts.ts"))
+    ? fs.readFileSync(path.resolve(__dirname, "../src/components/listening/useKeyboardShortcuts.ts"), "utf-8")
+    : "";
+  const combinedShortcuts = listeningViewContent + shortcutHookContent;
   assert.ok(
-    listeningViewContent.includes("if (isAdminSpotifyModalOpen) {") &&
-      !listeningViewContent.includes("isAdminSpotifyModalOpen && e.key === \"Escape\""),
+    combinedShortcuts.includes("if (isAdminSpotifyModalOpen) {") &&
+      !combinedShortcuts.includes("isAdminSpotifyModalOpen && e.key === \"Escape\""),
     "ListeningView must delegate Escape key handling to AdminSpotifyModal to preserve !isBusy guard"
   );
 });

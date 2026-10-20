@@ -17,6 +17,10 @@ import {
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
 import { resolvePlayRequest, shouldToggleInPlace } from "@/lib/player-playback";
 import { createSingleFlight } from "@/lib/player-connection";
+import { usePlayerPlaylists, UserPlaylistSummary } from "./player/usePlayerPlaylists";
+import { usePlayerInitialContext } from "./player/usePlayerInitialContext";
+
+export type { UserPlaylistSummary };
 
 const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
 const DEVICE_NAME = "Listening Index";
@@ -66,14 +70,6 @@ export interface PlaybackContextSelection {
   type: "auto" | "playlist";
   name: string;
   uri?: string;
-}
-
-export interface UserPlaylistSummary {
-  id: string;
-  name: string;
-  uri: string;
-  trackCount: number;
-  imageUrl?: string;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -170,39 +166,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const volumeRef = useRef<number>(volume);
   volumeRef.current = volume;
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
-  const [initialContext, setInitialContext] = useState<{
-    track: {
-      id?: string;
-      name: string;
-      artist: string;
-      album: string;
-      imageUrl?: string;
-      durationMs: number;
-    } | null;
-    context: {
-      type: "auto" | "playlist";
-      name: string;
-      uri?: string;
-    } | null;
-  }>({ track: null, context: null });
-
-  // Query database for current / last-played playback context
-  const loadInitialContext = useCallback(async () => {
-    try {
-      const res = await fetch("/api/player/current-context");
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.track) {
-          setInitialContext({
-            track: data.track,
-            context: data.context || { type: "auto", name: "Recent Favorites" },
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("[PLAYER] Failed to load initial context:", e);
-    }
-  }, []);
+  const { initialContext, setInitialContext, loadInitialContext } = usePlayerInitialContext();
 
   const [selectedContext, setSelectedContext] = useState<PlaybackContextSelection>(() => {
     if (typeof window !== "undefined") {
@@ -216,22 +180,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { type: "auto", name: "Recent Favorites" };
   });
 
-  const [userPlaylists, setUserPlaylists] = useState<UserPlaylistSummary[]>([]);
-
-  // Fetch owner playlists from Spotify API
-  const loadPlaylists = useCallback(async () => {
-    try {
-      const res = await fetch("/api/player/playlists");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data?.playlists)) {
-          setUserPlaylists(data.playlists);
-        }
-      }
-    } catch (e) {
-      console.warn("[PLAYER] Failed to load playlists:", e);
-    }
-  }, []);
+  const { userPlaylists, loadPlaylists } = usePlayerPlaylists();
 
 
   // Query Spotify API for active playback device
