@@ -37,7 +37,7 @@ test("GET /api/player/current-context returns last played track and auto-play co
 
 test("PlayerContext integrates /api/player/current-context on initialization", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const hookPath = path.resolve(__dirname, "../src/context/player/usePlayerInitialContext.ts");
+  const hookPath = path.resolve(__dirname, "../src/context/player-context/usePlayerInitialContext.ts");
   const content = fs.readFileSync(playerContextPath, "utf-8") +
     (fs.existsSync(hookPath) ? fs.readFileSync(hookPath, "utf-8") : "");
 

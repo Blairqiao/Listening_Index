@@ -71,9 +71,9 @@ test("AC-2: cadence query and bucket builder are extracted to src/lib/db/queries
   );
 });
 
-test("AC-3: SpectrumCanvas is extracted to src/components/player/SpectrumCanvas.tsx", async () => {
-  const spectrumFile = path.join(root, "src/components/player/SpectrumCanvas.tsx");
-  assert.ok(fs.existsSync(spectrumFile), "src/components/player/SpectrumCanvas.tsx must exist");
+test("AC-3: SpectrumCanvas is extracted to src/components/live-player-view/SpectrumCanvas.tsx", async () => {
+  const spectrumFile = path.join(root, "src/components/live-player-view/SpectrumCanvas.tsx");
+  assert.ok(fs.existsSync(spectrumFile), "src/components/live-player-view/SpectrumCanvas.tsx must exist");
 
   const spectrumContent = fs.readFileSync(spectrumFile, "utf-8");
   assert.ok(
@@ -87,14 +87,14 @@ test("AC-3: SpectrumCanvas is extracted to src/components/player/SpectrumCanvas.
     "LivePlayerView.tsx must import SpectrumCanvas"
   );
   assert.ok(
-    livePlayerContent.includes("./player/SpectrumCanvas") || livePlayerContent.includes("@/components/player/SpectrumCanvas"),
+    livePlayerContent.includes("./live-player-view/SpectrumCanvas") || livePlayerContent.includes("@/components/live-player-view/SpectrumCanvas"),
     "LivePlayerView.tsx must import SpectrumCanvas from dedicated component file"
   );
 });
 
-test("AC-4: ScheduledSyncCard is extracted to src/components/admin/ScheduledSyncCard.tsx", async () => {
-  const syncCardFile = path.join(root, "src/components/admin/ScheduledSyncCard.tsx");
-  assert.ok(fs.existsSync(syncCardFile), "src/components/admin/ScheduledSyncCard.tsx must exist");
+test("AC-4: ScheduledSyncCard is extracted to src/components/admin-spotify-modal/ScheduledSyncCard.tsx", async () => {
+  const syncCardFile = path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx");
+  assert.ok(fs.existsSync(syncCardFile), "src/components/admin-spotify-modal/ScheduledSyncCard.tsx must exist");
 
   const syncCardContent = fs.readFileSync(syncCardFile, "utf-8");
   assert.ok(
@@ -109,9 +109,9 @@ test("AC-4: ScheduledSyncCard is extracted to src/components/admin/ScheduledSync
   );
 });
 
-test("AC-5: usePlayerPlaylists and usePlayerInitialContext are extracted to src/context/player/", async () => {
-  const playlistsHookFile = path.join(root, "src/context/player/usePlayerPlaylists.ts");
-  const initialContextHookFile = path.join(root, "src/context/player/usePlayerInitialContext.ts");
+test("AC-5: usePlayerPlaylists and usePlayerInitialContext are extracted to src/context/player-context/", async () => {
+  const playlistsHookFile = path.join(root, "src/context/player-context/usePlayerPlaylists.ts");
+  const initialContextHookFile = path.join(root, "src/context/player-context/usePlayerInitialContext.ts");
 
   assert.ok(fs.existsSync(playlistsHookFile), "usePlayerPlaylists.ts must exist");
   assert.ok(fs.existsSync(initialContextHookFile), "usePlayerInitialContext.ts must exist");
@@ -127,9 +127,9 @@ test("AC-5: usePlayerPlaylists and usePlayerInitialContext are extracted to src/
   );
 });
 
-test("AC-6: useKeyboardShortcuts and useListeningUrlSync are extracted to src/components/listening/", async () => {
-  const shortcutsHookFile = path.join(root, "src/components/listening/useKeyboardShortcuts.ts");
-  const urlSyncHookFile = path.join(root, "src/components/listening/useListeningUrlSync.ts");
+test("AC-6: useKeyboardShortcuts and useListeningUrlSync are extracted to src/components/listening-view/", async () => {
+  const shortcutsHookFile = path.join(root, "src/components/listening-view/useKeyboardShortcuts.ts");
+  const urlSyncHookFile = path.join(root, "src/components/listening-view/useListeningUrlSync.ts");
 
   assert.ok(fs.existsSync(shortcutsHookFile), "useKeyboardShortcuts.ts must exist");
   assert.ok(fs.existsSync(urlSyncHookFile), "useListeningUrlSync.ts must exist");

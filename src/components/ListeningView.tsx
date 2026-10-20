@@ -27,8 +27,8 @@ import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import type { Mode, RangeKey } from "@/lib/types";
-import { useKeyboardShortcuts } from "./listening/useKeyboardShortcuts";
-import { useListeningUrlSync } from "./listening/useListeningUrlSync";
+import { useKeyboardShortcuts } from "./listening-view/useKeyboardShortcuts";
+import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
 import {
   OverviewData,
   StreamLogData,

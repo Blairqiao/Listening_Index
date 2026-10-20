@@ -4,7 +4,7 @@ import React, { useCallback, useRef, useState, useEffect } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";
-import { SpectrumCanvas, gradientStops } from "./player/SpectrumCanvas";
+import { SpectrumCanvas, gradientStops } from "./live-player-view/SpectrumCanvas";
 
 export { gradientStops };
 
