@@ -112,28 +112,15 @@ Choose one of two options:
 
 1. Ensure `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, and `ADMIN_PASSWORD` (see Step 6) are configured in your environment variables, and your database is connected.
 2. Open your app and log in as admin: press `L` (or click the lock icon) and enter your `ADMIN_PASSWORD`.
-3. Open the Spotify Connection Manager: press `S` (or click the music icon `[ <Music2 /> ]` in the navigation bar), or click the **[ ! SETUP SPOTIFY ]** indicator in the footer.
+3. Open the Spotify Connection Manager: press `S` (or click the music icon `[ <Music2 /> ]` in the top navigation bar).
 4. Ensure your app's Redirect URIs (both production `https://<your-app>.vercel.app/callback` and local dev `http://127.0.0.1:8888/callback`, displayed in the modal) are registered in your Spotify Developer Dashboard.
 5. Click **[ CONNECT SPOTIFY ACCOUNT ]**. The unified token is automatically stored in Neon Postgres, powering both background sync and live playback without setting `SPOTIFY_REFRESH_TOKEN` manually.
 
 ##### 6-Month Token Monitoring & In-App Renewal
 
 Spotify Developer mode enforces a 180-day lifecycle:
-- When within 14 days of expiration, an amber `[ ! TOKEN EXPIRING · {d}d ]` indicator alerts authenticated admins in the navigation tabs and footer.
+- When within 14 days of expiration, an amber `[ ! TOKEN EXPIRING · {d}d ]` indicator alerts authenticated admins in the navigation tabs.
 - 1-click renewal resets the 180-day cycle without needing terminal commands or redeployment.
-
-#### Option B: Terminal script (CLI-first users · Deprecated)
-
-> **Note:** Generating tokens via `npm run auth:spotify` and setting `SPOTIFY_REFRESH_TOKEN` is deprecated. Tokens created via this CLI script lack Web Playback SDK streaming permissions and bypass the 6-month lifecycle tracker. All Spotify access is unified exclusively through the 1-click in-app generator (Option A).
-
-If running locally for quick tests without database persistence:
-
-```bash
-npm install
-npm run auth:spotify
-```
-
-The script asks for your Client ID and Secret, opens Spotify in your browser, and captures your refresh token.
 
 ---
 
@@ -221,9 +208,8 @@ Open `http://127.0.0.1:8888` (or `http://localhost:8888`).
 
 1. Copy your database connection string (`DATABASE_URL`) from the **Storage** tab in your Vercel dashboard, or from the [Neon Console](https://console.neon.tech).
 2. Create `.env.local` from the template `.env.example`
-3. Run the setup scripts to authorize Spotify and generate your cron key:
+3. Run the setup scripts to generate your cron key and sync recent tracks:
    ```bash
-   npm run auth:spotify
    npm run generate:cron
    npm run sync
    npm run dev
@@ -300,7 +286,6 @@ export const siteConfig = {
 | `npm run dev` | Start development server on `http://127.0.0.1:8888` |
 | `npm run build` | Build production Next.js application |
 | `npm run start` | Start production Next.js server locally |
-| `npm run auth:spotify` | *(Deprecated)* Interactive CLI to authorize Spotify and save refresh token to `.env.local` (prefer 1-click in-app generator) |
 | `npm run generate:cron` | Generate a secure `CRON_SECRET` and save to `.env.local` |
 | `npm run sync` | Fetch recent tracks from Spotify and write to database (`sync:spotify` alias) |
 | `npm run test:rate-limit` | Test Spotify Web API rate limits against batch queries |

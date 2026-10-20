@@ -3,14 +3,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   X,
-  Upload,
   Check,
   AlertTriangle,
-  FileArchive,
   Loader2,
 } from "lucide-react";
 import { extractAudioHistoryEntries, isAudioHistoryFilename } from "@/lib/zip-utils";
 import { parseHistoryRecords } from "@/lib/history-parser";
+import {
+  CatalogEnrichmentCard,
+  EnrichmentProgress,
+} from "./upload-modal/CatalogEnrichmentCard";
+import { HistoryDropzone } from "./upload-modal/HistoryDropzone";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -18,13 +21,6 @@ interface UploadModalProps {
   onUploadComplete?: () => void;
   onProcessingChange?: (isProcessing: boolean) => void;
   isDbConfigured: boolean;
-}
-
-interface EnrichmentProgress {
-  pending: number;
-  enriched: number;
-  delisted: number;
-  total: number;
 }
 
 type UploadStep = "idle" | "inspecting" | "stage1" | "completed" | "error";
@@ -79,7 +75,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     newPlays: 0,
   });
 
-  const [isDragOver, setIsDragOver] = useState(false);
   const isProcessingRef = useRef(false);
 
   // Animation transition states
@@ -108,35 +103,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
-
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!isProcessingRef.current) setIsDragOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragOver(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (isProcessingRef.current) return;
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      await processFiles(files);
-    }
-  };
-
-  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const files = Array.from(e.target.files);
-      await processFiles(files);
-      e.target.value = "";
-    }
-  };
 
   /**
    * Main File Ingestion: Ingests all qualified plays into PostgreSQL.
@@ -306,60 +272,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <div className="p-5 sm:p-6 space-y-5 font-mono text-[11px]">
           {/* Always-Visible Database Enrichment Status Bar */}
           {isDbConfigured && enrichmentProgress && (
-            <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3.5 space-y-2">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-[#6A6A64] uppercase tracking-[0.08em] flex items-center gap-1.5 font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-music-accent" />
-                  DATABASE ENRICHMENT STATUS
-                </span>
-                <span className="text-[#EDEDE8] font-bold">
-                  {enrichmentProgress.total > 0
-                    ? `${Math.round(
-                        ((enrichmentProgress.enriched + enrichmentProgress.delisted) /
-                          enrichmentProgress.total) *
-                          100
-                      )}%`
-                    : "0%"}
-                  {" "}
-                  <span className="text-[#6A6A64] font-normal">
-                    ({(enrichmentProgress.enriched + enrichmentProgress.delisted).toLocaleString()} / {enrichmentProgress.total.toLocaleString()} tracks)
-                  </span>
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-1.5 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
-                <div
-                  className="h-full bg-music-accent transition-all duration-500 ease-out"
-                  style={{
-                    width: `${
-                      enrichmentProgress.total > 0
-                        ? Math.min(
-                            100,
-                            ((enrichmentProgress.enriched + enrichmentProgress.delisted) /
-                              enrichmentProgress.total) *
-                              100
-                          )
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-[9.5px] text-[#6A6A64]">
-                <span>
-                  ENRICHED: <strong className="text-[#EDEDE8]">{enrichmentProgress.enriched.toLocaleString()}</strong>
-                </span>
-                <span>
-                  STILL NEEDS ENRICHMENT: <strong className="text-amber-500">{enrichmentProgress.pending.toLocaleString()}</strong>
-                </span>
-                {enrichmentProgress.delisted > 0 && (
-                  <span>
-                    DELISTED: <strong className="text-[#A8A8A2]">{enrichmentProgress.delisted.toLocaleString()}</strong>
-                  </span>
-                )}
-              </div>
-            </div>
+            <CatalogEnrichmentCard progress={enrichmentProgress} />
           )}
 
           {!isDbConfigured ? (
@@ -376,67 +289,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           ) : step === "idle" ? (
             /* Idle Drag & Drop Zone */
-            <div className="space-y-4">
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed p-8 sm:p-10 text-center transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 select-none ${
-                  isDragOver
-                    ? "border-music-accent bg-music-accent/5 text-music-accent"
-                    : "border-[#26261F] hover:border-[#3A3A32] bg-[#0F0F0E]"
-                }`}
-                onClick={() => document.getElementById("spotify-history-input")?.click()}
-              >
-                <input
-                  id="spotify-history-input"
-                  type="file"
-                  multiple
-                  accept=".zip,.json"
-                  className="hidden"
-                  onChange={handleFileInput}
-                />
-                <div className="w-10 h-10 border border-[#26261F] flex items-center justify-center bg-[#141413]">
-                  <Upload className="w-5 h-5 text-music-accent" />
-                </div>
-                <div>
-                  <p className="text-[12px] font-bold text-[#EDEDE8] uppercase tracking-[0.08em]">
-                    Click or drop Spotify history files here
-                  </p>
-                  <p className="text-[#6A6A64] text-[10px] mt-1">
-                    Accepts official Spotify export <code className="text-[#A8A8A2]">.zip</code> or raw{" "}
-                    <code className="text-[#A8A8A2]">Streaming_History_Audio_*.json</code> files
-                  </p>
-                </div>
-              </div>
-
-              {/* Instructions */}
-              <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[#6A6A64] text-[10px] space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[#EDEDE8] font-bold uppercase tracking-[0.08em]">
-                  <FileArchive className="w-3.5 h-3.5 text-music-accent" />
-                  <span>How to request your export from Spotify</span>
-                </div>
-                <p>
-                  1. Visit{" "}
-                  <a
-                    href="https://www.spotify.com/account/privacy/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-music-accent underline underline-offset-2 hover:opacity-80"
-                  >
-                    spotify.com/account/privacy
-                  </a>
-                  .
-                </p>
-                <p>
-                  2. Select <strong className="text-[#EDEDE8]">Extended streaming history</strong> and
-                  request download.
-                </p>
-                <p>
-                  3. Upload the resulting <code className="text-music-accent">.zip</code> or JSON files directly above.
-                </p>
-              </div>
-            </div>
+            <HistoryDropzone
+              onFilesSelected={processFiles}
+              isProcessing={isProcessingRef.current}
+            />
           ) : step === "inspecting" || step === "stage1" ? (
             /* Upload & Ingestion Progress State */
             <div className="space-y-5 py-2">

@@ -8,9 +8,9 @@ export interface UseListeningUrlSyncParams {
   setActiveMode: (mode: Mode) => void;
   setActiveRange: (range: RangeKey) => void;
   activeRangeRef: React.MutableRefObject<RangeKey>;
-  overviewCacheRef: React.MutableRefObject<Record<string, any>>;
+  overviewCacheRef: React.MutableRefObject<Record<string, unknown>>;
   setDisplayedRange: (range: RangeKey) => void;
-  fetchOverview: (range: RangeKey) => Promise<any>;
+  fetchOverview: (range: RangeKey) => Promise<unknown>;
   setSelectedSessionId?: (id: string) => void;
   setSelectedSittingId?: (id: string) => void;
   sanitizeActiveMode: (mode: Mode, isAuthenticated: boolean) => Mode;

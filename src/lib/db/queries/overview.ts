@@ -4,13 +4,12 @@ import { getLastSync } from "./ingestion";
 import {
   sanitizeTimezone,
   formatLogStartDate,
-  formatDayGroupTz,
   formatDurationMs,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
 import { formatOverviewMetrics } from "@/lib/format-utils";
 import { buildCadenceQuery, buildActivityCadence } from "./cadence";
-import type { OverviewData, RangeKey, ActivityBucket } from "./types";
+import type { OverviewData, RangeKey } from "./types";
 import type {
   TrackSummary,
   AlbumSummary,

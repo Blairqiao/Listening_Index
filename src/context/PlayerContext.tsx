@@ -19,10 +19,10 @@ import { resolvePlayRequest, shouldToggleInPlace } from "@/lib/player-playback";
 import { createSingleFlight } from "@/lib/player-connection";
 import { usePlayerPlaylists, UserPlaylistSummary } from "./player-context/usePlayerPlaylists";
 import { usePlayerInitialContext } from "./player-context/usePlayerInitialContext";
+import { loadSpotifySdk } from "./player-context/useSpotifySdk";
 
 export type { UserPlaylistSummary };
 
-const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
 const DEVICE_NAME = "Listening Index";
 
 export interface ActiveDevice {
@@ -127,24 +127,8 @@ export function getNextRepeatState(current: number): "off" | "context" | "track"
   return "off";
 }
 
-let sdkPromise: Promise<void> | null = null;
-function loadSdk(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window.Spotify) return Promise.resolve();
-  if (sdkPromise) return sdkPromise;
-  sdkPromise = new Promise<void>((resolve, reject) => {
-    window.onSpotifyWebPlaybackSDKReady = () => resolve();
-    const tag = document.createElement("script");
-    tag.src = SDK_SRC;
-    tag.async = true;
-    tag.onerror = () => reject(new Error("Could not load the Spotify SDK script"));
-    document.body.appendChild(tag);
-  });
-  return sdkPromise;
-}
-
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { config, isAuthenticated, openModal } = useConfig();
+  const { isAuthenticated, openModal } = useConfig();
 
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
@@ -166,7 +150,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const volumeRef = useRef<number>(volume);
   volumeRef.current = volume;
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
-  const { initialContext, setInitialContext, loadInitialContext } = usePlayerInitialContext();
+  const { initialContext, loadInitialContext } = usePlayerInitialContext();
 
   const [selectedContext, setSelectedContext] = useState<PlaybackContextSelection>(() => {
     if (typeof window !== "undefined") {
@@ -268,7 +252,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     try {
-      await loadSdk();
+      await loadSpotifySdk();
       if (!window.Spotify) {
         throw new Error("Spotify SDK did not initialize");
       }
