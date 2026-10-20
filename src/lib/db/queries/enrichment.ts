@@ -369,32 +369,3 @@ export async function isCatalogFullyEnriched(): Promise<boolean> {
     }
   });
 }
-
-export async function cleanupOrphanedSyntheticEntities(): Promise<{
-  deletedAlbums: number;
-  deletedArtists: number;
-}> {
-  await ensureTablesExist();
-  const sql = getDb();
-
-  // FK constraint safety: Delete synthetic albums FIRST, then synthetic artists SECOND
-  const deletedAlbumsResult = ((await sql`
-    DELETE FROM albums
-    WHERE id LIKE 'alb_%'
-      AND id NOT IN (SELECT album_id FROM tracks WHERE album_id IS NOT NULL)
-    RETURNING id;
-  `));
-
-  const deletedArtistsResult = ((await sql`
-    DELETE FROM artists
-    WHERE id LIKE 'art_%'
-      AND id NOT IN (SELECT artist_id FROM tracks WHERE artist_id IS NOT NULL)
-      AND id NOT IN (SELECT artist_id FROM albums WHERE artist_id IS NOT NULL)
-    RETURNING id;
-  `));
-
-  return {
-    deletedAlbums: deletedAlbumsResult.length,
-    deletedArtists: deletedArtistsResult.length,
-  };
-}

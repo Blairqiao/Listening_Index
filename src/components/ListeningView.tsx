@@ -1307,10 +1307,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isAuthenticated={isAuthenticated}
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
-            // totalPlays={streamLogData.metrics[0]}
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
-            isLinked={isLinked}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}

@@ -12,8 +12,6 @@ import { useConfig } from "@/context/ConfigContext";
 import {
   beginLogin,
   beginLoginPopup,
-  clearToken,
-  setConfiguredClientId,
   AUTH_MESSAGE,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
@@ -235,9 +233,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  useEffect(() => {
-    setConfiguredClientId(config.spotifyClientId);
-  }, [config.spotifyClientId]);
 
   // Query Spotify API for active playback device
   const probeActivePlayback = useCallback(async (localId: string | null) => {
@@ -585,7 +580,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     playerRef.current = null;
     deviceIdRef.current = null;
     setDeviceId(null);
-    clearToken();
     setState(null);
     setActiveDevice(null);
     setIsLinked(false);

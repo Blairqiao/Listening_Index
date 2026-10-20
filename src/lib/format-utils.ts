@@ -197,3 +197,12 @@ export function formatPlaysDisplay(plays: number): string {
   return `${countStr} ${plays === 1 ? "PLAY" : "PLAYS"}`;
 }
 
+export function compactDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = date.toLocaleString("default", { month: "numeric" });
+  const day = date.getDate();
+  return `${month}/${day}/${year}`;
+}
+
+

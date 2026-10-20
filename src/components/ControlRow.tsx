@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Mode, RangeKey } from "@/lib/mock-listening-data";
-import { compactDate } from "@/lib/resize-utils";
+import { compactDate } from "@/lib/format-utils";
 
 interface ControlRowProps {
   mode: Mode;
@@ -14,13 +14,9 @@ interface ControlRowProps {
   isSyncing?: boolean;
   onTriggerSync?: () => void;
   streamLogCount?: number;
-  totalPlays?: string;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
-  sourceMode?: "synthetic" | "live";
-  onToggleSourceMode?: () => void;
-  isLinked?: boolean | null;
   isAuthenticated?: boolean;
 }
 
@@ -43,12 +39,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   isSyncing = false,
   onTriggerSync,
   streamLogCount,
-  // totalPlays,
   layout = "split",
   onToggleLayout,
-  // sourceMode = "synthetic",
-  // onToggleSourceMode,
-  isLinked: _isLinked = false,
   isAuthenticated = false,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
