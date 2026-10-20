@@ -253,7 +253,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [isAdminSpotifyModalOpen, isAuthenticated, fetchSpotifyStatus]);
   const {
     currentTrack,
-    isLinked,
     checkTokenStatus,
   } = usePlayer();
   const tzRef = useRef<string>(config.timezone);

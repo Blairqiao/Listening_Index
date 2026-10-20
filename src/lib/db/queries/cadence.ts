@@ -9,7 +9,7 @@ export interface CadenceRow {
   ym?: string;
   play_year?: number;
   count?: number | string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export function buildCadenceQuery(range: RangeKey, tz: string) {
@@ -85,7 +85,7 @@ export function buildActivityCadence(params: {
   range: RangeKey;
   tz: string;
   now?: Date;
-  cadenceRows: Record<string, any>[];
+  cadenceRows: Record<string, unknown>[];
   minDateRow?: { log_start_date?: string | null };
 }): { clockBuckets?: number[]; activityCadence: ActivityBucket[] } {
   const { range, tz, cadenceRows, minDateRow } = params;

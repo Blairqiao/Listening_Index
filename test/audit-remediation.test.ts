@@ -207,16 +207,20 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
   );
 
   const sessionView = fs.readFileSync(path.join(root, "src/components/SessionView.tsx"), "utf-8");
+  const analysisPanel = fs.existsSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"), "utf-8")
+    : "";
+  const combinedSession = sessionView + analysisPanel;
   assert.ok(
     sessionView.includes("[ CURRENT SESSION ]") && sessionView.includes("[ LAST SESSION ]"),
     "SessionView must render [ CURRENT SESSION ] / [ LAST SESSION ]"
   );
   assert.ok(
-    !sessionView.includes("[ CURRENT SITTING ]") && !sessionView.includes("[ LAST SITTING ]"),
+    !combinedSession.includes("[ CURRENT SITTING ]") && !combinedSession.includes("[ LAST SITTING ]"),
     "SessionView must not render obsolete sitting labels"
   );
   assert.ok(
-    sessionView.includes("TOP TRACK"),
+    combinedSession.includes("TOP TRACK"),
     "SessionView must render TOP TRACK label"
   );
 

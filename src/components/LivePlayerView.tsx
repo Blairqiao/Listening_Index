@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";

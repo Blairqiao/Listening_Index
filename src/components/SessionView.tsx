@@ -9,6 +9,8 @@ import {
   SittingAnalysis,
 } from "@/lib/mock-listening-data";
 import { Artwork } from "./Artwork";
+import { SessionHistogram } from "./session-view/SessionHistogram";
+import { SessionAnalysisPanel } from "./session-view/SessionAnalysisPanel";
 
 interface SessionViewProps {
   isOpen: boolean;
@@ -24,13 +26,6 @@ interface SessionViewProps {
   selectedSittingId?: string;
   selectedSessionId?: string;
 }
-
-const DEFAULT_HISTOGRAM: SessionHistogramData = {
-  avgRuntimeMinutes: 0,
-  oldestDate: "--",
-  newestDate: "--",
-  bars: [],
-};
 
 export const SessionView: React.FC<SessionViewProps> = ({
   isOpen,
@@ -61,7 +56,6 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const activeDefaultId = sittings[0]?.id || previousSittings[0]?.id || "s1";
   const selectedSessionId = externalSelectedSessionId || activeDefaultId;
   const selectedSittingId = selectedSessionId;
-  const [hoveredSittingId, setHoveredSittingId] = useState<string | null>(null);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -212,30 +206,6 @@ export const SessionView: React.FC<SessionViewProps> = ({
     };
   }, [activeTracks]);
 
-  // Dynamic Spotify links for session analytics
-  const activeTopTrack = analysis.topTrack || analysis.topSong;
-  const topSongHref = useMemo(() => {
-    if (!activeTopTrack) return undefined;
-    const isSpotifyId = activeTopTrack.id && !activeTopTrack.id.startsWith("tr-");
-    return isSpotifyId
-      ? `https://open.spotify.com/track/${activeTopTrack.id}`
-      : `https://open.spotify.com/search/${encodeURIComponent(`${activeTopTrack.title} ${activeTopTrack.artist || ""}`.trim())}`;
-  }, [activeTopTrack]);
-
-  const topAlbumHref = useMemo(() => {
-    if (!analysis.topAlbum || analysis.topAlbum.title === "None") return undefined;
-    return analysis.topAlbum.id
-      ? `https://open.spotify.com/album/${analysis.topAlbum.id}`
-      : `https://open.spotify.com/search/${encodeURIComponent(analysis.topAlbum.title)}`;
-  }, [analysis.topAlbum]);
-
-  const topArtistHref = useMemo(() => {
-    if (!analysis.topArtist || analysis.topArtist.name === "None") return undefined;
-    return analysis.topArtist.id
-      ? `https://open.spotify.com/artist/${analysis.topArtist.id}`
-      : `https://open.spotify.com/search/${encodeURIComponent(analysis.topArtist.name)}`;
-  }, [analysis.topArtist]);
-
   // Previous sittings normalized list (capped at 20)
   const sitsList: PreviousSitting[] = useMemo(() => {
     const list =
@@ -253,18 +223,6 @@ export const SessionView: React.FC<SessionViewProps> = ({
   }, [previousSittings, sittings]);
 
   const visibleSits = isMobile && !isSessionsExpanded ? sitsList.slice(0, 5) : sitsList;
-
-  // Histogram data (server pre-computed with fallback)
-  const histData = histogram ?? DEFAULT_HISTOGRAM;
-
-  const activeBars = useMemo(() => {
-    return histData.bars ? histData.bars.slice(-20) : [];
-  }, [histData.bars]);
-
-  const maxHistRuntime = useMemo(() => {
-    if (!activeBars || activeBars.length === 0) return 1;
-    return Math.max(...activeBars.map((b) => b.runtimeMinutes), 1);
-  }, [activeBars]);
 
   // Placeholder rows count (at least slotCount rows total)
   const placeholderCount = Math.max(0, slotCount - activeTracks.length);
@@ -408,117 +366,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
         {/* Right Column: Analysis + Previous Sittings + Histogram */}
         <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
           {/* Analysis Panel */}
-          <div>
-            <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] block mb-2 select-none">
-              [ ANALYSIS ]
-            </span>
-
-            {/* FIRST PLAYS */}
-            <div className="flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none">
-              <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55]">
-                FIRST PLAYS
-              </span>
-              <span className="font-mono text-[13px] text-[#EDEDE8] tabular-nums">
-                {analysis.firstPlaysCount}
-              </span>
-            </div>
-
-            {/* TOP TRACK (Always rendered & clickable) */}
-            <div
-              onClick={() => topSongHref && window.open(topSongHref, "_blank", "noopener,noreferrer")}
-              className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-                topSongHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
-              }`}
-            >
-              <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55] flex-none">
-                TOP TRACK
-              </span>
-              <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
-                {analysis.topSong ? (
-                  <>
-                    <a
-                      href={topSongHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="hover:underline no-underline text-inherit"
-                    >
-                      {analysis.topSong.title}
-                    </a>{" "}
-                    <span className="font-mono text-[#8A8A83] ml-1">
-                      {analysis.topSong.count}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[#4A4A46]">—</span>
-                )}
-              </span>
-            </div>
-
-            {/* TOP ALBUM (Clickable to Spotify) */}
-            {analysis.topAlbum && (
-              <div
-                onClick={() => topAlbumHref && window.open(topAlbumHref, "_blank", "noopener,noreferrer")}
-                className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-                  topAlbumHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
-                }`}
-              >
-                <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55] flex-none">
-                  TOP ALBUM
-                </span>
-                <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
-                  {topAlbumHref ? (
-                    <a
-                      href={topAlbumHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="hover:underline no-underline text-inherit"
-                    >
-                      {analysis.topAlbum.title}
-                    </a>
-                  ) : (
-                    <span>{analysis.topAlbum.title}</span>
-                  )}{" "}
-                  <span className="font-mono text-[#8A8A83] ml-1">
-                    {analysis.topAlbum.count}
-                  </span>
-                </span>
-              </div>
-            )}
-
-            {/* TOP ARTIST (Clickable to Spotify) */}
-            {analysis.topArtist && (
-              <div
-                onClick={() => topArtistHref && window.open(topArtistHref, "_blank", "noopener,noreferrer")}
-                className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-                  topArtistHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
-                }`}
-              >
-                <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55] flex-none">
-                  TOP ARTIST
-                </span>
-                <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
-                  {topArtistHref ? (
-                    <a
-                      href={topArtistHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="hover:underline no-underline text-inherit"
-                    >
-                      {analysis.topArtist.name}
-                    </a>
-                  ) : (
-                    <span>{analysis.topArtist.name}</span>
-                  )}{" "}
-                  <span className="font-mono text-[#8A8A83] ml-1">
-                    {analysis.topArtist.count}
-                  </span>
-                </span>
-              </div>
-            )}
-          </div>
+          <SessionAnalysisPanel analysis={analysis} />
 
           {/* Previous Sessions Panel */}
           <div>
@@ -550,8 +398,6 @@ export const SessionView: React.FC<SessionViewProps> = ({
                         handleSelectSitting(sittingId);
                       }
                     }}
-                    onMouseEnter={() => setHoveredSittingId(sittingId)}
-                    onMouseLeave={() => setHoveredSittingId(null)}
                     className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer transition-none select-none focus:outline-none ${
                       isSelected
                         ? "bg-[#181614] border-l-2 border-l-music-accent pl-2 -ml-[2px]"
@@ -592,78 +438,12 @@ export const SessionView: React.FC<SessionViewProps> = ({
             )}
           </div>
 
-          {/* Sessions Histogram (Moved into right column matching Overview design) */}
-          <div className="select-none">
-            <div className="flex justify-between items-baseline mb-2 select-none">
-              <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-                [ SESSIONS / LAST 20 ]
-              </span>
-              <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-                AVERAGE {histData.avgRuntimeMinutes}m
-              </span>
-            </div>
-
-            {/* 20 Bars Container */}
-            <div
-              className="flex gap-1 items-end h-[80px] w-full"
-              role="region"
-              aria-label="Last 20 sessions runtime histogram"
-            >
-              {/* Left empty baseline bars padding up to 20 total bars */}
-              {Array.from({ length: Math.max(0, 20 - activeBars.length) }).map((_, idx) => (
-                <div
-                  key={`empty-bar-${idx}`}
-                  className="flex-1 h-full flex flex-col justify-end"
-                  aria-hidden="true"
-                >
-                  <div
-                    style={{ height: "4%" }}
-                    className="w-full bg-[#1C1C1A]"
-                  />
-                </div>
-              ))}
-
-              {activeBars.map((bar, idx) => {
-                const isSelected = bar.id === selectedSittingId;
-                const isHovered = bar.id === hoveredSittingId;
-                const heightPct = Math.max(
-                  4,
-                  Math.round((bar.runtimeMinutes / maxHistRuntime) * 100)
-                );
-
-                return (
-                  <div
-                    key={`${bar.id}-${idx}`}
-                    role="button"
-                    tabIndex={0}
-                    title={`${bar.title || bar.runtimeMinutes + "m"}`}
-                    onClick={() => handleSelectSitting(bar.id)}
-                    onMouseEnter={() => setHoveredSittingId(bar.id)}
-                    onMouseLeave={() => setHoveredSittingId(null)}
-                    className="flex-1 h-full flex flex-col justify-end cursor-pointer group focus:outline-none"
-                    aria-label={`Session ${bar.dateStr}: ${bar.runtimeMinutes} minutes`}
-                  >
-                    <div
-                      style={{ height: `${heightPct}%` }}
-                      className={`w-full rounded-none transition-none ${
-                        isSelected
-                          ? "bg-music-accent"
-                          : isHovered
-                          ? "bg-[#2E2E2A]"
-                          : "bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"
-                      }`}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Date Labels below bars */}
-            <div className="flex justify-between font-mono text-[10px] text-[#5A5A55] mt-1.5 select-none">
-              <span>{histData.oldestDate}</span>
-              <span>{histData.newestDate}</span>
-            </div>
-          </div>
+          {/* Sessions Histogram */}
+          <SessionHistogram
+            histogram={histogram}
+            selectedSessionId={selectedSessionId}
+            onSelectSession={handleSelectSitting}
+          />
         </div>
       </div>
     </div>

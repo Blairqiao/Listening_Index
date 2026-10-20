@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { NextRequest } from "next/server";
 
 export const ADMIN_COOKIE_NAME = "admin_session";
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -71,3 +72,55 @@ export function getClearSessionCookieHeader(): string {
   const secure = isProd ? "; Secure" : "";
   return `${ADMIN_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
 }
+
+/**
+ * Validates whether an incoming HTTP request originated from the same host,
+ * preventing cross-origin invocation of sensitive endpoints.
+ */
+export function isSameOriginRequest(request: NextRequest): boolean {
+  if (process.env.NODE_ENV === "development") return true;
+
+  const secFetchSite = request.headers.get("sec-fetch-site");
+  if (secFetchSite === "same-origin") return true;
+
+  const host = request.headers.get("host") || request.nextUrl.host;
+  if (!host) return false;
+
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  }
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).host === host;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+export function isAuthorizedAdminRequest(request: NextRequest): boolean {
+  const cookie = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  if (cookie && verifySessionToken(cookie)) {
+    return true;
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const bearer = authHeader.slice(7).trim();
+    if (verifySessionToken(bearer) || verifyAdminPassword(bearer)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
