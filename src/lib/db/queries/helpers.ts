@@ -1,11 +1,5 @@
 import { siteConfig } from "@/config";
-
-export function formatDurationMs(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
+export { formatDurationMs } from "@/lib/format-utils";
 
 export function formatDurationHoursMinutes(ms: number): string {
   const totalMinutes = Math.max(0, Math.round(ms / 60000));

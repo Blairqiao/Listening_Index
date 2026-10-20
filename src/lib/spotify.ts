@@ -131,6 +131,78 @@ export function resetSpotifyTokenCache(): void {
 }
 
 /**
+ * Refreshes a Spotify access token using a refresh token.
+ * Supports both Client Secret (Authorization Code) and Client ID only (PKCE).
+ */
+export async function refreshAccessToken(
+  refreshToken: string,
+  clientId: string,
+  clientSecret?: string
+): Promise<Response> {
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  // A refresh token from the Authorization Code flow is redeemed with the
+  // client secret; one from the PKCE flow has no secret and is redeemed with
+  // the client id alone. Support both, so a token minted by a PKCE app works.
+  if (isConfigured(clientSecret)) {
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  } else {
+    body.set("client_id", clientId);
+  }
+
+  return fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers,
+    body: body.toString(),
+  });
+}
+
+/**
+ * Exchanges a Spotify authorization code for access and refresh tokens.
+ * Supports optional code_verifier (for PKCE) and client secret.
+ */
+export async function exchangeAuthorizationCode(
+  code: string,
+  redirectUri: string,
+  clientId: string,
+  clientSecret?: string,
+  codeVerifier?: string
+): Promise<Response> {
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri,
+  });
+
+  if (codeVerifier) {
+    body.set("code_verifier", codeVerifier);
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+
+  if (isConfigured(clientSecret)) {
+    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
+  } else {
+    body.set("client_id", clientId);
+  }
+
+  return fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers,
+    body: body.toString(),
+  });
+}
+
+/**
  * Retrieves an active Spotify access token using the refresh token flow.
  * Caches token in-memory with a 5-minute safety buffer.
  * Deduplicates concurrent token refresh calls via an in-flight promise latch.
@@ -149,38 +221,16 @@ export async function getAccessToken(): Promise<string> {
 
   activeTokenPromise = (async () => {
     try {
+      const creds = await resolveCredentials();
+      if (!creds) {
+        throw new Error(
+          "Spotify is not connected. Connect it from the in-app Spotify Connection Manager " +
+            "(press 'C' or click the setup prompt when logged in as admin)."
+        );
+      }
+      const { clientId, clientSecret, refreshToken } = creds;
 
-  const creds = await resolveCredentials();
-  if (!creds) {
-    throw new Error(
-      "Spotify is not connected. Connect it from the in-app Spotify Connection Manager " +
-        "(press 'C' or click the setup prompt when logged in as admin)."
-    );
-  }
-  const { clientId, clientSecret, refreshToken } = creds;
-
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-  });
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  // A refresh token from the Authorization Code flow is redeemed with the
-  // client secret; one from the PKCE flow has no secret and is redeemed with
-  // the client id alone. Support both, so a token minted by a PKCE app works.
-  if (isConfigured(clientSecret)) {
-    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-  } else {
-    body.set("client_id", clientId);
-  }
-
-  const response = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers,
-    body: body.toString(),
-  });
+      const response = await refreshAccessToken(refreshToken, clientId, clientSecret);
 
   if (!response.ok) {
     const errorText = await response.text();

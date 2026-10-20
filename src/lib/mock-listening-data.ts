@@ -40,7 +40,7 @@ export interface StreamLogItem {
   };
 }
 
-export interface SittingItem {
+export interface SessionItem {
   id: string;
   artistId?: string;
   albumId?: string;
@@ -56,9 +56,10 @@ export interface SittingItem {
   duration?: string;
 }
 
-export type SessionTrackItem = SittingItem;
+export type SittingItem = SessionItem;
+export type SessionTrackItem = SessionItem;
 
-export interface PreviousSitting {
+export interface PreviousSession {
   id?: string;
   dateStr: string; // '09 SEP'
   durationStr: string; // '1h 14m'
@@ -67,9 +68,9 @@ export interface PreviousSitting {
   trackCount?: number;
 }
 
-export type PreviousSession = PreviousSitting;
+export type PreviousSitting = PreviousSession;
 
-export interface SittingAnalysis {
+export interface SessionAnalysis {
   firstPlaysCount: number;
   totalTracks: number;
   topTrack?: { title: string; count: number; id?: string; artist?: string } | null;
@@ -78,9 +79,9 @@ export interface SittingAnalysis {
   topArtist: { name: string; count: number; id?: string };
 }
 
-export type SessionAnalysis = SittingAnalysis;
+export type SittingAnalysis = SessionAnalysis;
 
-export interface SittingSession {
+export interface SessionRecord {
   id: string;
   dateStr: string;
   runtimeMinutes: number;
@@ -90,11 +91,12 @@ export interface SittingSession {
   startTime: string;
   tagTime?: string;
   isOpen: boolean;
-  tracks: SittingItem[];
-  analysis: SittingAnalysis;
+  tracks: SessionItem[];
+  analysis: SessionAnalysis;
 }
 
-export type SessionBlock = SittingSession;
+export type SittingSession = SessionRecord;
+export type SessionBlock = SessionRecord;
 
 export interface SessionHistogramBar {
   id: string;

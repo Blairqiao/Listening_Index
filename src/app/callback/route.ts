@@ -5,7 +5,7 @@ import { closePopup as renderPopup, describeOAuthError } from "@/lib/popup-respo
 import { PLAYER_VERIFIER_COOKIE, clearPlayerVerifierCookie } from "@/lib/user-auth";
 import { AUTH_MESSAGE, getRedirectUri } from "@/lib/spotify-auth";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { resetSpotifyTokenCache } from "@/lib/spotify";
+import { resetSpotifyTokenCache, exchangeAuthorizationCode } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
@@ -44,28 +44,13 @@ export async function GET(request: NextRequest) {
   if (!clientId) return closePopup(origin, false, "No Spotify client id configured.");
 
   try {
-    const params = new URLSearchParams({
-      grant_type: "authorization_code",
+    const tokenRes = await exchangeAuthorizationCode(
       code,
-      redirect_uri: getRedirectUri(request),
-      code_verifier: verifier,
-    });
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/x-www-form-urlencoded",
-    };
-
-    if (clientSecret) {
-      headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-    } else {
-      params.set("client_id", clientId);
-    }
-
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers,
-      body: params.toString(),
-    });
+      getRedirectUri(request),
+      clientId,
+      clientSecret,
+      verifier
+    );
 
     const token = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || !token.refresh_token) {

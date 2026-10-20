@@ -4,6 +4,7 @@ import React, { useCallback, useRef, useState, useEffect } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { hexToHsv, hsvToHex, normalizeHex } from "@/lib/color-utils";
+import { formatDurationMs } from "@/lib/format-utils";
 import {
   BAND_COUNT,
   LiveAudioSpectrumSource,
@@ -112,10 +113,7 @@ export function resolveDisplayTrack(params: DisplayTrackParams) {
   };
 }
 
-export function msToClock(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
+export const msToClock = formatDurationMs;
 
 export function gradientStops(accent: string): [string, string, string] {
   const { h, s, v } = hexToHsv(normalizeHex(accent));
