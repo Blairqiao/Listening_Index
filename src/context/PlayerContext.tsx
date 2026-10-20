@@ -17,8 +17,8 @@ import {
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
 import { resolvePlayRequest, shouldToggleInPlace } from "@/lib/player-playback";
 import { createSingleFlight } from "@/lib/player-connection";
-import { usePlayerPlaylists, UserPlaylistSummary } from "./player/usePlayerPlaylists";
-import { usePlayerInitialContext } from "./player/usePlayerInitialContext";
+import { usePlayerPlaylists, UserPlaylistSummary } from "./player-context/usePlayerPlaylists";
+import { usePlayerInitialContext } from "./player-context/usePlayerInitialContext";
 
 export type { UserPlaylistSummary };
 

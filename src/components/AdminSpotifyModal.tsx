@@ -15,7 +15,7 @@ import {
   getRedirectUri,
   resolveRedirectUriDisplay,
 } from "@/lib/spotify-auth";
-import { ScheduledSyncCard } from "./admin/ScheduledSyncCard";
+import { ScheduledSyncCard } from "./admin-spotify-modal/ScheduledSyncCard";
 
 export interface SpotifyOwnerStatus {
   connected: boolean;

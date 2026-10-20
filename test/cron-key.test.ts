@@ -167,8 +167,8 @@ test("AC-7: AdminSpotifyModal renders Scheduled Sync section with Copy URL and R
     path.join(root, "src/components/AdminSpotifyModal.tsx"),
     "utf-8"
   );
-  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"))
-    ? fs.readFileSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"), "utf-8")
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
     : "";
   const combined = modalSource + syncCardSource;
 
@@ -229,8 +229,8 @@ test("AC-7b: AdminSpotifyModal guards Copy URL button when sync key is not yet l
     path.join(root, "src/components/AdminSpotifyModal.tsx"),
     "utf-8"
   );
-  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"))
-    ? fs.readFileSync(path.join(root, "src/components/admin/ScheduledSyncCard.tsx"), "utf-8")
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
     : "";
   const combined = modalSource + syncCardSource;
 
