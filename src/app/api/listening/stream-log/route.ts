@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getStreamLog } from "@/lib/db/queries";
 import { getOrFetchStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { getMockStreamLog } from "@/lib/mock-data";
+import { jsonNoCache, parseRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limitParam = searchParams.get("limit");
     const limit = limitParam ? Math.max(1, parseInt(limitParam, 10) || 50) : 50;
-    const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
+    const tzParam = parseRequestTimezone(request);
 
     const cursor = searchParams.get("cursor") || undefined;
     const cursorId = searchParams.get("cursorId") || undefined;
@@ -21,14 +22,7 @@ export async function GET(request: NextRequest) {
     // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
     if (!isDbConfigured() || process.env.FORCE_MOCK_DATA === "true") {
       const mockData = getMockStreamLog(limit, cursor, cursorId, prevDayGroup, prevPlayedAt);
-      return NextResponse.json(mockData, {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
+      return jsonNoCache(mockData);
     }
 
     // Check server cache first (only for initial page without cursor)
@@ -36,31 +30,13 @@ export async function GET(request: NextRequest) {
       const data = await getOrFetchStreamLog(limit, tzParam || "", () =>
         getStreamLog(limit, tzParam)
       );
-
-      return NextResponse.json(data, {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
+      return jsonNoCache(data);
     }
 
     // Dynamic fetch for pagination slices
     const data = await getStreamLog(limit, tzParam, cursor, cursorId, prevDayGroup, prevPlayedAt);
-
-    return NextResponse.json(data, {
-      status: 200,
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    return jsonNoCache(data);
   } catch (error: unknown) {
-    console.error("[API ERROR · /api/listening/stream-log]", error);
-    const message = error instanceof Error ? error.message : "Internal Server Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError("/api/listening/stream-log", error);
   }
 }

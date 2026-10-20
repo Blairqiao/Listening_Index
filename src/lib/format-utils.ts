@@ -197,6 +197,13 @@ export function formatPlaysDisplay(plays: number): string {
   return `${countStr} ${plays === 1 ? "PLAY" : "PLAYS"}`;
 }
 
+export function formatDurationMs(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function compactDate(dateStr: string): string {
   const date = new Date(dateStr);
   const year = date.getFullYear();

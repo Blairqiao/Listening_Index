@@ -5,7 +5,7 @@ import {
   formatDayGroupTz,
   formatHHmmTz,
   formatTimeTz,
-  formatSittingAge,
+  formatSessionAge,
   formatDurationMs,
   formatDurationHoursMinutes,
 } from "./helpers";
@@ -148,7 +148,7 @@ export async function getCurrentSession(tzOverride?: string): Promise<SessionDat
       tagTime = formatTimeTz(new Date(sittingLatest.played_at), tz);
     } else {
       const ageMs = Math.max(0, Date.now() - new Date(sittingLatest.played_at).getTime());
-      tagTime = formatSittingAge(ageMs);
+      tagTime = formatSessionAge(ageMs);
     }
 
     const tracks: SittingItem[] = sittingPlays.map((p, pIdx) => ({

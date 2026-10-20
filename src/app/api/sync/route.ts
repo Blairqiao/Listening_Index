@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncSpotify } from "../../../../scripts/sync-spotify";
+import { syncSpotify } from "@/lib/spotify-sync";
 import { clearServerCache } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";

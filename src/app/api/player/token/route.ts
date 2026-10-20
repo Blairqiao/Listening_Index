@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { getRedirectUri } from "@/lib/spotify-auth";
+import { refreshAccessToken, exchangeAuthorizationCode } from "@/lib/spotify";
 import {
   getOwnerPlaybackToken,
   saveOwnerPlaybackToken,
@@ -9,67 +10,6 @@ import {
 } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
-
-async function refreshSpotifyToken(
-  refreshToken: string,
-  clientId: string,
-  clientSecret?: string
-): Promise<Response> {
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-  });
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  if (clientSecret) {
-    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-  } else {
-    body.set("client_id", clientId);
-  }
-
-  return fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers,
-    body: body.toString(),
-  });
-}
-
-async function exchangeAuthCode(
-  code: string,
-  redirectUri: string,
-  clientId: string,
-  clientSecret?: string,
-  codeVerifier?: string
-): Promise<Response> {
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: redirectUri,
-  });
-
-  if (codeVerifier) {
-    body.set("code_verifier", codeVerifier);
-  }
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/x-www-form-urlencoded",
-  };
-
-  if (clientSecret) {
-    headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-  } else {
-    body.set("client_id", clientId);
-  }
-
-  return fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers,
-    body: body.toString(),
-  });
-}
 
 /**
  * GET /api/player/token
@@ -103,7 +43,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const response = await refreshSpotifyToken(token, clientId, clientSecret);
+  const response = await refreshAccessToken(token, clientId, clientSecret);
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     return NextResponse.json(
@@ -162,7 +102,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (refreshToken) {
-    const response = await refreshSpotifyToken(refreshToken, clientId, clientSecret);
+    const response = await refreshAccessToken(refreshToken, clientId, clientSecret);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
@@ -190,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   if (code) {
     const effectiveRedirectUri = redirectUri || body.redirect_uri || getRedirectUri(request);
-    const response = await exchangeAuthCode(
+    const response = await exchangeAuthorizationCode(
       code,
       effectiveRedirectUri,
       clientId,

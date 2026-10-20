@@ -3,6 +3,7 @@ import { getOverviewData, RangeKey } from "@/lib/db/queries";
 import { getOrFetchOverview } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
+import { jsonNoCache, parseRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -23,35 +24,19 @@ export async function GET(request: NextRequest) {
     }
 
     const range = rangeParam as RangeKey;
-    const tzParam = searchParams.get("tz") || searchParams.get("timezone") || request.headers.get("x-timezone") || undefined;
-    
+    const tzParam = parseRequestTimezone(request);
+
     // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
     if (!isDbConfigured() || process.env.FORCE_MOCK_DATA === "true") {
-      return NextResponse.json(MOCK_DATA.overview[range], {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0",
-        },
-      });
+      return jsonNoCache(MOCK_DATA.overview[range]);
     }
 
     const overviewData = await getOrFetchOverview(range, tzParam || "", () =>
       getOverviewData(range, tzParam)
     );
 
-    return NextResponse.json(overviewData, {
-      status: 200,
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-      },
-    });
+    return jsonNoCache(overviewData);
   } catch (error: unknown) {
-    console.error("[API ERROR · /api/listening/overview]", error);
-    const message = error instanceof Error ? error.message : "Internal Server Error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError("/api/listening/overview", error);
   }
 }

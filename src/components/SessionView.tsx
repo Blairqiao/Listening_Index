@@ -129,22 +129,22 @@ export const SessionView: React.FC<SessionViewProps> = ({
     const firstPlaysCount = activeTracks.filter((t) => t.isFirstPlay).length;
     const totalTracks = activeTracks.length;
 
-    // Top Song: if counts are equal (e.g. all 1) or tied, pick the latest one played (first in activeTracks)
-    const songCounts = new Map<string, number>();
+    // Top Track: if counts are equal (e.g. all 1) or tied, pick the latest one played (first in activeTracks)
+    const trackCounts = new Map<string, number>();
     for (const t of activeTracks) {
-      songCounts.set(t.title, (songCounts.get(t.title) || 0) + 1);
+      trackCounts.set(t.title, (trackCounts.get(t.title) || 0) + 1);
     }
-    let maxSongCount = 0;
-    for (const count of songCounts.values()) {
-      if (count > maxSongCount) maxSongCount = count;
+    let maxTrackCount = 0;
+    for (const count of trackCounts.values()) {
+      if (count > maxTrackCount) maxTrackCount = count;
     }
-    let topSong: { title: string; count: number; id?: string; artist?: string } | null = null;
-    if (activeTracks.length > 0 && maxSongCount > 0) {
-      const latestTrack = activeTracks.find((t) => songCounts.get(t.title) === maxSongCount);
+    let topTrack: { title: string; count: number; id?: string; artist?: string } | null = null;
+    if (activeTracks.length > 0 && maxTrackCount > 0) {
+      const latestTrack = activeTracks.find((t) => trackCounts.get(t.title) === maxTrackCount);
       if (latestTrack) {
-        topSong = {
+        topTrack = {
           title: latestTrack.title,
-          count: maxSongCount,
+          count: maxTrackCount,
           id: latestTrack.id,
           artist: latestTrack.artist,
         };
@@ -205,20 +205,22 @@ export const SessionView: React.FC<SessionViewProps> = ({
     return {
       firstPlaysCount,
       totalTracks,
-      topSong,
+      topTrack,
+      topSong: topTrack,
       topAlbum,
       topArtist,
     };
   }, [activeTracks]);
 
   // Dynamic Spotify links for session analytics
+  const activeTopTrack = analysis.topTrack || analysis.topSong;
   const topSongHref = useMemo(() => {
-    if (!analysis.topSong) return undefined;
-    const isSpotifyId = analysis.topSong.id && !analysis.topSong.id.startsWith("tr-");
+    if (!activeTopTrack) return undefined;
+    const isSpotifyId = activeTopTrack.id && !activeTopTrack.id.startsWith("tr-");
     return isSpotifyId
-      ? `https://open.spotify.com/track/${analysis.topSong.id}`
-      : `https://open.spotify.com/search/${encodeURIComponent(`${analysis.topSong.title} ${analysis.topSong.artist || ""}`.trim())}`;
-  }, [analysis.topSong]);
+      ? `https://open.spotify.com/track/${activeTopTrack.id}`
+      : `https://open.spotify.com/search/${encodeURIComponent(`${activeTopTrack.title} ${activeTopTrack.artist || ""}`.trim())}`;
+  }, [activeTopTrack]);
 
   const topAlbumHref = useMemo(() => {
     if (!analysis.topAlbum || analysis.topAlbum.title === "None") return undefined;

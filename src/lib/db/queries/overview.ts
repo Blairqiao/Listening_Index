@@ -8,6 +8,7 @@ import {
   formatDurationMs,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
+import { formatOverviewMetrics } from "@/lib/format-utils";
 import type { OverviewData, RangeKey, ActivityBucket } from "./types";
 import type {
   TrackSummary,
@@ -291,17 +292,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     elapsedDays,
   };
 
-  const minutesStr = Math.round(totalMs / 60000).toLocaleString();
-  const tracksStr = trackCount.toLocaleString();
-  const artistsStr = artistCount.toLocaleString();
-  const totalHours = totalMs / 3600000.0;
-  const dailyAvgStr = `${(totalHours / elapsedDays).toFixed(1)}h`;
-  const metrics: [string, string, string, string] = [
-    minutesStr,
-    tracksStr,
-    artistsStr,
-    dailyAvgStr,
-  ];
+  const metrics = formatOverviewMetrics(rawMetrics, "minutes", range);
 
   // Process top tracks
   const topTracks: TrackSummary[] = rawTopTracks.map((row) => ({
