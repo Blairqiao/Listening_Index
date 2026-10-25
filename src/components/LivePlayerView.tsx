@@ -141,6 +141,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     handleCycleRepeat,
     selectedContext,
     selectContext,
+    contextName,
     userPlaylists,
   } = usePlayer();
 
@@ -276,7 +277,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               <span className="truncate">
                 {selectedContext.type === "auto"
                   ? "[⚡ AUTO PLAY · RECENT FAVORITES]"
-                  : `[♫ ${selectedContext.name.toUpperCase()}]`}
+                  : `[♫ ${(contextName || selectedContext.name).toUpperCase()}]`}
               </span>
               <span className="text-[8px] text-[#6A6A64]">▼</span>
             </button>
@@ -311,7 +312,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   </button>
 
                   {/* Playlists section */}
-                  {userPlaylists.length > 0 && (
+                  {userPlaylists.length > 0 ? (
                     <>
                       <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-t border-b border-[#1A1A18] mt-1">
                         SPOTIFY PLAYLISTS ({userPlaylists.length})
@@ -341,6 +342,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                         );
                       })}
                     </>
+                  ) : (
+                    <div className="px-2.5 py-2 text-[#5A5A55] text-[9px] border-t border-[#1A1A18] mt-1 text-center font-mono">
+                      [ NO SPOTIFY PLAYLISTS LOADED ]
+                    </div>
                   )}
                 </div>
               </>

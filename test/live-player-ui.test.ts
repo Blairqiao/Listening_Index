@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-test("PlayerContext exports selectedContext, selectContext, and userPlaylists", () => {
+test("PlayerContext exports selectedContext, selectContext, contextName, and userPlaylists", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
   const content = fs.readFileSync(playerContextPath, "utf-8");
 
@@ -16,12 +16,16 @@ test("PlayerContext exports selectedContext, selectContext, and userPlaylists", 
     "PlayerContext must expose selectContext handler"
   );
   assert.ok(
+    content.includes("contextName"),
+    "PlayerContext must expose contextName"
+  );
+  assert.ok(
     content.includes("userPlaylists"),
     "PlayerContext must expose userPlaylists"
   );
 });
 
-test("LivePlayerView renders the context selector with Auto Play and user playlists", () => {
+test("LivePlayerView renders the context selector with Auto Play, user playlists, and contextName", () => {
   const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
@@ -30,8 +34,16 @@ test("LivePlayerView renders the context selector with Auto Play and user playli
     "LivePlayerView must display AUTO PLAY / Recent Favorites option"
   );
   assert.ok(
+    content.includes("contextName"),
+    "LivePlayerView must render contextName"
+  );
+  assert.ok(
     content.includes("userPlaylists"),
     "LivePlayerView must render userPlaylists options"
+  );
+  assert.ok(
+    content.includes("NO SPOTIFY PLAYLISTS LOADED"),
+    "LivePlayerView must render empty state when userPlaylists is empty"
   );
   assert.ok(
     content.includes("selectContext"),

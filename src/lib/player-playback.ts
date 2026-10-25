@@ -63,14 +63,30 @@ export interface ShouldToggleInPlaceParams {
   isContextArmed: boolean;
   hasPlayer: boolean;
   hasLoadedTrack: boolean;
+  isPlaying?: boolean;
   trackIdOrUri?: string;
 }
 
 export function shouldToggleInPlace(params: ShouldToggleInPlaceParams): boolean {
+  // 1. Actively streaming audio always toggles in place (pauses) on the loaded track
+  if (params.isPlaying && params.hasPlayer && !params.trackIdOrUri) {
+    return true;
+  }
+
+  // 2. Idle player resumes in place only if context has not been armed with a new source
   return (
     !params.isContextArmed &&
     params.hasPlayer &&
     params.hasLoadedTrack &&
     !params.trackIdOrUri
   );
+}
+
+export function isSameContext(
+  current: PlaybackContextSelection,
+  incoming: PlaybackContextSelection
+): boolean {
+  if (current.type !== incoming.type) return false;
+  if (current.type === "auto") return true;
+  return Boolean(current.uri && incoming.uri && current.uri === incoming.uri);
 }

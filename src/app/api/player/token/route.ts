@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { getRedirectUri } from "@/lib/spotify-auth";
-import { refreshAccessToken, exchangeAuthorizationCode } from "@/lib/spotify";
+import {
+  refreshAccessToken,
+  exchangeAuthorizationCode,
+  getAccessToken,
+  resetSpotifyTokenCache,
+  SpotifyApiError,
+} from "@/lib/spotify";
 import {
   getOwnerPlaybackToken,
   saveOwnerPlaybackToken,
@@ -14,6 +20,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/player/token
  * Returns active Spotify access token for Web Playback SDK if owner playback token is linked.
+ * Utilizes the centralized in-memory tokenCache from src/lib/spotify.ts.
  * Admin-only.
  */
 export async function GET(request: NextRequest) {
@@ -29,44 +36,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ linked: false });
   }
 
-  const config = await getActiveSiteConfig();
-  const clientId =
-    process.env.SPOTIFY_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    config.spotifyClientId;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
-  if (!clientId) {
+  try {
+    const accessToken = await getAccessToken();
+    return NextResponse.json({
+      linked: true,
+      accessToken,
+      expiresIn: 3600,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to refresh Spotify token";
+    const status = err instanceof SpotifyApiError && err.status ? err.status : 502;
     return NextResponse.json(
-      { error: "Spotify client ID not configured" },
-      { status: 500 }
+      { error: message },
+      { status: status >= 400 && status < 500 ? status : 502 }
     );
   }
-
-  const response = await refreshAccessToken(token, clientId, clientSecret);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    return NextResponse.json(
-      { error: errorData.error_description || "Failed to refresh Spotify token" },
-      { status: response.status >= 400 && response.status < 500 ? response.status : 502 }
-    );
-  }
-
-  const data = (await response.json()) as {
-    access_token: string;
-    expires_in: number;
-    refresh_token?: string;
-  };
-
-  if (data.refresh_token && data.refresh_token !== token) {
-    await saveOwnerPlaybackToken(data.refresh_token);
-  }
-
-  return NextResponse.json({
-    linked: true,
-    accessToken: data.access_token,
-    expiresIn: data.expires_in,
-  });
 }
 
 /**
@@ -187,5 +171,6 @@ export async function DELETE(request: NextRequest) {
   }
 
   await deleteOwnerPlaybackToken();
+  resetSpotifyTokenCache();
   return NextResponse.json({ success: true });
 }
