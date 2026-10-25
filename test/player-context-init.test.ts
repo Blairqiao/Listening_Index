@@ -35,7 +35,7 @@ test("GET /api/player/current-context returns last played track and auto-play co
   assert.equal(json.context.name, "Recent Favorites");
 });
 
-test("PlayerContext integrates /api/player/current-context on initialization", () => {
+test("PlayerContext integrates /api/player/current-context and probeActivePlayback for current song detection", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
   const hookPath = path.resolve(__dirname, "../src/context/player-context/usePlayerInitialContext.ts");
   const content = fs.readFileSync(playerContextPath, "utf-8") +
@@ -44,5 +44,13 @@ test("PlayerContext integrates /api/player/current-context on initialization", (
   assert.ok(
     content.includes("/api/player/current-context"),
     "PlayerContext must fetch /api/player/current-context to initialize context and last-played track"
+  );
+  assert.ok(
+    content.includes("probeActivePlayback") && content.includes("setProbedTrack"),
+    "PlayerContext must probe active playback to seed currently playing song without database reset"
+  );
+  assert.ok(
+    content.includes("probedTrack || fallbackTrack"),
+    "currentTrack must fall back to probedTrack before fallbackTrack"
   );
 });

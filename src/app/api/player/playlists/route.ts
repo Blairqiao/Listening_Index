@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { getOwnerPlaybackToken, getActiveSiteConfig } from "@/lib/db/queries";
+import { getOwnerPlaybackToken } from "@/lib/db/queries";
+import { getAccessToken } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
@@ -30,44 +31,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ playlists: [] });
   }
 
-  const config = await getActiveSiteConfig();
-  const clientId =
-    process.env.SPOTIFY_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    config.spotifyClientId;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
-  if (!clientId) {
-    return NextResponse.json({ playlists: [] });
-  }
-
   try {
-    // Refresh access token using owner refresh token
-    const tokenParams = new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: token,
-    });
-    const headers: Record<string, string> = {
-      "Content-Type": "application/x-www-form-urlencoded",
-    };
-    if (clientSecret) {
-      headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
-    } else {
-      tokenParams.set("client_id", clientId);
-    }
-
-    const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers,
-      body: tokenParams.toString(),
-    });
-
-    if (!tokenRes.ok) {
-      return NextResponse.json({ playlists: [] });
-    }
-
-    const tokenData = await tokenRes.json();
-    const accessToken = tokenData.access_token;
+    const accessToken = await getAccessToken();
 
     const playlistsRes = await fetch("https://api.spotify.com/v1/me/playlists?limit=50", {
       headers: {

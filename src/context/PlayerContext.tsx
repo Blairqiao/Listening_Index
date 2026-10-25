@@ -15,7 +15,7 @@ import {
   AUTH_MESSAGE,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
-import { resolvePlayRequest, shouldToggleInPlace } from "@/lib/player-playback";
+import { resolvePlayRequest, shouldToggleInPlace, isSameContext } from "@/lib/player-playback";
 import { createSingleFlight } from "@/lib/player-connection";
 import { usePlayerPlaylists, UserPlaylistSummary } from "./player-context/usePlayerPlaylists";
 import { usePlayerInitialContext } from "./player-context/usePlayerInitialContext";
@@ -145,6 +145,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [activeDevice, setActiveDevice] = useState<ActiveDevice | null>(null);
   const [state, setState] = useState<SpotifyPlaybackState | null>(null);
+  const [probedTrack, setProbedTrack] = useState<SpotifyPlaybackTrack | null>(null);
   const [position, setPosition] = useState<number>(0);
   const [volume, setVolumeState] = useState<number>(() => getStoredVolume(0.35));
   const volumeRef = useRef<number>(volume);
@@ -165,9 +166,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const { userPlaylists, loadPlaylists } = usePlayerPlaylists();
+  const userPlaylistsRef = useRef(userPlaylists);
+  userPlaylistsRef.current = userPlaylists;
 
-
-  // Query Spotify API for active playback device
+  // Query Spotify API for active playback device & current song
   const probeActivePlayback = useCallback(async (localId: string | null) => {
     try {
       const tokenRes = await fetch("/api/player/token");
@@ -183,6 +185,46 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const data: SpotifyApiPlaybackResponse = await res.json();
         const resolved = resolveActiveDevice(data, localId);
         setActiveDevice(resolved);
+
+        // On-demand seed of current track if browser SDK is not yet playing
+        if (data.item) {
+          const remoteTrack: SpotifyPlaybackTrack = {
+            id: data.item.id || null,
+            uri: data.item.uri || (data.item.id ? `spotify:track:${data.item.id}` : ""),
+            name: data.item.name,
+            duration_ms: data.item.duration_ms,
+            artists: data.item.artists?.map((a) => ({ name: a.name, uri: a.uri || "" })) || [],
+            album: {
+              name: data.item.album?.name || "",
+              uri: data.item.album?.uri || "",
+              images: data.item.album?.images || [],
+            },
+          };
+          setProbedTrack(remoteTrack);
+          if (typeof data.progress_ms === "number") {
+            setPosition(data.progress_ms);
+          }
+          if (data.context?.uri) {
+            const contextUri = data.context.uri;
+            setSelectedContext((prev) => {
+              if (prev.uri === contextUri) return prev;
+              const matchingPlaylist = userPlaylistsRef.current.find((p) => p.uri === contextUri);
+              if (matchingPlaylist) {
+                return {
+                  type: "playlist",
+                  name: matchingPlaylist.name,
+                  uri: matchingPlaylist.uri,
+                };
+              }
+              const name = contextUri.includes(":album:") ? "Active Album" : "Spotify Queue";
+              return {
+                type: "playlist",
+                name,
+                uri: contextUri,
+              };
+            });
+          }
+        }
       } else if (res.status === 204 || res.status === 404) {
         // Nothing playing anywhere
         if (localId) {
@@ -309,6 +351,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (s) {
           setPosition(s.position);
           setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+          if (!s.paused) {
+            armedContextRef.current = false;
+          }
+          if (s.context?.uri) {
+            const contextUri = s.context.uri;
+            setSelectedContext((prev) => {
+              if (prev.uri === contextUri) return prev;
+              const matchingPlaylist = userPlaylistsRef.current.find((p) => p.uri === contextUri);
+              if (matchingPlaylist) {
+                return {
+                  type: "playlist",
+                  name: matchingPlaylist.name,
+                  uri: matchingPlaylist.uri,
+                };
+              }
+              const contextName = s.context?.metadata?.name || (contextUri.includes(":album:") ? "Active Album" : "Spotify Queue");
+              return {
+                type: "playlist",
+                name: contextName,
+                uri: contextUri,
+              };
+            });
+          }
         }
       });
 
@@ -371,6 +436,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     deviceIdRef.current = null;
     setDeviceId(null);
     setState(null);
+    setProbedTrack(null);
     setActiveDevice(null);
     setIsLinked(false);
     setPlayerStatus("unlinked");
@@ -524,6 +590,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const id = deviceIdRef.current;
     if (!id) return;
     setErrorMessage(null);
+    armedContextRef.current = false;
 
     try {
       const tokenRes = await fetch("/api/player/token");
@@ -544,6 +611,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       if (res.ok || res.status === 204) {
+        armedContextRef.current = false;
         setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
       } else {
         setErrorMessage(
@@ -572,11 +640,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     async (trackIdOrUri?: string) => {
       setErrorMessage(null);
 
-      // 1. If currently playing and context has not been armed for a new source, toggle pause/resume:
+      // 1. If currently playing and no specific track is requested, unconditionally pause:
+      if (state && !state.paused && !trackIdOrUri) {
+        if (playerRef.current) {
+          try {
+            await playerRef.current.pause();
+            armedContextRef.current = false;
+            return;
+          } catch (e) {
+            console.warn("[PLAYER] Failed to pause player via SDK:", e);
+          }
+        }
+      }
+
+      // 2. If track is loaded and can toggle in place (resume paused track):
       const canToggleInPlace = shouldToggleInPlace({
         isContextArmed: armedContextRef.current,
         hasPlayer: Boolean(playerRef.current),
         hasLoadedTrack: Boolean(state?.track_window?.current_track),
+        isPlaying: state ? !state.paused : false,
         trackIdOrUri,
       });
 
@@ -584,15 +666,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         try {
           const currentState = await playerRef.current.getCurrentState();
           if (currentState && currentState.track_window?.current_track) {
-            await playerRef.current.togglePlay();
+            await playerRef.current.resume();
+            armedContextRef.current = false;
             return;
           }
         } catch (e) {
-          console.warn("[PLAYER] SDK getCurrentState failed, falling back to Web API:", e);
+          console.warn("[PLAYER] SDK resume failed, falling back to Web API:", e);
         }
       }
 
-      // 2. Start playback of armed context or specific track via Spotify Web API.
+      // 3. Start playback of armed context or specific track via Spotify Web API.
       const targetDeviceId = deviceIdRef.current;
       if (!targetDeviceId) {
         setErrorMessage("Spotify player is not ready yet. Please wait a moment.");
@@ -660,11 +743,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setErrorMessage(message || "Playback toggle failed");
       }
     },
-    [selectedContext, initialContext.track?.id, state?.track_window?.current_track]
+    [selectedContext, initialContext.track?.id, state]
   );
 
   const selectContext = useCallback(
     async (ctx: PlaybackContextSelection) => {
+      // If already playing this context, avoid restarting it from track 1
+      if (isSameContext(selectedContext, ctx) && state && !state.paused) {
+        return;
+      }
+
       setSelectedContext(ctx);
       try {
         localStorage.setItem("listening_selected_context", JSON.stringify(ctx));
@@ -713,7 +801,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         armedContextRef.current = true;
       }
     },
-    [state]
+    [state, selectedContext]
   );
 
   const handleNext = useCallback(() => {
@@ -790,7 +878,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     : null;
 
-  const currentTrack = state?.track_window.current_track || fallbackTrack;
+  const currentTrack = state?.track_window.current_track || probedTrack || fallbackTrack;
   const previousTrack =
     state?.track_window.previous_tracks && state.track_window.previous_tracks.length > 0
       ? state.track_window.previous_tracks[state.track_window.previous_tracks.length - 1]
@@ -801,7 +889,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     (selectedContext.type === "playlist"
       ? selectedContext.name
       : initialContext.context?.name || "Recent Favorites");
-  const duration = state?.duration || currentTrack?.duration_ms || initialContext.track?.durationMs || 0;
+  const duration =
+    state?.duration ||
+    currentTrack?.duration_ms ||
+    probedTrack?.duration_ms ||
+    initialContext.track?.durationMs ||
+    0;
   const isPlaying = state ? !state.paused : false;
   const shuffle = state ? state.shuffle : false;
   const repeatMode = state ? state.repeat_mode : 0;

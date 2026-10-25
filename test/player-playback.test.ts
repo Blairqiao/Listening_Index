@@ -104,23 +104,38 @@ test("AC-3: resolvePlayRequest plays single track when explicit trackIdOrUri is 
 });
 
 test("AC-4: shouldToggleInPlace determines in-place pause/resume vs new playback", () => {
+  // When actively playing, clicking toggle MUST pause in-place even if context is armed
+  assert.equal(
+    shouldToggleInPlace({
+      isContextArmed: true,
+      hasPlayer: true,
+      hasLoadedTrack: true,
+      isPlaying: true,
+      trackIdOrUri: undefined,
+    }),
+    true,
+    "Actively playing track must toggle in-place (pause) even if context is marked armed"
+  );
+
   // When context is not armed, player is available, track is loaded, and no trackId passed -> toggle in place
   assert.equal(
     shouldToggleInPlace({
       isContextArmed: false,
       hasPlayer: true,
       hasLoadedTrack: true,
+      isPlaying: false,
       trackIdOrUri: undefined,
     }),
     true
   );
 
-  // When context is newly armed (e.g. user selected another playlist) -> false (must start new playback)
+  // When idle and context is newly armed (e.g. user selected another playlist) -> false (must start new playback)
   assert.equal(
     shouldToggleInPlace({
       isContextArmed: true,
       hasPlayer: true,
       hasLoadedTrack: true,
+      isPlaying: false,
       trackIdOrUri: undefined,
     }),
     false
@@ -132,6 +147,7 @@ test("AC-4: shouldToggleInPlace determines in-place pause/resume vs new playback
       isContextArmed: false,
       hasPlayer: true,
       hasLoadedTrack: true,
+      isPlaying: false,
       trackIdOrUri: "some_track",
     }),
     false
@@ -143,8 +159,37 @@ test("AC-4: shouldToggleInPlace determines in-place pause/resume vs new playback
       isContextArmed: false,
       hasPlayer: true,
       hasLoadedTrack: false,
+      isPlaying: false,
       trackIdOrUri: undefined,
     }),
     false
   );
+});
+
+test("AC-5: isSameContext determines if newly selected context matches active context", async () => {
+  const { isSameContext } = await import("../src/lib/player-playback");
+
+  const autoCtx: PlaybackContextSelection = { type: "auto", name: "Recent Favorites" };
+  const autoCtx2: PlaybackContextSelection = { type: "auto", name: "Auto Play (Top 100)" };
+  assert.equal(isSameContext(autoCtx, autoCtx2), true, "Both auto contexts match");
+
+  const pl1: PlaybackContextSelection = {
+    type: "playlist",
+    name: "My Jams",
+    uri: "spotify:playlist:123",
+  };
+  const pl1Duplicate: PlaybackContextSelection = {
+    type: "playlist",
+    name: "My Jams Renamed",
+    uri: "spotify:playlist:123",
+  };
+  const pl2: PlaybackContextSelection = {
+    type: "playlist",
+    name: "Other Jams",
+    uri: "spotify:playlist:456",
+  };
+
+  assert.equal(isSameContext(pl1, pl1Duplicate), true, "Matching URI means same context");
+  assert.equal(isSameContext(pl1, pl2), false, "Different URI means different context");
+  assert.equal(isSameContext(pl1, autoCtx), false, "Different type means different context");
 });
