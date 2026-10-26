@@ -12,6 +12,7 @@ import { useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { ColorPicker } from "@/components/ColorPicker";
 import { TimezoneSelect } from "./customization-modal/TimezoneSelect";
 import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import {
   areSiteConfigsEqual,
   DEFAULT_SITE_CONFIG,
@@ -27,6 +28,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
     markAsDeployed,
     updateConfig,
     resetToDefaults,
+    resetLocalCustomizations,
     isDbConfigured,
     isModalOpen,
     closeModal,
@@ -37,6 +39,9 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
   // Local draft state while modal is open
   const [draft, setDraft] = useState<SiteConfigState>(config);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
+
+  // Lock document body scroll while modal is open
+  useBodyScrollLock(isModalOpen);
 
   // Animation transition state for smooth open and close
   const [shouldRender, setShouldRender] = useState<boolean>(isModalOpen);
@@ -174,12 +179,12 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
     }
   };
 
-  // Reset accent color to factory default (#1DB954) for visitor
+  // Reset accent color to site owner's deployed color and clear local visitor override
   const handleResetColor = () => {
-    const defaultColor = DEFAULT_SITE_CONFIG.accentColor;
-    setDraft((prev) => ({ ...prev, accentColor: defaultColor }));
-    applyAccentColorToDom(defaultColor);
-    updateConfig({ accentColor: defaultColor });
+    const ownerColor = deployedConfig.accentColor;
+    setDraft((prev) => ({ ...prev, accentColor: ownerColor }));
+    applyAccentColorToDom(ownerColor);
+    resetLocalCustomizations();
   };
 
   // Reset draft form to factory defaults for admin (does not apply to site until Save is clicked)

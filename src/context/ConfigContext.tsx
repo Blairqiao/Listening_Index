@@ -17,6 +17,7 @@ interface ConfigContextType {
   markAsDeployed: (cfg: SiteConfigState) => void;
   updateConfig: (patch: Partial<SiteConfigState>) => void;
   resetToDefaults: () => void;
+  resetLocalCustomizations: () => void;
   applyAccentColorLive: (color: string) => void;
   generateConfigTsCode: () => string;
   isCustomized: boolean;
@@ -209,6 +210,22 @@ export const ConfigProvider: React.FC<{
     }
   }, [config, syncSideEffects, onConfigChange]);
 
+  const resetLocalCustomizations = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      setIsCustomized(false);
+    } catch (e) {
+      console.warn("[CONFIG] Failed to remove configuration from localStorage:", e);
+    }
+    applyAccentColorToDom(deployedConfig.accentColor);
+    const prev = config;
+    setConfig(deployedConfig);
+    syncSideEffects(deployedConfig);
+    if (onConfigChange) {
+      onConfigChange(deployedConfig, prev);
+    }
+  }, [deployedConfig, config, syncSideEffects, onConfigChange]);
+
   const generateConfigTsCode = useCallback((): string => {
     return buildConfigTsCode(config);
   }, [config]);
@@ -305,6 +322,7 @@ export const ConfigProvider: React.FC<{
       markAsDeployed,
       updateConfig,
       resetToDefaults,
+      resetLocalCustomizations,
       applyAccentColorLive,
       generateConfigTsCode,
       isCustomized,
@@ -329,6 +347,7 @@ export const ConfigProvider: React.FC<{
       markAsDeployed,
       updateConfig,
       resetToDefaults,
+      resetLocalCustomizations,
       applyAccentColorLive,
       generateConfigTsCode,
       isCustomized,

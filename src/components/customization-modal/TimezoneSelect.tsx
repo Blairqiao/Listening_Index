@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Clock, Search, ChevronDown, X } from "lucide-react";
+import { Clock, Search, ChevronDown, X, Compass } from "lucide-react";
+import { detectLocalTimezone } from "@/lib/timezone-utils";
 
 // Major timezones fallback if Intl.supportedValuesOf is unavailable
 const POPULAR_TIMEZONES = [
@@ -46,6 +47,7 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
   const [currentTimeStr, setCurrentTimeStr] = useState<string>("");
   const [isTzOpen, setIsTzOpen] = useState<boolean>(false);
   const tzContainerRef = useRef<HTMLDivElement>(null);
+  const detectedTz = useMemo(() => detectLocalTimezone(), []);
 
   // Click-outside listener to collapse timezone dropdown
   useEffect(() => {
@@ -193,19 +195,39 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
           </div>
         )}
 
-        {/* Active Timezone Indicator */}
-        <div className="flex items-center justify-between pt-0.5 font-mono text-[10px] tracking-[0.08em]">
-          <div className="flex items-center gap-1.5">
+        {/* Active Timezone Indicator & Auto-detect Action */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-0.5 font-mono text-[10px] tracking-[0.08em]">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className="text-[#6A6A64]">ACTIVE:</span>
             <span className="text-music-accent font-medium">{timezone}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsTzOpen((prev) => !prev)}
-            className="text-[#6A6A64] hover:text-[#EDEDE8] underline text-[9px] cursor-pointer"
-          >
-            {isTzOpen ? "COLLAPSE LIST" : "BROWSE ALL"}
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {detectedTz && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(detectedTz);
+                  setIsTzOpen(false);
+                }}
+                title={`Set timezone to your detected local environment (${detectedTz})`}
+                className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 border transition-colors cursor-pointer ${
+                  timezone === detectedTz
+                    ? "border-music-accent/40 text-music-accent bg-music-accent/10"
+                    : "border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+                }`}
+              >
+                <Compass className="w-2.5 h-2.5" />
+                <span>{timezone === detectedTz ? `[ LOCAL: ${detectedTz} ]` : `[ DETECT LOCAL: ${detectedTz} ]`}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsTzOpen((prev) => !prev)}
+              className="text-[#6A6A64] hover:text-[#EDEDE8] underline text-[9px] cursor-pointer"
+            >
+              {isTzOpen ? "COLLAPSE LIST" : "BROWSE ALL"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -79,18 +79,19 @@ export async function syncSpotify(): Promise<SyncResult> {
     // 2b. Reverse stream items to ingest chronologically (oldest -> newest)
     const reversedItems = [...streamItems].reverse();
 
-    // 2c. Debounce rapid duplicate stream events (< 30s gap per track)
+    // 2c. Debounce rapid duplicate stream events (< 30s gap or < track duration per track)
     const { debounced: newStreamItems, droppedCount: debouncedDuplicatesCount } = debouncePlays(
       reversedItems.map((item) => ({
         ...item,
         playedAt: item.played_at,
         trackId: item.track.id,
+        durationMs: item.track.duration_ms,
       })),
       30_000
     );
 
     if (debouncedDuplicatesCount > 0) {
-      console.log(`      Debounced ${debouncedDuplicatesCount} rapid duplicate stream events (< 30s gap)`);
+      console.log(`      Debounced ${debouncedDuplicatesCount} rapid duplicate/resumption stream events`);
     }
 
     // 2d. Pre-filter existing artists, albums, and tracks in batch to avoid redundant upserts

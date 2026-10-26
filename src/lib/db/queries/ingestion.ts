@@ -271,7 +271,8 @@ export async function bulkInsertPlays(
   // 1. Check DB boundary for candidate tracks to populate initialLastSeen
   const candidateTrackIds = Array.from(new Set(plays.map((p) => p.trackId)));
   const timesMs = plays.map((p) => new Date(p.playedAt).getTime());
-  const minTime = new Date(Math.min(...timesMs) - 30_000).toISOString();
+  const maxCandidateDuration = Math.max(30_000, ...plays.map((p) => p.msPlayed || 0));
+  const minTime = new Date(Math.min(...timesMs) - maxCandidateDuration).toISOString();
   const maxTime = new Date(Math.max(...timesMs) + 30_000).toISOString();
 
   const sql = getDb();

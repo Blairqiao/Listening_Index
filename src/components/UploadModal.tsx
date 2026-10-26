@@ -14,6 +14,7 @@ import {
   EnrichmentProgress,
 } from "./upload-modal/CatalogEnrichmentCard";
 import { HistoryDropzone } from "./upload-modal/HistoryDropzone";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -35,6 +36,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [step, setStep] = useState<UploadStep>("idle");
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // Lock document body scroll while upload modal is open
+  useBodyScrollLock(isOpen);
 
   // Ingestion Progress
   const [stage1Current, setStage1Current] = useState<number>(0);
