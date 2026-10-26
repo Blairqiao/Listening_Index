@@ -16,6 +16,7 @@ import {
   resolveRedirectUriDisplay,
 } from "@/lib/spotify-auth";
 import { ScheduledSyncCard } from "./admin-spotify-modal/ScheduledSyncCard";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 export interface SpotifyOwnerStatus {
   connected: boolean;
@@ -97,6 +98,9 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
   const config = useConfig();
   const effectiveIsOpen = propIsOpen !== undefined ? propIsOpen : config.isAdminSpotifyModalOpen;
   const effectiveOnClose = propOnClose || config.closeAdminSpotifyModal;
+
+  // Lock document body scroll while Spotify modal is open
+  useBodyScrollLock(effectiveIsOpen);
 
   const [status, setStatus] = useState<SpotifyOwnerStatus | null>(() => {
     if (initialStatus) {

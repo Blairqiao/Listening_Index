@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useConfig } from "@/context/ConfigContext";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 export const AdminLoginModal: React.FC = () => {
   const { isAdminLoginModalOpen, closeAdminLoginModal, login } = useConfig();
@@ -11,6 +12,9 @@ export const AdminLoginModal: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Lock document body scroll while modal is open
+  useBodyScrollLock(isAdminLoginModalOpen);
 
   const inputRef = useRef<HTMLInputElement>(null);
 

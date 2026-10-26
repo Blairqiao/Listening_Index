@@ -176,7 +176,8 @@ export function parseHistoryRecords(records: unknown[]): CompactPlayEvent[] {
 export interface DebouncePlayItem {
   playedAt: string | Date;
   trackId: string;
-  // [key: string]: any;
+  durationMs?: number;
+  msPlayed?: number;
 }
 
 /** Canonical domain alias: stream events prior to meeting the Play Threshold */
@@ -196,7 +197,7 @@ export type DebounceStreamEventItem = DebouncePlayItem;
  */
 export function debouncePlays<T extends DebouncePlayItem>(
   plays: T[],
-  cooldownMs: number = 30_000,
+  fallbackCooldownMs: number = 30_000,
   initialLastSeen?: Map<string, number>
 ): { debounced: T[]; droppedCount: number } {
   if (plays.length === 0) {
@@ -208,7 +209,8 @@ export function debouncePlays<T extends DebouncePlayItem>(
     (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
   );
 
-  const lastSeen = new Map<string, number>(initialLastSeen);
+  const lastAcceptedTimeMs = new Map<string, number>(initialLastSeen);
+  const lastAcceptedIndex = new Map<string, number>();
   const debounced: T[] = [];
   let droppedCount = 0;
 
@@ -219,14 +221,33 @@ export function debouncePlays<T extends DebouncePlayItem>(
       continue;
     }
 
-    const prevSeenMs = lastSeen.get(play.trackId);
-    lastSeen.set(play.trackId, playTimeMs);
+    const prevAcceptedMs = lastAcceptedTimeMs.get(play.trackId);
+    const itemDuration = Number(play.durationMs ?? play.msPlayed ?? 0);
+    // Track-aware debounce window: 90% of track duration (accounting for max 12s Spotify crossfade)
+    // with a minimum floor of fallbackCooldownMs (default: 30s)
+    const effectiveCooldown = itemDuration > 0
+      ? Math.max(fallbackCooldownMs, Math.round(itemDuration * 0.90))
+      : fallbackCooldownMs;
 
-    if (prevSeenMs !== undefined && Math.abs(playTimeMs - prevSeenMs) < cooldownMs) {
+    if (prevAcceptedMs !== undefined && Math.abs(playTimeMs - prevAcceptedMs) < effectiveCooldown) {
       droppedCount++;
+      // If this later stream event occurred within the cooldown window of an accepted play in the current batch,
+      // update the accepted record's playedAt to the later completion timestamp.
+      const existingIdx = lastAcceptedIndex.get(play.trackId);
+      if (existingIdx !== undefined && debounced[existingIdx]) {
+        const existingTimeMs = new Date(debounced[existingIdx].playedAt).getTime();
+        if (playTimeMs > existingTimeMs) {
+          debounced[existingIdx] = {
+            ...debounced[existingIdx],
+            playedAt: play.playedAt,
+          };
+        }
+      }
       continue;
     }
 
+    lastAcceptedTimeMs.set(play.trackId, playTimeMs);
+    lastAcceptedIndex.set(play.trackId, debounced.length);
     debounced.push(play);
   }
 
