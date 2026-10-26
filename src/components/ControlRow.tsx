@@ -46,28 +46,13 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
-        return (
-          <>
-            <span className="sm:hidden">[ SINCE {compactDate(logStartDate)} ]</span>
-            <span className="hidden sm:inline">[ RANGE · LOG SINCE {logStartDate} ]</span>
-          </>
-        );
+        return `SINCE ${compactDate(logStartDate)}`;
       case 1:
-        return "[ STREAM LOG ]";
+        return "STREAM LOG";
       case 2:
-        return (
-          <>
-            <span className="sm:hidden">[ SES ]</span>
-            <span className="hidden sm:inline">[ SESSION ]</span>
-          </>
-        );
+        return "SESSION";
       case 3:
-        return (
-          <>
-            <span className="sm:hidden">[ LIVE ]</span>
-            <span className="hidden sm:inline">[ LIVE PLAYER ]</span>
-          </>
-        );
+        return "LIVE PLAYER";
     }
   };
 

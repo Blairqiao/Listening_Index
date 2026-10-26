@@ -256,7 +256,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none">
           <div className="flex items-center gap-2">
             <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#EDEDE8]">
-              [ IMPORT SPOTIFY STREAMING HISTORY ]
+              IMPORT SPOTIFY STREAMING HISTORY
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -398,12 +398,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               </button>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#1C1C1A] px-5 py-3 select-none text-[10px] text-[#5A5A55]">
-          <span>FORMAT: EXTENDED HISTORY (.ZIP / .JSON)</span>
-          <span>KEY [U] TOGGLE MODAL</span>
         </div>
       </div>
     </div>

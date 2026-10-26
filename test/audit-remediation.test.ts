@@ -226,7 +226,7 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
 
   const footer = fs.readFileSync(path.join(root, "src/components/ListeningFooter.tsx"), "utf-8");
   assert.ok(
-    footer.includes("KEYS [1-4] VIEW"),
-    "ListeningFooter must preserve KEYS [1-4] VIEW hint"
+    !footer.includes("KEYS [1-4] VIEW"),
+    "ListeningFooter must omit deprecated keyboard shortcuts hint"
   );
 });

@@ -16,14 +16,14 @@ interface ModeTabsProps {
 }
 
 export const BASE_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
-  { id: 0, label: "[ 1 · OVERVIEW ]", abbrev: "[ OVR ]" },
-  { id: 1, label: "[ 2 · STREAM LOG ]", abbrev: "[ LOG ]" },
-  { id: 2, label: "[ 3 · SESSIONS ]", abbrev: "[ SES ]" },
+  { id: 0, label: "[ OVERVIEW ]", abbrev: "[ OVR ]" },
+  { id: 1, label: "[ STREAM LOG ]", abbrev: "[ LOG ]" },
+  { id: 2, label: "[ SESSIONS ]", abbrev: "[ SES ]" },
 ];
 
 export const ADMIN_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   ...BASE_MODES,
-  { id: 3, label: "[ 4 · LIVE PLAYER ]", abbrev: "[ LIVE ]" },
+  { id: 3, label: "[ LIVE PLAYER ]", abbrev: "[ LIVE ]" },
 ];
 
 export function getAvailableModes(isAuthenticated: boolean): Array<{ id: Mode; label: string; abbrev: string }> {
@@ -51,14 +51,14 @@ export function getSpotifyTabState(
     return {
       visible: true,
       variant: "connected",
-      title: "Manage Spotify connection & refresh token [Key: S]",
+      title: "Manage Spotify connection & refresh token",
     };
   }
   if (!spotifyStatus.connected) {
     return {
       visible: true,
       variant: "setup",
-      title: "Setup Spotify connection & refresh token [Key: S]",
+      title: "Setup Spotify connection & refresh token",
     };
   }
   if (spotifyStatus.isExpiringSoon) {
@@ -69,13 +69,13 @@ export function getSpotifyTabState(
     return {
       visible: true,
       variant: "expiring",
-      title: `Spotify token expiring in ${daysStr} · click to renew [Key: S]`,
+      title: `Spotify token expiring in ${daysStr} · click to renew`,
     };
   }
   return {
     visible: true,
     variant: "connected",
-    title: "Manage Spotify connection & refresh token [Key: S]",
+    title: "Manage Spotify connection & refresh token",
   };
 }
 
@@ -133,7 +133,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           <button
             type="button"
             onClick={onOpenUpload}
-            title="Import Spotify Extended Streaming History (.zip / .json) [Key: U]"
+            title="Import Spotify Extended Streaming History (.zip / .json)"
             aria-label="Import Spotify Extended Streaming History"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
@@ -167,7 +167,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
         <button
           type="button"
           onClick={openModal}
-          title={isAuthenticated ? "Open configuration settings [Key: C]" : "Open appearance settings [Key: C]"}
+          title={isAuthenticated ? "Open configuration settings" : "Open appearance settings"}
           aria-label="Appearance and configuration settings"
           className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
         >
@@ -180,7 +180,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           <button
             type="button"
             onClick={logout}
-            title="Admin session active · click to lock [Key: L]"
+            title="Admin session active · click to lock"
             aria-label="Lock admin session"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
@@ -192,7 +192,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           <button
             type="button"
             onClick={openAdminLoginModal}
-            title="Admin login [Key: L]"
+            title="Admin login"
             aria-label="Admin login"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
