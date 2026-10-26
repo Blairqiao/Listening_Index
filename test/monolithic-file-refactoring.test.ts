@@ -127,20 +127,17 @@ test("AC-5: usePlayerPlaylists and usePlayerInitialContext are extracted to src/
   );
 });
 
-test("AC-6: useKeyboardShortcuts and useListeningUrlSync are extracted to src/components/listening-view/", async () => {
-  const shortcutsHookFile = path.join(root, "src/components/listening-view/useKeyboardShortcuts.ts");
+test("AC-6: useListeningUrlSync is extracted to src/components/listening-view/ and keyboard shortcuts are deprecated", async () => {
   const urlSyncHookFile = path.join(root, "src/components/listening-view/useListeningUrlSync.ts");
-
-  assert.ok(fs.existsSync(shortcutsHookFile), "useKeyboardShortcuts.ts must exist");
   assert.ok(fs.existsSync(urlSyncHookFile), "useListeningUrlSync.ts must exist");
 
   const listeningViewContent = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
   assert.ok(
-    listeningViewContent.includes("useKeyboardShortcuts"),
-    "ListeningView.tsx must import useKeyboardShortcuts"
-  );
-  assert.ok(
     listeningViewContent.includes("useListeningUrlSync"),
     "ListeningView.tsx must import useListeningUrlSync"
+  );
+  assert.ok(
+    !listeningViewContent.includes("useKeyboardShortcuts"),
+    "ListeningView.tsx must not import deprecated useKeyboardShortcuts"
   );
 });

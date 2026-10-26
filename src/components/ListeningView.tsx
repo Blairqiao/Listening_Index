@@ -27,7 +27,6 @@ import { AdminLoginModal } from "@/components/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import type { Mode, RangeKey } from "@/lib/types";
-import { useKeyboardShortcuts } from "./listening-view/useKeyboardShortcuts";
 import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
 import {
   OverviewData,
@@ -157,10 +156,6 @@ export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
     return 0;
   }
   return mode;
-}
-
-export function getAllowedShortcutKeys(isAuthenticated: boolean): string[] {
-  return isAuthenticated ? ["1", "2", "3", "4"] : ["1", "2", "3"];
 }
 
 interface ListeningViewProps {
@@ -976,29 +971,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     },
     [isSyncing, overviewCache, fetchOverview]
   );
-
-  // Keyboard navigation
-  useKeyboardShortcuts({
-    activeMode,
-    activeRange,
-    rangeKeys: RANGE_KEYS,
-    handleSelectMode,
-    handleSelectRange,
-    isSyncing,
-    isModalOpen,
-    openModal,
-    closeModal,
-    isUploadModalOpen,
-    setIsUploadModalOpen,
-    isUploadProcessing,
-    isAuthenticated,
-    isAdminLoginModalOpen,
-    openAdminLoginModal,
-    closeAdminLoginModal,
-    isAdminSpotifyModalOpen,
-    openAdminSpotifyModal,
-    logout,
-  });
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const currentOverview: OverviewData =

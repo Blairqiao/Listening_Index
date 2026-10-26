@@ -17,8 +17,8 @@ test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedica
     "ModeTabs must accept onOpenSpotifyModal and spotifyStatus props"
   );
   assert.ok(
-    modeTabsContent.includes("Music2") && modeTabsContent.includes("[Key: S]"),
-    "ModeTabs must render the Spotify modal icon button with [Key: S] hint"
+    modeTabsContent.includes("Music2"),
+    "ModeTabs must render the Spotify modal icon button"
   );
 
   // ListeningFooter checks: must NOT have Spotify prompt/modal triggers
@@ -68,13 +68,8 @@ test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedica
     !listeningViewContent.includes("http://127.0.0.1:8888/callback"),
     "ListeningView must not hardcode http://127.0.0.1:8888/callback placeholders"
   );
-  const shortcutHookContent = fs.existsSync(path.resolve(__dirname, "../src/components/listening-view/useKeyboardShortcuts.ts"))
-    ? fs.readFileSync(path.resolve(__dirname, "../src/components/listening-view/useKeyboardShortcuts.ts"), "utf-8")
-    : "";
-  const combinedShortcuts = listeningViewContent + shortcutHookContent;
   assert.ok(
-    combinedShortcuts.includes("if (isAdminSpotifyModalOpen) {") &&
-      !combinedShortcuts.includes("isAdminSpotifyModalOpen && e.key === \"Escape\""),
+    !listeningViewContent.includes("isAdminSpotifyModalOpen && e.key === \"Escape\""),
     "ListeningView must delegate Escape key handling to AdminSpotifyModal to preserve !isBusy guard"
   );
 });
@@ -95,7 +90,7 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
   assert.deepEqual(getSpotifyTabState(true, null), {
     visible: true,
     variant: "connected",
-    title: "Manage Spotify connection & refresh token [Key: S]",
+    title: "Manage Spotify connection & refresh token",
   });
 
   // 3. Authenticated and unconnected -> setup variant
@@ -104,7 +99,7 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
     {
       visible: true,
       variant: "setup",
-      title: "Setup Spotify connection & refresh token [Key: S]",
+      title: "Setup Spotify connection & refresh token",
     }
   );
 
@@ -114,7 +109,7 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
     {
       visible: true,
       variant: "expiring",
-      title: "Spotify token expiring in 6d · click to renew [Key: S]",
+      title: "Spotify token expiring in 6d · click to renew",
     }
   );
 
@@ -124,7 +119,7 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
     {
       visible: true,
       variant: "connected",
-      title: "Manage Spotify connection & refresh token [Key: S]",
+      title: "Manage Spotify connection & refresh token",
     }
   );
 });
