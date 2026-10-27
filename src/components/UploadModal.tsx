@@ -304,10 +304,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <Loader2 className="w-5 h-5 text-music-accent animate-spin flex-none" />
                 <div className="space-y-1 overflow-hidden">
                   <div className="flex items-center gap-2">
-                    <span className="text-music-accent font-bold uppercase tracking-[0.08em]">
+                    <span className="text-music-accent font-bold tracking-[0.08em]">
                       {step === "inspecting"
-                        ? "[ DECOMPRESSING ARCHIVE ]"
-                        : "[ INGESTING PLAYS INTO DATABASE ]"}
+                        ? "Decompressing archive..."
+                        : "Ingesting plays into database..."}
                     </span>
                   </div>
                   <p className="text-[#A8A8A2] text-[11px] truncate">{statusMessage}</p>

@@ -233,7 +233,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
               id="customization-modal-title"
               className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
             >
-              {isAuthenticated ? "[ ACTIVE CONFIGURATION ]" : "[ APPEARANCE ]"}
+              {isAuthenticated ? "ACTIVE CONFIGURATION" : "APPEARANCE"}
             </h2>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -255,7 +255,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  [ IDENTITY ]
+                  IDENTITY 
                 </span>
               </div>
 
@@ -275,7 +275,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
 
                 <div className="space-y-1">
                   <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                    DISPLAY NAME (HEADER)
+                    DISPLAY NAME
                   </label>
                   <input
                     type="text"
@@ -293,7 +293,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
           <div className="space-y-3">
             <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
               <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                [ ACCENT COLOR ]
+                ACCENT COLOR
               </span>
             </div>
 
@@ -313,7 +313,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  [ LINKS ]
+                  LINKS
                 </span>
               </div>
 
@@ -380,7 +380,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>[ RESET COLOR ]</span>
+                  <span>Reset Color</span>
                 </button>
               </div>
 
@@ -390,7 +390,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   onClick={handleSave}
                   className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
                 >
-                  <span>[ SAVE LOCALLY ]</span>
+                  <span>Save Locally</span>
                 </button>
               </div>
             </>
@@ -404,8 +404,8 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span className="sm:hidden">RESET</span>
-                  <span className="hidden sm:inline">RESET DEFAULTS</span>
+                  <span className="sm:hidden">Reset</span>
+                  <span className="hidden sm:inline">Reset Defaults</span>
                 </button>
 
                 <button
@@ -417,13 +417,13 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   {copiedCode ? (
                     <>
                       <Check className="w-3 h-3 text-music-accent" />
-                      <span className="text-music-accent">COPIED!</span>
+                      <span className="text-music-accent">Copied!</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3 h-3" />
-                      <span className="sm:hidden">COPY</span>
-                      <span className="hidden sm:inline">COPY CONFIG.TS</span>
+                      <span className="sm:hidden">Copy</span>
+                      <span className="hidden sm:inline">Copy config.ts</span>
                     </>
                   )}
                 </button>
@@ -447,27 +447,27 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   {isSaving ? (
                     <>
                       <span className="w-1.5 h-1.5 rounded-full bg-music-accent animate-pulse" />
-                      <span>DEPLOYING...</span>
+                      <span>Deploying...</span>
                     </>
                   ) : saveError ? (
-                    <span>SAVE FAILED · RETRY</span>
+                    <span>Save failed · Retry</span>
                   ) : canSave ? (
                     <span>
                       {hasLocalEdits
                         ? isDbConfigured
-                          ? "SAVE & DEPLOY TO DATABASE"
-                          : "SAVE & APPLY TO CONFIG.TS"
+                          ? "Save & Deploy"
+                          : "Save to config.ts"
                         : isDbConfigured
-                        ? "DEPLOY TO DATABASE"
-                        : "SAVE TO CONFIG.TS"}
+                        ? "Deploy"
+                        : "Save to config.ts"}
                     </span>
                   ) : (
                     <>
                       <Check className="w-3.5 h-3.5 text-music-accent" />
                       <span>
                         {isDbConfigured
-                          ? "DEPLOYED TO DATABASE"
-                          : "SAVED TO CONFIG.TS"}
+                          ? "Deployed"
+                          : "Saved to config.ts"}
                       </span>
                     </>
                   )}

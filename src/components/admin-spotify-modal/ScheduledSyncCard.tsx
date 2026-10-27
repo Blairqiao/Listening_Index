@@ -42,10 +42,10 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
           {isRegeneratingKey ? (
             <>
               <Loader2 className={`w-3 h-3 animate-spin ${accentColorClass}`} />
-              <span>[ ROTATING... ]</span>
+              <span>Rotating...</span>
             </>
           ) : (
-            <span>[ REGENERATE ]</span>
+            <span>[ Regenerate ]</span>
           )}
         </button>
       </div>
@@ -64,12 +64,12 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
           {copiedSyncUrl ? (
             <>
               <Check className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-emerald-400 font-bold">[ COPIED ]</span>
+              <span className="text-emerald-400 font-bold">Copied</span>
             </>
           ) : (
             <>
               <Copy className="w-3.5 h-3.5" />
-              <span>[ COPY URL ]</span>
+              <span>Copy URL</span>
             </>
           )}
         </button>

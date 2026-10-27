@@ -170,7 +170,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
   });
 
   const repeatLabel =
-    repeatMode === 2 ? "[REP: 1]" : repeatMode === 1 ? "[REP: ALL]" : "[REP: OFF]";
+    repeatMode === 2 ? "Repeat 1" : repeatMode === 1 ? "Repeat All" : "Repeat Off";
 
   // Shared Player Deck Component
   const renderDeck = (isStacked = false) => (
@@ -238,9 +238,9 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                 <button
                   type="button"
                   onClick={() => void handleTransferPlayback()}
-                  className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer"
+                  className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-mono"
                 >
-                  [ TRANSFER HERE ]
+                  Transfer here
                 </button>
               )}
             </div>
@@ -254,9 +254,9 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               <button
                 type="button"
                 onClick={() => void checkTokenStatus()}
-                className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer"
+                className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer font-mono"
               >
-                [ RETRY ]
+                Retry
               </button>
             </div>
           )}
@@ -271,13 +271,13 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             <button
               type="button"
               onClick={() => setIsContextSelectorOpen((prev) => !prev)}
-              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 uppercase font-mono max-w-[220px] sm:max-w-[300px] truncate"
+              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 font-mono max-w-[220px] sm:max-w-[300px] truncate"
               title="Select playback context (Auto Play or user playlist)"
             >
               <span className="truncate">
                 {selectedContext.type === "auto"
-                  ? "[⚡ AUTO PLAY · RECENT FAVORITES]"
-                  : `[♫ ${(contextName || selectedContext.name).toUpperCase()}]`}
+                  ? "⚡ Auto Play · Recent Favorites"
+                  : `♫ ${contextName || selectedContext.name}`}
               </span>
               <span className="text-[8px] text-[#6A6A64]">▼</span>
             </button>
@@ -305,10 +305,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                     }`}
                   >
                     <div className="truncate">
-                      <span>[⚡ AUTO PLAY]</span>
-                      <span className="text-[#6A6A64] ml-1.5 text-[9px]">RECENT FAVORITES (TOP 100)</span>
+                      <span>⚡ Auto Play</span>
+                      <span className="text-[#6A6A64] ml-1.5 text-[9px]">Recent Favorites (Top 100)</span>
                     </div>
-                    {selectedContext.type === "auto" && <span className="text-music-accent text-[9px]">[ACTIVE]</span>}
+                    {selectedContext.type === "auto" && <span className="text-music-accent text-[9px]">Active</span>}
                   </button>
 
                   {/* Playlists section */}
@@ -332,11 +332,11 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                             }`}
                           >
                             <span className="truncate pr-2">
-                              [♫ {pl.name.toUpperCase()}]
+                              ♫ {pl.name}
                             </span>
                             <div className="flex items-center gap-1.5 shrink-0 text-[9px] text-[#6A6A64]">
                               <span>{pl.trackCount} tracks</span>
-                              {isSelected && <span className="text-music-accent">[ACTIVE]</span>}
+                              {isSelected && <span className="text-music-accent">Active</span>}
                             </div>
                           </button>
                         );
@@ -344,7 +344,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                     </>
                   ) : (
                     <div className="px-2.5 py-2 text-[#5A5A55] text-[9px] border-t border-[#1A1A18] mt-1 text-center font-mono">
-                      [ NO SPOTIFY PLAYLISTS LOADED ]
+                      No Spotify playlists loaded
                     </div>
                   )}
                 </div>
@@ -378,7 +378,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             onClick={handlePrevious}
             className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
           >
-            [PREV]
+            Prev
           </button>
 
           <button
@@ -390,7 +390,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                 : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
             } bg-transparent`}
           >
-            {isPlaying ? "[PAUSE]" : "[PLAY]"}
+            {isPlaying ? "Pause" : "Play"}
           </button>
 
           <button
@@ -398,7 +398,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             onClick={handleNext}
             className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
           >
-            [NEXT]
+            Next
           </button>
 
           <button
@@ -411,7 +411,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             } bg-transparent`}
             title="Toggle Shuffle"
           >
-            [SHUFFLE]
+            Shuffle
           </button>
 
           <button

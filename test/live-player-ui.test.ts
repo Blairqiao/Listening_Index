@@ -42,7 +42,7 @@ test("LivePlayerView renders the context selector with Auto Play, user playlists
     "LivePlayerView must render userPlaylists options"
   );
   assert.ok(
-    content.includes("NO SPOTIFY PLAYLISTS LOADED"),
+    content.includes("NO SPOTIFY PLAYLISTS LOADED") || content.includes("No Spotify playlists loaded"),
     "LivePlayerView must render empty state when userPlaylists is empty"
   );
   assert.ok(
