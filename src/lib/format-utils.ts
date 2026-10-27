@@ -212,4 +212,41 @@ export function compactDate(dateStr: string): string {
   return `${month}/${day}/${year}`;
 }
 
+export function formatDayGroup(date: Date, tz = "UTC"): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      day: "2-digit",
+      month: "short",
+    }).formatToParts(date);
+    const day = parts.find((p) => p.type === "day")?.value || "";
+    const month = parts.find((p) => p.type === "month")?.value.toUpperCase() || "";
+    return `${day} ${month}`;
+  } catch {
+    return date.toISOString().slice(5, 10).toUpperCase();
+  }
+}
+
+export function formatStreamLogDateSpan(
+  oldestDateStr?: string,
+  newestDateStr?: string,
+  tz = "UTC"
+): string {
+  if (!oldestDateStr && !newestDateStr) return "STREAM LOG";
+  if (!oldestDateStr || !newestDateStr) {
+    const d = new Date(newestDateStr || oldestDateStr!);
+    return isNaN(d.getTime()) ? "STREAM LOG" : formatDayGroup(d, tz);
+  }
+  const oldest = new Date(oldestDateStr);
+  const newest = new Date(newestDateStr);
+  if (isNaN(oldest.getTime()) || isNaN(newest.getTime())) return "STREAM LOG";
+
+  const oldestGroup = formatDayGroup(oldest, tz);
+  const newestGroup = formatDayGroup(newest, tz);
+  if (oldestGroup === newestGroup) {
+    return oldestGroup;
+  }
+  return `${oldestGroup} – ${newestGroup}`;
+}
+
 

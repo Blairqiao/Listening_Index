@@ -209,77 +209,114 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
         </div>
       </div>
 
-      {/* Device & Playback Context Row */}
-      <div className="text-[10px] tracking-[0.12em] py-1 border-y border-[#161614] flex flex-wrap items-center justify-between gap-2 min-h-[30px] font-mono relative">
-        {/* Left Side: Connection & Device State */}
-        <div className="flex items-center gap-2 min-w-0">
-          {playerStatus === "checking" && (
-            <span className="text-[#5A5A55]">[ CHECKING CONNECTION... ]</span>
-          )}
+      {playerStatus === "unlinked" && (
+        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[#141413] border border-[#22221E] text-[#8A8A82] text-[10px] font-mono">
+          <span className="truncate">SPOTIFY NOT LINKED · OPEN SPOTIFY MODAL (S)</span>
+        </div>
+      )}
 
-          {playerStatus === "unlinked" && (
-            <span className="text-[#8A8A82] truncate">
-              [ SPOTIFY NOT LINKED · OPEN MODAL (S) ]
-            </span>
-          )}
+      {playerStatus === "error" && (
+        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-red-500/10 border border-red-500/30 text-[#FF6B6B] text-[10px] font-mono">
+          <span className="truncate">{errorMessage || "Player Error"}</span>
+          <button
+            type="button"
+            onClick={() => void checkTokenStatus()}
+            className="px-2 py-0.5 border border-red-500/40 text-red-400 hover:text-[#EDEDE8] bg-transparent cursor-pointer font-mono shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
-          {playerStatus === "connecting" && (
-            <span className="text-[#5A5A55]">[ CONNECTING TO SPOTIFY... ]</span>
-          )}
+      {/* Scrubber */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-[10px] text-[#5A5A55] tabular-nums">
+          <span>{msToClock(position)}</span>
+          <span>{msToClock(displayTrack.durationMs)}</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={displayTrack.durationMs}
+          value={position}
+          onChange={(e) => handleSeek(Number(e.target.value))}
+          className="w-full accent-[var(--music-accent)] cursor-pointer h-1.5 bg-[#1C1C1A]"
+        />
+      </div>
 
-          {playerStatus === "ready" && (
-            <div className="flex items-center gap-2">
-              <span className="text-music-accent">
-                {activeDevice?.isThisBrowser
-                  ? "[ DEVICE: LISTENING INDEX · ACTIVE ]"
-                  : `[ LISTENING ON: ${activeDevice?.name?.toUpperCase() || "EXTERNAL"} ]`}
-              </span>
-              {activeDevice && !activeDevice.isThisBrowser && (
-                <button
-                  type="button"
-                  onClick={() => void handleTransferPlayback()}
-                  className="px-2 py-0.5 border border-music-accent text-music-accent hover:bg-music-accent/10 bg-transparent cursor-pointer font-mono"
-                >
-                  Transfer here
-                </button>
-              )}
-            </div>
-          )}
+      {/* Transport, Context Selector & Volume Controls */}
+      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-[#161614] text-[11px] gap-2 relative">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
+          >
+            Prev
+          </button>
 
-          {playerStatus === "error" && (
-            <div className="flex items-center gap-2">
-              <span className="text-[#FF6B6B] truncate max-w-[160px] sm:max-w-[220px]">
-                {errorMessage || "[ PLAYER ERROR ]"}
-              </span>
-              <button
-                type="button"
-                onClick={() => void checkTokenStatus()}
-                className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] bg-transparent cursor-pointer font-mono"
-              >
-                Retry
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => void handleTogglePlay()}
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              isPlaying
+                ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
+          >
+            {isPlaying ? "Pause" : "Play"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleNext}
+            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
+          >
+            Next
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleToggleShuffle()}
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              shuffle
+                ? "border-music-accent text-music-accent font-bold"
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
+            title="Toggle Shuffle"
+          >
+            Shuffle
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleCycleRepeat()}
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
+              repeatMode > 0
+                ? "border-music-accent text-music-accent font-bold"
+                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            } bg-transparent`}
+            title="Cycle Repeat Mode"
+          >
+            {repeatLabel}
+          </button>
         </div>
 
-        {/* Right Side: Playback Context Selector */}
-        <div className="flex items-center gap-1.5 shrink-0 relative">
-          <span className="text-[#6A6A64] uppercase font-bold shrink-0">
-            CONTEXT:
-          </span>
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Playback Context Selector */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setIsContextSelectorOpen((prev) => !prev)}
-              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 font-mono max-w-[220px] sm:max-w-[300px] truncate"
+              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 font-mono max-w-[150px] sm:max-w-[200px] truncate text-[10px]"
               title="Select playback context (Auto Play or user playlist)"
             >
               <span className="truncate">
                 {selectedContext.type === "auto"
-                  ? "⚡ Auto Play · Recent Favorites"
+                  ? "⚡ Auto Play"
                   : `♫ ${contextName || selectedContext.name}`}
               </span>
-              <span className="text-[8px] text-[#6A6A64]">▼</span>
+              <span className="text-[8px] text-[#6A6A64]">▲</span>
             </button>
 
             {isContextSelectorOpen && (
@@ -288,7 +325,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   className="fixed inset-0 z-20"
                   onClick={() => setIsContextSelectorOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[10px]">
+                <div className="absolute right-0 bottom-full mb-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[10px]">
                   <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-b border-[#1A1A18]">
                     CHOOSE PLAYBACK CONTEXT
                   </div>
@@ -351,94 +388,19 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               </>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Scrubber */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[10px] text-[#5A5A55] tabular-nums">
-          <span>{msToClock(position)}</span>
-          <span>{msToClock(displayTrack.durationMs)}</span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={displayTrack.durationMs}
-          value={position}
-          onChange={(e) => handleSeek(Number(e.target.value))}
-          className="w-full accent-[var(--music-accent)] cursor-pointer h-1.5 bg-[#1C1C1A]"
-        />
-      </div>
-
-      {/* Transport & Volume Controls */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#161614] text-[11px] gap-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            type="button"
-            onClick={handlePrevious}
-            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
-          >
-            Prev
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleTogglePlay()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              isPlaying
-                ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"
-                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
-          >
-            {isPlaying ? "Pause" : "Play"}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleNext}
-            className="px-2 py-0.5 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer select-none transition-colors"
-          >
-            Next
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleToggleShuffle()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              shuffle
-                ? "border-music-accent text-music-accent font-bold"
-                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
-            title="Toggle Shuffle"
-          >
-            Shuffle
-          </button>
-
-          <button
-            type="button"
-            onClick={() => void handleCycleRepeat()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              repeatMode > 0
-                ? "border-music-accent text-music-accent font-bold"
-                : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
-            title="Cycle Repeat Mode"
-          >
-            {repeatLabel}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0 font-mono">
-          <span className="tracking-wider">VOL</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={(e) => handleVolume(Number(e.target.value))}
-            className="w-[60px] accent-[var(--music-accent)] cursor-pointer h-1 bg-[#1C1C1A]"
-          />
+          <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0 font-mono">
+            <span className="tracking-wider">VOL</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => handleVolume(Number(e.target.value))}
+              className="w-[50px] sm:w-[60px] accent-[var(--music-accent)] cursor-pointer h-1 bg-[#1C1C1A]"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -471,7 +433,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               accentColor={config.accentColor}
               sourceMode={sourceMode}
               onToggleSource={toggleSourceMode}
-              heightClass="h-[180px] sm:h-[220px] md:h-[240px]"
+              heightClass="h-[200px] sm:h-[240px] md:h-[260px]"
             />
           </div>
         </div>
@@ -501,7 +463,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           accentColor={config.accentColor}
           sourceMode={sourceMode}
           onToggleSource={toggleSourceMode}
-          heightClass="h-[120px] sm:h-[140px] md:h-[160px]"
+          heightClass="h-[140px] sm:h-[180px] md:h-[220px]"
         />
       </div>
 

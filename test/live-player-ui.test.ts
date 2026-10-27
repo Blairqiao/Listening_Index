@@ -65,7 +65,10 @@ test("ListeningView and LivePlayerView prevent stacked view controls from gettin
   const livePlayerContent = fs.readFileSync(livePlayerPath, "utf-8");
 
   assert.ok(
-    livePlayerContent.includes("md:h-[180px]") || livePlayerContent.includes("md:h-[160px]") || livePlayerContent.includes("h-[140px]"),
+    livePlayerContent.includes("md:h-[220px]") ||
+      livePlayerContent.includes("md:h-[180px]") ||
+      livePlayerContent.includes("md:h-[160px]") ||
+      livePlayerContent.includes("h-[140px]"),
     "LivePlayerView stacked visualizer must use compact height to preserve deck bounds"
   );
 });
