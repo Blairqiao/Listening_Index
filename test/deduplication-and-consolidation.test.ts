@@ -62,7 +62,7 @@ test("AC-3: formatDurationMs in format-utils replaces msToClock in LivePlayerVie
     "src/lib/format-utils.ts must export formatDurationMs"
   );
 
-  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/LivePlayerView.tsx"), "utf-8");
+  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/LivePlayerView.tsx"), "utf-8");
   assert.ok(
     !livePlayerContent.includes("function msToClock"),
     "LivePlayerView.tsx must not declare msToClock"
@@ -113,10 +113,10 @@ test("AC-5: spotify.ts centralizes exchangeAuthorizationCode and refreshAccessTo
     "src/lib/spotify.ts must export refreshAccessToken"
   );
 
-  const playerTokenRoute = fs.readFileSync(path.join(root, "src/app/api/player/token/route.ts"), "utf-8");
+  const playerTokenRoute = fs.readFileSync(path.join(root, "src/app/callback/route.ts"), "utf-8");
   assert.ok(
     playerTokenRoute.includes("refreshAccessToken") || playerTokenRoute.includes("exchangeAuthorizationCode"),
-    "player/token/route.ts must use centralized helpers from spotify.ts"
+    "callback/route.ts must use centralized exchange helpers from spotify.ts"
   );
 });
 
@@ -127,7 +127,7 @@ test("AC-6: Canonical types and components use Session* and topTrack", () => {
   assert.ok(typesContent.includes("SessionRecord") || typesContent.includes("SessionBlock"), "src/lib/types.ts must export SessionRecord or SessionBlock");
   assert.ok(typesContent.includes("SessionAnalysis"), "src/lib/types.ts must export SessionAnalysis");
 
-  const sessionViewContent = fs.readFileSync(path.join(root, "src/components/SessionView.tsx"), "utf-8");
+  const sessionViewContent = fs.readFileSync(path.join(root, "src/components/views/SessionView.tsx"), "utf-8");
   assert.ok(
     !sessionViewContent.includes("// Top Song"),
     "SessionView.tsx must not contain '// Top Song' comment"

@@ -108,6 +108,8 @@ export async function ensureTablesExist(): Promise<void> {
             timezone TEXT NOT NULL,
             spotify_client_id TEXT NOT NULL DEFAULT '',
             owner_playback_token TEXT,
+            owner_token_revision BIGINT NOT NULL DEFAULT 0,
+            owner_oauth_nonce TEXT,
             live_player_layout TEXT NOT NULL DEFAULT 'split',
             owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
             owner_spotify_name TEXT,
@@ -120,6 +122,8 @@ export async function ensureTablesExist(): Promise<void> {
           ALTER TABLE site_settings
             ADD COLUMN IF NOT EXISTS spotify_client_id TEXT NOT NULL DEFAULT '',
             ADD COLUMN IF NOT EXISTS owner_playback_token TEXT,
+            ADD COLUMN IF NOT EXISTS owner_token_revision BIGINT NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS owner_oauth_nonce TEXT,
             ADD COLUMN IF NOT EXISTS live_player_layout TEXT NOT NULL DEFAULT 'split',
             ADD COLUMN IF NOT EXISTS owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
             ADD COLUMN IF NOT EXISTS owner_spotify_name TEXT,

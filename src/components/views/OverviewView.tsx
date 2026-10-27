@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/mock-listening-data";
-import { Artwork } from "./Artwork";
+import { Artwork } from "../Artwork";
 import { formatCadenceTooltip } from "@/lib/format-utils";
 
 interface OverviewViewProps {
@@ -66,9 +66,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             Array.from({ length: 5 }).map((_, idx) => (
               <div
                 key={idx}
-                className={`flex items-center gap-3 px-1 h-[54px] md:h-[55px] animate-pulse ${
-                  idx === 4 ? "border-b-0" : "border-b border-[#191917]"
-                }`}
+                className={`flex items-center gap-3 px-1 h-[54px] md:h-[55px] animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
+                  }`}
               >
                 <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none">
                   {String(idx + 1).padStart(2, "0")}
@@ -102,9 +101,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         "noopener,noreferrer"
                       )
                     }
-                    className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] ${
-                      isLast ? "border-b-0" : "border-b border-[#191917]"
-                    }`}
+                    className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                      }`}
                   >
                     {/* Rank Index */}
                     <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -113,13 +111,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
                     {/* 2-Character Rank Drift Indicator */}
                     <span
-                      className={`font-mono text-[10.5px] w-[22px] flex-none text-center tabular-nums select-none ${
-                        isNew
+                      className={`font-mono text-[10.5px] w-[22px] flex-none text-center tabular-nums select-none ${isNew
                           ? "text-music-accent font-medium"
                           : isNeutral
-                          ? "text-[#4A4A46]"
-                          : "text-[#8A8A83]"
-                      }`}
+                            ? "text-[#4A4A46]"
+                            : "text-[#8A8A83]"
+                        }`}
                       title={`Rank drift: ${track.drift}`}
                     >
                       {track.drift}
@@ -187,11 +184,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {Array.from({ length: trackPlaceholderCount }).map((_, idx) => (
                 <div
                   key={`track-ph-${idx}`}
-                  className={`h-[54px] md:h-[55px] ${
-                    idx === trackPlaceholderCount - 1
+                  className={`h-[54px] md:h-[55px] ${idx === trackPlaceholderCount - 1
                       ? "border-b-0"
                       : "border-b border-[#191917]"
-                  }`}
+                    }`}
                   aria-hidden="true"
                 />
               ))}
@@ -212,9 +208,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               Array.from({ length: 5 }).map((_, idx) => (
                 <div
                   key={idx}
-                  className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${
-                    idx === 4 ? "border-b-0" : "border-b border-[#191917]"
-                  }`}
+                  className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
+                    }`}
                 >
                   <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
                     {String(idx + 1).padStart(2, "0")}
@@ -234,9 +229,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       href={artist.id ? `https://open.spotify.com/artist/${artist.id}` : undefined}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer no-underline hover:bg-[#111110] transition-none ${
-                        isLast ? "border-b-0" : "border-b border-[#191917]"
-                      }`}
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer no-underline hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                        }`}
                     >
                       <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {artist.rank}
@@ -253,11 +247,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {Array.from({ length: artistPlaceholderCount }).map((_, idx) => (
                   <div
                     key={`artist-ph-${idx}`}
-                    className={`h-[35px] ${
-                      idx === artistPlaceholderCount - 1
+                    className={`h-[35px] ${idx === artistPlaceholderCount - 1
                         ? "border-b-0"
                         : "border-b border-[#191917]"
-                    }`}
+                      }`}
                     aria-hidden="true"
                   />
                 ))}
@@ -276,9 +269,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               Array.from({ length: 5 }).map((_, idx) => (
                 <div
                   key={idx}
-                  className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${
-                    idx === 4 ? "border-b-0" : "border-b border-[#191917]"
-                  }`}
+                  className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
+                    }`}
                 >
                   <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
                     {String(idx + 1).padStart(2, "0")}
@@ -303,9 +295,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           "noopener,noreferrer"
                         )
                       }
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer hover:bg-[#111110] transition-none ${
-                        isLast ? "border-b-0" : "border-b border-[#191917]"
-                      }`}
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                        }`}
                     >
                       <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {album.rank}
@@ -343,11 +334,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 {Array.from({ length: albumPlaceholderCount }).map((_, idx) => (
                   <div
                     key={`album-ph-${idx}`}
-                    className={`h-[35px] ${
-                      idx === albumPlaceholderCount - 1
+                    className={`h-[35px] ${idx === albumPlaceholderCount - 1
                         ? "border-b-0"
                         : "border-b border-[#191917]"
-                    }`}
+                      }`}
                     aria-hidden="true"
                   />
                 ))}
@@ -406,13 +396,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <div
                       key={i}
                       title={tooltipText}
-                      className={`flex-1 rounded-none select-none transition-none cursor-default ${
-                        isHot
+                      className={`flex-1 rounded-none select-none transition-none cursor-default ${isHot
                           ? "bg-music-accent"
                           : isMarkerBar
-                          ? "bg-[#2A2A26] hover:bg-[#3E3E38]"
-                          : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"
-                      }`}
+                            ? "bg-[#2A2A26] hover:bg-[#3E3E38]"
+                            : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"
+                        }`}
                       style={{
                         height: `${heightPercent}%`,
                       }}

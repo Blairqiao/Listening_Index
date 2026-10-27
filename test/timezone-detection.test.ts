@@ -1,8 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { detectLocalTimezone, isValidIanaTimezone } from "../src/lib/timezone-utils";
+import { detectLocalTimezone, isValidIanaTimezone, syncLocalTimezoneCookie } from "../src/lib/timezone-utils";
 
 test("isValidIanaTimezone validates valid and invalid IANA timezone identifiers", () => {
   assert.equal(isValidIanaTimezone("America/Chicago"), true);
@@ -22,12 +20,25 @@ test("detectLocalTimezone resolves a valid IANA timezone identifier from runtime
   assert.equal(isValidIanaTimezone(detected), true);
 });
 
-test("TimezoneSelect component renders detect local timezone button", () => {
-  const tzSelectPath = path.resolve(__dirname, "../src/components/customization-modal/TimezoneSelect.tsx");
-  const content = fs.readFileSync(tzSelectPath, "utf-8");
+test("syncLocalTimezoneCookie sets listening_timezone cookie in document", () => {
+  const originalDocument = globalThis.document;
+  try {
+    let cookieStore = "";
+    (globalThis as { document?: unknown }).document = {
+      get cookie() {
+        return cookieStore;
+      },
+      set cookie(val: string) {
+        cookieStore = val;
+      },
+    };
 
-  assert.ok(
-    content.includes("detectLocalTimezone") || content.includes("DETECT"),
-    "TimezoneSelect must include automatic local timezone detection"
-  );
+    syncLocalTimezoneCookie("America/Chicago");
+    assert.match(cookieStore, /listening_timezone=America%2FChicago/);
+
+    syncLocalTimezoneCookie("Invalid/Zone");
+    assert.match(cookieStore, /listening_timezone=UTC/);
+  } finally {
+    (globalThis as { document?: unknown }).document = originalDocument;
+  }
 });

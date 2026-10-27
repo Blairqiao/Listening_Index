@@ -41,10 +41,11 @@ export function closePopup(
   origin: string,
   ok: boolean,
   message: string | null,
-  messageType: string
+  messageType: string,
+  redirectTo = "/"
 ): NextResponse {
   const payload = scriptSafeJson({ type: messageType, ok, message });
-  // const target = scriptSafeJson(origin);
+  const target = scriptSafeJson(new URL(origin).origin);
   // Only the script carrying this nonce may run, so even if markup were ever
   // injected into this page it could not execute.
   const nonce = crypto.randomBytes(16).toString("base64");
@@ -52,8 +53,8 @@ export function closePopup(
 <body style="background:#080808;color:#5A5A55;font:12px ui-monospace,monospace;display:grid;place-items:center;height:100vh;margin:0">
 <p>${ok ? "Connected. You can close this window." : escapeHtml(message || "Sign-in failed.")}</p>
 <script nonce="${nonce}">
-  try { if (window.opener) window.opener.postMessage(${payload}, "*"); } catch (e) {}
-  if (window.opener) window.close(); else location.replace("/");
+  try { if (window.opener) window.opener.postMessage(${payload}, ${target}); } catch (e) {}
+  if (window.opener) window.close(); else location.replace(${scriptSafeJson(redirectTo)});
 </script>`;
   return new NextResponse(html, {
     status: 200,

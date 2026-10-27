@@ -12,7 +12,6 @@ export interface UseListeningUrlSyncParams {
   setDisplayedRange: (range: RangeKey) => void;
   fetchOverview: (range: RangeKey) => Promise<unknown>;
   setSelectedSessionId?: (id: string) => void;
-  setSelectedSittingId?: (id: string) => void;
   sanitizeActiveMode: (mode: Mode, isAuthenticated: boolean) => Mode;
 }
 
@@ -27,7 +26,6 @@ export function useListeningUrlSync({
   setDisplayedRange,
   fetchOverview,
   setSelectedSessionId,
-  setSelectedSittingId,
   sanitizeActiveMode,
 }: UseListeningUrlSyncParams) {
   useEffect(() => {
@@ -51,7 +49,6 @@ export function useListeningUrlSync({
       const sess = params.get("session") || params.get("sitting");
       if (sess) {
         if (setSelectedSessionId) setSelectedSessionId(sess);
-        if (setSelectedSittingId) setSelectedSittingId(sess);
       }
       const configParam = params.get("config");
       if (configParam === "true" || configParam === "1") {
@@ -69,7 +66,6 @@ export function useListeningUrlSync({
     overviewCacheRef,
     setDisplayedRange,
     setSelectedSessionId,
-    setSelectedSittingId,
-    sanitizeActiveMode,
+      sanitizeActiveMode,
   ]);
 }

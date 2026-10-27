@@ -78,8 +78,8 @@ test("TASK-2: POST /api/upload/enrich does not require admin authorization (F8)"
 
 test("TASK-2: Manual sync UI button is admin-locked in ListeningView, ListeningFooter, and ControlRow (F11)", () => {
   const listeningView = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
-  const listeningFooter = fs.readFileSync(path.join(root, "src/components/ListeningFooter.tsx"), "utf-8");
-  const controlRow = fs.readFileSync(path.join(root, "src/components/ControlRow.tsx"), "utf-8");
+  const listeningFooter = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
+  const controlRow = fs.readFileSync(path.join(root, "src/components/listening-view/ControlRow.tsx"), "utf-8");
 
   // ListeningView passes isAuthenticated to ControlRow and ListeningFooter
   assert.ok(
@@ -206,7 +206,7 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
     "ListeningView must have exactly 1 window.location.search reader effect"
   );
 
-  const sessionView = fs.readFileSync(path.join(root, "src/components/SessionView.tsx"), "utf-8");
+  const sessionView = fs.readFileSync(path.join(root, "src/components/views/SessionView.tsx"), "utf-8");
   const analysisPanel = fs.existsSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"))
     ? fs.readFileSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"), "utf-8")
     : "";
@@ -224,7 +224,7 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
     "SessionView must render TOP TRACK label"
   );
 
-  const footer = fs.readFileSync(path.join(root, "src/components/ListeningFooter.tsx"), "utf-8");
+  const footer = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
   assert.ok(
     !footer.includes("KEYS [1-4] VIEW"),
     "ListeningFooter must omit deprecated keyboard shortcuts hint"

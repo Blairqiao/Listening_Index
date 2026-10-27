@@ -37,14 +37,12 @@ export async function bulkApplyEnrichment(data: {
 
   // 1. Purge delisted tracks and their associated plays so they never remain in the system
   if (data.delistedIds.length > 0) {
-    await sql`
-      DELETE FROM plays
-      WHERE track_id = ANY(${data.delistedIds}::text[]);
-    `;
-    await sql`
-      DELETE FROM tracks
-      WHERE id = ANY(${data.delistedIds}::text[]);
-    `;
+    await sql.transaction([
+      sql`SELECT id FROM tracks WHERE id = ANY(${data.delistedIds}::text[]) ORDER BY id FOR UPDATE`,
+      sql`DELETE FROM plays WHERE track_id = ANY(${data.delistedIds}::text[])`,
+      sql`DELETE FROM tracks WHERE id = ANY(${data.delistedIds}::text[])`,
+    ]);
+    catalogStatusCache.invalidate();
   }
 
   if (data.enriched.length === 0) return;

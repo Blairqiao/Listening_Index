@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { isDbConfigured } from "@/lib/db";
 import { runEnrichmentBatch } from "@/lib/enrichment";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
@@ -17,16 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!(await isOwnerSpotifyConfigured())) {
-      return NextResponse.json(
-        {
-          error:
-            "Spotify API credentials not configured. Connect your Spotify account from the settings menu before enriching.",
-        },
-        { status: 400 }
-      );
-    }
-
     let trackIds: string[] | undefined = undefined;
     let source: "cron" | "dynamic" | undefined = undefined;
 
@@ -42,10 +33,28 @@ export async function POST(request: NextRequest) {
       // Use default parameters if no body
     }
 
+    const bucket = source || (trackIds ? "dynamic" : "cron");
+    if (bucket === "dynamic" && !trackIds?.length) {
+      return NextResponse.json({error:"Dynamic enrichment requires Track IDs."},{status:400});
+    }
+    if (bucket === "cron" && !(await isAuthorizedCronRequest(request))) {
+      return NextResponse.json({error:"Unauthorized. Provide the current cron key."},{status:401});
+    }
+
+    if (!(await isOwnerSpotifyConfigured())) {
+      return NextResponse.json(
+        {
+          error:
+            "Spotify API credentials not configured. Connect your Spotify account from the settings menu before enriching.",
+        },
+        { status: 400 }
+      );
+    }
+
     // 2. Delegate to unified Stage 2 engine
     const result = await runEnrichmentBatch({
       trackIds,
-      bucket: source || (trackIds ? "dynamic" : "cron"),
+      bucket,
     });
 
     return NextResponse.json({

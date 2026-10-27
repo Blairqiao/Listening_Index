@@ -7,10 +7,10 @@ import {
   Copy,
   RotateCcw,
   ExternalLink,
+  Menu,
 } from "lucide-react";
 import { useConfig, SiteConfigState } from "@/context/ConfigContext";
-import { ColorPicker } from "@/components/ColorPicker";
-import { TimezoneSelect } from "./customization-modal/TimezoneSelect";
+import { ColorPicker } from "@/components/modals/customization-modal/ColorPicker";
 import { normalizeHex, applyAccentColorToDom } from "@/lib/color-utils";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import {
@@ -27,7 +27,6 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
     deployedConfig,
     markAsDeployed,
     updateConfig,
-    resetToDefaults,
     resetLocalCustomizations,
     isDbConfigured,
     isModalOpen,
@@ -126,10 +125,8 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
 
   // Clear save error when new valid changes occur
   useEffect(() => {
-    if (canSave) {
-      setSaveError(null);
-    }
-  }, [canSave]);
+    setSaveError(null);
+  }, [draft]);
 
   // Save and apply changes to site (persists to Neon DB if authenticated, or local fallback)
   const handleSave = async () => {
@@ -141,23 +138,12 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
       return;
     }
 
-    if (!canSave && !isSaving) return;
+    if (!canSave || isSaving) return;
 
     setSaveError(null);
 
-    // 1. Immediately apply draft accent color to DOM so all site elements repaint in 0ms!
-    applyAccentColorToDom(draft.accentColor);
-
     const isFactory = areSiteConfigsEqual(draft, DEFAULT_SITE_CONFIG);
 
-    // 2. Immediately update client config context so title, owner, timezone repaint in 0ms
-    if (isFactory) {
-      resetToDefaults();
-    } else {
-      updateConfig(draft);
-    }
-
-    // 3. Persist to Neon DB in the background
     setIsSaving(true);
     try {
       const res = await fetch("/api/config", {
@@ -169,7 +155,10 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
       if (!res.ok || !data.success) {
         setSaveError(data.error || "Save failed");
       } else {
-        markAsDeployed(isFactory ? DEFAULT_SITE_CONFIG : draft);
+        const saved = data.config || (isFactory ? DEFAULT_SITE_CONFIG : draft);
+        updateConfig(saved);
+        markAsDeployed(saved);
+        applyAccentColorToDom(saved.accentColor);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Network error";
@@ -212,23 +201,22 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="customization-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${
-        isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
       onClick={(e) => {
         if (e.target === e.currentTarget) handleCancel();
       }}
     >
       <div
-        className={`w-full max-w-[620px] max-h-[92vh] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transform will-change-[transform,opacity] ${
-          isVisible
+        className={`w-full max-w-[620px] max-h-[92vh] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transform will-change-[transform,opacity] ${isVisible
             ? "opacity-100 scale-100 translate-y-0"
             : "opacity-0 scale-[0.97] translate-y-2"
-        }`}
+          }`}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2.5 flex-wrap">
+            <Menu className="w-3.5 h-3.5 text-music-accent" />
             <h2
               id="customization-modal-title"
               className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
@@ -255,7 +243,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
                 <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  IDENTITY 
+                  IDENTITY
                 </span>
               </div>
 
@@ -299,14 +287,6 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
 
             <ColorPicker color={draft.accentColor} onChange={handleColorChange} />
           </div>
-
-          {/* Section 3: Timezone */}
-          {isAuthenticated && (
-            <TimezoneSelect
-              timezone={draft.timezone}
-              onChange={(tz) => setDraft((prev) => ({ ...prev, timezone: tz }))}
-            />
-          )}
 
           {/* Section 4: External Links */}
           {isAuthenticated && (
@@ -434,15 +414,14 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving || !canSave}
-                  className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
-                    isSaving
+                  className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${isSaving
                       ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
                       : saveError
-                      ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
-                      : canSave
-                      ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
-                      : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
-                  }`}
+                        ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
+                        : canSave
+                          ? "border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)]"
+                          : "border-music-accent/60 bg-music-accent/10 text-music-accent cursor-default select-none"
+                    }`}
                 >
                   {isSaving ? (
                     <>
@@ -458,8 +437,8 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                           ? "Save & Deploy"
                           : "Save to config.ts"
                         : isDbConfigured
-                        ? "Deploy"
-                        : "Save to config.ts"}
+                          ? "Deploy"
+                          : "Save to config.ts"}
                     </span>
                   ) : (
                     <>

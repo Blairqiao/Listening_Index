@@ -2,13 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { getSpotifyTabState } from "../src/components/ModeTabs";
+import { getSpotifyTabState } from "../src/components/listening-view/ModeTabs";
 
 test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedicated strictly to telemetry and CustomizationModal omits Spotify section", () => {
   const root = path.resolve(__dirname, "..");
-  const modeTabsContent = fs.readFileSync(path.join(root, "src/components/ModeTabs.tsx"), "utf-8");
-  const footerContent = fs.readFileSync(path.join(root, "src/components/ListeningFooter.tsx"), "utf-8");
-  const customizationContent = fs.readFileSync(path.join(root, "src/components/CustomizationModal.tsx"), "utf-8");
+  const modeTabsContent = fs.readFileSync(path.join(root, "src/components/listening-view/ModeTabs.tsx"), "utf-8");
+  const footerContent = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
+  const customizationContent = fs.readFileSync(path.join(root, "src/components/modals/customization-modal/CustomizationModal.tsx"), "utf-8");
   const listeningViewContent = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
 
   // ModeTabs checks
@@ -42,7 +42,7 @@ test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedica
   // CustomizationModal must no longer contain the Spotify Account section
   assert.ok(
     !customizationContent.includes("[ SPOTIFY ACCOUNT ]") &&
-      !customizationContent.includes("[ MANAGE SPOTIFY ]"),
+    !customizationContent.includes("[ MANAGE SPOTIFY ]"),
     "CustomizationModal must not render the Spotify Account section"
   );
 
@@ -57,7 +57,7 @@ test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedica
   );
   assert.ok(
     listeningViewContent.includes("onOpenSpotifyModal={openAdminSpotifyModal}") &&
-      listeningViewContent.includes("spotifyStatus={spotifyStatus}"),
+    listeningViewContent.includes("spotifyStatus={spotifyStatus}"),
     "ListeningView must pass onOpenSpotifyModal and spotifyStatus to ModeTabs"
   );
   assert.ok(
@@ -127,15 +127,15 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
 test("ListeningFooter maintains clean system telemetry without prompt notification buttons", () => {
   const root = path.resolve(__dirname, "..");
   const footerSource = fs.readFileSync(
-    path.join(root, "src/components/ListeningFooter.tsx"),
+    path.join(root, "src/components/listening-view/ListeningFooter.tsx"),
     "utf-8"
   );
 
   // Telemetry indicators present
   assert.ok(
     footerSource.includes("[ SYNCING... ]") &&
-      footerSource.includes("[ ▪ LIVE ]") &&
-      footerSource.includes("[ SYNCED"),
+    footerSource.includes("[ ▪ LIVE ]") &&
+    footerSource.includes("[ SYNCED"),
     "ListeningFooter must render standard sync and live telemetry indicators"
   );
 
@@ -150,8 +150,8 @@ test("ListeningFooter maintains clean system telemetry without prompt notificati
 
 test("Spotify modal icon in ModeTabs and AdminSpotifyModal has slow blinking animation during setup/onboarding and expiring modes", () => {
   const root = path.resolve(__dirname, "..");
-  const modeTabsContent = fs.readFileSync(path.join(root, "src/components/ModeTabs.tsx"), "utf-8");
-  const modalContent = fs.readFileSync(path.join(root, "src/components/AdminSpotifyModal.tsx"), "utf-8");
+  const modeTabsContent = fs.readFileSync(path.join(root, "src/components/listening-view/ModeTabs.tsx"), "utf-8");
+  const modalContent = fs.readFileSync(path.join(root, "src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"), "utf-8");
   const cssContent = fs.readFileSync(path.join(root, "src/app/globals.css"), "utf-8");
 
   // globals.css must define @keyframes slow-blink and .animate-slow-blink with slower duration (>= 3s)
@@ -171,12 +171,12 @@ test("Spotify modal icon in ModeTabs and AdminSpotifyModal has slow blinking ani
   // ModeTabs applies animate-slow-blink to the entire button container enclosing [ icon ]
   assert.ok(
     modeTabsContent.includes('spotifyTab.variant === "setup"') &&
-      modeTabsContent.includes("animate-slow-blink"),
+    modeTabsContent.includes("animate-slow-blink"),
     "ModeTabs must include animate-slow-blink"
   );
   assert.ok(
     modeTabsContent.includes('text-music-accent hover:text-[#EDEDE8] animate-slow-blink') &&
-      modeTabsContent.includes('text-amber-400 hover:text-amber-300 animate-slow-blink'),
+    modeTabsContent.includes('text-amber-400 hover:text-amber-300 animate-slow-blink'),
     "ModeTabs must apply animate-slow-blink to the button element so the entire [ icon ] blinks"
   );
   assert.ok(

@@ -30,3 +30,47 @@ export function createVerifier(): string {
 export function challengeFor(verifier: string): string {
   return crypto.createHash("sha256").update(verifier).digest("base64url");
 }
+
+export interface OwnerAuthorizationState {
+  verifier: string;
+  nonce: string;
+  revision: string;
+  returnOrigin: string;
+  redirectUri: string;
+  expiresAt: number;
+}
+
+function authorizationKey(): Buffer {
+  const secret = process.env.ADMIN_PASSWORD;
+  if (!secret || secret === "todo" || secret === "placeholder") {
+    throw new Error("Admin authentication must be configured before connecting Spotify.");
+  }
+  return crypto.createHash("sha256").update(`owner-spotify-oauth:${secret}`).digest();
+}
+
+/** Keep PKCE private when Spotify's required loopback host differs from the opener. */
+export function sealOwnerAuthorization(state: OwnerAuthorizationState): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", authorizationKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(state), "utf8"), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64url");
+}
+
+export function readOwnerAuthorization(value: string): OwnerAuthorizationState | null {
+  try {
+    if (value.length > 8192) return null;
+    const packed = Buffer.from(value, "base64url");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", authorizationKey(), packed.subarray(0, 12));
+    decipher.setAuthTag(packed.subarray(12, 28));
+    const state = JSON.parse(Buffer.concat([decipher.update(packed.subarray(28)), decipher.final()]).toString("utf8"));
+    if (typeof state.verifier !== "string" || typeof state.nonce !== "string" ||
+        typeof state.revision !== "string" || !/^\d+$/.test(state.revision) ||
+        typeof state.returnOrigin !== "string" || typeof state.redirectUri !== "string" ||
+        typeof state.expiresAt !== "number" || state.expiresAt <= Date.now() ||
+        state.expiresAt > Date.now() + VERIFIER_TTL_SECONDS * 1000 ||
+        new URL(state.returnOrigin).origin !== state.returnOrigin) return null;
+    return state;
+  } catch {
+    return null;
+  }
+}

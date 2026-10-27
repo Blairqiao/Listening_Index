@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveAdminSpotifyMode } from "../src/components/AdminSpotifyModal";
+import { resolveAdminSpotifyMode } from "../src/components/modals/admin-spotify-modal/AdminSpotifyModal";
 import { calculateTokenExpiration } from "../src/lib/spotify-auth";
 
 test("calculateTokenExpiration calculates remaining days and expiration threshold", () => {
@@ -65,7 +65,7 @@ test("resolveRedirectUriDisplay provides both production and local loopback URIs
 
   // 3. AdminSpotifyModal.tsx must not use hardcoded "http://127.0.0.1:8888/callback" state fallbacks
   const modalSource = fs.readFileSync(
-    path.resolve(__dirname, "../src/components/AdminSpotifyModal.tsx"),
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
     "utf-8"
   );
   assert.ok(
@@ -79,7 +79,7 @@ test("resolveRedirectUriDisplay provides both production and local loopback URIs
 });
 
 test("resolveSpotifyProfileUrl and profile link within AdminSpotifyModal", async () => {
-  const { resolveSpotifyProfileUrl } = await import("../src/components/AdminSpotifyModal");
+  const { resolveSpotifyProfileUrl } = await import("../src/components/modals/admin-spotify-modal/AdminSpotifyModal");
   const fs = await import("node:fs");
   const path = await import("node:path");
 
@@ -101,7 +101,7 @@ test("resolveSpotifyProfileUrl and profile link within AdminSpotifyModal", async
 
   // 4. AdminSpotifyModal.tsx source verifies clickable profile link with target="_blank"
   const modalSource = fs.readFileSync(
-    path.resolve(__dirname, "../src/components/AdminSpotifyModal.tsx"),
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
     "utf-8"
   );
   assert.ok(
@@ -122,7 +122,7 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
   const fs = await import("node:fs");
   const path = await import("node:path");
   const modalSource = fs.readFileSync(
-    path.resolve(__dirname, "../src/components/AdminSpotifyModal.tsx"),
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
     "utf-8"
   );
 
@@ -143,7 +143,7 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
   // 2. Onboarding mode renders clear step-based setup flow without artificial status cards
   assert.ok(
     modalSource.includes("STEP 1: REGISTER REDIRECT URIS") &&
-      modalSource.includes("STEP 2: CONNECT ACCOUNT"),
+    modalSource.includes("STEP 2: CONNECT ACCOUNT"),
     "AdminSpotifyModal onboarding mode must render step-based setup workflow"
   );
   assert.ok(

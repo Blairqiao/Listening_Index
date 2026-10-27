@@ -6,21 +6,16 @@
 
 import { isConfigured } from "@/lib/db";
 import { getActiveSiteConfig } from "@/lib/db/queries";
-import { getOwnerCredential, saveOwnerCredential } from "@/lib/owner-spotify";
+import { getOwnerCredential, rotateOwnerCredential } from "@/lib/owner-spotify";
 
-/**
- * Where the owner's Spotify credentials come from.
- *
- * Environment variables win, so a deployment configured the original way is
- * untouched. Without them, the credential saved from the settings menu is
- * used, with the client id the owner entered there.
- */
+/** Resolve the current database connection before reusing credentials. */
 export async function resolveCredentials(): Promise<{
   clientId: string;
   clientSecret: string | undefined;
   refreshToken: string;
   fromDatabase: boolean;
   displayName: string | null;
+  revision: string;
 } | null> {
   const stored = await getOwnerCredential();
   if (!stored) return null;
@@ -37,6 +32,7 @@ export async function resolveCredentials(): Promise<{
     refreshToken: stored.refreshToken,
     fromDatabase: true,
     displayName: stored.displayName,
+    revision: stored.revision ?? "0",
   };
 }
 
@@ -116,10 +112,12 @@ export interface SpotifyRecentlyPlayedResponse {
 interface CachedToken {
   accessToken: string;
   expiresAt: number; // Unix timestamp ms
+  connection: string;
 }
 
 let tokenCache: CachedToken | null = null;
-let activeTokenPromise: Promise<string> | null = null;
+const activeTokenPromises = new Map<string, Promise<string>>();
+let tokenCacheGeneration = 0;
 
 /**
  * Drops the cached access token. Called when the owner connects or
@@ -128,6 +126,7 @@ let activeTokenPromise: Promise<string> | null = null;
  */
 export function resetSpotifyTokenCache(): void {
   tokenCache = null;
+  tokenCacheGeneration += 1;
 }
 
 /**
@@ -208,81 +207,59 @@ export async function exchangeAuthorizationCode(
  * Deduplicates concurrent token refresh calls via an in-flight promise latch.
  */
 export async function getAccessToken(): Promise<string> {
-  const now = Date.now();
-
-  // Return cached token if valid and outside the 5-minute buffer
-  if (tokenCache && now < tokenCache.expiresAt - 5 * 60 * 1000) {
+  const creds = await resolveCredentials();
+  if (!creds) throw new Error("Spotify is not connected. Connect it from the Spotify Connection Manager.");
+  const connection = JSON.stringify([creds.revision, creds.refreshToken]);
+  const generation = tokenCacheGeneration;
+  if (tokenCache?.connection === connection && Date.now() < tokenCache.expiresAt - 5 * 60 * 1000) {
     return tokenCache.accessToken;
   }
+  const pendingKey = JSON.stringify([generation, connection]);
+  const pending = activeTokenPromises.get(pendingKey);
+  if (pending) return pending;
 
-  if (activeTokenPromise) {
-    return activeTokenPromise;
-  }
-
-  activeTokenPromise = (async () => {
-    try {
-      const creds = await resolveCredentials();
-      if (!creds) {
-        throw new Error(
-          "Spotify is not connected. Connect it from the in-app Spotify Connection Manager " +
-            "(press 'C' or click the setup prompt when logged in as admin)."
-        );
-      }
-      const { clientId, clientSecret, refreshToken } = creds;
-
-      const response = await refreshAccessToken(refreshToken, clientId, clientSecret);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const retryAfter = response.headers.get("Retry-After");
-
-    if (response.status === 429) {
+  const work = (async () => {
+    const response = await refreshAccessToken(creds.refreshToken, creds.clientId, creds.clientSecret);
+    if (!response.ok) {
+      const errorText = await response.text();
+      const retryAfter = response.headers.get("Retry-After");
       throw new SpotifyApiError({
-        status: 429,
-        message: `Rate limit exceeded on token refresh. Retry after ${retryAfter ?? "unknown"}s`,
-        retryAfter: retryAfter ? parseInt(retryAfter, 10) : undefined,
+        status: response.status,
+        message: response.status === 401
+          ? `Invalid Spotify credentials or revoked refresh token: ${errorText}`
+          : `Failed to refresh Spotify access token: ${errorText}`,
+        retryAfter: response.status === 429 && retryAfter ? parseInt(retryAfter, 10) : undefined,
       });
     }
-
-    if (response.status === 401) {
-      throw new SpotifyApiError({
-        status: 401,
-        message: `Invalid Spotify credentials or revoked refresh token: ${errorText}`,
-      });
+    const data = await response.json() as {
+      access_token: string;
+      expires_in: number;
+      refresh_token?: string;
+    };
+    let revision = creds.revision;
+    const refreshToken = data.refresh_token || creds.refreshToken;
+    if (refreshToken !== creds.refreshToken) {
+      const rotatedRevision = await rotateOwnerCredential(creds, refreshToken);
+      if (rotatedRevision === null) throw new Error("Spotify connection changed during token refresh.");
+      revision = rotatedRevision;
     }
-
-    throw new SpotifyApiError({
-      status: response.status,
-      message: `Failed to refresh Spotify access token: ${errorText}`,
-    });
-  }
-
-  const data = (await response.json()) as {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-    scope?: string;
-    refresh_token?: string;
-  };
-
-  // PKCE refreshes can rotate the refresh token. A stored one must be
-  // replaced, or the next refresh would present a token Spotify retired.
-  if (creds.fromDatabase && data.refresh_token && data.refresh_token !== refreshToken) {
-    await saveOwnerCredential(data.refresh_token, creds.displayName).catch(() => {});
-  }
-
-  tokenCache = {
-    accessToken: data.access_token,
-    expiresAt: now + data.expires_in * 1000,
-  };
-
-  return data.access_token;
-    } finally {
-      activeTokenPromise = null;
+    const current = await getOwnerCredential();
+    if (!current || (current.revision ?? "0") !== revision || current.refreshToken !== refreshToken || generation !== tokenCacheGeneration) {
+      throw new Error("Spotify connection changed during token refresh.");
     }
+    tokenCache = {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+      connection: JSON.stringify([revision, refreshToken]),
+    };
+    return data.access_token;
   })();
-
-  return activeTokenPromise;
+  activeTokenPromises.set(pendingKey, work);
+  try {
+    return await work;
+  } finally {
+    if (activeTokenPromises.get(pendingKey) === work) activeTokenPromises.delete(pendingKey);
+  }
 }
 
 /**

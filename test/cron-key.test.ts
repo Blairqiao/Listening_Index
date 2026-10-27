@@ -164,11 +164,11 @@ test("AC-5 & AC-6: /api/sync accepts database cron_key and rejects invalid/rotat
 
 test("AC-7: AdminSpotifyModal renders Scheduled Sync section with Copy URL and Regenerate actions", () => {
   const modalSource = fs.readFileSync(
-    path.join(root, "src/components/AdminSpotifyModal.tsx"),
+    path.join(root, "src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
     "utf-8"
   );
-  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"))
-    ? fs.readFileSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
     : "";
   const combined = modalSource + syncCardSource;
 
@@ -226,11 +226,11 @@ test("AC-2b: saveActiveSiteConfig preserves cron_key in site_settings", async ()
 
 test("AC-7b: AdminSpotifyModal guards Copy URL button when sync key is not yet loaded", () => {
   const modalSource = fs.readFileSync(
-    path.join(root, "src/components/AdminSpotifyModal.tsx"),
+    path.join(root, "src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
     "utf-8"
   );
-  const syncCardSource = fs.existsSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"))
-    ? fs.readFileSync(path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
+  const syncCardSource = fs.existsSync(path.join(root, "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx"), "utf-8")
     : "";
   const combined = modalSource + syncCardSource;
 

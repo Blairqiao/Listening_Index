@@ -251,7 +251,8 @@ export async function bulkUpsertTracks(
       artist_id = COALESCE(EXCLUDED.artist_id, tracks.artist_id),
       album_id = COALESCE(EXCLUDED.album_id, tracks.album_id),
       duration_ms = CASE 
-        WHEN tracks.enrichment_status = 'enriched' THEN tracks.duration_ms 
+        WHEN tracks.enrichment_status = 'enriched' THEN tracks.duration_ms
+        WHEN EXCLUDED.enrichment_status = 'enriched' THEN EXCLUDED.duration_ms
         ELSE GREATEST(tracks.duration_ms, EXCLUDED.duration_ms) 
       END,
       enrichment_status = CASE 
@@ -277,21 +278,27 @@ export async function bulkInsertPlays(
 
   const sql = getDb();
   const existingRecentPlays = (await sql`
-    SELECT track_id, MAX(played_at) as latest_played_at
+    SELECT track_id, played_at
     FROM plays
     WHERE track_id = ANY(${candidateTrackIds}::text[])
       AND played_at >= ${minTime}::timestamptz
       AND played_at <= ${maxTime}::timestamptz
-    GROUP BY track_id;
-  `) as Array<{ track_id: string; latest_played_at: Date | string }>;
+    ;
+  `) as Array<{ track_id: string; played_at: Date | string }>;
 
   const initialLastSeen = new Map<string, number>();
+  const existingKeys = new Set<string>();
   for (const ep of existingRecentPlays) {
-    initialLastSeen.set(ep.track_id, new Date(ep.latest_played_at).getTime());
+    const timestamp = new Date(ep.played_at).getTime();
+    initialLastSeen.set(ep.track_id, Math.max(initialLastSeen.get(ep.track_id) ?? -Infinity, timestamp));
+    existingKeys.add(`${truncateToSeconds(ep.played_at)}::${ep.track_id}`);
   }
 
   // 2. Debounce candidate plays with cross-batch continuity
-  const { debounced } = debouncePlays(plays, 30_000, initialLastSeen);
+  const exact = plays.filter(p => existingKeys.has(`${truncateToSeconds(p.playedAt)}::${p.trackId}`));
+  const candidates = plays.filter(p => !existingKeys.has(`${truncateToSeconds(p.playedAt)}::${p.trackId}`));
+  const { debounced: newPlays } = debouncePlays(candidates, 30_000, initialLastSeen);
+  const debounced = [...exact, ...newPlays];
   if (debounced.length === 0) return { insertedCount: 0 };
 
   // 3. Deduplicate on truncated UTC seconds in JS to prevent Postgres ON CONFLICT batch error
@@ -299,9 +306,8 @@ export async function bulkInsertPlays(
   for (const p of debounced) {
     const truncated = truncateToSeconds(p.playedAt);
     const key = `${truncated}::${p.trackId}`;
-    if (!seen.has(key)) {
-      seen.set(key, { ...p, playedAt: truncated });
-    }
+    const previous = seen.get(key);
+    seen.set(key, { ...p, playedAt: truncated, msPlayed: Math.max(previous?.msPlayed || 0, p.msPlayed) });
   }
 
   // Sort by (played_at, track_id) to enforce deterministic lock ordering and prevent deadlocks
@@ -322,7 +328,7 @@ export async function bulkInsertPlays(
       ${msPlayeds}::int[]
     ) AS u(played_at, track_id, ms_played)
     ON CONFLICT (played_at, track_id) DO UPDATE SET
-      ms_played = EXCLUDED.ms_played
+      ms_played = GREATEST(plays.ms_played, EXCLUDED.ms_played)
     RETURNING (xmax = 0) AS was_inserted;
   `));
 

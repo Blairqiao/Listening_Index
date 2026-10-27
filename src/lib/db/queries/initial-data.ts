@@ -1,3 +1,4 @@
+import { sanitizeTimezone } from "./helpers";
 import { isDbConfigured } from "../index";
 import {
   getOrFetchOverview,
@@ -13,7 +14,7 @@ import type { OverviewData, StreamLogData, SessionData, RangeKey } from "./types
  * Concurrently orchestrates initial listening data queries for server-side hydration.
  * Returns null placeholders gracefully if database is unconfigured or unreachable.
  */
-export async function getInitialMusicData(initialRange: RangeKey = "1w"): Promise<{
+export async function getInitialMusicData(initialRange: RangeKey = "1w", timezone?: string): Promise<{
   overview: OverviewData | null;
   streamLog: StreamLogData | null;
   session: SessionData | null;
@@ -23,9 +24,10 @@ export async function getInitialMusicData(initialRange: RangeKey = "1w"): Promis
   }
 
   try {
-    const overviewPromise = getOrFetchOverview(initialRange, () => getOverviewData(initialRange));
-    const streamLogPromise = getOrFetchStreamLog(50, () => getStreamLog(50));
-    const sessionPromise = getOrFetchSession(() => getCurrentSession());
+    const tz = sanitizeTimezone(timezone);
+    const overviewPromise = getOrFetchOverview(initialRange, tz, () => getOverviewData(initialRange, tz));
+    const streamLogPromise = getOrFetchStreamLog(50, tz, () => getStreamLog(50, tz));
+    const sessionPromise = getOrFetchSession(tz, () => getCurrentSession(tz));
 
     const [overviewResult, streamLogResult, sessionResult] = await Promise.allSettled([
       overviewPromise,

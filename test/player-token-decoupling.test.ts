@@ -18,17 +18,9 @@ test("GET /api/player/token returns 401 with ADMIN_AUTH_REQUIRED when not authen
   assert.equal(data.error, "Admin authentication required");
 });
 
-test("POST /api/player/token returns 401 with ADMIN_AUTH_REQUIRED when not authenticated", async () => {
-  const { POST } = await import("../src/app/api/player/token/route");
-  const unauthReq = new NextRequest("http://127.0.0.1:8888/api/player/token", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-  const res = await POST(unauthReq);
-  assert.equal(res.status, 401);
-  const data = await res.json();
-  assert.equal(data.code, "ADMIN_AUTH_REQUIRED");
-  assert.equal(data.error, "Admin authentication required");
+test("player token route does not expose an unused credential replacement POST", async () => {
+  const route = await import("../src/app/api/player/token/route");
+  assert.equal("POST" in route, false);
 });
 
 test("DELETE /api/player/token returns 401 with ADMIN_AUTH_REQUIRED when not authenticated", async () => {

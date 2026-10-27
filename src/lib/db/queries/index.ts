@@ -12,7 +12,6 @@ export {
   formatDayGroupTz,
   formatLogStartDate,
   formatSessionAge,
-  formatSittingAge,
 } from "./helpers";
 
 // Cache

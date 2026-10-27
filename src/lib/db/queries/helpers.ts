@@ -112,4 +112,4 @@ export function formatSessionAge(ageMs: number): string {
 }
 
 /** Legacy alias for backwards compatibility */
-export const formatSittingAge = formatSessionAge;
+

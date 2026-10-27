@@ -18,7 +18,11 @@ export function loadSpotifySdk(): Promise<void> {
     const tag = document.createElement("script");
     tag.src = SDK_SRC;
     tag.async = true;
-    tag.onerror = () => reject(new Error("Could not load the Spotify SDK script"));
+    tag.onerror = () => {
+      tag.remove();
+      sdkPromise = null;
+      reject(new Error("Could not load the Spotify SDK script"));
+    };
     document.body.appendChild(tag);
   });
 

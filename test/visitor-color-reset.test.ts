@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 test("CustomizationModal handleResetColor restores deployedConfig.accentColor instead of DEFAULT_SITE_CONFIG", () => {
-  const modalPath = path.resolve(__dirname, "../src/components/CustomizationModal.tsx");
+  const modalPath = path.resolve(__dirname, "../src/components/modals/customization-modal/CustomizationModal.tsx");
   const modalContent = fs.readFileSync(modalPath, "utf-8");
 
   // Verify handleResetColor uses deployedConfig.accentColor

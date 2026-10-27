@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { applyAccentColorToDom, normalizeHex } from "@/lib/color-utils";
+import { applyAccentColorToDom, normalizeHex, isValidHex } from "@/lib/color-utils";
+import { detectLocalTimezone, syncLocalTimezoneCookie } from "@/lib/timezone-utils";
 import {
   SiteConfigState,
   DEFAULT_SITE_CONFIG,
@@ -13,6 +14,7 @@ export type { ConfigContextType, SiteConfigState };
 
 interface ConfigContextType {
   config: SiteConfigState;
+  visitorTimezone: string;
   deployedConfig: SiteConfigState;
   markAsDeployed: (cfg: SiteConfigState) => void;
   updateConfig: (patch: Partial<SiteConfigState>) => void;
@@ -46,6 +48,7 @@ const ConfigContext = createContext<ConfigContextType | null>(null);
 export const ConfigProvider: React.FC<{
   children: React.ReactNode;
   initialConfig?: SiteConfigState;
+  initialVisitorTimezone?: string;
   isDbConfigured?: boolean;
   initialIsAuthenticated?: boolean;
   initialIsPasswordConfigured?: boolean;
@@ -53,6 +56,7 @@ export const ConfigProvider: React.FC<{
 }> = ({
   children,
   initialConfig,
+  initialVisitorTimezone,
   isDbConfigured: propIsDbConfigured = true,
   initialIsAuthenticated = false,
   initialIsPasswordConfigured = false,
@@ -62,27 +66,8 @@ export const ConfigProvider: React.FC<{
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialIsAuthenticated);
   const [isPasswordConfigured, setIsPasswordConfigured] = useState<boolean>(initialIsPasswordConfigured);
 
-  // Initialize config once from initialConfig or localStorage or defaults
-  const [config, setConfig] = useState<SiteConfigState>(() => {
-    if (initialConfig) {
-      return {
-        ...initialConfig,
-        accentColor: normalizeHex(initialConfig.accentColor),
-      };
-    }
-    if (typeof window !== "undefined") {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
-          return normalizeSiteConfig(parsed, DEFAULT_CONFIG);
-        }
-      } catch (e) {
-        console.warn("[CONFIG] Could not load persisted configuration:", e);
-      }
-    }
-    return DEFAULT_CONFIG;
-  });
+  const [config, setConfig] = useState<SiteConfigState>(() => normalizeSiteConfig(initialConfig));
+  const [visitorTimezone, setVisitorTimezone] = useState(initialVisitorTimezone || initialConfig?.timezone || DEFAULT_CONFIG.timezone);
 
   const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -99,6 +84,17 @@ export const ConfigProvider: React.FC<{
     }
     return DEFAULT_CONFIG;
   });
+
+  useEffect(() => {
+    const detect = () => {
+      const timezone = detectLocalTimezone(deployedConfig.timezone);
+      setVisitorTimezone(timezone);
+      syncLocalTimezoneCookie(timezone);
+    };
+    detect();
+    window.addEventListener("focus", detect);
+    return () => window.removeEventListener("focus", detect);
+  }, [deployedConfig.timezone]);
 
   const markAsDeployed = useCallback((cfg: SiteConfigState) => {
     setDeployedConfig({
@@ -117,8 +113,6 @@ export const ConfigProvider: React.FC<{
     if (typeof document !== "undefined") {
       document.title = `${cfg.title} | ${cfg.ownerName}`;
       applyAccentColorToDom(cfg.accentColor);
-      // Persist timezone in cookie for server-side requests
-      document.cookie = `listening_timezone=${encodeURIComponent(cfg.timezone)}; path=/; max-age=31536000; SameSite=Lax`;
     }
   }, []);
 
@@ -131,16 +125,18 @@ export const ConfigProvider: React.FC<{
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check browser localStorage for locally saved configurations
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<SiteConfigState>;
-        const localCfg = normalizeSiteConfig(parsed, initialConfig || DEFAULT_CONFIG);
+      const parsed = stored ? JSON.parse(stored) : null;
+      if (parsed && typeof parsed.accentColor === "string" && isValidHex(parsed.accentColor)) {
+        const accentColor = normalizeHex(parsed.accentColor);
+        const localCfg = { ...(initialConfig || DEFAULT_CONFIG), accentColor };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, accentColor }));
         setConfig(localCfg);
         setIsCustomized(true);
         syncSideEffects(localCfg);
       } else {
+        if (stored) localStorage.removeItem(STORAGE_KEY);
         syncSideEffects(config);
       }
     } catch {
@@ -158,6 +154,7 @@ export const ConfigProvider: React.FC<{
           if (data?.config) {
             const normalized = normalizeSiteConfig(data.config, DEFAULT_CONFIG);
             setDeployedConfig(normalized);
+            setConfig(prev => ({ ...normalized, accentColor: prev.accentColor }));
           }
         })
         .catch(() => {});
@@ -179,7 +176,7 @@ export const ConfigProvider: React.FC<{
           accentColor: normalizedAccent || prev.accentColor,
         };
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, accentColor: next.accentColor }));
           setIsCustomized(true);
         } catch (e) {
           console.warn("[CONFIG] Failed to save configuration to localStorage:", e);
@@ -318,6 +315,7 @@ export const ConfigProvider: React.FC<{
   const contextValue = React.useMemo(
     () => ({
       config,
+      visitorTimezone,
       deployedConfig,
       markAsDeployed,
       updateConfig,
@@ -343,6 +341,7 @@ export const ConfigProvider: React.FC<{
     }),
     [
       config,
+      visitorTimezone,
       deployedConfig,
       markAsDeployed,
       updateConfig,

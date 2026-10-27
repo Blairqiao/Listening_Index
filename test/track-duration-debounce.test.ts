@@ -72,3 +72,12 @@ test("debouncePlays merges pause-and-resume stream events for the same track", (
     "Should retain the final track completion timestamp"
   );
 });
+
+test('merge retains greatest observed duration and advances the comparison timestamp', () => {
+  const base = Date.parse('2026-10-26T12:00:00Z');
+  const items = [0,29_000,31_000].map((offset,i) => ({trackId:'chain', playedAt:new Date(base+offset).toISOString(), msPlayed: i === 1 ? 31_000 : 30_000}));
+  const result = debouncePlays(items);
+  assert.equal(result.debounced.length,1);
+  assert.equal(result.debounced[0].msPlayed,31_000);
+  assert.equal(result.debounced[0].playedAt,items[2].playedAt);
+});

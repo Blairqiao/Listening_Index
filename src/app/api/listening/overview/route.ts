@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOverviewData, RangeKey } from "@/lib/db/queries";
+import { getActiveSiteConfig, getOverviewData, RangeKey } from "@/lib/db/queries";
 import { getOrFetchOverview } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { MOCK_DATA } from "@/lib/mock-data";
-import { jsonNoCache, parseRequestTimezone, handleApiError } from "@/lib/route-utils";
+import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,13 @@ export async function GET(request: NextRequest) {
     }
 
     const range = rangeParam as RangeKey;
-    const tzParam = parseRequestTimezone(request);
 
     // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
     if (!isDbConfigured() || process.env.FORCE_MOCK_DATA === "true") {
       return jsonNoCache(MOCK_DATA.overview[range]);
     }
+
+    const tzParam = effectiveRequestTimezone(request, (await getActiveSiteConfig()).timezone);
 
     const overviewData = await getOrFetchOverview(range, tzParam || "", () =>
       getOverviewData(range, tzParam)

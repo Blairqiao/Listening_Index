@@ -43,6 +43,7 @@ export function isValidHex(hex: string): boolean {
  * Normalizes any valid hex string into standard 6-character '#RRGGBB' uppercase.
  */
 export function normalizeHex(hex: string, fallback = "#76FF49"): string {
+  if (!isValidHex(hex)) return fallback.toUpperCase();
   const clean = hex.trim().replace(/^#/, "");
   if (clean.length === 3) {
     const r = clean[0] + clean[0];

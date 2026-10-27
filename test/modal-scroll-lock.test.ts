@@ -45,10 +45,10 @@ test("lockBodyScroll and unlockBodyScroll manage body overflow style with refere
 
 test("CustomizationModal, UploadModal, AdminLoginModal, and AdminSpotifyModal integrate useBodyScrollLock", () => {
   const components = [
-    "src/components/CustomizationModal.tsx",
-    "src/components/UploadModal.tsx",
-    "src/components/AdminLoginModal.tsx",
-    "src/components/AdminSpotifyModal.tsx",
+    "src/components/modals/customization-modal/CustomizationModal.tsx",
+    "src/components/modals/upload-modal/UploadModal.tsx",
+    "src/components/modals/admin-login-modal/AdminLoginModal.tsx",
+    "src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx",
   ];
 
   for (const relPath of components) {

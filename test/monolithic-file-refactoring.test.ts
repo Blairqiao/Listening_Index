@@ -81,7 +81,7 @@ test("AC-3: SpectrumCanvas is extracted to src/components/live-player-view/Spect
     "SpectrumCanvas.tsx must export SpectrumCanvas"
   );
 
-  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/LivePlayerView.tsx"), "utf-8");
+  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/LivePlayerView.tsx"), "utf-8");
   assert.ok(
     livePlayerContent.includes("SpectrumCanvas"),
     "LivePlayerView.tsx must import SpectrumCanvas"
@@ -92,9 +92,9 @@ test("AC-3: SpectrumCanvas is extracted to src/components/live-player-view/Spect
   );
 });
 
-test("AC-4: ScheduledSyncCard is extracted to src/components/admin-spotify-modal/ScheduledSyncCard.tsx", async () => {
-  const syncCardFile = path.join(root, "src/components/admin-spotify-modal/ScheduledSyncCard.tsx");
-  assert.ok(fs.existsSync(syncCardFile), "src/components/admin-spotify-modal/ScheduledSyncCard.tsx must exist");
+test("AC-4: ScheduledSyncCard is extracted to src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx", async () => {
+  const syncCardFile = path.join(root, "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx");
+  assert.ok(fs.existsSync(syncCardFile), "src/components/modals/admin-spotify-modal/ScheduledSyncCard.tsx must exist");
 
   const syncCardContent = fs.readFileSync(syncCardFile, "utf-8");
   assert.ok(
@@ -102,7 +102,7 @@ test("AC-4: ScheduledSyncCard is extracted to src/components/admin-spotify-modal
     "ScheduledSyncCard.tsx must export ScheduledSyncCard"
   );
 
-  const modalContent = fs.readFileSync(path.join(root, "src/components/AdminSpotifyModal.tsx"), "utf-8");
+  const modalContent = fs.readFileSync(path.join(root, "src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"), "utf-8");
   assert.ok(
     modalContent.includes("ScheduledSyncCard"),
     "AdminSpotifyModal.tsx must use ScheduledSyncCard"

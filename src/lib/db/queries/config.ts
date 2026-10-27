@@ -21,7 +21,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: "",
-    livePlayerLayout: "split",
+    livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
 
   if (!isDbConfigured()) {
@@ -140,40 +140,38 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     githubUrl: siteConfig.githubUrl,
     timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: "",
-    livePlayerLayout: "split",
+    livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
 
   if (isDbConfigured()) {
-    try {
-      await ensureTablesExist();
-      const sql = getDb();
-      await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, live_player_layout, updated_at)
-        VALUES (
-          'active',
-          ${defaults.title},
-          ${defaults.ownerName},
-          ${defaults.accentColor},
-          ${defaults.siteUrl},
-          ${defaults.githubUrl},
-          ${defaults.timezone},
-          ${defaults.livePlayerLayout},
-          NOW()
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          title = EXCLUDED.title,
-          owner_name = EXCLUDED.owner_name,
-          accent_color = EXCLUDED.accent_color,
-          site_url = EXCLUDED.site_url,
-          github_url = EXCLUDED.github_url,
-          timezone = EXCLUDED.timezone,
-          live_player_layout = EXCLUDED.live_player_layout,
-          updated_at = NOW();
-      `;
-      siteConfigCache.invalidate();
-    } catch (error) {
-      console.warn("[SITE CONFIG] Failed to reset active config in Neon DB:", error);
-    }
+    await ensureTablesExist();
+    const sql = getDb();
+    await sql`
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
+      VALUES (
+        'active',
+        ${defaults.title},
+        ${defaults.ownerName},
+        ${defaults.accentColor},
+        ${defaults.siteUrl},
+        ${defaults.githubUrl},
+        ${defaults.timezone},
+        ${defaults.spotifyClientId},
+        ${defaults.livePlayerLayout},
+        NOW()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        owner_name = EXCLUDED.owner_name,
+        accent_color = EXCLUDED.accent_color,
+        site_url = EXCLUDED.site_url,
+        github_url = EXCLUDED.github_url,
+        timezone = EXCLUDED.timezone,
+        spotify_client_id = EXCLUDED.spotify_client_id,
+        live_player_layout = EXCLUDED.live_player_layout,
+        updated_at = NOW();
+    `;
+    siteConfigCache.invalidate();
   }
 
   return defaults;
@@ -183,28 +181,73 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
  * Retrieves the owner's Spotify playback refresh token from site_settings.
  * Returns null if not set or database is unconfigured.
  */
-export async function getOwnerPlaybackToken(): Promise<string | null> {
-  if (!isDbConfigured()) {
-    return null;
-  }
-  try {
-    await ensureTablesExist();
-    const sql = getDb();
-    const rows = ((await sql`
-      SELECT owner_playback_token
-      FROM site_settings
-      WHERE id = 'active'
-      LIMIT 1;
-    `));
+export async function getOwnerPlaybackCredential(): Promise<{
+  refreshToken: string;
+  displayName: string | null;
+  revision: string;
+} | null> {
+  if (!isDbConfigured()) return null;
+  await ensureTablesExist();
+  const rows = await getDb()`
+    SELECT owner_playback_token, owner_spotify_name, owner_token_revision
+    FROM site_settings WHERE id = 'active' LIMIT 1;
+  `;
+  const row = rows[0];
+  return row?.owner_playback_token ? {
+    refreshToken: row.owner_playback_token,
+    displayName: row.owner_spotify_name || null,
+    revision: String(row.owner_token_revision),
+  } : null;
+}
 
-    if (rows && rows.length > 0 && rows[0]?.owner_playback_token) {
-      return rows[0].owner_playback_token;
-    }
-    return null;
-  } catch (error) {
-    console.error("[SITE CONFIG] Failed to get owner playback token from Neon DB:", error);
-    return null;
-  }
+export async function getOwnerPlaybackToken(): Promise<string | null> {
+  return (await getOwnerPlaybackCredential())?.refreshToken ?? null;
+}
+
+/** A refresh may rotate tokens only while its original connection still exists. */
+export async function rotateOwnerPlaybackToken(
+  expectedRevision: string,
+  previousToken: string,
+  token: string
+): Promise<string | null> {
+  if (!isDbConfigured()) return null;
+  await ensureTablesExist();
+  const rows = await getDb()`
+    UPDATE site_settings
+    SET owner_playback_token = ${token},
+        updated_at = NOW()
+    WHERE id = 'active' AND owner_token_revision = ${expectedRevision}::bigint
+      AND owner_playback_token = ${previousToken}
+    RETURNING owner_token_revision;
+  `;
+  return rows[0] ? String(rows[0].owner_token_revision) : null;
+}
+
+/** Register one pending owner authorization attempt without changing the connection. */
+export async function beginOwnerAuthorization(nonce: string): Promise<string> {
+  if (!isDbConfigured()) throw new Error("A database is required to connect Spotify.");
+  await ensureTablesExist();
+  const rows = await getDb()`
+    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, owner_oauth_nonce)
+    VALUES ('active', ${siteConfig.title}, ${siteConfig.ownerName}, ${siteConfig.accentColor},
+      ${siteConfig.siteUrl}, ${siteConfig.githubUrl}, ${siteConfig.timezone || "America/Chicago"}, ${nonce})
+    ON CONFLICT (id) DO UPDATE SET owner_oauth_nonce = EXCLUDED.owner_oauth_nonce
+    RETURNING owner_token_revision;
+  `;
+  return String(rows[0].owner_token_revision);
+}
+
+/** Claim a sealed attempt once, including when the callback changes loopback hosts. */
+export async function consumeOwnerAuthorization(nonce: string, revision: string): Promise<boolean> {
+  if (!isDbConfigured()) return false;
+  await ensureTablesExist();
+  const rows = await getDb()`
+    UPDATE site_settings SET owner_oauth_nonce = NULL
+    WHERE id = 'active' AND owner_oauth_nonce = ${nonce}
+      AND owner_token_revision = ${revision}::bigint
+    RETURNING owner_token_revision;
+  `;
+  return rows.length === 1;
 }
 
 /**
@@ -213,12 +256,25 @@ export async function getOwnerPlaybackToken(): Promise<string | null> {
 export async function saveOwnerPlaybackToken(
   token: string,
   displayName?: string | null,
-  profileUrl?: string | null
-): Promise<void> {
-  if (!isDbConfigured()) return;
+  profileUrl?: string | null,
+  expectedRevision?: string
+): Promise<boolean> {
+  if (!isDbConfigured()) return false;
   try {
     await ensureTablesExist();
     const sql = getDb();
+    if (expectedRevision !== undefined) {
+      const rows = await sql`
+        UPDATE site_settings SET owner_playback_token = ${token},
+          owner_spotify_name = ${displayName || null}, owner_spotify_url = ${profileUrl || null},
+          owner_token_revision = owner_token_revision + 1,
+          owner_oauth_nonce = NULL,
+          owner_token_updated_at = NOW(), updated_at = NOW()
+        WHERE id = 'active' AND owner_token_revision = ${expectedRevision}::bigint
+        RETURNING owner_token_revision;
+      `;
+      return rows.length === 1;
+    }
     await sql`
       INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
       VALUES (
@@ -237,11 +293,14 @@ export async function saveOwnerPlaybackToken(
       )
       ON CONFLICT (id) DO UPDATE SET
         owner_playback_token = EXCLUDED.owner_playback_token,
+        owner_token_revision = site_settings.owner_token_revision + 1,
+        owner_oauth_nonce = NULL,
         owner_spotify_name = COALESCE(EXCLUDED.owner_spotify_name, site_settings.owner_spotify_name),
         owner_spotify_url = COALESCE(EXCLUDED.owner_spotify_url, site_settings.owner_spotify_url),
         owner_token_updated_at = NOW(),
         updated_at = NOW();
     `;
+    return true;
   } catch (error) {
     console.error("[SITE CONFIG] Failed to save owner playback token to Neon DB:", error);
     throw error;
@@ -297,6 +356,8 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
     await sql`
       UPDATE site_settings
       SET owner_playback_token = NULL,
+          owner_token_revision = owner_token_revision + 1,
+          owner_oauth_nonce = NULL,
           owner_spotify_name = NULL,
           owner_spotify_url = NULL,
           owner_token_updated_at = NULL,
@@ -314,9 +375,9 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
  * If null or unseeded on database connection, auto-generates a 32-character hex key and saves it.
  * Falls back to process.env.CRON_SECRET if the database is unconfigured.
  */
-export async function getCronKey(): Promise<string | null> {
+export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}): Promise<string | null> {
   if (!isDbConfigured()) {
-    return process.env.CRON_SECRET || null;
+    return options.allowLegacyFallback === false ? null : process.env.CRON_SECRET || null;
   }
 
   try {
@@ -335,7 +396,7 @@ export async function getCronKey(): Promise<string | null> {
 
     // Auto-generate 32-character random hex string if missing on database connection
     const newKey = crypto.randomBytes(16).toString("hex");
-    await sql`
+    const seeded = await sql`
       INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, cron_key, updated_at)
       VALUES (
         'active',
@@ -349,13 +410,14 @@ export async function getCronKey(): Promise<string | null> {
         NOW()
       )
       ON CONFLICT (id) DO UPDATE SET
-        cron_key = EXCLUDED.cron_key,
-        updated_at = NOW();
+        cron_key = COALESCE(site_settings.cron_key, EXCLUDED.cron_key),
+        updated_at = NOW()
+      RETURNING cron_key;
     `;
-    return newKey;
+    return seeded[0]?.cron_key ?? null;
   } catch (error) {
     console.error("[SITE CONFIG] Failed to get or seed cron key from Neon DB:", error);
-    return process.env.CRON_SECRET || null;
+    return options.allowLegacyFallback === false ? null : process.env.CRON_SECRET || null;
   }
 }
 

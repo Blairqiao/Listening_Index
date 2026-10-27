@@ -236,10 +236,13 @@ export function debouncePlays<T extends DebouncePlayItem>(
       const existingIdx = lastAcceptedIndex.get(play.trackId);
       if (existingIdx !== undefined && debounced[existingIdx]) {
         const existingTimeMs = new Date(debounced[existingIdx].playedAt).getTime();
-        if (playTimeMs > existingTimeMs) {
+        if (playTimeMs >= existingTimeMs) {
+          lastAcceptedTimeMs.set(play.trackId, playTimeMs);
           debounced[existingIdx] = {
             ...debounced[existingIdx],
             playedAt: play.playedAt,
+            ...(play.msPlayed !== undefined || debounced[existingIdx].msPlayed !== undefined ? { msPlayed: Math.max(play.msPlayed || 0, debounced[existingIdx].msPlayed || 0) } : {}),
+            ...(play.durationMs !== undefined || debounced[existingIdx].durationMs !== undefined ? { durationMs: Math.max(play.durationMs || 0, debounced[existingIdx].durationMs || 0) } : {}),
           };
         }
       }

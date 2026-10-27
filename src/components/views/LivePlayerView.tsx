@@ -4,7 +4,7 @@ import React, { useCallback, useState } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";
-import { SpectrumCanvas, gradientStops } from "./live-player-view/SpectrumCanvas";
+import { SpectrumCanvas, gradientStops } from "../live-player-view/SpectrumCanvas";
 
 export { gradientStops };
 
@@ -258,11 +258,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           <button
             type="button"
             onClick={() => void handleTogglePlay()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              isPlaying
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${isPlaying
                 ? "border-music-accent text-music-accent hover:bg-music-accent/10 font-bold"
                 : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
+              } bg-transparent`}
           >
             {isPlaying ? "Pause" : "Play"}
           </button>
@@ -278,11 +277,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           <button
             type="button"
             onClick={() => void handleToggleShuffle()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              shuffle
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${shuffle
                 ? "border-music-accent text-music-accent font-bold"
                 : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
+              } bg-transparent`}
             title="Toggle Shuffle"
           >
             Shuffle
@@ -291,11 +289,10 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           <button
             type="button"
             onClick={() => void handleCycleRepeat()}
-            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${
-              repeatMode > 0
+            className={`px-2 py-0.5 border transition-colors cursor-pointer select-none ${repeatMode > 0
                 ? "border-music-accent text-music-accent font-bold"
                 : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            } bg-transparent`}
+              } bg-transparent`}
             title="Cycle Repeat Mode"
           >
             {repeatLabel}
@@ -337,9 +334,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                       void selectContext({ type: "auto", name: "Recent Favorites" });
                       setIsContextSelectorOpen(false);
                     }}
-                    className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${
-                      selectedContext.type === "auto" ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
-                    }`}
+                    className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${selectedContext.type === "auto" ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
+                      }`}
                   >
                     <div className="truncate">
                       <span>⚡ Auto Play</span>
@@ -364,9 +360,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                               void selectContext({ type: "playlist", name: pl.name, uri: pl.uri });
                               setIsContextSelectorOpen(false);
                             }}
-                            className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${
-                              isSelected ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
-                            }`}
+                            className={`w-full text-left px-2.5 py-1.5 flex items-center justify-between hover:bg-[#1A1A18] cursor-pointer transition-colors ${isSelected ? "text-music-accent font-bold bg-music-accent/5" : "text-[#EDEDE8]"
+                              }`}
                           >
                             <span className="truncate pr-2">
                               ♫ {pl.name}

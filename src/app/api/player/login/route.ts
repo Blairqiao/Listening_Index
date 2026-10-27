@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import crypto from "node:crypto";
+import { requestOrigin } from "@/lib/request-origin";
+import { beginOwnerAuthorization } from "@/lib/db/queries/config";
 import { getActiveSiteConfig } from "@/lib/db/queries";
-import { challengeFor, createVerifier, playerVerifierCookie } from "@/lib/user-auth";
+import { challengeFor, createVerifier, playerVerifierCookie, sealOwnerAuthorization } from "@/lib/user-auth";
 import { getRedirectUri, TOKEN_SCOPES } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +32,19 @@ export async function GET(request: NextRequest) {
   }
 
   const verifier = createVerifier();
+  const nonce = crypto.randomBytes(32).toString("hex");
+  const revision = await beginOwnerAuthorization(nonce);
+  const redirectUri = getRedirectUri(request);
+  const state = sealOwnerAuthorization({
+    verifier, nonce, revision, redirectUri,
+    returnOrigin: requestOrigin(request, false),
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
   const params = new URLSearchParams({
     client_id: clientId,
     response_type: "code",
-    redirect_uri: getRedirectUri(request),
+    redirect_uri: redirectUri,
+    state,
     scope: TOKEN_SCOPES,
     code_challenge_method: "S256",
     code_challenge: challengeFor(verifier),

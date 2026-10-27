@@ -57,7 +57,7 @@ test("AC-3: PlayerContext implements idempotent connectPlayer and non-blocking a
 });
 
 test("AC-4: LivePlayerView has no link button and notifies user to link Spotify ID via Spotify modal (S)", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   // Must not render a [ LINK SPOTIFY ] or [ LINK ] button
@@ -91,7 +91,7 @@ test("AC-5: handleTogglePlay supports API fallback with track URI when SDK state
     "handleTogglePlay must call Spotify play endpoint when player buffer is empty"
   );
 
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const liveContent = fs.readFileSync(livePlayerPath, "utf-8");
   assert.ok(
     !liveContent.includes("handleTogglePlay(displayTrack.trackId"),

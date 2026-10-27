@@ -26,7 +26,7 @@ test("PlayerContext exports selectedContext, selectContext, contextName, and use
 });
 
 test("LivePlayerView renders the context selector with Auto Play, user playlists, and contextName", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   assert.ok(
@@ -61,7 +61,7 @@ test("ListeningView and LivePlayerView prevent stacked view controls from gettin
     "ListeningView must adapt container height for LivePlayerView to prevent bounds clipping on desktop"
   );
 
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const livePlayerContent = fs.readFileSync(livePlayerPath, "utf-8");
 
   assert.ok(
@@ -74,7 +74,7 @@ test("ListeningView and LivePlayerView prevent stacked view controls from gettin
 });
 
 test("AC-1: LivePlayerView renders device status and context selector on a unified row", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   // Must not have a separate dedicated border-b row for CONTEXT:
@@ -85,7 +85,7 @@ test("AC-1: LivePlayerView renders device status and context selector on a unifi
 });
 
 test("AC-2: LivePlayerView playlist selector dropdown uses scrollbar-hidden", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   assert.ok(

@@ -1,4 +1,5 @@
-import type { StreamLogItem, StreamLogMetricsRaw } from "@/lib/types";
+import type { StreamLogItem } from "@/lib/types";
+import { calculateSessions, SESSION_GAP_MS } from "../session-calculation";
 import { CATALOG } from "./catalog";
 import { MOCK_DATA } from "./overview-data";
 
@@ -6,36 +7,18 @@ import { MOCK_DATA } from "./overview-data";
 // Demo Mode Extended Stream Log Mock Data (Chunks 2 & 3: Plays 51 to 150)
 // ---------------------------------------------------------------------------
 
+let currentMockDay = "2026-09-07";
 function createMockStreamItem(
   id: string,
-  timeStr: string,
-  track: {
-    id: string;
-    name: string;
-    artist: string;
-    artistId?: string;
-    album: string;
-    albumId?: string;
-    duration: string;
-    albumImageUrl?: string | null;
-  },
+  time: string,
+  track: { id: string; name: string; artist: string; artistId?: string; album: string; albumId?: string; duration: string; albumImageUrl?: string | null },
   dayGroup?: string,
-  sessionGap?: { durationStr: string; sittingLabel: string }
 ): StreamLogItem {
-  return {
-    id,
-    trackId: track.id,
-    timeStr,
-    title: track.name,
-    artist: track.artist,
-    artistId: track.artistId,
-    album: track.album,
-    albumId: track.albumId,
-    duration: track.duration,
-    albumImageUrl: track.albumImageUrl,
-    dayGroup,
-    sessionGap,
-  };
+  if (dayGroup) currentMockDay = `2026-09-${dayGroup.slice(0,2)}`;
+  const [minutes,seconds] = track.duration.split(':').map(Number);
+  return {id,trackId:track.id,playedAt:`${currentMockDay}T${time}:00.000Z`,title:track.name,
+    artist:track.artist,artistId:track.artistId,album:track.album,albumId:track.albumId,
+    durationMs:(minutes*60+seconds)*1000,albumImageUrl:track.albumImageUrl};
 }
 
 const MOCK_STREAM_LOG_CHUNK_2: StreamLogItem[] = [
@@ -54,7 +37,7 @@ const MOCK_STREAM_LOG_CHUNK_2: StreamLogItem[] = [
   createMockStreamItem("sl-62", "15:36", CATALOG.taylor_swift_cardigan),
 
   // 06 SEP Evening Session
-  createMockStreamItem("sl-63", "23:25", CATALOG.radiohead_paranoid_android, "06 SEP", { durationStr: "16H 11M", sittingLabel: "18 TRACKS · 1H 14M" }),
+  createMockStreamItem("sl-63", "23:25", CATALOG.radiohead_paranoid_android, "06 SEP"),
   createMockStreamItem("sl-64", "23:19", CATALOG.radiohead_karma_police),
   createMockStreamItem("sl-65", "23:14", CATALOG.frank_ocean_pink_white),
   createMockStreamItem("sl-66", "23:10", CATALOG.frank_ocean_ivy),
@@ -74,7 +57,7 @@ const MOCK_STREAM_LOG_CHUNK_2: StreamLogItem[] = [
   createMockStreamItem("sl-80", "22:04", CATALOG.beach_house_space_song),
 
   // 06 SEP Afternoon Session
-  createMockStreamItem("sl-81", "15:45", CATALOG.tame_impala_less_i_know, undefined, { durationStr: "6H 19M", sittingLabel: "20 TRACKS · 1H 22M" }),
+  createMockStreamItem("sl-81", "15:45", CATALOG.tame_impala_less_i_know, undefined),
   createMockStreamItem("sl-82", "15:41", CATALOG.nirvana_teen_spirit),
   createMockStreamItem("sl-83", "15:36", CATALOG.david_bowie_heroes),
   createMockStreamItem("sl-84", "15:31", CATALOG.michael_jackson_billie_jean),
@@ -98,7 +81,7 @@ const MOCK_STREAM_LOG_CHUNK_2: StreamLogItem[] = [
 
 const MOCK_STREAM_LOG_CHUNK_3: StreamLogItem[] = [
   // 05 SEP Evening Session
-  createMockStreamItem("sl-101", "22:40", CATALOG.taylor_swift_exile, "05 SEP", { durationStr: "15H 39M", sittingLabel: "20 TRACKS · 1H 18M" }),
+  createMockStreamItem("sl-101", "22:40", CATALOG.taylor_swift_exile, "05 SEP"),
   createMockStreamItem("sl-102", "22:35", CATALOG.taylor_swift_cardigan),
   createMockStreamItem("sl-103", "22:31", CATALOG.beach_house_space_song),
   createMockStreamItem("sl-104", "22:27", CATALOG.tame_impala_less_i_know),
@@ -120,7 +103,7 @@ const MOCK_STREAM_LOG_CHUNK_3: StreamLogItem[] = [
   createMockStreamItem("sl-120", "21:10", CATALOG.phoebe_kyoto),
 
   // 05 SEP Afternoon Session
-  createMockStreamItem("sl-121", "14:15", CATALOG.kendrick_money_trees, undefined, { durationStr: "6H 55M", sittingLabel: "15 TRACKS · 58M" }),
+  createMockStreamItem("sl-121", "14:15", CATALOG.kendrick_money_trees, undefined),
   createMockStreamItem("sl-122", "14:09", CATALOG.kendrick_king_kunta),
   createMockStreamItem("sl-123", "14:05", CATALOG.kendrick_alright),
   createMockStreamItem("sl-124", "14:01", CATALOG.frank_ocean_nights),
@@ -137,7 +120,7 @@ const MOCK_STREAM_LOG_CHUNK_3: StreamLogItem[] = [
   createMockStreamItem("sl-135", "13:11", CATALOG.lorde_ribs),
 
   // 04 SEP Evening Session (Terminal Genesis)
-  createMockStreamItem("sl-136", "23:55", CATALOG.queen_bohemian_rhapsody, "04 SEP", { durationStr: "13H 16M", sittingLabel: "15 TRACKS · 1H 02M" }),
+  createMockStreamItem("sl-136", "23:55", CATALOG.queen_bohemian_rhapsody, "04 SEP"),
   createMockStreamItem("sl-137", "23:49", CATALOG.michael_jackson_billie_jean),
   createMockStreamItem("sl-138", "23:44", CATALOG.david_bowie_heroes),
   createMockStreamItem("sl-139", "23:40", CATALOG.nirvana_teen_spirit),
@@ -160,92 +143,20 @@ export const ALL_MOCK_STREAM_LOG_ENTRIES: StreamLogItem[] = [
   ...MOCK_STREAM_LOG_CHUNK_3,
 ];
 
-// Initialize ISO timestamps for all mock entries
-let currentMockDay = "2026-09-09";
-for (const entry of ALL_MOCK_STREAM_LOG_ENTRIES) {
-  if (entry.dayGroup === "09 SEP") currentMockDay = "2026-09-09";
-  else if (entry.dayGroup === "08 SEP") currentMockDay = "2026-09-08";
-  else if (entry.dayGroup === "07 SEP") currentMockDay = "2026-09-07";
-  else if (entry.dayGroup === "06 SEP") currentMockDay = "2026-09-06";
-  else if (entry.dayGroup === "05 SEP") currentMockDay = "2026-09-05";
-  else if (entry.dayGroup === "04 SEP") currentMockDay = "2026-09-04";
-
-  if (!entry.playedAt) {
-    entry.playedAt = `${currentMockDay}T${entry.timeStr}:00.000Z`;
-  }
+const sessions = calculateSessions(ALL_MOCK_STREAM_LOG_ENTRIES.map(entry => ({...entry,trackId:entry.trackId!})));
+const summaryById = new Map(sessions.flatMap(session=>session.plays.map(play=>[play.id,session] as const)));
+for (let i=1;i<ALL_MOCK_STREAM_LOG_ENTRIES.length;i++) {
+  const entry=ALL_MOCK_STREAM_LOG_ENTRIES[i];
+  const gap=Date.parse(ALL_MOCK_STREAM_LOG_ENTRIES[i-1].playedAt)-Date.parse(entry.playedAt);
+  if (gap<=SESSION_GAP_MS) continue;
+  const session=summaryById.get(entry.id)!;
+  entry.sessionGap={durationMs:gap,sessionId:session.id,trackCount:session.plays.length,runtimeMs:session.runtimeMs};
 }
 
-export function getMockStreamLog(
-  limit = 50,
-  cursor?: string,
-  cursorId?: string,
-  prevDayGroup?: string,
-  prevPlayedAt?: string
-): {
-  rawMetrics: StreamLogMetricsRaw;
-  metrics: [string, string, string, string];
-  entries: StreamLogItem[];
-  hasMore: boolean;
-  nextCursor: string | null;
-  nextCursorId: string | null;
-  lastSyncedAt: string;
-} {
-  let startIndex = 0;
-  if (cursorId) {
-    const idx = ALL_MOCK_STREAM_LOG_ENTRIES.findIndex((e) => e.id === cursorId);
-    if (idx !== -1) {
-      startIndex = idx + 1;
-    }
-  } else if (cursor) {
-    const idx = ALL_MOCK_STREAM_LOG_ENTRIES.findIndex((e) => e.playedAt === cursor);
-    if (idx !== -1) {
-      startIndex = idx + 1;
-    }
-  }
-
-  const paged = ALL_MOCK_STREAM_LOG_ENTRIES.slice(startIndex, startIndex + limit);
-  const hasMore = startIndex + limit < ALL_MOCK_STREAM_LOG_ENTRIES.length;
-  const lastEntry = paged[paged.length - 1];
-
-  // Cross-chunk boundary stitching
-  const entries: StreamLogItem[] = paged.map((entry, i) => {
-    const item = { ...entry };
-    if (i === 0) {
-      // 1. Boundary session gap: if prevPlayedAt is present and gap > 30 mins
-      if (prevPlayedAt && item.playedAt) {
-        const gapMs = new Date(prevPlayedAt).getTime() - new Date(item.playedAt).getTime();
-        if (gapMs > 30 * 60 * 1000) {
-          const diffMinutes = Math.floor(gapMs / (60 * 1000));
-          const hours = Math.floor(diffMinutes / 60);
-          const mins = diffMinutes % 60;
-          const durationStr = hours > 0 ? `${hours}H ${mins}M` : `${mins}M`;
-          item.sessionGap = {
-            durationStr,
-            sittingLabel: "PREVIOUS SESSION",
-          };
-        }
-      }
-      // 2. Suppress duplicate dayGroup if it matches prevDayGroup
-      if (prevDayGroup && item.dayGroup === prevDayGroup) {
-        item.dayGroup = undefined;
-      }
-    }
-    return item;
-  });
-
-  return {
-    rawMetrics: {
-      totalPlays: 150,
-      uniqueTracks: 84,
-      uniqueArtists: 34,
-      streakDays: 14,
-    },
-    metrics: ["150", "84", "34", "14 DAYS"],
-    entries,
-    hasMore,
-    nextCursor: lastEntry?.playedAt ?? null,
-    nextCursorId: lastEntry?.id ?? null,
-    lastSyncedAt: new Date().toISOString(),
-  };
+export function getMockStreamLog(limit=50,cursor?:string,cursorId?:string,_prevDayGroup?:string,_prevPlayedAt?:string) {
+  const found=cursorId?ALL_MOCK_STREAM_LOG_ENTRIES.findIndex(e=>e.id===cursorId):cursor?ALL_MOCK_STREAM_LOG_ENTRIES.findIndex(e=>e.playedAt===cursor):-1;
+  const startIndex=found+1;
+  const entries=ALL_MOCK_STREAM_LOG_ENTRIES.slice(startIndex,startIndex+limit);
+  const last=entries[entries.length-1];
+  return {rawMetrics:{totalPlays:150,uniqueTracks:84,uniqueArtists:34,streakDays:14},metrics:['150','84','34','14 DAYS'] as [string,string,string,string],entries,hasMore:startIndex+limit<ALL_MOCK_STREAM_LOG_ENTRIES.length,nextCursor:last?.playedAt??null,nextCursorId:last?.id??null,lastSyncedAt:new Date().toISOString()};
 }
-
