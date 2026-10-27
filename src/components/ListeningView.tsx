@@ -47,6 +47,7 @@ import {
   formatStreamLogMetrics,
   formatRankDisplay,
   formatPlaysDisplay,
+  formatStreamLogDateSpan,
 } from "@/lib/format-utils";
 
 export function getTrackStatsCacheKey(params: {
@@ -249,6 +250,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const {
     currentTrack,
     checkTokenStatus,
+    activeDevice,
+    playerStatus,
+    handleTransferPlayback,
   } = usePlayer();
   const tzRef = useRef<string>(config.timezone);
 // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
@@ -1010,7 +1014,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       previousSittings: [],
     };
 
-  // Selected sitting lookup for Mode 3
+  // Selected sitting lookup for Mode 2
   const activeSitting = React.useMemo(() => {
     if (!sessionData.sittings || sessionData.sittings.length === 0) return null;
     return (
@@ -1018,6 +1022,22 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       sessionData.sittings[0]
     );
   }, [sessionData.sittings, selectedSittingId]);
+
+  const totalSessions =
+    sessionData.sittings?.length || sessionData.previousSittings?.length || 1;
+  const selectedSessionNumber = React.useMemo(() => {
+    if (!sessionData.sittings || sessionData.sittings.length === 0) return 1;
+    const idx = sessionData.sittings.findIndex((s) => s.id === selectedSittingId);
+    return idx >= 0 ? idx + 1 : 1;
+  }, [sessionData.sittings, selectedSittingId]);
+
+  const streamLogDateSpan = React.useMemo(() => {
+    const entries = streamLogData.entries;
+    if (!entries || entries.length === 0) return "STREAM LOG";
+    const newest = entries[0]?.playedAt;
+    const oldest = entries[entries.length - 1]?.playedAt;
+    return formatStreamLogDateSpan(oldest, newest, config.timezone);
+  }, [streamLogData.entries, config.timezone]);
 
   // Active enrichment candidates for viewport micro-enrichment across modes
   const activeEnrichmentCandidates = React.useMemo(() => {
@@ -1143,8 +1163,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isAuthenticated={isAuthenticated}
             onTriggerSync={handleTriggerSync}
             streamLogCount={streamLogData.entries.length || loadedPlaysCount}
+            streamLogDateSpan={streamLogDateSpan}
+            sessionNumber={selectedSessionNumber}
+            totalSessions={totalSessions}
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
+            activeDevice={activeDevice}
+            playerStatus={playerStatus}
+            onTransferPlayback={handleTransferPlayback}
           />
 
           {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}

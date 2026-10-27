@@ -14,10 +14,17 @@ interface ControlRowProps {
   isSyncing?: boolean;
   onTriggerSync?: () => void;
   streamLogCount?: number;
+  streamLogDateSpan?: string;
+  sessionNumber?: number;
+  sessionIndex?: number;
+  totalSessions?: number;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
   isAuthenticated?: boolean;
+  activeDevice?: { name?: string; isThisBrowser?: boolean } | null;
+  playerStatus?: "idle" | "checking" | "unlinked" | "connecting" | "ready" | "error";
+  onTransferPlayback?: () => void;
 }
 
 const RANGES: Array<{ key: RangeKey; label: string }> = [
@@ -39,20 +46,75 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   isSyncing = false,
   onTriggerSync,
   streamLogCount,
+  streamLogDateSpan,
+  sessionNumber,
+  sessionIndex,
+  totalSessions,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
+  activeDevice,
+  playerStatus,
+  onTransferPlayback,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
         return `SINCE ${compactDate(logStartDate)}`;
       case 1:
-        return "STREAM LOG";
-      case 2:
-        return "SESSION";
-      case 3:
-        return "LIVE PLAYER";
+        return streamLogDateSpan || "STREAM LOG";
+      case 2: {
+        const num = sessionNumber ?? (sessionIndex != null ? sessionIndex + 1 : 1);
+        const total = totalSessions ?? 1;
+        const padNum = String(num).padStart(2, "0");
+        const padTotal = String(total).padStart(2, "0");
+        return `SESSION ${padNum} / ${padTotal}`;
+      }
+      case 3: {
+        if (playerStatus === "checking") {
+          return "CHECKING CONNECTION...";
+        }
+        if (playerStatus === "unlinked") {
+          return "SPOTIFY NOT LINKED";
+        }
+        if (playerStatus === "connecting") {
+          return "CONNECTING TO SPOTIFY...";
+        }
+        if (playerStatus === "error") {
+          return <span className="text-[#FF6B6B]">PLAYER ERROR</span>;
+        }
+        if (activeDevice?.isThisBrowser) {
+          return (
+            <span className="text-music-accent">
+              DEVICE: LISTENING INDEX · ACTIVE
+            </span>
+          );
+        }
+        if (activeDevice && !activeDevice.isThisBrowser) {
+          return (
+            <span className="inline-flex items-center gap-2">
+              <span className="text-[#8A8A82] truncate max-w-[200px] sm:max-w-none">
+                LISTENING ON: {activeDevice.name?.toUpperCase() || "EXTERNAL"}
+              </span>
+              {onTransferPlayback && (
+                <>
+                  <span className="text-[#3A3A36]">·</span>
+                  <button
+                    type="button"
+                    onClick={onTransferPlayback}
+                    className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
+                    title="Transfer playback to this browser"
+                  >
+                    <span className="sm:hidden">[ TRANSFER ]</span>
+                    <span className="hidden sm:inline">[ TRANSFER HERE ]</span>
+                  </button>
+                </>
+              )}
+            </span>
+          );
+        }
+        return <span className="text-music-accent">DEVICE: LISTENING INDEX</span>;
+      }
     }
   };
 
@@ -144,7 +206,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       }
       case 3:
         return (
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden md:flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={onToggleLayout}
@@ -152,8 +214,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
               title="Toggle between Split Console and Stacked Stage"
             >
-              <span className="sm:hidden">{layout === "stacked" ? "[ STACKED ]" : "[ SPLIT ]"}</span>
-              <span className="hidden sm:inline">{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
+              <span>{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
             </button>
           </div>
         );

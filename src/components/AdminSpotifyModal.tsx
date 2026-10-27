@@ -414,7 +414,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <div className="font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                      Step 1: Register redirect URI
+                      STEP 1: REGISTER REDIRECT URIS
                     </div>
                     <p className="font-mono text-[11px] leading-relaxed text-[#A6A69F]">
                       Add your production and local callback URIs to your App Settings in the{" "}
