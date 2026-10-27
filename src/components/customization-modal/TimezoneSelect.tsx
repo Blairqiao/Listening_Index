@@ -163,7 +163,7 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
           <div className="absolute z-30 left-0 right-0 top-[38px] max-h-52 overflow-y-auto bg-[#141413] border border-[#26261F] shadow-2xl divide-y divide-[#1C1C1A] scrollbar-hidden">
             {filteredTimezones.length === 0 ? (
               <div className="p-3 font-mono text-[11px] text-[#6A6A64] text-center">
-                NO MATCHING TIMEZONES FOUND
+                No matching timezones found
               </div>
             ) : (
               filteredTimezones.map((tz) => {
@@ -186,7 +186,7 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
                   >
                     <span>{tz}</span>
                     {isActive && (
-                      <span className="text-[10px] text-music-accent tracking-widest">[ACTIVE]</span>
+                      <span className="text-[10px] text-music-accent">Active</span>
                     )}
                   </button>
                 );
@@ -217,7 +217,7 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
                 }`}
               >
                 <Compass className="w-2.5 h-2.5" />
-                <span>{timezone === detectedTz ? `[ LOCAL: ${detectedTz} ]` : `[ DETECT LOCAL: ${detectedTz} ]`}</span>
+                <span>{timezone === detectedTz ? `Local: ${detectedTz}` : `Detect local: ${detectedTz}`}</span>
               </button>
             )}
             <button
@@ -225,7 +225,7 @@ export const TimezoneSelect: React.FC<TimezoneSelectProps> = ({ timezone, onChan
               onClick={() => setIsTzOpen((prev) => !prev)}
               className="text-[#6A6A64] hover:text-[#EDEDE8] underline text-[9px] cursor-pointer"
             >
-              {isTzOpen ? "COLLAPSE LIST" : "BROWSE ALL"}
+              {isTzOpen ? "Collapse list" : "Browse all"}
             </button>
           </div>
         </div>

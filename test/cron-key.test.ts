@@ -177,11 +177,11 @@ test("AC-7: AdminSpotifyModal renders Scheduled Sync section with Copy URL and R
     "AdminSpotifyModal must render Scheduled Sync section"
   );
   assert.ok(
-    combined.includes("COPY URL") || combined.includes("COPY"),
+    combined.includes("COPY URL") || combined.includes("COPY") || combined.includes("Copy URL") || combined.includes("Copy"),
     "AdminSpotifyModal must include Copy URL action"
   );
   assert.ok(
-    combined.includes("REGENERATE"),
+    combined.includes("REGENERATE") || combined.includes("Regenerate"),
     "AdminSpotifyModal must include Regenerate action"
   );
 });

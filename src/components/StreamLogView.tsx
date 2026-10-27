@@ -245,10 +245,10 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     }`}
                   >
                     <span className="md:hidden">
-                      {isLoadingMore ? "[ FETCHING PLAYS... ]" : "[ LOAD 25 MORE PLAYS ]"}
+                      {isLoadingMore ? "Fetching plays..." : "Load 25 more plays"}
                     </span>
                     <span className="hidden md:inline">
-                      {isLoadingMore ? "[ FETCHING PLAYS... ]" : "[ LOAD 50 MORE PLAYS ]"}
+                      {isLoadingMore ? "Fetching plays..." : "Load 50 more plays"}
                     </span>
                   </button>
                   <button

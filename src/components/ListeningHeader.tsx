@@ -27,9 +27,9 @@ export const ListeningHeader: React.FC = () => {
         href={config.siteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="group inline-flex items-center gap-2 font-mono text-[13px] sm:text-[16px] tracking-[0.16em] text-[#5A5A55] hover:text-[#EDEDE8] transition-colors uppercase py-1 cursor-pointer bg-transparent border-0 no-underline"
+        className="group inline-flex items-center gap-2 font-mono text-[13px] sm:text-[16px] tracking-[0.16em] text-[#5A5A55] hover:text-[#EDEDE8] transition-colors py-1 cursor-pointer bg-transparent border-0 no-underline"
       >
-        <span>{config.ownerName.toUpperCase()}</span>
+        <span>{config.ownerName}</span>
         <ExternalLink className="w-4 h-4 text-music-accent transition-transform mb-0.5" />
       </a>
     </header>
