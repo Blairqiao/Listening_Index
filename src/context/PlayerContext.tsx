@@ -12,7 +12,6 @@ import { useConfig } from "@/context/ConfigContext";
 import {
   beginLogin,
   beginLoginPopup,
-  AUTH_MESSAGE,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
 import { resolvePlayRequest, shouldToggleInPlace, isSameContext } from "@/lib/player-playback";
@@ -133,6 +132,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const playerRef = useRef<SpotifyPlayer | null>(null);
   const deviceIdRef = useRef<string | null>(null);
   const connectingRef = useRef<boolean>(false);
+  const connectionAttemptRef = useRef<number>(0);
   const armedContextRef = useRef<boolean>(true);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const singleFlightCheckRef = useRef(createSingleFlight<void>());
@@ -239,6 +239,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Connect Web Playback SDK
   const connectPlayer = useCallback(async (forceReconnect = false) => {
     if (connectingRef.current) return;
+    const currentAttempt = ++connectionAttemptRef.current;
 
     // In-place reconnect of existing player instance: forces SDK to invoke getOAuthToken with new token
     if (playerRef.current && (forceReconnect || !deviceIdRef.current)) {
@@ -255,6 +256,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         playerRef.current.disconnect();
         const ok = await playerRef.current.connect();
+        if (currentAttempt !== connectionAttemptRef.current) return;
         if (ok) {
           if (deviceIdRef.current) {
             if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
@@ -267,11 +269,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setErrorMessage("Failed to reconnect player with new Spotify token.");
         }
       } catch (err) {
+        if (currentAttempt !== connectionAttemptRef.current) return;
         if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setPlayerStatus("error");
         setErrorMessage(err instanceof Error ? err.message : "Reconnect error");
       } finally {
-        connectingRef.current = false;
+        if (currentAttempt === connectionAttemptRef.current) {
+          connectingRef.current = false;
+        }
       }
       return;
     }
@@ -295,6 +300,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       await loadSpotifySdk();
+      if (currentAttempt !== connectionAttemptRef.current) return;
       if (!window.Spotify) {
         throw new Error("Spotify SDK did not initialize");
       }
@@ -335,6 +341,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("ready", ({ device_id }) => {
+        if (currentAttempt !== connectionAttemptRef.current || playerRef.current !== player) return;
         if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
@@ -343,6 +350,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       player.addListener("not_ready", () => {
+        if (currentAttempt !== connectionAttemptRef.current || playerRef.current !== player) return;
+        deviceIdRef.current = null;
+        setDeviceId(null);
         setPlayerStatus("connecting");
       });
 
@@ -401,6 +411,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       const ok = await player.connect();
+      if (currentAttempt !== connectionAttemptRef.current) {
+        player.disconnect();
+        return;
+      }
       if (ok) {
         playerRef.current = player;
         connectionTimeoutRef.current = setTimeout(() => {
@@ -415,11 +429,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setErrorMessage("The player could not connect to Spotify.");
       }
     } catch (e) {
+      if (currentAttempt !== connectionAttemptRef.current) return;
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       setPlayerStatus("error");
       setErrorMessage(e instanceof Error ? e.message : String(e));
     } finally {
-      connectingRef.current = false;
+      if (currentAttempt === connectionAttemptRef.current) {
+        connectingRef.current = false;
+      }
     }
   }, [probeActivePlayback]);
 
@@ -429,9 +446,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       clearTimeout(connectionTimeoutRef.current);
       connectionTimeoutRef.current = null;
     }
+    connectionAttemptRef.current++;
     if (playerRef.current) {
       playerRef.current.pause().catch(() => {});
       playerRef.current.disconnect();
+      playerRef.current = null;
     }
     deviceIdRef.current = null;
     setDeviceId(null);
@@ -494,12 +513,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const onAuthMessage = (e: MessageEvent) => {
-      if (e.data?.type === AUTH_MESSAGE && e.data?.ok) {
-        void checkTokenStatus(true);
-      }
-    };
-
     const onStatusChanged = (e: Event) => {
       const customEvent = e as CustomEvent<{ connected?: boolean }>;
       if (customEvent.detail?.connected === false) {
@@ -509,18 +522,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    window.addEventListener("message", onAuthMessage);
     window.addEventListener("spotify-status-changed", onStatusChanged);
 
     return () => {
-      window.removeEventListener("message", onAuthMessage);
       window.removeEventListener("spotify-status-changed", onStatusChanged);
     };
   }, [checkTokenStatus, teardownPlayer]);
 
   // Cleanup player only when PlayerProvider itself unmounts
   useEffect(() => {
+    const attemptRef = connectionAttemptRef;
     return () => {
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      attemptRef.current++;
       playerRef.current?.disconnect();
       playerRef.current = null;
       deviceIdRef.current = null;
@@ -570,6 +587,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Unlink Spotify handler
   const handleUnlink = useCallback(async () => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
+    connectionAttemptRef.current++;
     try {
       await fetch("/api/player/token", { method: "DELETE" });
     } catch (e) {
@@ -728,6 +750,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           armedContextRef.current = false;
           setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
         } else {
+          armedContextRef.current = true;
           const errData = await res.json().catch(() => ({}));
           const msg =
             errData?.error?.message ||
@@ -735,10 +758,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               ? "Spotify Premium is required for Web Playback."
               : res.status === 404
               ? "No track queued to play. Select a track or enter Spotify URL."
+              : res.status === 429
+              ? "Spotify rate limit reached. Try again shortly."
               : `Playback failed (${res.status}).`);
           setErrorMessage(msg);
         }
       } catch (error) {
+        armedContextRef.current = true;
         const message = error instanceof Error ? error.message : "Playback toggle failed";
         setErrorMessage(message || "Playback toggle failed");
       }
@@ -783,7 +809,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           if (body) {
-            await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`, {
+            const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`, {
               method: "PUT",
               headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -791,11 +817,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               },
               body,
             });
-            armedContextRef.current = false;
-            setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+            if (res.ok || res.status === 204) {
+              armedContextRef.current = false;
+              setActiveDevice({ name: DEVICE_NAME, isThisBrowser: true });
+            } else {
+              armedContextRef.current = true;
+              const errData = await res.json().catch(() => ({}));
+              const msg =
+                errData?.error?.message ||
+                (res.status === 403
+                  ? "Spotify Premium is required for Web Playback."
+                  : res.status === 404
+                  ? "No track queued to play. Select a track or enter Spotify URL."
+                  : res.status === 429
+                  ? "Spotify rate limit reached. Try again shortly."
+                  : `Playback switch failed (${res.status}).`);
+              setErrorMessage(msg);
+            }
           }
         } catch (e) {
           console.warn("[PLAYER] Failed to switch playback context:", e);
+          armedContextRef.current = true;
+          setErrorMessage(e instanceof Error ? e.message : "Playback switch failed");
         }
       } else {
         armedContextRef.current = true;

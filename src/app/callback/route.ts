@@ -2,15 +2,16 @@ import { NextRequest } from "next/server";
 import { requestOrigin } from "@/lib/request-origin";
 import { getActiveSiteConfig, saveOwnerPlaybackToken } from "@/lib/db/queries";
 import { closePopup as renderPopup, describeOAuthError } from "@/lib/popup-response";
-import { PLAYER_VERIFIER_COOKIE, clearPlayerVerifierCookie } from "@/lib/user-auth";
+import { readOwnerAuthorization, clearPlayerVerifierCookie } from "@/lib/user-auth";
 import { AUTH_MESSAGE, getRedirectUri } from "@/lib/spotify-auth";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { consumeOwnerAuthorization } from "@/lib/db/queries/config";
 import { resetSpotifyTokenCache, exchangeAuthorizationCode } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
 function closePopup(origin: string, ok: boolean, message: string | null) {
-  const res = renderPopup(origin, ok, message, AUTH_MESSAGE);
+  const res = renderPopup(origin, ok, message, AUTH_MESSAGE, `${origin}/`);
   res.headers.append("Set-Cookie", clearPlayerVerifierCookie());
   return res;
 }
@@ -20,19 +21,24 @@ function closePopup(origin: string, ok: boolean, message: string | null) {
  * Exchanges authorization code and persists owner playback refresh token to Neon DB.
  */
 export async function GET(request: NextRequest) {
-  const origin = requestOrigin(request);
-
-  if (!isAuthorizedAdminRequest(request)) {
-    return closePopup(origin, false, "Admin sign-in required.");
+  const fallbackOrigin = requestOrigin(request, false);
+  const stateValue = request.nextUrl.searchParams.get("state");
+  if (!stateValue) {
+    return closePopup(fallbackOrigin, false, isAuthorizedAdminRequest(request)
+      ? "Connection expired. Try again." : "Admin sign-in required.");
   }
-
+  const state = readOwnerAuthorization(stateValue);
+  if (!state || state.redirectUri !== getRedirectUri(request)) {
+    return closePopup(fallbackOrigin, false, "Connection expired or invalid. Try again.");
+  }
+  const origin = state.returnOrigin;
+  if (!await consumeOwnerAuthorization(state.nonce, state.revision)) {
+    return closePopup(origin, false, "Connection expired or already used. Try again.");
+  }
   const error = request.nextUrl.searchParams.get("error");
   const code = request.nextUrl.searchParams.get("code");
-  const verifier = request.cookies.get(PLAYER_VERIFIER_COOKIE)?.value;
-
   if (error) return closePopup(origin, false, describeOAuthError(error));
   if (!code) return closePopup(origin, false, "No authorization code returned.");
-  if (!verifier) return closePopup(origin, false, "Connection expired. Try again.");
 
   const config = await getActiveSiteConfig();
   const clientId =
@@ -46,10 +52,10 @@ export async function GET(request: NextRequest) {
   try {
     const tokenRes = await exchangeAuthorizationCode(
       code,
-      getRedirectUri(request),
+      state.redirectUri,
       clientId,
       clientSecret,
-      verifier
+      state.verifier
     );
 
     const token = await tokenRes.json().catch(() => ({}));
@@ -75,7 +81,8 @@ export async function GET(request: NextRequest) {
       // Proceed even if fetching profile name fails
     }
 
-    await saveOwnerPlaybackToken(token.refresh_token, displayName, profileUrl);
+    const saved = await saveOwnerPlaybackToken(token.refresh_token, displayName, profileUrl, state.revision);
+    if (!saved) return closePopup(origin, false, "Spotify connection changed. Try again.");
     resetSpotifyTokenCache();
     return closePopup(origin, true, null);
   } catch (e) {

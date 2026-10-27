@@ -23,28 +23,29 @@ export interface StreamLogItem {
   trackId?: string;
   artistId?: string;
   albumId?: string;
-  playedAt?: string;
-  timeStr: string; // '21:02'
+  playedAt: string;
   title: string;
   artist: string;
   album: string;
-  duration: string;
-  durationMs?: number;
+  durationMs: number;
   albumImageUrl?: string | null;
   swatchColor?: string;
   status?: string;
-  dayGroup?: string; // '09 SEP'
   sessionGap?: {
-    durationStr: string;
-    sittingLabel: string;
+    durationMs: number;
+    sessionId: string;
+    trackCount: number;
+    runtimeMs: number;
   };
 }
 
 export interface SessionItem {
   id: string;
+  playId: string;
+  playedAt: string;
+  durationMs: number;
   artistId?: string;
   albumId?: string;
-  timestamp: string; // '23:47'
   title: string;
   artist: string;
   album: string;
@@ -53,11 +54,8 @@ export interface SessionItem {
   status?: string;
   isActive?: boolean;
   isFirstPlay?: boolean;
-  duration?: string;
 }
 
-export type SittingItem = SessionItem;
-export type SessionTrackItem = SessionItem;
 
 export interface PreviousSession {
   id?: string;
@@ -68,35 +66,28 @@ export interface PreviousSession {
   trackCount?: number;
 }
 
-export type PreviousSitting = PreviousSession;
 
 export interface SessionAnalysis {
   firstPlaysCount: number;
   totalTracks: number;
-  topTrack?: { title: string; count: number; id?: string; artist?: string } | null;
-  topSong: { title: string; count: number; id?: string; artist?: string } | null;
+  topTrack: { title: string; count: number; id?: string; artist?: string } | null;
   topAlbum: { title: string; count: number; id?: string; artist?: string };
   topArtist: { name: string; count: number; id?: string };
 }
 
-export type SittingAnalysis = SessionAnalysis;
 
 export interface SessionRecord {
   id: string;
-  dateStr: string;
-  runtimeMinutes: number;
-  runtimeStr: string;
+  startedAt: string;
+  endedAt: string;
+  runtimeMs: number;
   trackCount: number;
   uniqueArtistsCount: number;
-  startTime: string;
-  tagTime?: string;
   isOpen: boolean;
   tracks: SessionItem[];
   analysis: SessionAnalysis;
 }
 
-export type SittingSession = SessionRecord;
-export type SessionBlock = SessionRecord;
 
 export interface SessionHistogramBar {
   id: string;
@@ -113,17 +104,8 @@ export interface SessionHistogramData {
 }
 
 export interface SessionData {
-  isOpen: boolean;
-  tagTime: string; // '22:15 CDT' or '18M'
-  metrics: [string, string, string, string]; // Runtime, Tracks, Unique Artists, Start Time
-  sessionTracks?: SessionItem[];
-  sittingTracks: SessionItem[];
-  previousSessions?: PreviousSession[];
-  previousSittings: PreviousSession[];
+  sessions: SessionRecord[];
   lastSyncedAt?: string;
-  sessions?: SessionRecord[];
-  sittings?: SessionRecord[];
-  histogram?: SessionHistogramData;
 }
 
 export interface AlbumSummary {
@@ -158,9 +140,7 @@ export interface OverviewData {
   lastSyncedAt?: string;
 }
 
-export interface MockListeningData {
-  overview: Record<RangeKey, OverviewData>;
-  streamLog: {
+export interface StreamLogData {
     rawMetrics: StreamLogMetricsRaw;
     metrics: [string, string, string, string]; // Plays, Unique Tracks, Artists, Streak
     entries: StreamLogItem[];
@@ -168,7 +148,11 @@ export interface MockListeningData {
     nextCursorId?: string | null;
     hasMore?: boolean;
     lastSyncedAt?: string;
-  };
+  }
+
+export interface MockListeningData {
+  overview: Record<RangeKey, OverviewData>;
+  streamLog: StreamLogData;
   session: SessionData;
 }
 

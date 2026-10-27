@@ -1,12 +1,10 @@
 import { getDb } from "../index";
+import { getCompleteSessionRows } from "./session-context";
+import { calculateSessions, SESSION_GAP_MS } from "@/lib/session-calculation";
 import { getLastSync } from "./ingestion";
 import { isCatalogFullyEnriched } from "./enrichment";
 import {
   sanitizeTimezone,
-  formatDayGroupTz,
-  formatHHmmTz,
-  formatDurationMs,
-  formatDurationHoursMinutes,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
 import type { StreamLogData, StreamLogItem, StreamLogMetricsRaw } from "./types";
@@ -19,7 +17,7 @@ export async function getStreamLog(
   tzOverride?: string,
   cursorTimestamp?: string,
   cursorId?: string,
-  prevDayGroup?: string,
+  _prevDayGroup?: string,
   prevPlayedAt?: string
 ): Promise<StreamLogData> {
   const sql = getDb();
@@ -185,103 +183,25 @@ export async function getStreamLog(
   const nextCursor = lastRow ? new Date(lastRow.played_at).toISOString() : null;
   const nextCursorId = lastRow ? String(lastRow.id) : null;
 
-  // 3. Group pagedRows into sessions bounded by >30-min gap
-  interface SittingGroup {
-    startIndex: number;
-    rows: StreamRow[];
+  const context = pagedRows.length ? await getCompleteSessionRows({newest:pagedRows[0],oldest:pagedRows[pagedRows.length-1]}) : [];
+  const sessions = calculateSessions(context.map(p=>({...p,playedAt:new Date(p.played_at).toISOString(),durationMs:p.duration_ms,trackId:p.track_id,artistId:p.artist_id,albumId:p.album_id})));
+  const summaryByPlay = new Map(sessions.flatMap(session=>session.plays.map(play=>[play.id,session] as const)));
+  const sittingGapMap = new Map<number,NonNullable<StreamLogItem["sessionGap"]>>();
+  for (let i=0;i<pagedRows.length;i++) {
+    const previous = i ? pagedRows[i-1].played_at : prevPlayedAt;
+    if (!previous) continue;
+    const gap=Date.parse(previous)-new Date(pagedRows[i].played_at).getTime();
+    if (gap<=SESSION_GAP_MS) continue;
+    const session=summaryByPlay.get(pagedRows[i].id);
+    if (!session) continue;
+    const count=session.plays.length;
+    sittingGapMap.set(i,{durationMs:gap,sessionId:session.id,trackCount:count,runtimeMs:session.runtimeMs});
   }
 
-  const sittings: SittingGroup[] = [];
-  let currentGroupRows: StreamRow[] = [];
-  let currentGroupStartIndex = 0;
-
-  for (let i = 0; i < pagedRows.length; i++) {
-    const row = pagedRows[i];
-    currentGroupRows.push(row);
-
-    const nextRow = pagedRows[i + 1];
-    if (nextRow) {
-      const currentMs = new Date(row.played_at).getTime();
-      const nextMs = new Date(nextRow.played_at).getTime();
-      const gapMs = currentMs - nextMs;
-
-      if (gapMs > 30 * 60 * 1000) {
-        sittings.push({
-          startIndex: currentGroupStartIndex,
-          rows: currentGroupRows,
-        });
-        currentGroupRows = [];
-        currentGroupStartIndex = i + 1;
-      }
-    } else {
-      sittings.push({
-        startIndex: currentGroupStartIndex,
-        rows: currentGroupRows,
-      });
-      currentGroupRows = [];
-    }
-  }
-
-  // 4. Map session startIndex -> sessionGap with summary (# tracks · duration)
-  const sittingGapMap = new Map<number, { durationStr: string; sittingLabel: string }>();
-
-  // Cross-chunk boundary stitching: detect gap between prevPlayedAt and row 0
-  if (prevPlayedAt && pagedRows.length > 0 && sittings.length > 0) {
-    const boundaryGapMs = new Date(prevPlayedAt).getTime() - new Date(pagedRows[0].played_at).getTime();
-    if (boundaryGapMs > 30 * 60 * 1000) {
-      const sitting0 = sittings[0];
-      const count = sitting0.rows.length;
-      const tracksLabel = `${count} ${count === 1 ? "TRACK" : "TRACKS"}`;
-      const sittingStartMs = new Date(sitting0.rows[sitting0.rows.length - 1].played_at).getTime();
-      const sittingEndMs = new Date(sitting0.rows[0].played_at).getTime();
-      const lastTrackDurationMs = sitting0.rows[sitting0.rows.length - 1].duration_ms || 0;
-      const sumDurationMs = sitting0.rows.reduce((sum, r) => sum + (r.duration_ms || 0), 0);
-      const runtimeMs = Math.max(sittingEndMs - sittingStartMs + lastTrackDurationMs, sumDurationMs);
-      const sittingDurationStr = formatDurationHoursMinutes(runtimeMs);
-
-      sittingGapMap.set(0, {
-        durationStr: formatDurationHoursMinutes(boundaryGapMs),
-        sittingLabel: `${tracksLabel} · ${sittingDurationStr.toUpperCase()}`,
-      });
-    }
-  }
-
-  for (let k = 1; k < sittings.length; k++) {
-    const prevSitting = sittings[k - 1];
-    const sitting = sittings[k];
-
-    const prevOldestMs = new Date(prevSitting.rows[prevSitting.rows.length - 1].played_at).getTime();
-    const currentNewestMs = new Date(sitting.rows[0].played_at).getTime();
-    const gapMs = prevOldestMs - currentNewestMs;
-    const gapDurationStr = formatDurationHoursMinutes(gapMs);
-
-    const count = sitting.rows.length;
-    const tracksLabel = `${count} ${count === 1 ? "TRACK" : "TRACKS"}`;
-
-    const sittingStartMs = new Date(sitting.rows[sitting.rows.length - 1].played_at).getTime();
-    const sittingEndMs = new Date(sitting.rows[0].played_at).getTime();
-    const lastTrackDurationMs = sitting.rows[sitting.rows.length - 1].duration_ms || 0;
-    const sumDurationMs = sitting.rows.reduce((sum, r) => sum + (r.duration_ms || 0), 0);
-    const runtimeMs = Math.max(sittingEndMs - sittingStartMs + lastTrackDurationMs, sumDurationMs);
-    const sittingDurationStr = formatDurationHoursMinutes(runtimeMs);
-
-    const sittingLabel = `${tracksLabel} · ${sittingDurationStr.toUpperCase()}`;
-
-    sittingGapMap.set(sitting.startIndex, {
-      durationStr: gapDurationStr,
-      sittingLabel,
-    });
-  }
-
-  let lastDayGroup = prevDayGroup || "";
   const entries: StreamLogItem[] = [];
 
   for (let i = 0; i < pagedRows.length; i++) {
     const row = pagedRows[i];
-    const playDate = new Date(row.played_at);
-    const dayGroup = formatDayGroupTz(playDate, tz);
-    const isNewDay = dayGroup !== lastDayGroup;
-    lastDayGroup = dayGroup;
 
     const sessionGap = sittingGapMap.get(i);
 
@@ -293,14 +213,11 @@ export async function getStreamLog(
       albumImageUrl: row.album_image_url || null,
       swatchColor: getSwatchColor(row.track_id + row.title),
       playedAt: new Date(row.played_at).toISOString(),
-      timeStr: formatHHmmTz(playDate, tz),
       title: row.title,
       artist: row.artist,
       album: row.album,
-      duration: formatDurationMs(row.duration_ms),
       durationMs: row.duration_ms,
       status: row.status,
-      dayGroup: isNewDay ? dayGroup : undefined,
       sessionGap,
     });
   }

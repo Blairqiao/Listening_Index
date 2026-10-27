@@ -22,7 +22,7 @@ export const DEFAULT_SITE_CONFIG: SiteConfigState = {
   githubUrl: siteConfig.githubUrl,
   timezone: siteConfig.timezone || "America/Chicago",
   spotifyClientId: (siteConfig as { spotifyClientId?: string }).spotifyClientId || "",
-  livePlayerLayout: "split",
+  livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
 };
 
 /**
@@ -42,7 +42,7 @@ export function normalizeSiteConfig(
   return {
     title: patch.title !== undefined ? String(patch.title).trim() : base.title,
     ownerName: patch.ownerName !== undefined ? String(patch.ownerName).trim() : base.ownerName,
-    accentColor: patch.accentColor ? normalizeHex(patch.accentColor) : base.accentColor,
+    accentColor: patch.accentColor ? normalizeHex(patch.accentColor, base.accentColor) : base.accentColor,
     siteUrl: patch.siteUrl !== undefined ? String(patch.siteUrl).trim() : base.siteUrl,
     githubUrl: patch.githubUrl !== undefined ? String(patch.githubUrl).trim() : base.githubUrl,
     timezone: patch.timezone !== undefined ? String(patch.timezone).trim() : base.timezone,

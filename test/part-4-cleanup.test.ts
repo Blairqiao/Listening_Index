@@ -51,34 +51,20 @@ test("AC-1: schema.ts eliminates pre-v1 migration blocks while preserving core s
   );
 });
 
-test("AC-2: CustomizationModal delegates timezone selection to src/components/customization-modal/TimezoneSelect.tsx", () => {
-  const tzSelectPath = path.join(
-    root,
-    "src/components/customization-modal/TimezoneSelect.tsx"
-  );
-  assert.ok(
-    fs.existsSync(tzSelectPath),
-    "TimezoneSelect.tsx must exist in src/components/customization-modal/"
-  );
-
-  const tzContent = fs.readFileSync(tzSelectPath, "utf-8");
-  assert.ok(
-    tzContent.includes("export const TimezoneSelect") || tzContent.includes("export function TimezoneSelect"),
-    "TimezoneSelect must be exported"
-  );
-
+test("AC-2: CustomizationModal omits manual timezone selection in favor of automated background detection", () => {
   const modalSource = fs.readFileSync(
-    path.join(root, "src/components/CustomizationModal.tsx"),
+    path.join(root, "src/components/modals/customization-modal/CustomizationModal.tsx"),
     "utf-8"
   );
-  assert.ok(
-    modalSource.includes("./customization-modal/TimezoneSelect") ||
-      modalSource.includes("@/components/customization-modal/TimezoneSelect"),
-    "CustomizationModal must import TimezoneSelect from ./customization-modal/TimezoneSelect"
+  assert.equal(
+    modalSource.includes("TimezoneSelect"),
+    false,
+    "CustomizationModal must not reference TimezoneSelect"
   );
-  assert.ok(
+  assert.equal(
     modalSource.includes("<TimezoneSelect"),
-    "CustomizationModal must render <TimezoneSelect"
+    false,
+    "CustomizationModal must not render <TimezoneSelect"
   );
 });
 
@@ -102,7 +88,7 @@ test("AC-3: SessionView decomposes SessionHistogram and SessionAnalysisPanel int
   );
 
   const sessionViewSource = fs.readFileSync(
-    path.join(root, "src/components/SessionView.tsx"),
+    path.join(root, "src/components/views/SessionView.tsx"),
     "utf-8"
   );
   assert.ok(
@@ -123,27 +109,27 @@ test("AC-3: SessionView decomposes SessionHistogram and SessionAnalysisPanel int
   );
 });
 
-test("AC-4: UploadModal decomposes HistoryDropzone and CatalogEnrichmentCard into src/components/upload-modal/", () => {
+test("AC-4: UploadModal decomposes HistoryDropzone and CatalogEnrichmentCard into src/components/modals/upload-modal/", () => {
   const dropzonePath = path.join(
     root,
-    "src/components/upload-modal/HistoryDropzone.tsx"
+    "src/components/modals/upload-modal/HistoryDropzone.tsx"
   );
   const enrichmentCardPath = path.join(
     root,
-    "src/components/upload-modal/CatalogEnrichmentCard.tsx"
+    "src/components/modals/upload-modal/CatalogEnrichmentCard.tsx"
   );
 
   assert.ok(
     fs.existsSync(dropzonePath),
-    "HistoryDropzone.tsx must exist in src/components/upload-modal/"
+    "HistoryDropzone.tsx must exist in src/components/modals/upload-modal/"
   );
   assert.ok(
     fs.existsSync(enrichmentCardPath),
-    "CatalogEnrichmentCard.tsx must exist in src/components/upload-modal/"
+    "CatalogEnrichmentCard.tsx must exist in src/components/modals/upload-modal/"
   );
 
   const uploadModalSource = fs.readFileSync(
-    path.join(root, "src/components/UploadModal.tsx"),
+    path.join(root, "src/components/modals/upload-modal/UploadModal.tsx"),
     "utf-8"
   );
   assert.ok(

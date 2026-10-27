@@ -22,6 +22,7 @@ export interface EnrichmentBatchResult {
   rateLimited?: boolean;
   retryAfterSeconds?: number;
   quotaReached?: boolean;
+  quotaResetAt?: string;
   reason?: string;
   isComplete: boolean;
   enriched?: EnrichedTrackItem[];
@@ -56,6 +57,7 @@ interface EnrichmentRequestResult {
 export async function runEnrichmentBatch(
   options: EnrichmentBatchOptions = {}
 ): Promise<EnrichmentBatchResult> {
+  const quotaResetAt = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)).toISOString();
   const bucket = options.bucket || (options.trackIds && options.trackIds.length > 0 ? "dynamic" : "cron");
 
   // 1. Check global rate limit cooldown (HTTP 429)
@@ -81,6 +83,7 @@ export async function runEnrichmentBatch(
       enrichedCount: 0,
       delistedCount: 0,
       quotaReached: true,
+      quotaResetAt,
       reason: `Daily quota ceiling reached for bucket: ${bucket}`,
       isComplete: progress.pending === 0,
       progress,
@@ -89,6 +92,23 @@ export async function runEnrichmentBatch(
 
   const batchCeiling = bucket === "dynamic" ? 5 : 14;
   const limit = Math.max(1, Math.min(batchCeiling, initialQuotaCheck.remaining));
+  let requestCount = 0;
+  let quotaDenied = false;
+  async function reserveRequests(count: number): Promise<boolean> {
+    if (requestCount + count > batchCeiling) return false;
+    if (requestCount + count > initialQuotaCheck.remaining) {
+      quotaDenied = true;
+      return false;
+    }
+    const quota = await checkAndIncrementApiQuota(bucket, count);
+    if (!quota.allowed) {
+      quotaDenied = true;
+      return false;
+    }
+    requestCount += count;
+    return true;
+  }
+
 
   // 3. Fetch pending tracks (explicit trackIds for viewport, or chronologically ordered for cron)
   const pendingTracks = await getPendingTracksForEnrichment(limit, {
@@ -133,8 +153,8 @@ export async function runEnrichmentBatch(
           const seed = tracksInGroup[0];
 
           // Check quota for seed track request
-          const seedQuota = await checkAndIncrementApiQuota("cron", 1);
-          if (!seedQuota.allowed) break;
+          const seedAllowed = await reserveRequests(1);
+          if (!seedAllowed) break;
 
           const seedRes = await fetch(
             `https://api.spotify.com/v1/tracks/${encodeURIComponent(seed.id)}`,
@@ -198,8 +218,8 @@ export async function runEnrichmentBatch(
               const MAX_PAGES = 3; // Up to 150 tracks max
 
               while (nextUrl && unmatchedSiblings.size > 0 && pageCount < MAX_PAGES) {
-                const albumQuota = await checkAndIncrementApiQuota("cron", 1);
-                if (!albumQuota.allowed) break;
+                const albumAllowed = await reserveRequests(1);
+                if (!albumAllowed) break;
 
                 const albumTracksRes = await fetch(nextUrl, {
                   headers: {
@@ -273,11 +293,16 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
   const CONCURRENCY = bucket === "dynamic" ? 5 : 3;
 
   for (let i = 0; i < remainingTracks.length; i += CONCURRENCY) {
-    const chunk = remainingTracks.slice(i, i + CONCURRENCY);
+    const available = Math.min(CONCURRENCY, batchCeiling-requestCount, initialQuotaCheck.remaining-requestCount);
+    if (available <= 0) {
+      if (requestCount >= initialQuotaCheck.remaining) quotaDenied = true;
+      break;
+    }
+    const chunk = remainingTracks.slice(i, i + available);
 
     // Atomically reserve quota for this chunk
-    const quotaCheck = await checkAndIncrementApiQuota(bucket, chunk.length);
-    if (!quotaCheck.allowed) {
+    const allowed = await reserveRequests(chunk.length);
+    if (!allowed) {
       break;
     }
 
@@ -381,6 +406,8 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
     isComplete,
     enriched: enrichedItems,
     delistedIds,
+    quotaReached: quotaDenied || undefined,
+    quotaResetAt: quotaDenied ? quotaResetAt : undefined,
     progress,
   };
 }

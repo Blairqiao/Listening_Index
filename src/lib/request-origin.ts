@@ -13,17 +13,17 @@ import type { NextRequest } from "next/server";
  * A spoofed Host only affects the request that spoofs it: Spotify still
  * refuses any redirect URI the owner did not register.
  */
-export function requestOrigin(request: NextRequest): string {
+export function requestOrigin(request: NextRequest, normalizeLocalhost = true): string {
   let host =
     request.headers.get("x-forwarded-host")?.split(",")[0].trim() ||
     request.headers.get("host") ||
-    request.nextUrl.host;
+    new URL(request.url).host;
   const proto =
     request.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
-    request.nextUrl.protocol.replace(/:$/, "");
+    new URL(request.url).protocol.replace(/:$/, "");
 
   // Spotify strictly rejects "localhost" redirect URIs and requires 127.0.0.1
-  if (host.startsWith("localhost")) {
+  if (normalizeLocalhost && /^localhost(?::|$)/.test(host)) {
     host = host.replace("localhost", "127.0.0.1");
   }
 

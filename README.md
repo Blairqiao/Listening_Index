@@ -100,27 +100,25 @@ Listening Index decouples visitor personalization from administrative configurat
    - Client ID (`SPOTIFY_CLIENT_ID`)
    - Client Secret (`SPOTIFY_CLIENT_SECRET`)
 
-Spotify redirects back to `http://127.0.0.1:8888/callback` during the login step so the local script can capture your auth code. In production, the Live Player authenticates via `https://<your-app>.vercel.app/callback`.
+Spotify redirects back to `http://127.0.0.1:8888/callback` during local development, or `https://<your-app>.vercel.app/callback` in production, to complete the OAuth connection flow.
 
 ---
 
 ### Step 4: Connect Spotify & get refresh token
 
-Choose one of two options:
-
-#### Option A: 1-Click In-App Generator (Recommended · No Terminal Needed)
+#### 1-Click In-App Connection
 
 1. Ensure `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, and `ADMIN_PASSWORD` (see Step 6) are configured in your environment variables, and your database is connected.
-2. Open your app and log in as admin: press `L` (or click the lock icon) and enter your `ADMIN_PASSWORD`.
-3. Open the Spotify Connection Manager: press `S` (or click the music icon `[ <Music2 /> ]` in the top navigation bar).
+2. Open your app and log in as admin: click the lock icon `[ <Lock /> ]` in the top navigation bar (or press `L`) and enter your `ADMIN_PASSWORD`.
+3. Open the Spotify Connection Manager: click the music icon `[ <Music2 /> ]` in the top navigation bar (or press `S`).
 4. Ensure your app's Redirect URIs (both production `https://<your-app>.vercel.app/callback` and local dev `http://127.0.0.1:8888/callback`, displayed in the modal) are registered in your Spotify Developer Dashboard.
-5. Click **[ CONNECT SPOTIFY ACCOUNT ]**. The unified token is automatically stored in Neon Postgres, powering both background sync and live playback without setting `SPOTIFY_REFRESH_TOKEN` manually.
+5. Click **[ CONNECT SPOTIFY ACCOUNT ]**. The owner refresh token is saved to `site_settings` in Neon Postgres, granting the 9 required scopes (`user-read-recently-played`, `user-read-playback-state`, `user-modify-playback-state`, `user-read-currently-playing`, `streaming`, `user-read-email`, `user-read-private`, `playlist-read-private`, `playlist-read-collaborative`). This powers both background sync and live playback without setting `SPOTIFY_REFRESH_TOKEN` manually.
 
-##### 6-Month Token Monitoring & In-App Renewal
+##### 6-Month Token Application Reminder & In-App Renewal
 
-Spotify Developer mode enforces a 180-day lifecycle:
+Spotify Developer mode accounts include an application reminder tracking the 180-day lifecycle:
 - When within 14 days of expiration, an amber `[ ! TOKEN EXPIRING · {d}d ]` indicator alerts authenticated admins in the navigation tabs.
-- 1-click renewal resets the 180-day cycle without needing terminal commands or redeployment.
+- 1-click renewal resets the 180-day reminder cycle without needing terminal commands or redeployment.
 
 ---
 
@@ -158,7 +156,7 @@ Your Listening Index is designed to be public so friends and visitors can browse
 
 ### Step 7: Run your first sync
 
-#### IMPORTANT: Make sure your required [environment variables](#environment-variables) (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, and `ADMIN_PASSWORD`) are present in Vercel and redeployed (and Spotify is connected via Step 4 Option A). Go to the [Vercel dashboard](https://vercel.com/dashboard) and verify your environment variables before testing.
+#### IMPORTANT: Make sure your required [environment variables](#environment-variables) (`DATABASE_URL`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, and `ADMIN_PASSWORD`) are present in Vercel and redeployed (and Spotify is connected via Step 4). Go to the [Vercel dashboard](https://vercel.com/dashboard) and verify your environment variables before testing.
 
 1. Copy your scheduled sync URL from the Spotify Connection Manager (`S` key) and open it in your browser (or trigger a sync using the in-app manual sync button).
 2. The endpoint returns a JSON confirmation when complete:
@@ -206,7 +204,10 @@ Open `http://127.0.0.1:8888` (or `http://localhost:8888`).
 
 ### Connect real data locally
 
-1. Copy your database connection string (`DATABASE_URL`) from the **Storage** tab in your Vercel dashboard, or from the [Neon Console](https://console.neon.tech).
+> [!WARNING]
+> `.env.local` must select a dedicated secondary development and test database, never your production database. Local integration tests and utility scripts execute database writes including sync-key rotation, site title replacement, and test Play/Track insertion and deletion.
+
+1. Copy your secondary development database connection string (`DATABASE_URL`) from the [Neon Console](https://console.neon.tech).
 2. Create `.env.local` from the template `.env.example`
 3. Run the setup scripts to generate your cron key and sync recent tracks:
    ```bash
@@ -249,20 +250,19 @@ export const siteConfig = {
 
 ---
 
-## Keyboard shortcuts
+## Navigation and controls
 
-| Key | Action | Availability |
+| Control | Action | Availability |
 | :--- | :--- | :--- |
-| `1` | Switch to overview | All visitors |
-| `2` | Switch to stream log | All visitors |
-| `3` | Switch to sessions | All visitors |
-| `4` | Switch to live player | Admin only |
-| `←` / `→` | Change time range | All visitors |
-| `C` | Open appearance / configuration modal | All visitors |
-| `S` | Open Spotify connection manager | Admin only |
-| `U` | Open upload history modal | Admin only |
-| `L` | Admin login / lock session | All visitors |
-| `Esc` | Close modal | All visitors |
+| `[ 1 · OVERVIEW ]` | Switch to overview | All visitors |
+| `[ 2 · STREAM LOG ]` | Switch to stream log | All visitors |
+| `[ 3 · SESSIONS ]` | Switch to sessions | All visitors |
+| `[ 4 · LIVE PLAYER ]` | Switch to live player | Admin only |
+| Time range pills (`1D`–`ALL`) | Change time range | All visitors |
+| `[ <Menu /> ]` / `[ APPEARANCE ]` | Open appearance / configuration modal | All visitors |
+| `[ <Music2 /> ]` | Open Spotify connection manager | Admin only |
+| `[ <Upload /> ]` | Open upload history modal | Admin only |
+| `[ <Lock /> ]` / `[ <Unlock /> ]` | Admin login / lock session | All visitors |
 
 ---
 
@@ -274,7 +274,7 @@ export const siteConfig = {
 | `ADMIN_PASSWORD` | Secret passphrase to authorize administrative actions (saving config to Neon DB, uploading extended history, manual sync from UI) | Set your own secure passphrase |
 | `SPOTIFY_CLIENT_ID` | Spotify app client ID | Spotify Developer Dashboard |
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret | Spotify Developer Dashboard |
-| `SPOTIFY_REFRESH_TOKEN` | *(Deprecated)* Previously used for user account refresh token. Unified token is now stored securely in Neon Postgres via Option A in-app generator. | Deprecated (managed in-app) |
+| `SPOTIFY_REFRESH_TOKEN` | *(Deprecated)* Previously used for user account refresh token. Owner token is now stored securely in Neon Postgres via the in-app connection manager. | Deprecated (managed in-app) |
 | `CRON_SECRET` | *(Optional / Legacy)* Fallback secret token securing `/api/sync`. Database sync key is now auto-generated in Neon Postgres and managed via the in-app modal. | Auto-generated in-app (optional legacy env fallback) |
 
 ---

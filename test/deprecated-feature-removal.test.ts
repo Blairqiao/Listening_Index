@@ -128,7 +128,7 @@ test("AC-5: resize-utils is deleted, compactDate moved to format-utils, dead pro
     "src/lib/format-utils.ts must export compactDate"
   );
 
-  const controlRowContent = fs.readFileSync(path.join(root, "src/components/ControlRow.tsx"), "utf-8");
+  const controlRowContent = fs.readFileSync(path.join(root, "src/components/listening-view/ControlRow.tsx"), "utf-8");
   assert.ok(
     !controlRowContent.includes("resize-utils"),
     "ControlRow.tsx must not import from resize-utils"
@@ -148,7 +148,7 @@ test("AC-5: resize-utils is deleted, compactDate moved to format-utils, dead pro
     "ListeningView.tsx must not pass isLinked to ControlRow"
   );
 
-  const metricRibbonContent = fs.readFileSync(path.join(root, "src/components/MetricRibbon.tsx"), "utf-8");
+  const metricRibbonContent = fs.readFileSync(path.join(root, "src/components/listening-view/MetricRibbon.tsx"), "utf-8");
   assert.ok(
     !metricRibbonContent.includes("// trackRankFormat"),
     "MetricRibbon.tsx must not contain commented-out // trackRankFormat"

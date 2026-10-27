@@ -1,61 +1,32 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import {
-  SittingItem,
-  PreviousSitting,
-  SittingSession,
-  SessionHistogramData,
-  SittingAnalysis,
-} from "@/lib/mock-listening-data";
-import { Artwork } from "./Artwork";
-import { SessionHistogram } from "./session-view/SessionHistogram";
-import { SessionAnalysisPanel } from "./session-view/SessionAnalysisPanel";
+import type { SessionRecord, SessionAnalysis, PreviousSession } from "@/lib/types";
+import { useConfig } from "@/context/ConfigContext";
+import { presentSession, presentSessionHistogram, type PresentedSessionItem } from "@/lib/listening-presentation";
+import { calculateSessions } from "@/lib/session-calculation";
+import { Artwork } from "../Artwork";
+import { SessionHistogram } from "../session-view/SessionHistogram";
+import { SessionAnalysisPanel } from "../session-view/SessionAnalysisPanel";
 
 interface SessionViewProps {
-  isOpen: boolean;
-  sittingTracks?: SittingItem[];
-  sessionTracks?: SittingItem[];
-  previousSittings?: PreviousSitting[];
-  previousSessions?: PreviousSitting[];
-  sittings?: SittingSession[];
-  sessions?: SittingSession[];
-  histogram?: SessionHistogramData;
-  onSelectSitting?: (sittingId: string) => void;
+  sessions: SessionRecord[];
   onSelectSession?: (sessionId: string) => void;
-  selectedSittingId?: string;
   selectedSessionId?: string;
 }
 
 export const SessionView: React.FC<SessionViewProps> = ({
-  isOpen,
-  sittingTracks,
-  sessionTracks,
-  previousSittings: rawPreviousSittings,
-  previousSessions: rawPreviousSessions,
-  sittings: rawSittings,
-  sessions: rawSessions,
-  histogram,
-  onSelectSitting,
+  sessions,
   onSelectSession,
-  selectedSittingId: externalSelectedSittingId,
-  selectedSessionId: externalSelectedSessionIdProp,
+  selectedSessionId: externalSelectedSessionId,
 }) => {
-  const effectiveSessionTracks = useMemo(() => {
-    return sessionTracks || sittingTracks || [];
-  }, [sessionTracks, sittingTracks]);
-  const previousSittings = useMemo(() => {
-    return rawPreviousSessions || rawPreviousSittings || [];
-  }, [rawPreviousSessions, rawPreviousSittings]);
-  const sittings = useMemo(() => {
-    return rawSessions || rawSittings || [];
-  }, [rawSessions, rawSittings]);
-  const onSelect = onSelectSession || onSelectSitting;
-  const externalSelectedSessionId = externalSelectedSessionIdProp ?? externalSelectedSittingId;
-
-  const activeDefaultId = sittings[0]?.id || previousSittings[0]?.id || "s1";
-  const selectedSessionId = externalSelectedSessionId || activeDefaultId;
-  const selectedSittingId = selectedSessionId;
+  const { visitorTimezone } = useConfig();
+  const sittings = useMemo(() => sessions.map(session => presentSession(session, visitorTimezone)), [sessions, visitorTimezone]);
+  const histogram = useMemo(() => presentSessionHistogram(sessions, visitorTimezone), [sessions, visitorTimezone]);
+  const onSelect = onSelectSession;
+  const selectedSessionId = externalSelectedSessionId || sittings[0]?.id;
+  const selectedSessionIdValue = selectedSessionId;
+  const isOpen = sittings[0]?.isOpen || false;
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -95,7 +66,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
   }, []);
 
   // Handle selecting a session (from previous sessions or histogram bars)
-  const handleSelectSitting = useCallback(
+  const handleSelectSession = useCallback(
     (id: string) => {
       onSelect?.(id);
     },
@@ -108,119 +79,27 @@ export const SessionView: React.FC<SessionViewProps> = ({
   }, [sittings, selectedSessionId]);
 
   // Tracks for active session
-  const activeTracks: SittingItem[] = useMemo(() => {
+  const activeTracks: PresentedSessionItem[] = useMemo(() => {
     if (activeSession && activeSession.tracks) {
       return activeSession.tracks;
     }
-    return effectiveSessionTracks;
-  }, [activeSession, effectiveSessionTracks]);
+    return [];
+  }, [activeSession]);
 
   const visibleTracks = isMobile && !isTracksExpanded ? activeTracks.slice(0, 6) : activeTracks;
 
-  // Analysis computation (uses sitting.analysis if present, else computes on the fly)
-  // Analysis computation (computed directly from activeTracks)
-  const analysis: SittingAnalysis = useMemo(() => {
-    const firstPlaysCount = activeTracks.filter((t) => t.isFirstPlay).length;
-    const totalTracks = activeTracks.length;
-
-    // Top Track: if counts are equal (e.g. all 1) or tied, pick the latest one played (first in activeTracks)
-    const trackCounts = new Map<string, number>();
-    for (const t of activeTracks) {
-      trackCounts.set(t.title, (trackCounts.get(t.title) || 0) + 1);
-    }
-    let maxTrackCount = 0;
-    for (const count of trackCounts.values()) {
-      if (count > maxTrackCount) maxTrackCount = count;
-    }
-    let topTrack: { title: string; count: number; id?: string; artist?: string } | null = null;
-    if (activeTracks.length > 0 && maxTrackCount > 0) {
-      const latestTrack = activeTracks.find((t) => trackCounts.get(t.title) === maxTrackCount);
-      if (latestTrack) {
-        topTrack = {
-          title: latestTrack.title,
-          count: maxTrackCount,
-          id: latestTrack.id,
-          artist: latestTrack.artist,
-        };
-      }
-    }
-
-    // Top Album
-    const albumCounts = new Map<string, number>();
-    for (const t of activeTracks) {
-      if (t.album) {
-        albumCounts.set(t.album, (albumCounts.get(t.album) || 0) + 1);
-      }
-    }
-    let topAlbumEntry: [string, number] | null = null;
-    for (const [album, count] of albumCounts.entries()) {
-      if (!topAlbumEntry || count > topAlbumEntry[1]) {
-        topAlbumEntry = [album, count];
-      }
-    }
-    let topAlbum: { title: string; count: number; id?: string; artist?: string } | null;
-    if (topAlbumEntry) {
-      const matchTrack = activeTracks.find((t) => t.album === topAlbumEntry![0]);
-      topAlbum = {
-        title: topAlbumEntry[0],
-        count: topAlbumEntry[1],
-        id: matchTrack?.albumId,
-        artist: matchTrack?.artist,
-      };
-    } else {
-      topAlbum = { title: "None", count: 0 };
-    }
-
-    // Top Artist
-    const artistCounts = new Map<string, number>();
-    for (const t of activeTracks) {
-      if (t.artist) {
-        artistCounts.set(t.artist, (artistCounts.get(t.artist) || 0) + 1);
-      }
-    }
-    let topArtistEntry: [string, number] | null = null;
-    for (const [artist, count] of artistCounts.entries()) {
-      if (!topArtistEntry || count > topArtistEntry[1]) {
-        topArtistEntry = [artist, count];
-      }
-    }
-    let topArtist: { name: string; count: number; id?: string } | null;
-    if (topArtistEntry) {
-      const matchTrack = activeTracks.find((t) => t.artist === topArtistEntry![0]);
-      topArtist = {
-        name: topArtistEntry[0],
-        count: topArtistEntry[1],
-        id: matchTrack?.artistId,
-      };
-    } else {
-      topArtist = { name: "None", count: 0 };
-    }
-
-    return {
-      firstPlaysCount,
-      totalTracks,
-      topTrack,
-      topSong: topTrack,
-      topAlbum,
-      topArtist,
+  const analysis: SessionAnalysis = useMemo(() => {
+    return calculateSessions(activeTracks.map(track => ({ ...track, id: track.playId, trackId: track.id })))[0]?.analysis || {
+      firstPlaysCount: 0, totalTracks: 0, topTrack: null,
+      topAlbum: { title: "None", count: 0 }, topArtist: { name: "None", count: 0 },
     };
   }, [activeTracks]);
 
-  // Previous sittings normalized list (capped at 20)
-  const sitsList: PreviousSitting[] = useMemo(() => {
-    const list =
-      previousSittings.length > 0
-        ? previousSittings
-        : sittings.map((s) => ({
-            id: s.id,
-            dateStr: s.dateStr,
-            durationStr: s.runtimeStr,
-            tracksCountStr: `${s.trackCount} ${s.trackCount === 1 ? "track" : "tracks"}`,
-            runtimeMinutes: s.runtimeMinutes,
-            trackCount: s.trackCount,
-          }));
-    return list.slice(0, 20);
-  }, [previousSittings, sittings]);
+  const sitsList: PreviousSession[] = useMemo(() => sittings.slice(0, 20).map(session => ({
+    id: session.id, dateStr: session.dateStr, durationStr: session.runtimeStr,
+    tracksCountStr: `${session.trackCount} ${session.trackCount === 1 ? "track" : "tracks"}`,
+    runtimeMinutes: session.runtimeMinutes, trackCount: session.trackCount,
+  })), [sittings]);
 
   const visibleSits = isMobile && !isSessionsExpanded ? sitsList.slice(0, 5) : sitsList;
 
@@ -248,7 +127,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
             className="h-auto md:h-[550px] overflow-y-auto scrollbar-hidden"
             role="list"
           >
-            {/* Active Sitting Track Rows */}
+            {/* Active Session Track Rows */}
             {visibleTracks.map((track, idx) => {
               const isSpotifyTrackId = track.id && !track.id.startsWith("tr-");
               const trackHref = isSpotifyTrackId
@@ -262,8 +141,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
               const albumHref = track.albumId
                 ? `https://open.spotify.com/album/${track.albumId}`
                 : track.album
-                ? `https://open.spotify.com/search/${encodeURIComponent(track.album)}`
-                : undefined;
+                  ? `https://open.spotify.com/search/${encodeURIComponent(track.album)}`
+                  : undefined;
 
               return (
                 <div
@@ -363,7 +242,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
           )}
         </div>
 
-        {/* Right Column: Analysis + Previous Sittings + Histogram */}
+        {/* Right Column: Analysis + Previous Sessions + Histogram */}
         <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
           {/* Analysis Panel */}
           <SessionAnalysisPanel analysis={analysis} />
@@ -379,9 +258,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
               role="list"
             >
               {visibleSits.map((sitting, idx) => {
-                const sittingId = sitting.id || `s${idx + 1}`;
-                const isSelected = sittingId === selectedSittingId;
-                // const isHovered = sittingId === hoveredSittingId;
+                const sessionId = sitting.id || `s${idx + 1}`;
+                const isSelected = sessionId === selectedSessionIdValue;
                 const rawCount = sitting.tracksCountStr
                   .replace(" tracks", "")
                   .replace(" track", "");
@@ -391,18 +269,17 @@ export const SessionView: React.FC<SessionViewProps> = ({
                     key={`${sitting.dateStr}-${idx}`}
                     role="listitem"
                     tabIndex={0}
-                    onClick={() => handleSelectSitting(sittingId)}
+                    onClick={() => handleSelectSession(sessionId)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        handleSelectSitting(sittingId);
+                        handleSelectSession(sessionId);
                       }
                     }}
-                    className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer transition-none select-none focus:outline-none ${
-                      isSelected
+                    className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer transition-none select-none focus:outline-none ${isSelected
                         ? "bg-[#181614] border-l-2 border-l-music-accent pl-2 -ml-[2px]"
                         : "hover:bg-[#111110]"
-                    }`}
+                      }`}
                   >
                     {/* Date (mono 11px, #4A4A46) */}
                     <span className="font-mono text-[11px] text-[#4A4A46] tabular-nums select-none">
@@ -411,9 +288,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
                     {/* Runtime (Space Grotesk 13px, text-music-accent when selected) */}
                     <span
-                      className={`font-sans text-[13px] truncate select-none ${
-                        isSelected ? "text-music-accent font-medium" : "text-[#EDEDE8]"
-                      }`}
+                      className={`font-sans text-[13px] truncate select-none ${isSelected ? "text-music-accent font-medium" : "text-[#EDEDE8]"
+                        }`}
                     >
                       {sitting.durationStr}
                     </span>
@@ -442,7 +318,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
           <SessionHistogram
             histogram={histogram}
             selectedSessionId={selectedSessionId}
-            onSelectSession={handleSelectSitting}
+            onSelectSession={handleSelectSession}
           />
         </div>
       </div>

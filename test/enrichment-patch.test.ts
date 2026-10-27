@@ -140,21 +140,21 @@ test("patchStreamLogWithEnrichment - patches entries and marks delisted items", 
       {
         id: "play-1",
         trackId: "track-10",
-        timeStr: "12:00",
+        playedAt: "2026-10-01T12:00:00Z",
         title: "Track 10",
         artist: "Artist 10",
         album: "Album 10",
-        duration: "3:10",
+        durationMs: 190000,
         albumImageUrl: null,
       },
       {
         id: "play-2",
         trackId: "track-20",
-        timeStr: "12:05",
+        playedAt: "2026-10-01T12:05:00Z",
         title: "Track 20",
         artist: "Artist 20",
         album: "Album 20",
-        duration: "2:50",
+        durationMs: 170000,
         albumImageUrl: null,
       },
     ],
@@ -182,64 +182,18 @@ test("patchStreamLogWithEnrichment - patches entries and marks delisted items", 
   assert.equal(updated?.entries[1].albumImageUrl, null);
 });
 
-test("patchSessionWithEnrichment - patches sittingTracks and active sittings", () => {
-  const initialSession: SessionData = {
-    isOpen: true,
-    tagTime: "22:15 CDT",
-    metrics: ["45m", "10", "5", "21:30"],
-    sittingTracks: [
-      {
-        id: "track-30",
-        timestamp: "21:30",
-        title: "Track 30",
-        artist: "Artist 30",
-        album: "Album 30",
-        swatchColor: "#444444",
-        albumImageUrl: null,
-      },
-    ],
-    previousSittings: [],
-    sittings: [
-      {
-        id: "sess-1",
-        dateStr: "2026-10-01",
-        tagTime: "22:15 CDT",
-        startTime: "21:30",
-        trackCount: 1,
-        uniqueArtistsCount: 1,
-        runtimeMinutes: 45,
-        runtimeStr: "45m",
-        isOpen: true, analysis: { firstPlaysCount: 0, totalTracks: 0, topSong: null, topAlbum: { title: "", count: 0 }, topArtist: { name: "", count: 0 } },
-        tracks: [
-          {
-            id: "track-30",
-            timestamp: "21:30",
-            title: "Track 30",
-            artist: "Artist 30",
-            album: "Album 30",
-            swatchColor: "#444444",
-            albumImageUrl: null,
-          },
-        ],
-      },
-    ],
-  };
-
-  const enrichmentMap = new Map([
-    [
-      "track-30",
-      {
-        albumImageUrl: "https://example.com/track-30.jpg",
-        artistId: "art-30",
-        albumId: "alb-30",
-      },
-    ],
-  ]);
-
-  const updated = patchSessionWithEnrichment(initialSession, enrichmentMap);
-
-  assert.notEqual(updated, null);
-  assert.equal(updated?.sittingTracks[0].albumImageUrl, "https://example.com/track-30.jpg");
-  assert.equal(updated?.sittings?.[0].tracks?.[0].albumImageUrl, "https://example.com/track-30.jpg");
-  assert.equal(updated?.sittings?.[0].tracks?.[0].artistId, "art-30");
+test("patchSessionWithEnrichment patches canonical Session tracks", () => {
+  const initialSession: SessionData = {sessions:[{
+    id:"session-1",startedAt:"2026-10-01T21:30:00Z",endedAt:"2026-10-01T21:30:00Z",runtimeMs:180000,
+    trackCount:1,uniqueArtistsCount:1,isOpen:true,
+    analysis:{firstPlaysCount:0,totalTracks:1,topTrack:null,topAlbum:{title:"",count:0},topArtist:{name:"",count:0}},
+    tracks:[{id:"track-30",playId:"play-30",playedAt:"2026-10-01T21:30:00Z",durationMs:180000,
+      title:"Track 30",artist:"Artist 30",album:"Album 30",swatchColor:"#444444",albumImageUrl:null}],
+  }]};
+  const enrichmentMap=new Map([["track-30",{albumImageUrl:"https://example.com/track-30.jpg",artistId:"art-30",albumId:"alb-30"}]]);
+  const updated=patchSessionWithEnrichment(initialSession,enrichmentMap);
+  assert.equal(updated?.sessions[0].tracks[0].albumImageUrl,"https://example.com/track-30.jpg");
+  assert.equal(updated?.sessions[0].tracks[0].artistId,"art-30");
+  assert.equal(updated?.sessions[0].tracks[0].playedAt,initialSession.sessions[0].tracks[0].playedAt);
+  assert.equal("sittings" in updated!,false);
 });

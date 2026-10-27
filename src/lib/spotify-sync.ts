@@ -152,7 +152,6 @@ export async function syncSpotify(): Promise<SyncResult> {
 
     // 3c. Bulk Upsert Tracks
     const tracksToUpsert: TrackUpsertItem[] = Array.from(candidateTrackIds)
-      .filter((id) => !existingTrackIds.has(id))
       .map((id) => {
         const item = newStreamItems.find((i) => i.track.id === id)!;
         const track = item.track;

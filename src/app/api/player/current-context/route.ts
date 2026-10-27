@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
 import { isDbConfigured } from "@/lib/db";
 import { getStreamLog } from "@/lib/db/queries/stream-log";
-import { DEFAULT_FALLBACK_TRACK } from "@/components/LivePlayerView";
+import { DEFAULT_FALLBACK_TRACK } from "@/components/views/LivePlayerView";
 
 export const dynamic = "force-dynamic";
 

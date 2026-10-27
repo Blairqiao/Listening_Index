@@ -1,22 +1,9 @@
-/**
- * The owner's own Spotify connection, stored in the database.
- *
- * The dashboard reads the owner's playback and history with a refresh token.
- * That token used to come only from SPOTIFY_REFRESH_TOKEN, which means a
- * terminal script and a hosting dashboard before anything works. Connecting
- * from the settings menu stores it here instead, encrypted exactly like a
- * guest's player token.
- *
- * It shares the guests' table under a reserved id rather than growing a new
- * one. Guest ids are Spotify user ids, which never begin with an underscore,
- * and readGuestSession refuses reserved ids — so no guest session, forged or
- * otherwise, can resolve to this record.
- */
+/** Database-backed Spotify credentials for the site owner. */
 
 import { isDbConfigured } from "@/lib/db";
 import {
-  getOwnerPlaybackToken,
-  getOwnerSpotifyStatus,
+  getOwnerPlaybackCredential,
+  rotateOwnerPlaybackToken,
   saveOwnerPlaybackToken,
   deleteOwnerPlaybackToken,
 } from "@/lib/db/queries/config";
@@ -24,6 +11,7 @@ import {
 export interface OwnerCredential {
   displayName: string | null;
   refreshToken: string;
+  revision?: string;
 }
 
 let mockOwnerCredential: OwnerCredential | null | undefined = undefined;
@@ -44,14 +32,7 @@ export async function getOwnerCredential(): Promise<OwnerCredential | null> {
     return mockOwnerCredential;
   }
   if (!canStoreOwnerCredential()) return null;
-  try {
-    const token = await getOwnerPlaybackToken();
-    if (!token) return null;
-    const status = await getOwnerSpotifyStatus();
-    return { displayName: status.displayName, refreshToken: token };
-  } catch {
-    return null;
-  }
+  return getOwnerPlaybackCredential();
 }
 
 export async function saveOwnerCredential(
@@ -63,4 +44,11 @@ export async function saveOwnerCredential(
 
 export async function clearOwnerCredential(): Promise<void> {
   await deleteOwnerPlaybackToken();
+}
+
+export async function rotateOwnerCredential(
+  credential: OwnerCredential,
+  refreshToken: string
+): Promise<string | null> {
+  return rotateOwnerPlaybackToken(credential.revision ?? "0", credential.refreshToken, refreshToken);
 }

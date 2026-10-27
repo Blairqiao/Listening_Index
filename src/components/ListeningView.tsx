@@ -2,28 +2,28 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { ListeningHeader } from "@/components/ListeningHeader";
-import { ModeTabs } from "@/components/ModeTabs";
-import { ControlRow } from "@/components/ControlRow";
-import { MetricRibbon } from "@/components/MetricRibbon";
-import { LivePlayerView } from "@/components/LivePlayerView";
-import { OverviewView } from "@/components/OverviewView";
-import { StreamLogView } from "@/components/StreamLogView";
-import { SessionView } from "@/components/SessionView";
-import { ListeningFooter } from "@/components/ListeningFooter";
+import { ListeningHeader } from "@/components/listening-view/ListeningHeader";
+import { ModeTabs } from "@/components/listening-view/ModeTabs";
+import { ControlRow } from "@/components/listening-view/ControlRow";
+import { MetricRibbon } from "@/components/listening-view/MetricRibbon";
+import { LivePlayerView } from "@/components/views/LivePlayerView";
+import { OverviewView } from "@/components/views/OverviewView";
+import { StreamLogView } from "@/components/views/StreamLogView";
+import { SessionView } from "@/components/views/SessionView";
+import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 const CustomizationModal = dynamic(
-  () => import("@/components/CustomizationModal").then((mod) => mod.CustomizationModal),
+  () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
 );
 const UploadModal = dynamic(
-  () => import("@/components/UploadModal").then((mod) => mod.UploadModal),
+  () => import("@/components/modals/upload-modal/UploadModal").then((mod) => mod.UploadModal),
   { ssr: false }
 );
 const AdminSpotifyModal = dynamic(
-  () => import("@/components/AdminSpotifyModal").then((mod) => mod.AdminSpotifyModal),
+  () => import("@/components/modals/admin-spotify-modal/AdminSpotifyModal").then((mod) => mod.AdminSpotifyModal),
   { ssr: false }
 );
-import { AdminLoginModal } from "@/components/AdminLoginModal";
+import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import type { Mode, RangeKey } from "@/lib/types";
@@ -41,6 +41,7 @@ import {
   patchSessionWithEnrichment,
   type EnrichmentPatchData,
 } from "@/lib/enrichment-patch";
+import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
   formatOverviewMetrics,
@@ -164,6 +165,7 @@ interface ListeningViewProps {
   initialStreamLog?: StreamLogData | null;
   initialSession?: SessionData | null;
   initialConfig?: SiteConfigState | null;
+  initialVisitorTimezone?: string;
   initialTrack?: {
     id?: string;
     name?: string;
@@ -185,21 +187,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialRange = "1w",
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [isUploadProcessing, setIsUploadProcessing] = useState(false);
+  const [, setIsUploadProcessing] = useState(false);
 
   const {
     config,
+    visitorTimezone,
     updateConfig,
     openModal,
-    closeModal,
-    isModalOpen,
     isAuthenticated,
-    isAdminLoginModalOpen,
-    openAdminLoginModal,
-    closeAdminLoginModal,
     isAdminSpotifyModalOpen,
     openAdminSpotifyModal,
-    logout,
   } = useConfig();
 
   const [spotifyStatus, setSpotifyStatus] = useState<{
@@ -254,8 +251,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     playerStatus,
     handleTransferPlayback,
   } = usePlayer();
-  const tzRef = useRef<string>(config.timezone);
-// Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
+  const tzRef = useRef<string>(visitorTimezone);
+  const requestGenerationRef = useRef(0);
+  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(initialMode, isAuthenticated));
 
   // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
@@ -271,7 +269,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ livePlayerLayout: next }),
-    }).catch(() => {});
+    }).catch(() => { });
   }, [config.livePlayerLayout, updateConfig]);
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
@@ -391,6 +389,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [loadedPlaysCount, setLoadedPlaysCount] = useState<number>(() => {
     return initialStreamLog?.entries?.length || 50;
   });
+  const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      return Math.min(25, initialStreamLog?.entries?.length || 25);
+    }
+    return null;
+  });
   const loadedPlaysCountRef = useRef<number>(loadedPlaysCount);
   useEffect(() => {
     loadedPlaysCountRef.current = loadedPlaysCount;
@@ -402,7 +406,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return initialSession || null;
   });
 
-// In-memory track stats cache to avoid re-fetching on already-seen tracks
+  // In-memory track stats cache to avoid re-fetching on already-seen tracks
   const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
   const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
 
@@ -553,12 +557,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [lastSyncedAt, computeSyncedAgo]);
 
   // Active session sitting state for Mode 3
-  const [selectedSittingId, setSelectedSittingId] = useState<string | undefined>(undefined);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
   // Fetch Overview data from server (cached on server, reset on sync)
   const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
+    const timezone = tzRef.current;
+    const generation = requestGenerationRef.current;
     try {
-      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
       const url = `/api/listening/overview?range=${rangeToFetch}${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
@@ -566,6 +572,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       });
       if (res.ok) {
         const data = (await res.json()) as OverviewData;
+        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return null;
         if (data && data.metrics) {
           setOverviewCache((prev) => {
             const next = { ...prev, [rangeToFetch]: data };
@@ -592,7 +599,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       console.error("[API FETCH] Overview query error:", err);
     }
     // Fallback if fetch returned error: unfreeze to requested range
-    if (activeRangeRef.current === rangeToFetch) {
+    if (generation === requestGenerationRef.current && timezone === tzRef.current && activeRangeRef.current === rangeToFetch) {
       setDisplayedRange(rangeToFetch);
     }
     return null;
@@ -609,16 +616,18 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     overviewCacheRef,
     setDisplayedRange,
     fetchOverview,
-    setSelectedSittingId,
+    setSelectedSessionId,
     sanitizeActiveMode,
   });
 
   // Fetch Stream Log from server (cached on server, reset on sync)
-  const fetchStreamLog = useCallback(async (countToFetch?: number) => {
+  const fetchStreamLog = useCallback(async (countToFetch?: number, aggregatesOnly = false) => {
+    const timezone = tzRef.current;
+    const generation = requestGenerationRef.current;
     try {
       // Background / revalidation fetches only head slice (50) to prevent downloading hundreds of historical rows
-      const depth = countToFetch || 50;
-      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const depth = aggregatesOnly ? 1 : countToFetch || 50;
+      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
       const url = `/api/listening/stream-log?limit=${depth}${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
@@ -626,8 +635,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       });
       if (res.ok) {
         const data = (await res.json()) as StreamLogData;
+        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
         if (data && data.entries) {
           setStreamLogState((prev) => {
+            if (aggregatesOnly && prev) return { ...prev, rawMetrics: data.rawMetrics, metrics: data.metrics };
             let next: StreamLogData;
             if (!prev || countToFetch) {
               next = data;
@@ -652,7 +663,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             }
             return next;
           });
-          setLoadedPlaysCount((prev) => (countToFetch ? data.entries.length : Math.max(prev, data.entries.length)));
+          if (!aggregatesOnly) setLoadedPlaysCount((prev) => (countToFetch ? data.entries.length : Math.max(prev, data.entries.length)));
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -682,6 +693,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     ) {
       return;
     }
+    const timezone = tzRef.current;
+    const generation = requestGenerationRef.current;
     setIsLoadingMorePlays(true);
     try {
       const cursor = streamLogState.nextCursor;
@@ -689,25 +702,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const lastEntry = streamLogState.entries[streamLogState.entries.length - 1];
       const prevPlayedAt = lastEntry?.playedAt || "";
 
-      // Find the dayGroup of the last entry by scanning backward
-      let prevDayGroup = "";
-      for (let i = streamLogState.entries.length - 1; i >= 0; i--) {
-        if (streamLogState.entries[i].dayGroup) {
-          prevDayGroup = streamLogState.entries[i].dayGroup!;
-          break;
-        }
-      }
-
       const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
       const limit = isMobile ? "25" : "50";
 
-      const tzQuery = tzRef.current ? `&tz=${encodeURIComponent(tzRef.current)}` : "";
+      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
       const params = new URLSearchParams({
         limit,
         cursor,
         cursorId,
         prevPlayedAt,
-        prevDayGroup,
       });
 
       const url = `/api/listening/stream-log?${params.toString()}${tzQuery}`;
@@ -718,6 +721,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
       if (res.ok) {
         const data = (await res.json()) as StreamLogData;
+        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
         if (data && data.entries) {
           setStreamLogState((prev) => {
             if (!prev) return data;
@@ -755,8 +759,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Fetch Current Session from server (cached on server, reset on sync)
   const fetchSession = useCallback(async () => {
+    const timezone = tzRef.current;
+    const generation = requestGenerationRef.current;
     try {
-      const tzQuery = tzRef.current ? `?tz=${encodeURIComponent(tzRef.current)}` : "";
+      const tzQuery = timezone ? `?tz=${encodeURIComponent(timezone)}` : "";
       const url = `/api/listening/session${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
@@ -764,7 +770,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       });
       if (res.ok) {
         const data = (await res.json()) as SessionData;
-        if (data && (data.sittingTracks || data.previousSittings)) {
+        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
+        if (data && data.sessions) {
           setSessionState(() => {
             if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
               return patchSessionWithEnrichment(
@@ -786,16 +793,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }
   }, []);
 
-  // When config.timezone is modified, invalidate cache and reload telemetry for the new timezone
   useEffect(() => {
-    if (tzRef.current !== config.timezone) {
-      tzRef.current = config.timezone;
+    if (tzRef.current !== visitorTimezone) {
+      tzRef.current = visitorTimezone;
+      requestGenerationRef.current++;
       setOverviewCache({});
-      fetchOverview(activeRangeRef.current);
-      fetchStreamLog();
-      fetchSession();
+      void fetchOverview(activeRangeRef.current);
+      void fetchStreamLog(undefined, true);
     }
-  }, [config.timezone, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [visitorTimezone, fetchOverview, fetchStreamLog]);
 
   // Initial load: fetch all endpoints in background if not already available
   useEffect(() => {
@@ -823,6 +829,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Manual sync trigger: executes ingestion, purges server cache, and refetches active views
   const handleTriggerSync = useCallback(async () => {
     if (!isAuthenticated || isSyncing) return;
+    requestGenerationRef.current++;
     setIsSyncing(true);
     try {
       const res = await fetch("/api/sync", {
@@ -839,15 +846,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
         // Concurrently recall endpoints (server cache was purged by /api/sync)
         // Keep existing views frozen and visible (dimmed) during sync - DO NOT wipe cache upfront
+        const range = activeRangeRef.current;
+        const generation = requestGenerationRef.current;
         const [newOverview] = await Promise.all([
-          fetchOverview(activeRange),
+          fetchOverview(range),
           fetchStreamLog(),
           fetchSession(),
         ]);
 
         // Invalidate stale non-active ranges in overviewCache so switching to them fetches fresh data
-        if (newOverview) {
-          setOverviewCache({ [activeRange]: newOverview });
+        if (newOverview && generation === requestGenerationRef.current) {
+          setOverviewCache({ [range]: newOverview });
         }
       }
     } catch (err) {
@@ -855,22 +864,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     } finally {
       setIsSyncing(false);
     }
-  }, [isSyncing, isAuthenticated, activeRange, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [isSyncing, isAuthenticated, fetchOverview, fetchStreamLog, fetchSession]);
 
   // Background silent refetch helper (used by auto-sync schedule and focus revalidation)
   const refetchActiveData = useCallback(async () => {
     try {
-      const [newOverview] = await Promise.all([
+      await Promise.all([
         fetchOverview(activeRangeRef.current),
         fetchStreamLog(),
         fetchSession(),
       ]);
-      if (newOverview) {
-        setOverviewCache((prev) => ({
-          ...prev,
-          [activeRangeRef.current]: newOverview,
-        }));
-      }
+
     } catch (err) {
       console.error("[AUTO REFETCH] Error updating telemetry:", err);
     }
@@ -878,17 +882,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // When an upload batch completes, invalidate cached overview metrics across all ranges and refetch
   const handleUploadComplete = useCallback(async () => {
+    requestGenerationRef.current++;
     try {
       // Invalidate client range cache so switching ranges displays the newly imported plays
       setOverviewCache({});
-      const [newOverview] = await Promise.all([
+      await Promise.all([
         fetchOverview(activeRangeRef.current),
         fetchStreamLog(),
         fetchSession(),
       ]);
-      if (newOverview) {
-        setOverviewCache({ [activeRangeRef.current]: newOverview });
-      }
+
     } catch (err) {
       console.error("[UPLOAD COMPLETE] Error refreshing listening data:", err);
     }
@@ -1005,39 +1008,21 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       entries: [],
     };
 
-  const sessionData: SessionData =
-    sessionState || {
-      isOpen: initialSession?.isOpen ?? false,
-      tagTime: "--",
-      metrics: ["--", "--", "--", "--"],
-      sittingTracks: [],
-      previousSittings: [],
-    };
-
-  // Selected sitting lookup for Mode 2
-  const activeSitting = React.useMemo(() => {
-    if (!sessionData.sittings || sessionData.sittings.length === 0) return null;
-    return (
-      sessionData.sittings.find((s) => s.id === selectedSittingId) ||
-      sessionData.sittings[0]
-    );
-  }, [sessionData.sittings, selectedSittingId]);
-
-  const totalSessions =
-    sessionData.sittings?.length || sessionData.previousSittings?.length || 1;
-  const selectedSessionNumber = React.useMemo(() => {
-    if (!sessionData.sittings || sessionData.sittings.length === 0) return 1;
-    const idx = sessionData.sittings.findIndex((s) => s.id === selectedSittingId);
-    return idx >= 0 ? idx + 1 : 1;
-  }, [sessionData.sittings, selectedSittingId]);
+  const sessionData: SessionData = sessionState || { sessions: [] };
+  const activeSession = React.useMemo(() => {
+    const session = sessionData.sessions.find(session => session.id === selectedSessionId) || sessionData.sessions[0];
+    return session ? presentSession(session, visitorTimezone) : null;
+  }, [sessionData.sessions, selectedSessionId, visitorTimezone]);
+  const totalSessions = sessionData.sessions.length || 1;
+  const selectedSessionNumber = Math.max(1, sessionData.sessions.findIndex(session => session.id === selectedSessionId) + 1);
 
   const streamLogDateSpan = React.useMemo(() => {
     const entries = streamLogData.entries;
     if (!entries || entries.length === 0) return "STREAM LOG";
     const newest = entries[0]?.playedAt;
     const oldest = entries[entries.length - 1]?.playedAt;
-    return formatStreamLogDateSpan(oldest, newest, config.timezone);
-  }, [streamLogData.entries, config.timezone]);
+    return formatStreamLogDateSpan(oldest, newest, visitorTimezone);
+  }, [streamLogData.entries, visitorTimezone]);
 
   // Active enrichment candidates for viewport micro-enrichment across modes
   const activeEnrichmentCandidates = React.useMemo(() => {
@@ -1057,7 +1042,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       }));
     }
     if (activeMode === 2) {
-      const tracks = activeSitting?.tracks || sessionData.sittingTracks || [];
+      const tracks = activeSession?.tracks || [];
       return tracks.map((t) => ({
         id: t.id,
         trackId: t.id,
@@ -1070,8 +1055,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     activeMode,
     currentOverview.topTracks,
     streamLogData.entries,
-    activeSitting,
-    sessionData.sittingTracks,
+    activeSession,
   ]);
 
   useDeferredEnrichment({
@@ -1082,16 +1066,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Derived session metrics for Mode 3
   const currentSessionMetrics = React.useMemo((): [string, string, string, string] => {
-    if (activeSitting) {
+    if (activeSession) {
       return [
-        activeSitting.runtimeStr,
-        String(activeSitting.trackCount),
-        String(activeSitting.uniqueArtistsCount),
-        activeSitting.startTime,
+        activeSession.runtimeStr,
+        String(activeSession.trackCount),
+        String(activeSession.uniqueArtistsCount),
+        activeSession.startTime,
       ];
     }
-    return sessionData.metrics;
-  }, [activeSitting, sessionData.metrics]);
+    return ["--", "--", "--", "--"];
+  }, [activeSession]);
 
   // Active metrics per mode
   const overviewMetrics: [string, string, string, string] =
@@ -1122,8 +1106,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const currentMetrics = metricByMode[activeMode];
 
   const sessionTagTime =
-    activeSitting?.tagTime || sessionData.tagTime || (sessionData.isOpen ? "LIVE" : "--");
-  const isSystemLive = sessionData.isOpen;
+    activeSession?.tagTime || "--";
+  const isSystemLive = sessionData.sessions[0]?.isOpen || false;
 
 
   return (
@@ -1131,9 +1115,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       {/* Black veil holding the screen as long as needed until real data is ready */}
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-300 ease-in-out ${
-          isDataReady ? "opacity-0" : "opacity-100"
-        }`}
+        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-300 ease-in-out ${isDataReady ? "opacity-0" : "opacity-100"
+          }`}
       />
       <main className="max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] flex flex-col justify-between ">
         <div className="flex-1">
@@ -1157,12 +1140,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             range={activeRange}
             onSelectRange={handleSelectRange}
             logStartDate={currentOverview.logStartDate}
-            isSessionOpen={sessionData.isOpen}
+            isSessionOpen={isSystemLive}
             sessionTagTime={sessionTagTime}
             isSyncing={isSyncing}
             isAuthenticated={isAuthenticated}
             onTriggerSync={handleTriggerSync}
-            streamLogCount={streamLogData.entries.length || loadedPlaysCount}
+            streamLogCount={visibleStreamLogCount ?? (streamLogData.entries.length || loadedPlaysCount)}
             streamLogDateSpan={streamLogDateSpan}
             sessionNumber={selectedSessionNumber}
             totalSessions={totalSessions}
@@ -1187,13 +1170,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player) */}
           <div
-            className={`h-auto ${
-              activeMode === 3 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
-            } transition-opacity duration-150 ${
-              isSyncing || (activeMode === 0 && isRangeLoading)
+            className={`h-auto ${activeMode === 3 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+              } transition-opacity duration-150 ${isSyncing || (activeMode === 0 && isRangeLoading)
                 ? "opacity-40 pointer-events-none"
                 : "opacity-100"
-            }`}
+              }`}
           >
             {activeMode === 0 && (
               <OverviewView
@@ -1214,18 +1195,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 hasMore={streamLogState?.hasMore ?? (streamLogData.entries.length >= 50)}
                 totalPlays={streamLogData.metrics[0]}
                 isLoading={!streamLogState && isDbConfigured}
+                onVisibleCountChange={setVisibleStreamLogCount}
               />
             )}
 
             {activeMode === 2 && (
               <SessionView
-                isOpen={sessionData.isOpen}
-                sittingTracks={sessionData.sittingTracks}
-                previousSittings={sessionData.previousSittings}
-                sittings={sessionData.sittings}
-                histogram={sessionData.histogram}
-                selectedSittingId={selectedSittingId}
-                onSelectSitting={(id) => setSelectedSittingId(id)}
+                sessions={sessionData.sessions}
+                selectedSessionId={selectedSessionId}
+                onSelectSession={setSelectedSessionId}
               />
             )}
 
@@ -1273,6 +1251,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
 export const ListeningView: React.FC<ListeningViewProps> = ({
   initialConfig,
+  initialVisitorTimezone,
   isDbConfigured = true,
   initialIsAuthenticated,
   ...props
@@ -1280,6 +1259,7 @@ export const ListeningView: React.FC<ListeningViewProps> = ({
   return (
     <ConfigProvider
       initialConfig={initialConfig || undefined}
+      initialVisitorTimezone={initialVisitorTimezone}
       isDbConfigured={isDbConfigured}
       initialIsAuthenticated={initialIsAuthenticated}
     >

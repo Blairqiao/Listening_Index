@@ -3,9 +3,6 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import {
   TOKEN_SCOPES,
-  TOKEN_SCOPE,
-  Token_Scope,
-  PLAYER_SCOPES,
   calculateTokenExpiration,
 } from "../src/lib/spotify-auth";
 import { createSessionToken, ADMIN_COOKIE_NAME } from "../src/lib/admin-auth";
@@ -13,7 +10,7 @@ import { PLAYER_VERIFIER_COOKIE } from "../src/lib/user-auth";
 
 process.env.ADMIN_PASSWORD = "test-admin-secret-password-123";
 
-test("TOKEN_SCOPES includes all 7 unified scopes and aliases are exported", () => {
+test("TOKEN_SCOPES includes the required unified scopes", () => {
   const requiredScopes = [
     "streaming",
     "user-read-email",
@@ -26,9 +23,6 @@ test("TOKEN_SCOPES includes all 7 unified scopes and aliases are exported", () =
   for (const scope of requiredScopes) {
     assert.ok(TOKEN_SCOPES.includes(scope), `Missing scope: ${scope}`);
   }
-  assert.equal(TOKEN_SCOPE, TOKEN_SCOPES);
-  assert.equal(Token_Scope, TOKEN_SCOPES);
-  assert.equal(PLAYER_SCOPES, TOKEN_SCOPES);
 });
 
 test("calculateTokenExpiration calculates daysRemaining and isExpiringSoon accurately", () => {
@@ -188,6 +182,7 @@ test("isOwnerSpotifyConfigured and resolveCredentials support database tokens wi
       refreshToken: "mock-db-refresh-token",
       fromDatabase: true,
       displayName: "Test Owner",
+      revision: "0",
     });
   } finally {
     __setMockOwnerCredentialForTesting(undefined);
@@ -239,18 +234,18 @@ test("getRedirectUri resolves production HTTPS origins, loopback origins, and av
     const localReq = new NextRequest("http://localhost:8888/api/owner/spotify");
     assert.equal(getRedirectUri(localReq), "http://127.0.0.1:8888/callback");
 
-    // 6. Verify /api/player/token/route.ts uses getRedirectUri(request) instead of hardcoded 127.0.0.1:8888
+    // Authorization initiation uses the shared redirect helper.
     const tokenRouteSource = fs.readFileSync(
-      path.resolve(__dirname, "../src/app/api/player/token/route.ts"),
+      path.resolve(__dirname, "../src/app/api/player/login/route.ts"),
       "utf-8"
     );
     assert.ok(
       !tokenRouteSource.includes('"http://127.0.0.1:8888/callback"'),
-      "src/app/api/player/token/route.ts must not hardcode http://127.0.0.1:8888/callback"
+      "src/app/api/player/login/route.ts must not hardcode http://127.0.0.1:8888/callback"
     );
     assert.ok(
       tokenRouteSource.includes("getRedirectUri(request)"),
-      "src/app/api/player/token/route.ts must fall back to getRedirectUri(request)"
+      "src/app/api/player/login/route.ts must fall back to getRedirectUri(request)"
     );
   } finally {
     if (prevRedirect !== undefined) process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI = prevRedirect;

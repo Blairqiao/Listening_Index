@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 test("ControlRow Mode 3 removes manual link and unlink buttons", () => {
-  const controlRowPath = path.resolve(__dirname, "../src/components/ControlRow.tsx");
+  const controlRowPath = path.resolve(__dirname, "../src/components/listening-view/ControlRow.tsx");
   const content = fs.readFileSync(controlRowPath, "utf-8");
 
   // Mode 3 in ControlRow must not render manual link/unlink buttons
@@ -26,7 +26,7 @@ test("ControlRow Mode 3 removes manual link and unlink buttons", () => {
   );
 });
 
-test("PlayerContext synchronizes token status automatically via status events and auth messages", () => {
+test("PlayerContext synchronizes token status through trusted status events and popup completion", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
   const content = fs.readFileSync(playerContextPath, "utf-8");
 
@@ -36,15 +36,15 @@ test("PlayerContext synchronizes token status automatically via status events an
     "PlayerContext must listen to spotify-status-changed custom event"
   );
 
-  // Must listen to AUTH_MESSAGE or popup completion
+  // The popup helper validates the browser message before returning.
   assert.ok(
-    content.includes("AUTH_MESSAGE"),
-    "PlayerContext must handle AUTH_MESSAGE popup message"
+    content.includes("beginLoginPopup"),
+    "PlayerContext must use validated popup completion"
   );
 });
 
 test("AdminSpotifyModal dispatches spotify-status-changed on connect and disconnect", () => {
-  const modalPath = path.resolve(__dirname, "../src/components/AdminSpotifyModal.tsx");
+  const modalPath = path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx");
   const content = fs.readFileSync(modalPath, "utf-8");
 
   assert.ok(

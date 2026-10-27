@@ -2,7 +2,9 @@
 
 import React from "react";
 import { StreamLogItem } from "@/lib/mock-listening-data";
-import { Artwork } from "./Artwork";
+import { useConfig } from "@/context/ConfigContext";
+import { presentStreamLog } from "@/lib/listening-presentation";
+import { Artwork } from "../Artwork";
 
 interface StreamLogViewProps {
   entries: StreamLogItem[];
@@ -11,16 +13,20 @@ interface StreamLogViewProps {
   hasMore?: boolean;
   totalPlays?: string;
   isLoading?: boolean;
+  onVisibleCountChange?: (count: number) => void;
 }
 
 export const StreamLogView: React.FC<StreamLogViewProps> = ({
-  entries,
+  entries: rawEntries,
   onLoadMore,
   isLoadingMore = false,
   hasMore = false,
   totalPlays,
   isLoading = false,
+  onVisibleCountChange,
 }) => {
+  const { visitorTimezone } = useConfig();
+  const entries = React.useMemo(() => presentStreamLog(rawEntries, visitorTimezone), [rawEntries, visitorTimezone]);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   const [isMobile, setIsMobile] = React.useState<boolean>(() => {
@@ -58,6 +64,10 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
 
   const renderedEntries = isMobile ? entries.slice(0, mobileVisibleCount) : entries;
   const canLoadMore = hasMore || (isMobile && mobileVisibleCount < entries.length);
+
+  React.useEffect(() => {
+    onVisibleCountChange?.(renderedEntries.length);
+  }, [renderedEntries.length, onVisibleCountChange]);
 
   const handleScrollToTop = () => {
     if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
@@ -240,9 +250,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     disabled={isLoadingMore}
                     onClick={handleLoadMore}
-                    className={`group font-mono text-[11px] tracking-[0.1em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${
-                      isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
-                    }`}
+                    className={`group font-mono text-[11px] tracking-[0.1em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
+                      }`}
                   >
                     <span className="md:hidden">
                       {isLoadingMore ? "Fetching plays..." : "Load 25 more plays"}

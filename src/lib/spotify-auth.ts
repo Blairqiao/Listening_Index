@@ -4,7 +4,7 @@ import { requestOrigin } from "./request-origin";
 /** Posted by the callback tab once tokens are stored. */
 export const AUTH_MESSAGE = "spotify-player-auth";
 
-/** Unified 7-scope super-set powering both background sync and live playback. */
+/** Nine scopes powering both background sync and live playback. */
 export const TOKEN_SCOPES = [
   "streaming",
   "user-read-email",
@@ -16,12 +16,6 @@ export const TOKEN_SCOPES = [
   "playlist-read-private",
   "playlist-read-collaborative",
 ].join(" ");
-
-export const TOKEN_SCOPE = TOKEN_SCOPES;
-export const Token_Scope = TOKEN_SCOPES;
-
-/** @deprecated Renamed to TOKEN_SCOPES / TOKEN_SCOPE */
-export const PLAYER_SCOPES = TOKEN_SCOPES;
 
 export interface TokenExpirationStatus {
   daysRemaining: number | null;
@@ -136,15 +130,10 @@ export async function beginLoginPopup(): Promise<boolean | null> {
       resolve(ok);
     };
     const onMessage = (e: MessageEvent) => {
-      const isAllowedOrigin =
-        e.origin === window.location.origin ||
-        e.origin === "http://127.0.0.1:8888" ||
-        e.origin === "http://localhost:8888" ||
-        e.origin === "http://127.0.0.1:3000" ||
-        e.origin === "http://localhost:3000";
-      if (!isAllowedOrigin) return;
-      if (e.data?.type !== AUTH_MESSAGE) return;
-      finish(Boolean(e.data.ok));
+      const callbackOrigin = new URL(getRedirectUri()).origin;
+      if (e.source !== popup || e.origin !== callbackOrigin) return;
+      if (e.data?.type !== AUTH_MESSAGE || typeof e.data.ok !== "boolean") return;
+      finish(e.data.ok);
     };
     window.addEventListener("message", onMessage);
     // A closed popup is the signal when the visitor backs out

@@ -23,24 +23,45 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
+export class CacheCapacityError extends Error {
+  constructor() {
+    super("Listening data is busy. Retry shortly.");
+    this.name = "CacheCapacityError";
+  }
+}
+
 export class KeyedAsyncCache<T> {
   private cache = new Map<string, CacheEntry<T>>();
   private inFlight = new Map<string, Promise<T>>();
 
-  constructor(private readonly ttlMs: number) {}
+  constructor(
+    private readonly ttlMs: number,
+    private readonly maxEntries = 128,
+    private readonly maxInFlight = 16
+  ) {}
 
   get(key: string): T | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
-    if (Date.now() - entry.timestamp > this.ttlMs) {
+    if (Date.now() - entry.timestamp >= this.ttlMs) {
       this.cache.delete(key);
       return undefined;
     }
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.data;
   }
 
   set(key: string, data: T): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
+    const now = Date.now();
+    for (const [entryKey, entry] of this.cache) {
+      if (now - entry.timestamp >= this.ttlMs) this.cache.delete(entryKey);
+    }
+    this.cache.delete(key);
+    this.cache.set(key, { data, timestamp: now });
+    while (this.cache.size > this.maxEntries) {
+      this.cache.delete(this.cache.keys().next().value!);
+    }
   }
 
   async getOrFetch(
@@ -53,8 +74,9 @@ export class KeyedAsyncCache<T> {
 
     let promise = this.inFlight.get(key);
     if (!promise) {
+      if (this.inFlight.size >= this.maxInFlight) throw new CacheCapacityError();
       const startEpoch = getEpoch ? getEpoch() : 0;
-      promise = (async () => {
+      promise = Promise.resolve().then(async () => {
         try {
           const data = await fetcher();
           if (!getEpoch || startEpoch === getEpoch()) {
@@ -62,9 +84,9 @@ export class KeyedAsyncCache<T> {
           }
           return data;
         } finally {
-          this.inFlight.delete(key);
+          if (this.inFlight.get(key) === promise) this.inFlight.delete(key);
         }
-      })();
+      });
       this.inFlight.set(key, promise);
     }
     return promise;
@@ -72,6 +94,6 @@ export class KeyedAsyncCache<T> {
 
   clear(): void {
     this.cache.clear();
-    this.inFlight.clear();
+
   }
 }

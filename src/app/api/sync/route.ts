@@ -4,18 +4,10 @@ import { clearServerCache } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { getCronKey } from "@/lib/db/queries";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
-
-import crypto from "crypto";
-
-function safeCompare(a: string, b: string): boolean {
-  const hashA = crypto.createHash("sha256").update(a).digest();
-  const hashB = crypto.createHash("sha256").update(b).digest();
-  return crypto.timingSafeEqual(hashA, hashB);
-}
 
 let isSyncInProgress = false;
 
@@ -25,35 +17,7 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
     return true;
   }
 
-  // 2. Machine-to-machine calls via Bearer token or ?key= / ?secret= query param
-  let token: string | null = null;
-  const authHeader = request.headers.get("authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.slice(7).trim();
-  }
-  if (!token) {
-    const url = new URL(request.url);
-    const param = url.searchParams.get("key") || url.searchParams.get("secret");
-    if (param) token = param.trim();
-  }
-
-  if (!token) {
-    return false;
-  }
-
-  // Check against database cron_key
-  const cronKey = await getCronKey();
-  if (cronKey && safeCompare(token, cronKey)) {
-    return true;
-  }
-
-  // Backward-compatibility fallback: check against process.env.CRON_SECRET if defined
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && safeCompare(token, cronSecret)) {
-    return true;
-  }
-
-  return false;
+  return isAuthorizedCronRequest(request,{allowLegacySecret:true});
 }
 
 async function handleSync(request: NextRequest) {

@@ -15,7 +15,7 @@ import {
   getRedirectUri,
   resolveRedirectUriDisplay,
 } from "@/lib/spotify-auth";
-import { ScheduledSyncCard } from "./admin-spotify-modal/ScheduledSyncCard";
+import { ScheduledSyncCard } from "./ScheduledSyncCard";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 export interface SpotifyOwnerStatus {

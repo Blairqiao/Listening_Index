@@ -65,20 +65,7 @@ export class AsyncLatchCache<T> {
     this.cached = { value, expiresAt: Date.now() + (customTtlMs ?? this.ttlMs) };
   }
 
-  /**
-   * Peeks at current cache entry without triggering a fetch.
-   */
-  peek(): CacheEntry<T> | null {
-    return this.cached;
-  }
 
-  getInFlight(): Promise<T> | null {
-    return this.inFlight;
-  }
-
-  setInFlight(p: Promise<T> | null): void {
-    this.inFlight = p;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -102,68 +89,3 @@ export function clearDbQueryCaches(): void {
 
 registerCacheClearListener(clearDbQueryCaches);
 
-// ---------------------------------------------------------------------------
-// Backward Compatibility Bridge Exports
-// ---------------------------------------------------------------------------
-
-export function getCachedLastSync(): { value: string | undefined; expiresAt: number } | null {
-  return lastSyncCache.peek();
-}
-
-export function setCachedLastSync(entry: { value: string | undefined; expiresAt: number } | null): void {
-  if (entry) {
-    lastSyncCache.set(entry.value, Math.max(0, entry.expiresAt - Date.now()));
-  } else {
-    lastSyncCache.invalidate();
-  }
-}
-
-export function getInFlightLastSync(): Promise<string | undefined> | null {
-  return lastSyncCache.getInFlight();
-}
-
-export function setInFlightLastSync(p: Promise<string | undefined> | null): void {
-  lastSyncCache.setInFlight(p);
-}
-
-export function getCachedCatalogStatus(): { fullyEnriched: boolean; expiresAt: number } | null {
-  const peek = catalogStatusCache.peek();
-  return peek ? { fullyEnriched: peek.value, expiresAt: peek.expiresAt } : null;
-}
-
-export function setCachedCatalogStatus(entry: { fullyEnriched: boolean; expiresAt: number } | null): void {
-  if (entry) {
-    catalogStatusCache.set(entry.fullyEnriched, Math.max(0, entry.expiresAt - Date.now()));
-  } else {
-    catalogStatusCache.invalidate();
-  }
-}
-
-export function getInFlightCatalogStatus(): Promise<boolean> | null {
-  return catalogStatusCache.getInFlight();
-}
-
-export function setInFlightCatalogStatus(p: Promise<boolean> | null): void {
-  catalogStatusCache.setInFlight(p);
-}
-
-export function getCachedSiteConfig(): { config: SiteConfigState; expiresAt: number } | null {
-  const peek = siteConfigCache.peek();
-  return peek ? { config: peek.value, expiresAt: peek.expiresAt } : null;
-}
-
-export function setCachedSiteConfig(entry: { config: SiteConfigState; expiresAt: number } | null): void {
-  if (entry) {
-    siteConfigCache.set(entry.config, Math.max(0, entry.expiresAt - Date.now()));
-  } else {
-    siteConfigCache.invalidate();
-  }
-}
-
-export function getInFlightSiteConfig(): Promise<SiteConfigState> | null {
-  return siteConfigCache.getInFlight();
-}
-
-export function setInFlightSiteConfig(p: Promise<SiteConfigState> | null): void {
-  siteConfigCache.setInFlight(p);
-}

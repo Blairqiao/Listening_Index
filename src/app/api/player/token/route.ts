@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
-import { getRedirectUri } from "@/lib/spotify-auth";
 import {
-  refreshAccessToken,
-  exchangeAuthorizationCode,
   getAccessToken,
   resetSpotifyTokenCache,
   SpotifyApiError,
 } from "@/lib/spotify";
 import {
   getOwnerPlaybackToken,
-  saveOwnerPlaybackToken,
   deleteOwnerPlaybackToken,
-  getActiveSiteConfig,
 } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
@@ -51,110 +46,6 @@ export async function GET(request: NextRequest) {
       { status: status >= 400 && status < 500 ? status : 502 }
     );
   }
-}
-
-/**
- * POST /api/player/token
- * Links owner playback token via authorization code exchange or direct refresh token,
- * then returns the first active access token.
- * Admin-only.
- */
-export async function POST(request: NextRequest) {
-  if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json(
-      { error: "Admin authentication required", code: "ADMIN_AUTH_REQUIRED" },
-      { status: 401 }
-    );
-  }
-
-  const body = await request.json().catch(() => ({}));
-  const { code, redirectUri, refreshToken } = body;
-  const codeVerifier = body.codeVerifier || body.code_verifier;
-
-  const config = await getActiveSiteConfig();
-  const clientId =
-    process.env.SPOTIFY_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    config.spotifyClientId;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
-  if (!clientId) {
-    return NextResponse.json(
-      { error: "Spotify client ID not configured" },
-      { status: 500 }
-    );
-  }
-
-  if (refreshToken) {
-    const response = await refreshAccessToken(refreshToken, clientId, clientSecret);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: errorData.error_description || "Failed to refresh Spotify token" },
-        { status: response.status >= 400 && response.status < 500 ? response.status : 502 }
-      );
-    }
-
-    const data = (await response.json()) as {
-      access_token: string;
-      expires_in: number;
-      refresh_token?: string;
-    };
-
-    // Persist only after Spotify successfully validates the token
-    const tokenToSave = data.refresh_token || refreshToken;
-    await saveOwnerPlaybackToken(tokenToSave);
-
-    return NextResponse.json({
-      linked: true,
-      accessToken: data.access_token,
-      expiresIn: data.expires_in,
-    });
-  }
-
-  if (code) {
-    const effectiveRedirectUri = redirectUri || body.redirect_uri || getRedirectUri(request);
-    const response = await exchangeAuthorizationCode(
-      code,
-      effectiveRedirectUri,
-      clientId,
-      clientSecret,
-      codeVerifier
-    );
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: errorData.error_description || "Failed to exchange authorization code" },
-        { status: response.status >= 400 && response.status < 500 ? response.status : 502 }
-      );
-    }
-
-    const data = (await response.json()) as {
-      access_token: string;
-      expires_in: number;
-      refresh_token?: string;
-    };
-
-    if (!data.refresh_token) {
-      return NextResponse.json(
-        { error: "Spotify response did not include a refresh token" },
-        { status: 400 }
-      );
-    }
-
-    await saveOwnerPlaybackToken(data.refresh_token);
-
-    return NextResponse.json({
-      linked: true,
-      accessToken: data.access_token,
-      expiresIn: data.expires_in,
-    });
-  }
-
-  return NextResponse.json(
-    { error: "Missing required parameters: code and redirectUri, or refreshToken" },
-    { status: 400 }
-  );
 }
 
 /**

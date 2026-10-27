@@ -154,14 +154,20 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           </div>
         );
       case 1: {
-        const count = streamLogCount || 50;
-        // const total = totalPlays || "--";
+        const count = streamLogCount ?? 50;
+        if (count === 0) {
+          return (
+            <span className="font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+              [ NO TRACKS ]
+            </span>
+          );
+        }
         return (
           <>
-            <span className="sm:hidden font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+            <span className="md:hidden font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
               [ LAST {count} ]
             </span>
-            <span className="hidden sm:inline font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+            <span className="hidden md:inline font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
               [ LAST {count} TRACKS ]
             </span>
           </>

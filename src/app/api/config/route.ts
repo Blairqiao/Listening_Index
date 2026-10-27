@@ -44,14 +44,16 @@ export async function POST(request: NextRequest) {
     const isReset = Boolean(body.resetToDefault);
 
     let targetConfig: SiteConfigState;
+    let wroteToDatabase = false;
 
     if (isReset) {
       targetConfig = await resetActiveSiteConfig();
+      wroteToDatabase = isDbConfigured();
     } else {
       targetConfig = normalizeSiteConfig(body, siteConfig);
 
       if (isDbConfigured()) {
-        await saveActiveSiteConfig(targetConfig);
+        wroteToDatabase = await saveActiveSiteConfig(targetConfig);
       }
     }
 
@@ -69,10 +71,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (!wroteToDatabase && !wroteToFile) {
+      return NextResponse.json({ success: false, error: "Could not persist configuration. Your draft has not been saved." }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
       persistedTo: {
-        database: isDbConfigured(),
+        database: wroteToDatabase,
         file: wroteToFile,
       },
       message: isDbConfigured()

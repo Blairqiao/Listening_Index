@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { SittingAnalysis } from "@/lib/mock-listening-data";
+import { SessionAnalysis } from "@/lib/mock-listening-data";
 
 export interface SessionAnalysisPanelProps {
-  analysis: SittingAnalysis;
+  analysis: SessionAnalysis;
 }
 
 export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ analysis }) => {
-  const activeTopTrack = analysis.topTrack || analysis.topSong;
+  const activeTopTrack = analysis.topTrack;
 
   const topSongHref = useMemo(() => {
     if (!activeTopTrack) return undefined;

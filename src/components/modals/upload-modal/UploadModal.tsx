@@ -6,14 +6,15 @@ import {
   Check,
   AlertTriangle,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { extractAudioHistoryEntries, isAudioHistoryFilename } from "@/lib/zip-utils";
 import { parseHistoryRecords } from "@/lib/history-parser";
 import {
   CatalogEnrichmentCard,
   EnrichmentProgress,
-} from "./upload-modal/CatalogEnrichmentCard";
-import { HistoryDropzone } from "./upload-modal/HistoryDropzone";
+} from "./CatalogEnrichmentCard";
+import { HistoryDropzone } from "./HistoryDropzone";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface UploadModalProps {
@@ -255,6 +256,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none">
           <div className="flex items-center gap-2">
+            <Upload className="w-3.5 h-3.5 text-music-accent" />
             <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#EDEDE8]">
               IMPORT SPOTIFY STREAMING HISTORY
             </h2>

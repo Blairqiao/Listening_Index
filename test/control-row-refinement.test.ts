@@ -26,7 +26,7 @@ test("formatStreamLogDateSpan formats date ranges correctly", () => {
 });
 
 test("ControlRow component supports dynamic scope labels for Stream Log, Sessions, and Live Player", () => {
-  const controlRowPath = path.resolve(__dirname, "../src/components/ControlRow.tsx");
+  const controlRowPath = path.resolve(__dirname, "../src/components/listening-view/ControlRow.tsx");
   const content = fs.readFileSync(controlRowPath, "utf-8");
 
   // Mode 1: uses dateSpan / streamLogDateSpan
@@ -55,7 +55,7 @@ test("ControlRow component supports dynamic scope labels for Stream Log, Session
 });
 
 test("LivePlayerView houses context selector inside playback controls without redundant middle device band", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   // Must not have the old separate "Device & Playback Context Row"

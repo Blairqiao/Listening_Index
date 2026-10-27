@@ -1,5 +1,5 @@
 import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries/types";
-import type { RangeKey, SittingItem } from "@/lib/types";
+import type { RangeKey, SessionItem } from "@/lib/types";
 
 export interface EnrichmentPatchData {
   albumImageUrl?: string | null;
@@ -118,7 +118,7 @@ export function patchSessionWithEnrichment(
 
   let sessionChanged = false;
 
-  const patchTrack = (track: SittingItem): SittingItem => {
+  const patchTrack = (track: SessionItem): SessionItem => {
     const trackId = track.id;
     const match = enrichedMap.get(trackId);
     const isDelisted = Boolean(delistedSet?.has(trackId));
@@ -136,8 +136,7 @@ export function patchSessionWithEnrichment(
     return track;
   };
 
-  const nextSittingTracks = session.sittingTracks?.map(patchTrack) ?? [];
-  const nextSittings = session.sittings?.map((sitting) => {
+  const sessions = session.sessions.map((sitting) => {
     if (!sitting.tracks) return sitting;
     let sittingTracksChanged = false;
     const patchedTracks = sitting.tracks.map((t) => {
@@ -152,7 +151,6 @@ export function patchSessionWithEnrichment(
 
   return {
     ...session,
-    sittingTracks: nextSittingTracks,
-    sittings: nextSittings,
+    sessions,
   };
 }

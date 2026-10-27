@@ -1,55 +1,18 @@
 import {
-  TrackSummary,
   AlbumSummary,
-  StreamLogItem,
-  SittingItem,
-  PreviousSitting,
-  SittingSession,
-  SessionHistogramData,
   RangeKey,
   ActivityDay,
   ActivityBucket,
 } from "@/lib/mock-listening-data";
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "@/lib/format-utils";
 
-export type { StreamLogItem, RangeKey, AlbumSummary, ActivityDay, ActivityBucket };
+export type { StreamLogItem } from "@/lib/types";
+export type { RangeKey, AlbumSummary, ActivityDay, ActivityBucket };
 export type { OverviewMetricsRaw, StreamLogMetricsRaw };
 
-export interface OverviewData {
-  logStartDate: string;
-  rawMetrics: OverviewMetricsRaw;
-  metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
-  topTracks: TrackSummary[];
-  topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
-  topAlbums: AlbumSummary[];
-  clockBuckets?: number[]; // 24 values representing hourly distribution (0-23)
-  activityCadence: ActivityBucket[];
-  lastSyncedAt?: string;
-}
+export type { OverviewData, StreamLogData } from "@/lib/types";
 
-
-export interface StreamLogData {
-  rawMetrics: StreamLogMetricsRaw;
-  metrics: [string, string, string, string]; // Total Plays, Unique Tracks, Unique Artists, Current Streak
-  entries: StreamLogItem[];
-  nextCursor?: string | null;
-  nextCursorId?: string | null;
-  hasMore?: boolean;
-  lastSyncedAt?: string;
-}
-
-
-export interface SessionData {
-  isOpen: boolean;
-  tagTime: string; // e.g. '22:15 CDT' or '42M'
-  metrics: [string, string, string, string]; // Runtime, Tracks, Unique Artists, Start Time
-  sittingTracks: SittingItem[];
-  previousSittings: PreviousSitting[];
-  lastSyncedAt?: string;
-  sittings?: SittingSession[];
-  sessions?: SittingSession[];
-  histogram?: SessionHistogramData;
-}
+export type { SessionData } from "@/lib/types";
 
 export interface TrackUpsertItem {
   id: string;
