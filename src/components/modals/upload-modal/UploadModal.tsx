@@ -233,7 +233,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 transition-opacity duration-200 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overscroll-contain transition-opacity duration-200 ${
         isVisible ? "opacity-100" : "opacity-0"
       }`}
       aria-modal="true"
@@ -241,20 +241,23 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     >
       {/* Dimmed backdrop */}
       <div
-        className="fixed inset-0 bg-black/85 backdrop-blur-xs"
+        className="fixed inset-0 bg-black/85 backdrop-blur-xs overscroll-contain touch-none"
         onClick={() => {
           if (!isProcessingRef.current) onClose();
+        }}
+        onTouchMove={(e) => {
+          e.preventDefault();
         }}
       />
 
       {/* Main Modal Window */}
       <div
-        className={`relative z-10 w-full max-w-xl border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl transition-transform duration-200 ${
+        className={`relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl transition-transform duration-200 ${
           isVisible ? "scale-100" : "scale-95"
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none">
+        <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none shrink-0">
           <div className="flex items-center gap-2">
             <Upload className="w-3.5 h-3.5 text-music-accent" />
             <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#EDEDE8]">
@@ -275,7 +278,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 sm:p-6 space-y-5 font-mono text-[11px]">
+        <div className="p-5 sm:p-6 space-y-5 font-mono text-[11px] overflow-y-auto overscroll-contain scrollbar-hidden">
           {/* Always-Visible Database Enrichment Status Bar */}
           {isDbConfigured && enrichmentProgress && (
             <CatalogEnrichmentCard progress={enrichmentProgress} />

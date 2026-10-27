@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { lockBodyScroll, unlockBodyScroll, getActiveScrollLocksCount } from "../src/lib/scroll-lock";
 
-test("lockBodyScroll and unlockBodyScroll manage body overflow style with reference counting", () => {
+test("lockBodyScroll and unlockBodyScroll manage body and documentElement overflow style with reference counting", () => {
   // Mock global document if running in Node environment
   const originalDocument = global.document;
   const mockBody = {
@@ -12,38 +12,48 @@ test("lockBodyScroll and unlockBodyScroll manage body overflow style with refere
       overflow: "",
     },
   };
+  const mockDocumentElement = {
+    style: {
+      overflow: "",
+    },
+  };
   // @ts-expect-error Mocking document for unit test
-  global.document = { body: mockBody };
+  global.document = { body: mockBody, documentElement: mockDocumentElement };
 
   try {
     assert.equal(getActiveScrollLocksCount(), 0);
     assert.equal(document.body.style.overflow, "");
+    assert.equal(document.documentElement.style.overflow, "");
 
     // 1. First modal locks
     lockBodyScroll();
     assert.equal(getActiveScrollLocksCount(), 1);
     assert.equal(document.body.style.overflow, "hidden");
+    assert.equal(document.documentElement.style.overflow, "hidden");
 
     // 2. Second modal opens on top (e.g. AdminLoginModal over CustomizationModal)
     lockBodyScroll();
     assert.equal(getActiveScrollLocksCount(), 2);
     assert.equal(document.body.style.overflow, "hidden");
+    assert.equal(document.documentElement.style.overflow, "hidden");
 
     // 3. Second modal closes
     unlockBodyScroll();
     assert.equal(getActiveScrollLocksCount(), 1);
     assert.equal(document.body.style.overflow, "hidden", "Body must remain locked while first modal is still open");
+    assert.equal(document.documentElement.style.overflow, "hidden", "DocumentElement must remain locked while first modal is still open");
 
     // 4. First modal closes
     unlockBodyScroll();
     assert.equal(getActiveScrollLocksCount(), 0);
     assert.equal(document.body.style.overflow, "", "Body overflow must be restored when all modals close");
+    assert.equal(document.documentElement.style.overflow, "", "DocumentElement overflow must be restored when all modals close");
   } finally {
     global.document = originalDocument;
   }
 });
 
-test("CustomizationModal, UploadModal, AdminLoginModal, and AdminSpotifyModal integrate useBodyScrollLock", () => {
+test("CustomizationModal, UploadModal, AdminLoginModal, and AdminSpotifyModal integrate useBodyScrollLock and overscroll-contain", () => {
   const components = [
     "src/components/modals/customization-modal/CustomizationModal.tsx",
     "src/components/modals/upload-modal/UploadModal.tsx",
@@ -57,6 +67,10 @@ test("CustomizationModal, UploadModal, AdminLoginModal, and AdminSpotifyModal in
     assert.ok(
       content.includes("useBodyScrollLock"),
       `${relPath} must integrate useBodyScrollLock`
+    );
+    assert.ok(
+      content.includes("overscroll-contain"),
+      `${relPath} must include overscroll-contain to prevent scroll chaining`
     );
   }
 });

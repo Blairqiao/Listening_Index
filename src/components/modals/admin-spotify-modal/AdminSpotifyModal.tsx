@@ -358,15 +358,18 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-spotify-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-200 ease-out ${
         isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       }`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isBusy) effectiveOnClose();
       }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
     >
       <div
-        className={`w-full max-w-[480px] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transform will-change-[transform,opacity] ${
+        className={`w-full max-w-[480px] max-h-[90vh] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transform will-change-[transform,opacity] ${
           isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.97] translate-y-2"
         }`}
       >
@@ -401,7 +404,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 sm:p-6 space-y-4 text-left">
+        <div className="p-5 sm:p-6 space-y-4 text-left overflow-y-auto overscroll-contain scrollbar-hidden">
           {isLoading && !status && !initialModeOverride ? (
             <div className="py-8 flex flex-col items-center justify-center gap-2 font-mono text-[11px] text-[#6A6A64]">
               <Loader2 className="w-4 h-4 animate-spin text-music-accent" />
