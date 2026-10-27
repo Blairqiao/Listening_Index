@@ -81,11 +81,14 @@ export const AdminLoginModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-login-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-200 ease-out ${
         isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       }`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isAuthenticating) closeAdminLoginModal();
+      }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
       <div
@@ -116,7 +119,7 @@ export const AdminLoginModal: React.FC = () => {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overscroll-contain">
           <div className="space-y-1.5">
             <label
               htmlFor="admin-login-password"

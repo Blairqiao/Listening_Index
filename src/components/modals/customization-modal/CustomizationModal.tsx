@@ -201,10 +201,13 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="customization-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm transition-opacity duration-200 ease-out ${isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-200 ease-out ${isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
       onClick={(e) => {
         if (e.target === e.currentTarget) handleCancel();
+      }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
       <div
@@ -237,7 +240,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="overflow-y-auto p-5 sm:p-6 space-y-6 scrollbar-hidden">
+        <div className="overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-6 scrollbar-hidden">
           {/* Section 1: Identity */}
           {isAuthenticated && (
             <div className="space-y-3">
