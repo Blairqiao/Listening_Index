@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     const cursorId = rawCursorId ?? undefined;
     const prevDayGroup = rawPrevDayGroup ?? undefined;
     const prevPlayedAt = rawPrevPlayedAt ?? undefined;
-    const tzParam = effectiveRequestTimezone(request, mock ? "America/Chicago" : (await getActiveSiteConfig()).timezone);
+    const tzParam = effectiveRequestTimezone(request);
 
     // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
     if (mock) {

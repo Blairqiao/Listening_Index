@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       return jsonNoCache(MOCK_DATA.overview[range]);
     }
 
-    const tzParam = effectiveRequestTimezone(request, (await getActiveSiteConfig()).timezone);
+    const tzParam = effectiveRequestTimezone(request);
 
     const overviewData = await getOrFetchOverview(range, tzParam || "", () =>
       getOverviewData(range, tzParam)

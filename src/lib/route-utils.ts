@@ -25,7 +25,7 @@ export function parseRequestTimezone(request: NextRequest): string | undefined {
   );
 }
 
-export function effectiveRequestTimezone(request: NextRequest, fallback: string): string {
+export function effectiveRequestTimezone(request: NextRequest, fallback: string = "UTC"): string {
   const requested = parseRequestTimezone(request);
   const cookie = request.cookies.get("listening_timezone")?.value;
   let detected = cookie;

@@ -1,4 +1,3 @@
-import { siteConfig } from "@/config";
 export { formatDurationMs } from "@/lib/format-utils";
 
 export function formatDurationHoursMinutes(ms: number): string {
@@ -12,7 +11,7 @@ export function formatDurationHoursMinutes(ms: number): string {
 }
 
 export function getTimezone(): string {
-  return siteConfig.timezone || "America/Chicago";
+  return "UTC";
 }
 
 /**
