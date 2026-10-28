@@ -54,11 +54,11 @@ export default async function Page({ searchParams }: PageProps) {
   const activeConfig = isForceMock ? {
     title: "Listening Index", ownerName: "YOUR NAME", accentColor: "#1DB954",
     siteUrl: "https://open.spotify.com/", githubUrl: "https://github.com/Blairqiao/listening_index",
-    timezone: "America/Chicago", spotifyClientId: "", livePlayerLayout: "split" as const,
+    spotifyClientId: "", livePlayerLayout: "split" as const,
   } : await getActiveSiteConfig();
   let cookieTimezone = cookieStore.get("listening_timezone")?.value;
   try { if (cookieTimezone) cookieTimezone = decodeURIComponent(cookieTimezone); } catch { cookieTimezone = undefined; }
-  const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : activeConfig.timezone;
+  const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
   const initialData = isConfigured ? await getInitialMusicData(initialRange, initialVisitorTimezone) : {
     overview: MOCK_DATA.overview[initialRange], streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session,
   };

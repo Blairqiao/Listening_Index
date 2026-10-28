@@ -105,7 +105,6 @@ export async function ensureTablesExist(): Promise<void> {
             accent_color TEXT NOT NULL,
             site_url TEXT NOT NULL,
             github_url TEXT NOT NULL,
-            timezone TEXT NOT NULL,
             spotify_client_id TEXT NOT NULL DEFAULT '',
             owner_playback_token TEXT,
             owner_token_revision BIGINT NOT NULL DEFAULT 0,
@@ -129,6 +128,9 @@ export async function ensureTablesExist(): Promise<void> {
             ADD COLUMN IF NOT EXISTS owner_spotify_name TEXT,
             ADD COLUMN IF NOT EXISTS owner_spotify_url TEXT,
             ADD COLUMN IF NOT EXISTS cron_key TEXT;
+
+          ALTER TABLE site_settings
+            DROP COLUMN IF EXISTS timezone;
 
           CREATE TABLE IF NOT EXISTS daily_api_usage (
             usage_date DATE PRIMARY KEY,

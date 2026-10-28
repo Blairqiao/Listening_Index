@@ -67,7 +67,7 @@ export const ConfigProvider: React.FC<{
   const [isPasswordConfigured, setIsPasswordConfigured] = useState<boolean>(initialIsPasswordConfigured);
 
   const [config, setConfig] = useState<SiteConfigState>(() => normalizeSiteConfig(initialConfig));
-  const [visitorTimezone, setVisitorTimezone] = useState(initialVisitorTimezone || initialConfig?.timezone || DEFAULT_CONFIG.timezone);
+  const [visitorTimezone, setVisitorTimezone] = useState(initialVisitorTimezone || "UTC");
 
   const [isCustomized, setIsCustomized] = useState<boolean>(Boolean(initialConfig));
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -87,14 +87,14 @@ export const ConfigProvider: React.FC<{
 
   useEffect(() => {
     const detect = () => {
-      const timezone = detectLocalTimezone(deployedConfig.timezone);
+      const timezone = detectLocalTimezone("UTC");
       setVisitorTimezone(timezone);
       syncLocalTimezoneCookie(timezone);
     };
     detect();
     window.addEventListener("focus", detect);
     return () => window.removeEventListener("focus", detect);
-  }, [deployedConfig.timezone]);
+  }, []);
 
   const markAsDeployed = useCallback((cfg: SiteConfigState) => {
     setDeployedConfig({

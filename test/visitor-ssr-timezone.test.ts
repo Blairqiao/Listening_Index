@@ -4,13 +4,13 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as timezoneUtils from '../src/lib/timezone-utils';
 
-test('SSR explicitly passes a valid detected cookie zone or owner fallback to all initial queries', async () => {
-  for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'Pacific/Auckland'], ['', 'Pacific/Auckland']]) {
+test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all initial queries', async () => {
+  for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'UTC'], ['', 'UTC']]) {
     const calls: unknown[][] = [];
     const deps: Record<string, unknown> = {
       'next/headers': { cookies: async () => ({ get: (key: string) => key === 'listening_timezone' && cookie ? { value: encodeURIComponent(cookie) } : undefined }) },
       '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock-data': {},
-      '@/lib/db/queries': { getActiveSiteConfig: async () => ({ timezone: 'Pacific/Auckland' }), getInitialMusicData: async (...args: unknown[]) => { calls.push(args); return {}; } },
+      '@/lib/db/queries': { getActiveSiteConfig: async () => ({}), getInitialMusicData: async (...args: unknown[]) => { calls.push(args); return {}; } },
       '@/lib/db': { isDbConfigured: () => true }, '@/lib/admin-auth': { ADMIN_COOKIE_NAME: 'admin_session', verifySessionToken: () => false },
       '@/lib/timezone-utils': timezoneUtils,
     };

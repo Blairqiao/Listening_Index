@@ -19,7 +19,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     accentColor: siteConfig.accentColor,
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
-    timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: "",
     livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
@@ -33,7 +32,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
       await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
-        SELECT title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout
+        SELECT title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
@@ -47,7 +46,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           accentColor: row.accent_color || fallback.accentColor,
           siteUrl: row.site_url || fallback.siteUrl,
           githubUrl: row.github_url || fallback.githubUrl,
-          timezone: row.timezone || fallback.timezone,
           // Empty string is a legitimate value here (player disabled), so
           // fall back only when the column is absent or null.
           spotifyClientId: row.spotify_client_id ?? fallback.spotifyClientId,
@@ -60,7 +58,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
 
       // Auto-seed table on first cold start with default config
       await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
+        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
         VALUES (
           'active',
           ${fallback.title},
@@ -68,7 +66,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           ${fallback.accentColor},
           ${fallback.siteUrl},
           ${fallback.githubUrl},
-          ${fallback.timezone},
           ${fallback.spotifyClientId},
           ${fallback.livePlayerLayout},
           NOW()
@@ -96,7 +93,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
       VALUES (
         'active',
         ${config.title},
@@ -104,7 +101,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         ${config.accentColor},
         ${config.siteUrl},
         ${config.githubUrl},
-        ${config.timezone},
         ${config.spotifyClientId},
         ${config.livePlayerLayout || "split"},
         NOW()
@@ -115,7 +111,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         accent_color = EXCLUDED.accent_color,
         site_url = EXCLUDED.site_url,
         github_url = EXCLUDED.github_url,
-        timezone = EXCLUDED.timezone,
         spotify_client_id = EXCLUDED.spotify_client_id,
         live_player_layout = EXCLUDED.live_player_layout,
         updated_at = NOW();
@@ -138,7 +133,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     accentColor: siteConfig.accentColor,
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
-    timezone: siteConfig.timezone || "America/Chicago",
     spotifyClientId: "",
     livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
@@ -147,7 +141,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, spotify_client_id, live_player_layout, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
       VALUES (
         'active',
         ${defaults.title},
@@ -155,7 +149,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
         ${defaults.accentColor},
         ${defaults.siteUrl},
         ${defaults.githubUrl},
-        ${defaults.timezone},
         ${defaults.spotifyClientId},
         ${defaults.livePlayerLayout},
         NOW()
@@ -166,7 +159,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
         accent_color = EXCLUDED.accent_color,
         site_url = EXCLUDED.site_url,
         github_url = EXCLUDED.github_url,
-        timezone = EXCLUDED.timezone,
         spotify_client_id = EXCLUDED.spotify_client_id,
         live_player_layout = EXCLUDED.live_player_layout,
         updated_at = NOW();
@@ -228,9 +220,9 @@ export async function beginOwnerAuthorization(nonce: string): Promise<string> {
   if (!isDbConfigured()) throw new Error("A database is required to connect Spotify.");
   await ensureTablesExist();
   const rows = await getDb()`
-    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, owner_oauth_nonce)
+    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, owner_oauth_nonce)
     VALUES ('active', ${siteConfig.title}, ${siteConfig.ownerName}, ${siteConfig.accentColor},
-      ${siteConfig.siteUrl}, ${siteConfig.githubUrl}, ${siteConfig.timezone || "America/Chicago"}, ${nonce})
+      ${siteConfig.siteUrl}, ${siteConfig.githubUrl}, ${nonce})
     ON CONFLICT (id) DO UPDATE SET owner_oauth_nonce = EXCLUDED.owner_oauth_nonce
     RETURNING owner_token_revision;
   `;
@@ -276,7 +268,7 @@ export async function saveOwnerPlaybackToken(
       return rows.length === 1;
     }
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
       VALUES (
         'active',
         ${siteConfig.title},
@@ -284,7 +276,6 @@ export async function saveOwnerPlaybackToken(
         ${siteConfig.accentColor},
         ${siteConfig.siteUrl},
         ${siteConfig.githubUrl},
-        ${siteConfig.timezone || "America/Chicago"},
         ${token},
         ${displayName || null},
         ${profileUrl || null},
@@ -397,7 +388,7 @@ export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}):
     // Auto-generate 32-character random hex string if missing on database connection
     const newKey = crypto.randomBytes(16).toString("hex");
     const seeded = await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, cron_key, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, cron_key, updated_at)
       VALUES (
         'active',
         ${siteConfig.title},
@@ -405,7 +396,6 @@ export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}):
         ${siteConfig.accentColor},
         ${siteConfig.siteUrl},
         ${siteConfig.githubUrl},
-        ${siteConfig.timezone || "America/Chicago"},
         ${newKey},
         NOW()
       )
@@ -436,7 +426,7 @@ export async function regenerateCronKey(): Promise<string> {
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, timezone, cron_key, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, cron_key, updated_at)
       VALUES (
         'active',
         ${siteConfig.title},
@@ -444,7 +434,6 @@ export async function regenerateCronKey(): Promise<string> {
         ${siteConfig.accentColor},
         ${siteConfig.siteUrl},
         ${siteConfig.githubUrl},
-        ${siteConfig.timezone || "America/Chicago"},
         ${newKey},
         NOW()
       )

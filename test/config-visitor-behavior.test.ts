@@ -64,11 +64,11 @@ function configHarness(initial = configUtils.DEFAULT_SITE_CONFIG, stored?: objec
 }
 
 test('legacy visitor preference retains only accent while deployed owner fields stay current', () => {
-  const initial = { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Current title', timezone: 'Pacific/Auckland', livePlayerLayout: 'stacked' as const };
-  const harness = configHarness(initial, { ...initial, title: 'Old title', timezone: 'UTC', livePlayerLayout: 'split', accentColor: '#ff00aa' });
+  const initial = { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Current title', livePlayerLayout: 'stacked' as const };
+  const harness = configHarness(initial, { ...initial, title: 'Old title', livePlayerLayout: 'split', accentColor: '#ff00aa' });
   const state = harness.flush();
   assert.equal(state.config.title, 'Current title');
-  assert.equal(state.config.timezone, 'Pacific/Auckland');
+  assert.equal('timezone' in state.config, false, 'timezone must not be present in state.config');
   assert.equal(state.config.livePlayerLayout, 'stacked');
   assert.equal(state.config.accentColor, '#FF00AA');
   const record = JSON.parse(harness.storage.get('listening_index_config')!);
@@ -78,12 +78,14 @@ test('legacy visitor preference retains only accent while deployed owner fields 
   assert.deepEqual(JSON.parse(harness.storage.get('listening_index_config')!), { version: 1, accentColor: '#123456' });
 });
 
-test('visitor timezone is detected separately and cannot overwrite owner fallback', () => {
-  const owner = { ...configUtils.DEFAULT_SITE_CONFIG, timezone: 'Pacific/Auckland' };
-  const harness = configHarness(owner);
+test('visitor timezone is detected from browser runtime and site config omits timezone entirely', () => {
+  assert.equal('timezone' in configUtils.DEFAULT_SITE_CONFIG, false, 'timezone must not be in DEFAULT_SITE_CONFIG');
+  const code = configUtils.generateConfigTsCode(configUtils.DEFAULT_SITE_CONFIG);
+  assert.equal(code.includes('timezone'), false, 'generateConfigTsCode must not output timezone');
+  const harness = configHarness(configUtils.DEFAULT_SITE_CONFIG);
   const state = harness.flush();
   assert.equal(state.visitorTimezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
-  assert.equal(state.config.timezone, owner.timezone);
+  assert.equal('timezone' in state.config, false, 'timezone must not be in site config state');
   assert.match(harness.document.cookie, /listening_timezone=/);
   assert.ok(harness.listeners.has('focus'), 'zone is rechecked after sleep or travel');
 });

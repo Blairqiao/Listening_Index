@@ -44,7 +44,7 @@ test('PostgreSQL rejects stale credential writes across disconnect/replacement a
   const sql = neon(databaseUrl);
   const results = await sql.transaction([
     sql`CREATE TEMP TABLE site_settings (
-      id TEXT PRIMARY KEY, title TEXT, owner_name TEXT, accent_color TEXT, site_url TEXT, github_url TEXT, timezone TEXT,
+      id TEXT PRIMARY KEY, title TEXT, owner_name TEXT, accent_color TEXT, site_url TEXT, github_url TEXT,
       owner_playback_token TEXT, owner_spotify_name TEXT, owner_spotify_url TEXT, owner_token_updated_at TIMESTAMPTZ,
       updated_at TIMESTAMPTZ, owner_token_revision BIGINT NOT NULL DEFAULT 0, owner_oauth_nonce TEXT
     ) ON COMMIT DROP`,

@@ -51,6 +51,22 @@ test("AC-1: schema.ts eliminates pre-v1 migration blocks while preserving core s
   );
 });
 
+test("AC-1b: schema.ts drops timezone column from site_settings entirely and excludes it from table definition", () => {
+  const schemaSource = fs.readFileSync(
+    path.join(root, "src/lib/db/queries/schema.ts"),
+    "utf-8"
+  );
+  assert.equal(
+    schemaSource.includes("timezone TEXT"),
+    false,
+    "schema.ts must not define timezone column in site_settings table definition"
+  );
+  assert.ok(
+    schemaSource.includes("DROP COLUMN IF EXISTS timezone"),
+    "schema.ts must drop timezone column via ALTER TABLE site_settings DROP COLUMN IF EXISTS timezone"
+  );
+});
+
 test("AC-2: CustomizationModal omits manual timezone selection in favor of automated background detection", () => {
   const modalSource = fs.readFileSync(
     path.join(root, "src/components/modals/customization-modal/CustomizationModal.tsx"),

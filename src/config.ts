@@ -4,5 +4,5 @@ export const siteConfig = {
   accentColor: "#76FF49",
   siteUrl: "https://open.spotify.com/",
   githubUrl: "https://github.com/Blairqiao/listening_index",
-  livePlayerLayout: "split",
+  livePlayerLayout: "split" as const,
 };

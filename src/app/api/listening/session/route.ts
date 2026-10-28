@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return jsonNoCache(MOCK_DATA.session);
     }
 
-    const tzParam = effectiveRequestTimezone(request, (await getActiveSiteConfig()).timezone);
+    const tzParam = effectiveRequestTimezone(request);
 
     const sessionData = await getOrFetchSession(tzParam || "", () =>
       getCurrentSession(tzParam)
