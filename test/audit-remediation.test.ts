@@ -206,9 +206,9 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
     "ListeningView must have exactly 1 window.location.search reader effect"
   );
 
-  const sessionView = fs.readFileSync(path.join(root, "src/components/views/SessionView.tsx"), "utf-8");
-  const analysisPanel = fs.existsSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"))
-    ? fs.readFileSync(path.join(root, "src/components/session-view/SessionAnalysisPanel.tsx"), "utf-8")
+  const sessionView = fs.readFileSync(path.join(root, "src/components/views/session-view/SessionView.tsx"), "utf-8");
+  const analysisPanel = fs.existsSync(path.join(root, "src/components/views/session-view/SessionAnalysisPanel.tsx"))
+    ? fs.readFileSync(path.join(root, "src/components/views/session-view/SessionAnalysisPanel.tsx"), "utf-8")
     : "";
   const combinedSession = sessionView + analysisPanel;
   assert.ok(

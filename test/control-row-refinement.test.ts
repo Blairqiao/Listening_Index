@@ -55,7 +55,7 @@ test("ControlRow component supports dynamic scope labels for Stream Log, Session
 });
 
 test("LivePlayerView houses context selector inside playback controls without redundant middle device band", () => {
-  const livePlayerPath = path.resolve(__dirname, "../src/components/views/LivePlayerView.tsx");
+  const livePlayerPath = path.resolve(__dirname, "../src/components/views/live-player-view/LivePlayerView.tsx");
   const content = fs.readFileSync(livePlayerPath, "utf-8");
 
   // Must not have the old separate "Device & Playback Context Row"

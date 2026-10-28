@@ -68,27 +68,27 @@ test("AC-2: CustomizationModal omits manual timezone selection in favor of autom
   );
 });
 
-test("AC-3: SessionView decomposes SessionHistogram and SessionAnalysisPanel into src/components/session-view/", () => {
+test("AC-3: SessionView decomposes SessionHistogram and SessionAnalysisPanel into src/components/views/session-view/", () => {
   const histPath = path.join(
     root,
-    "src/components/session-view/SessionHistogram.tsx"
+    "src/components/views/session-view/SessionHistogram.tsx"
   );
   const analysisPath = path.join(
     root,
-    "src/components/session-view/SessionAnalysisPanel.tsx"
+    "src/components/views/session-view/SessionAnalysisPanel.tsx"
   );
 
   assert.ok(
     fs.existsSync(histPath),
-    "SessionHistogram.tsx must exist in src/components/session-view/"
+    "SessionHistogram.tsx must exist in src/components/views/session-view/"
   );
   assert.ok(
     fs.existsSync(analysisPath),
-    "SessionAnalysisPanel.tsx must exist in src/components/session-view/"
+    "SessionAnalysisPanel.tsx must exist in src/components/views/session-view/"
   );
 
   const sessionViewSource = fs.readFileSync(
-    path.join(root, "src/components/views/SessionView.tsx"),
+    path.join(root, "src/components/views/session-view/SessionView.tsx"),
     "utf-8"
   );
   assert.ok(

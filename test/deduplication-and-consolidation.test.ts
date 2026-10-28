@@ -62,7 +62,7 @@ test("AC-3: formatDurationMs in format-utils replaces msToClock in LivePlayerVie
     "src/lib/format-utils.ts must export formatDurationMs"
   );
 
-  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/LivePlayerView.tsx"), "utf-8");
+  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/live-player-view/LivePlayerView.tsx"), "utf-8");
   assert.ok(
     !livePlayerContent.includes("function msToClock"),
     "LivePlayerView.tsx must not declare msToClock"
@@ -127,7 +127,7 @@ test("AC-6: Canonical types and components use Session* and topTrack", () => {
   assert.ok(typesContent.includes("SessionRecord") || typesContent.includes("SessionBlock"), "src/lib/types.ts must export SessionRecord or SessionBlock");
   assert.ok(typesContent.includes("SessionAnalysis"), "src/lib/types.ts must export SessionAnalysis");
 
-  const sessionViewContent = fs.readFileSync(path.join(root, "src/components/views/SessionView.tsx"), "utf-8");
+  const sessionViewContent = fs.readFileSync(path.join(root, "src/components/views/session-view/SessionView.tsx"), "utf-8");
   assert.ok(
     !sessionViewContent.includes("// Top Song"),
     "SessionView.tsx must not contain '// Top Song' comment"

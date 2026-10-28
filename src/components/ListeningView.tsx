@@ -6,10 +6,10 @@ import { ListeningHeader } from "@/components/listening-view/ListeningHeader";
 import { ModeTabs } from "@/components/listening-view/ModeTabs";
 import { ControlRow } from "@/components/listening-view/ControlRow";
 import { MetricRibbon } from "@/components/listening-view/MetricRibbon";
-import { LivePlayerView } from "@/components/views/LivePlayerView";
+import { LivePlayerView } from "@/components/views/live-player-view/LivePlayerView";
 import { OverviewView } from "@/components/views/OverviewView";
 import { StreamLogView } from "@/components/views/StreamLogView";
-import { SessionView } from "@/components/views/SessionView";
+import { SessionView } from "@/components/views/session-view/SessionView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
