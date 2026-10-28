@@ -71,9 +71,9 @@ test("AC-2: cadence query and bucket builder are extracted to src/lib/db/queries
   );
 });
 
-test("AC-3: SpectrumCanvas is extracted to src/components/live-player-view/SpectrumCanvas.tsx", async () => {
-  const spectrumFile = path.join(root, "src/components/live-player-view/SpectrumCanvas.tsx");
-  assert.ok(fs.existsSync(spectrumFile), "src/components/live-player-view/SpectrumCanvas.tsx must exist");
+test("AC-3: SpectrumCanvas is extracted to src/components/views/live-player-view/SpectrumCanvas.tsx", async () => {
+  const spectrumFile = path.join(root, "src/components/views/live-player-view/SpectrumCanvas.tsx");
+  assert.ok(fs.existsSync(spectrumFile), "src/components/views/live-player-view/SpectrumCanvas.tsx must exist");
 
   const spectrumContent = fs.readFileSync(spectrumFile, "utf-8");
   assert.ok(
@@ -81,13 +81,13 @@ test("AC-3: SpectrumCanvas is extracted to src/components/live-player-view/Spect
     "SpectrumCanvas.tsx must export SpectrumCanvas"
   );
 
-  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/LivePlayerView.tsx"), "utf-8");
+  const livePlayerContent = fs.readFileSync(path.join(root, "src/components/views/live-player-view/LivePlayerView.tsx"), "utf-8");
   assert.ok(
     livePlayerContent.includes("SpectrumCanvas"),
     "LivePlayerView.tsx must import SpectrumCanvas"
   );
   assert.ok(
-    livePlayerContent.includes("./live-player-view/SpectrumCanvas") || livePlayerContent.includes("@/components/live-player-view/SpectrumCanvas"),
+    livePlayerContent.includes("./SpectrumCanvas") || livePlayerContent.includes("./live-player-view/SpectrumCanvas") || livePlayerContent.includes("@/components/views/live-player-view/SpectrumCanvas"),
     "LivePlayerView.tsx must import SpectrumCanvas from dedicated component file"
   );
 });

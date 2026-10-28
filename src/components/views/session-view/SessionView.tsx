@@ -5,9 +5,9 @@ import type { SessionRecord, SessionAnalysis, PreviousSession } from "@/lib/type
 import { useConfig } from "@/context/ConfigContext";
 import { presentSession, presentSessionHistogram, type PresentedSessionItem } from "@/lib/listening-presentation";
 import { calculateSessions } from "@/lib/session-calculation";
-import { Artwork } from "../Artwork";
-import { SessionHistogram } from "../session-view/SessionHistogram";
-import { SessionAnalysisPanel } from "../session-view/SessionAnalysisPanel";
+import { Artwork } from "../../Artwork";
+import { SessionHistogram } from "./SessionHistogram";
+import { SessionAnalysisPanel } from "./SessionAnalysisPanel";
 
 interface SessionViewProps {
   sessions: SessionRecord[];

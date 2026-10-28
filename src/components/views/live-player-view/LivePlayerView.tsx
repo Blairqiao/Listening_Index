@@ -4,7 +4,7 @@ import React, { useCallback, useState } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";
-import { SpectrumCanvas, gradientStops } from "../live-player-view/SpectrumCanvas";
+import { SpectrumCanvas, gradientStops } from "./SpectrumCanvas";
 
 export { gradientStops };
 
@@ -211,7 +211,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
       {playerStatus === "unlinked" && (
         <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[#141413] border border-[#22221E] text-[#8A8A82] text-[10px] font-mono">
-          <span className="truncate">SPOTIFY NOT LINKED · OPEN SPOTIFY MODAL (S)</span>
+          <span className="truncate">SPOTIFY NOT LINKED · OPEN SPOTIFY MODAL</span>
         </div>
       )}
 
