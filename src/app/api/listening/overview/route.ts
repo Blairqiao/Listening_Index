@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveSiteConfig, getOverviewData, RangeKey } from "@/lib/db/queries";
+import { getOverviewData, RangeKey } from "@/lib/db/queries";
 import { getOrFetchOverview } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { MOCK_DATA } from "@/lib/mock-data";
+import { MOCK_DATA } from "@/lib/mock-listening-data";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";

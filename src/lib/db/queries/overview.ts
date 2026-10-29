@@ -13,7 +13,7 @@ import type { OverviewData, RangeKey } from "./types";
 import type {
   TrackSummary,
   AlbumSummary,
-} from "@/lib/mock-listening-data";
+} from "@/lib/types";
 
 export const OVERVIEW_INTERVAL_CONFIG: Record<
   Exclude<RangeKey, "all">,
@@ -161,7 +161,6 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
         COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
         COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
         MAX(t.artist_id) AS artist_id,
-        MAX(al.image_url) AS image_url,
         COUNT(p.id)::int AS count
       FROM plays p
       JOIN tracks t ON p.track_id = t.id
@@ -174,19 +173,11 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     `;
   });
 
-  // interface CadenceRow {
-  //   day?: string;
-  //   block?: number;
-  //   hour_key?: string;
-  //   ym?: string;
-  //   count: number;
-  // }
-
   // 6. Activity cadence query
   const cadenceQueryPromise = buildCadenceQuery(range, tz);
 
   // 7. Last sync
-  const lastSyncPromise = getLastSync("spotify");
+  const lastSyncPromise = getLastSync();
 
   // Execute all 7 queries concurrently!
   const [
@@ -269,12 +260,11 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     name: row.name,
     artist: row.artist,
     artistId: row.artist_id || undefined,
-    albumImageUrl: row.image_url || null,
     count: Number(row.count),
   }));
 
   // Process activity cadence
-  const { clockBuckets, activityCadence } = buildActivityCadence({
+  const { activityCadence } = buildActivityCadence({
     range,
     tz,
     cadenceRows,
@@ -288,7 +278,6 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     topTracks,
     topArtists,
     topAlbums,
-    clockBuckets,
     activityCadence,
     lastSyncedAt: lastSync,
   };

@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
 dotenv.config({ path: ".env.local" });
-dotenv.config({ path: "spotify.env" });
 
 import { syncSpotify } from "../src/lib/spotify-sync";
 

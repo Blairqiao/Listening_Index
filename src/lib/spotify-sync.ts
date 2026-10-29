@@ -69,7 +69,7 @@ export async function syncSpotify(): Promise<SyncResult> {
 
     if (streamItems.length === 0) {
       console.log("[INFO] No external streaming events found in batch. Exiting.");
-      await recordLastSync("spotify");
+      await recordLastSync();
       return {
         processed: 0,
         durationMs: Number((performance.now() - startTime).toFixed(1)),
@@ -209,7 +209,7 @@ export async function syncSpotify(): Promise<SyncResult> {
     );
     console.log("------------------------------------------------------------");
 
-    await recordLastSync("spotify");
+    await recordLastSync();
     return { processed: playsIngested, durationMs };
   } catch (error: unknown) {
     const durationMs = Number((performance.now() - startTime).toFixed(1));

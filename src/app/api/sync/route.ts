@@ -3,7 +3,7 @@ import { syncSpotify } from "@/lib/spotify-sync";
 import { clearServerCache } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";

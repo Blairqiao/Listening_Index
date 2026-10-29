@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { StreamLogItem } from "@/lib/mock-listening-data";
+import { StreamLogItem } from "@/lib/types";
 import { useConfig } from "@/context/ConfigContext";
 import { presentStreamLog } from "@/lib/listening-presentation";
 import { Artwork } from "../Artwork";
@@ -150,7 +150,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                       </span>
                       <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
                       <span className="font-mono text-[11px] tracking-[0.1em] text-[#4A4A46]">
-                        {entry.sessionGap.sittingLabel}
+                        {entry.sessionGap.sessionGapLabel}
                       </span>
                     </div>
                   )}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { getOwnerPlaybackToken } from "@/lib/db/queries";
 import { getAccessToken } from "@/lib/spotify";
 

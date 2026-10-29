@@ -10,40 +10,6 @@ import { lastSyncCache, catalogStatusCache } from "./cache";
 import type { TrackUpsertItem, PlayInsertItem } from "./types";
 
 /**
- * Retrieves existing (played_at, track_id) keys in a batch to pre-filter duplicates.
- */
-export async function getExistingPlayKeys(
-  items: Array<{ playedAt: string; trackId: string }>
-): Promise<Set<string>> {
-  if (items.length === 0) return new Set();
-  const sql = getDb();
-
-  let minMs = Infinity;
-  let maxMs = -Infinity;
-  for (const i of items) {
-    const t = new Date(i.playedAt).getTime();
-    if (t < minMs) minMs = t;
-    if (t > maxMs) maxMs = t;
-  }
-  const minDate = new Date(minMs).toISOString();
-  const maxDate = new Date(maxMs).toISOString();
-
-  const existingRows = ((await sql`
-    SELECT played_at, track_id
-    FROM plays
-    WHERE played_at >= ${minDate}::timestamptz 
-      AND played_at <= ${maxDate}::timestamptz;
-  `));
-
-  const existingKeys = new Set<string>();
-  for (const row of existingRows) {
-    const timeIso = truncateToSeconds(row.played_at);
-    existingKeys.add(`${timeIso}::${row.track_id}`);
-  }
-  return existingKeys;
-}
-
-/**
  * 6. Retrieves existing artist, album, and track IDs in batch to skip redundant metadata queries.
  */
 export async function getExistingEntityIds(params: {
@@ -85,7 +51,7 @@ export async function getExistingEntityIds(params: {
 /**
  * 7. Records the most recent sync execution timestamp in daily_api_usage.
  */
-export async function recordLastSync(_: string = "spotify"): Promise<Date> {
+export async function recordLastSync(): Promise<Date> {
   await ensureTablesExist();
   const sql = getDb();
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -105,7 +71,7 @@ export async function recordLastSync(_: string = "spotify"): Promise<Date> {
  * 8. Retrieves the most recent sync execution timestamp from daily_api_usage.
  * Deduplicates concurrent calls via in-flight promise latch and caches for 15 seconds.
  */
-export async function getLastSync(_: string = "spotify"): Promise<string | undefined> {
+export async function getLastSync(): Promise<string | undefined> {
   return lastSyncCache.get(async () => {
     try {
       await ensureTablesExist();

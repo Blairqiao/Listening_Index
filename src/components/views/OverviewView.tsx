@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/mock-listening-data";
+import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
 import { Artwork } from "../Artwork";
 import { formatCadenceTooltip } from "@/lib/format-utils";
 

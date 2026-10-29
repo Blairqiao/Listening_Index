@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/admin-auth";
 import { getCronKey, regenerateCronKey } from "@/lib/db/queries";
 import { requestOrigin } from "@/lib/request-origin";
 

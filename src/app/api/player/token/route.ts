@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/admin-auth";
 import {
   getAccessToken,
   resetSpotifyTokenCache,
@@ -58,6 +58,13 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(
       { error: "Admin authentication required", code: "ADMIN_AUTH_REQUIRED" },
       { status: 401 }
+    );
+  }
+
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json(
+      { error: "Cross-origin request not permitted." },
+      { status: 403 }
     );
   }
 

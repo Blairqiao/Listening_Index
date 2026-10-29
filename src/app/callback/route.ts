@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { requestOrigin } from "@/lib/request-origin";
-import { getActiveSiteConfig, saveOwnerPlaybackToken } from "@/lib/db/queries";
+import { saveOwnerPlaybackToken } from "@/lib/db/queries";
 import { closePopup as renderPopup, describeOAuthError } from "@/lib/popup-response";
-import { readOwnerAuthorization, clearPlayerVerifierCookie } from "@/lib/user-auth";
+import { readOwnerAuthorization, clearPlayerVerifierCookie, PLAYER_VERIFIER_COOKIE } from "@/lib/user-auth";
 import { AUTH_MESSAGE, getRedirectUri } from "@/lib/spotify-auth";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { consumeOwnerAuthorization } from "@/lib/db/queries/config";
 import { resetSpotifyTokenCache, exchangeAuthorizationCode } from "@/lib/spotify";
 
@@ -32,6 +32,10 @@ export async function GET(request: NextRequest) {
     return closePopup(fallbackOrigin, false, "Connection expired or invalid. Try again.");
   }
   const origin = state.returnOrigin;
+  const cookieVerifier = request.cookies.get(PLAYER_VERIFIER_COOKIE)?.value;
+  if (cookieVerifier && cookieVerifier !== state.verifier) {
+    return closePopup(origin, false, "Connection expired or invalid. Try again.");
+  }
   if (!await consumeOwnerAuthorization(state.nonce, state.revision)) {
     return closePopup(origin, false, "Connection expired or already used. Try again.");
   }
@@ -40,11 +44,9 @@ export async function GET(request: NextRequest) {
   if (error) return closePopup(origin, false, describeOAuthError(error));
   if (!code) return closePopup(origin, false, "No authorization code returned.");
 
-  const config = await getActiveSiteConfig();
   const clientId =
     process.env.SPOTIFY_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    config.spotifyClientId;
+    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
   if (!clientId) return closePopup(origin, false, "No Spotify client id configured.");

@@ -5,7 +5,6 @@ export interface EnrichmentPatchData {
   albumImageUrl?: string | null;
   artistId?: string;
   albumId?: string;
-  isDelisted?: boolean;
 }
 
 /**
@@ -32,12 +31,8 @@ export function patchOverviewCacheWithEnrichment(
 
     let tracksChanged = false;
     const nextTracks = data.topTracks.map((track) => {
-      const match =
-        enrichedMap.get(track.id) ||
-        (undefined);
-      const isDelisted =
-        Boolean(delistedSet?.has(track.id)) ||
-        Boolean(false);
+      const match = enrichedMap.get(track.id);
+      const isDelisted = Boolean(delistedSet?.has(track.id));
 
       if (match || isDelisted) {
         tracksChanged = true;
@@ -136,15 +131,15 @@ export function patchSessionWithEnrichment(
     return track;
   };
 
-  const sessions = session.sessions.map((sitting) => {
-    if (!sitting.tracks) return sitting;
-    let sittingTracksChanged = false;
-    const patchedTracks = sitting.tracks.map((t) => {
+  const sessions = session.sessions.map((sessionSummary) => {
+    if (!sessionSummary.tracks) return sessionSummary;
+    let sessionTracksChanged = false;
+    const patchedTracks = sessionSummary.tracks.map((t) => {
       const patched = patchTrack(t);
-      if (patched !== t) sittingTracksChanged = true;
+      if (patched !== t) sessionTracksChanged = true;
       return patched;
     });
-    return sittingTracksChanged ? { ...sitting, tracks: patchedTracks } : sitting;
+    return sessionTracksChanged ? { ...sessionSummary, tracks: patchedTracks } : sessionSummary;
   });
 
   if (!sessionChanged) return session;

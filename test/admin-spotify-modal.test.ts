@@ -179,4 +179,81 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
   }
 });
 
+test("AdminSpotifyModal falls back to beginLogin when popup is blocked", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const modalSource = fs.readFileSync(
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
+    "utf-8"
+  );
+
+  assert.ok(
+    modalSource.includes("beginLogin()"),
+    "AdminSpotifyModal must call beginLogin() when popup is blocked"
+  );
+  assert.ok(
+    /ok\s*===\s*null[\s\S]*?beginLogin\(\)/.test(modalSource),
+    "handleConnect must fall back to beginLogin() if popup is blocked (ok === null)"
+  );
+});
+
+test("AdminSpotifyModal guards Connect button and displays notice when canConnect is false", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const modalSource = fs.readFileSync(
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
+    "utf-8"
+  );
+
+  assert.ok(
+    modalSource.includes("canConnect === false"),
+    "AdminSpotifyModal must check status?.canConnect === false"
+  );
+  assert.ok(
+    modalSource.includes("database is required"),
+    "AdminSpotifyModal must explain that a database is required when canConnect is false"
+  );
+});
+
+test("AdminSpotifyModal does not inject hardcoded daysRemaining unless initialModeOverride is set", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const modalSource = fs.readFileSync(
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
+    "utf-8"
+  );
+
+  assert.ok(
+    modalSource.includes('initialModeOverride === "expiring"') ||
+    modalSource.includes("initialModeOverride === 'expiring'"),
+    "AdminSpotifyModal must check initialModeOverride === 'expiring' for preview fallback"
+  );
+  assert.ok(
+    modalSource.includes('initialModeOverride === "connected"') ||
+    modalSource.includes("initialModeOverride === 'connected'"),
+    "AdminSpotifyModal must check initialModeOverride === 'connected' for preview fallback"
+  );
+});
+
+test("AdminSpotifyModal disconnect flow invokes DELETE /api/player/token and not /api/owner/spotify", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const modalSource = fs.readFileSync(
+    path.resolve(__dirname, "../src/components/modals/admin-spotify-modal/AdminSpotifyModal.tsx"),
+    "utf-8"
+  );
+
+  assert.ok(
+    modalSource.includes('fetch("/api/player/token", { method: "DELETE" }') ||
+    modalSource.includes("fetch('/api/player/token', { method: 'DELETE' }"),
+    "AdminSpotifyModal must call fetch('/api/player/token', { method: 'DELETE' }) in handleDisconnect"
+  );
+  assert.ok(
+    !modalSource.includes('fetch("/api/owner/spotify", { method: "DELETE" }') &&
+    !modalSource.includes("fetch('/api/owner/spotify', { method: 'DELETE' }"),
+    "AdminSpotifyModal must not call DELETE /api/owner/spotify"
+  );
+});
+
+
 

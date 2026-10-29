@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { SessionAnalysis } from "@/lib/mock-listening-data";
+import { SessionAnalysis } from "@/lib/types";
 
 export interface SessionAnalysisPanelProps {
   analysis: SessionAnalysis;
@@ -10,9 +10,9 @@ export interface SessionAnalysisPanelProps {
 export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ analysis }) => {
   const activeTopTrack = analysis.topTrack;
 
-  const topSongHref = useMemo(() => {
+  const topTrackHref = useMemo(() => {
     if (!activeTopTrack) return undefined;
-    const isSpotifyId = activeTopTrack.id && !activeTopTrack.id.startsWith("tr-");
+    const isSpotifyId = activeTopTrack.id && !activeTopTrack.id.includes(":");
     return isSpotifyId
       ? `https://open.spotify.com/track/${activeTopTrack.id}`
       : `https://open.spotify.com/search/${encodeURIComponent(`${activeTopTrack.title} ${activeTopTrack.artist || ""}`.trim())}`;
@@ -50,9 +50,9 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
 
       {/* TOP TRACK */}
       <div
-        onClick={() => topSongHref && window.open(topSongHref, "_blank", "noopener,noreferrer")}
+        onClick={() => topTrackHref && window.open(topTrackHref, "_blank", "noopener,noreferrer")}
         className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-          topSongHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
+          topTrackHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
         }`}
       >
         <span className="font-mono text-[11px] tracking-[0.1em] text-[#5A5A55] flex-none">
@@ -62,7 +62,7 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
           {activeTopTrack ? (
             <>
               <a
-                href={topSongHref}
+                href={topTrackHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}

@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
-import { getActiveSiteConfig, getCurrentSession } from "@/lib/db/queries";
+import { getCurrentSession } from "@/lib/db/queries";
 import { getOrFetchSession } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { MOCK_DATA } from "@/lib/mock-data";
+import { MOCK_DATA } from "@/lib/mock-listening-data";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const tzParam = effectiveRequestTimezone(request);
 
     const sessionData = await getOrFetchSession(tzParam || "", () =>
-      getCurrentSession(tzParam)
+      getCurrentSession()
     );
 
     return jsonNoCache(sessionData);

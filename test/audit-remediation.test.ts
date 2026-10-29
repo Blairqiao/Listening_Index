@@ -230,3 +230,69 @@ test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint
     "ListeningFooter must omit deprecated keyboard shortcuts hint"
   );
 });
+
+test("AC-3: State-mutating routes reject cross-origin requests with 403, /api/now-playing is deleted, and getSigningKey has no insecure fallback", async () => {
+  // 1. /api/now-playing must be deleted
+  assert.equal(
+    fs.existsSync(path.join(root, "src/app/api/now-playing/route.ts")),
+    false,
+    "src/app/api/now-playing/route.ts must be deleted"
+  );
+
+  // 2. getSigningKey in admin-auth.ts must not contain fallback-insecure-key
+  const adminAuthSource = fs.readFileSync(path.join(root, "src/lib/admin-auth.ts"), "utf-8");
+  assert.ok(
+    !adminAuthSource.includes("fallback-insecure-key"),
+    "admin-auth.ts must not contain fallback-insecure-key"
+  );
+
+  const prevEnv = process.env.NODE_ENV;
+  const prevPassword = process.env.ADMIN_PASSWORD;
+  Object.assign(process.env, { NODE_ENV: "production" });
+  process.env.ADMIN_PASSWORD = "test-admin-secret-password-123";
+  try {
+    const { POST: uploadHistory } = await import("../src/app/api/upload/history/route");
+    const { DELETE: deletePlayerToken } = await import("../src/app/api/player/token/route");
+    const { POST: logout } = await import("../src/app/api/auth/logout/route");
+
+    const { createSessionToken, ADMIN_COOKIE_NAME } = await import("../src/lib/admin-auth");
+    const adminCookie = `${ADMIN_COOKIE_NAME}=${createSessionToken()}`;
+
+    // Cross-origin request has mismatched Origin header
+    const crossOriginHeaders = {
+      host: "listening-index.vercel.app",
+      origin: "https://evil-attacker.com",
+      cookie: adminCookie,
+    };
+
+    const uploadRes = await uploadHistory(new NextRequest("https://listening-index.vercel.app/api/upload/history", {
+      method: "POST",
+      headers: crossOriginHeaders,
+    }));
+    assert.equal(uploadRes.status, 403, "POST /api/upload/history must return 403 for cross-origin request");
+
+    const deleteTokenRes = await deletePlayerToken(new NextRequest("https://listening-index.vercel.app/api/player/token", {
+      method: "DELETE",
+      headers: crossOriginHeaders,
+    }));
+    assert.equal(deleteTokenRes.status, 403, "DELETE /api/player/token must return 403 for cross-origin request");
+
+    const logoutRes = await logout(new NextRequest("https://listening-index.vercel.app/api/auth/logout", {
+      method: "POST",
+      headers: crossOriginHeaders,
+    }));
+    assert.equal(logoutRes.status, 403, "POST /api/auth/logout must return 403 for cross-origin request");
+  } finally {
+    if (prevEnv !== undefined) {
+      Object.assign(process.env, { NODE_ENV: prevEnv });
+    } else {
+      delete (process.env as Record<string, string | undefined>).NODE_ENV;
+    }
+    if (prevPassword !== undefined) {
+      process.env.ADMIN_PASSWORD = prevPassword;
+    } else {
+      delete process.env.ADMIN_PASSWORD;
+    }
+  }
+});
+

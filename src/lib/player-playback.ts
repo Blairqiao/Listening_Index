@@ -1,8 +1,8 @@
 export interface PlaybackContextSelection {
-  type: "auto" | "playlist" | "album" | "artist";
-  id?: string;
-  uri?: string;
+  type: "auto" | "playlist";
   name: string;
+  uri?: string;
+  id?: string;
   trackCount?: number;
 }
 

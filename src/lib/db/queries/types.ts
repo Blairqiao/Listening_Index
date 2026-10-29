@@ -1,9 +1,9 @@
-import {
+import type {
   AlbumSummary,
   RangeKey,
   ActivityDay,
   ActivityBucket,
-} from "@/lib/mock-listening-data";
+} from "@/lib/types";
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "@/lib/format-utils";
 
 export type { StreamLogItem } from "@/lib/types";
@@ -24,7 +24,7 @@ export interface TrackUpsertItem {
   artistId?: string | null;
   albumId?: string | null;
   durationMs: number;
-  enrichmentStatus?: "pending" | "enriched" | "delisted";
+  enrichmentStatus?: "pending" | "enriched";
 }
 
 export interface PlayInsertItem {

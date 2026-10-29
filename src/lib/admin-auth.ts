@@ -23,7 +23,10 @@ export function verifyAdminPassword(candidate: string): boolean {
 }
 
 function getSigningKey(): string {
-  return process.env.ADMIN_PASSWORD || process.env.CRON_SECRET || "fallback-insecure-key";
+  if (!isAdminPasswordConfigured()) {
+    throw new Error("ADMIN_PASSWORD must be configured in environment variables to sign session tokens.");
+  }
+  return process.env.ADMIN_PASSWORD!;
 }
 
 export function createSessionToken(): string {

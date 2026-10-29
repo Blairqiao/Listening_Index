@@ -12,8 +12,8 @@ interface ArtworkProps {
   isDelisted?: boolean;
 }
 
-import { getFallbackSwatchColor, SWATCH_PALETTE } from "@/lib/color-utils";
-export { getFallbackSwatchColor, SWATCH_PALETTE };
+import { getFallbackSwatchColor } from "@/lib/color-utils";
+export { getFallbackSwatchColor };
 
 export const Artwork: React.FC<ArtworkProps> = ({
   src,

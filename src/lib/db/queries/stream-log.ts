@@ -7,6 +7,7 @@ import {
   sanitizeTimezone,
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
+import { formatStreamLogMetrics } from "@/lib/format-utils";
 import type { StreamLogData, StreamLogItem, StreamLogMetricsRaw } from "./types";
 
 /**
@@ -17,7 +18,6 @@ export async function getStreamLog(
   tzOverride?: string,
   cursorTimestamp?: string,
   cursorId?: string,
-  _prevDayGroup?: string,
   prevPlayedAt?: string
 ): Promise<StreamLogData> {
   const sql = getDb();
@@ -36,7 +36,6 @@ export async function getStreamLog(
     artist: string;
     album: string;
     duration_ms: number;
-    status: string;
   }
 
   let rawMetrics: StreamLogMetricsRaw = {
@@ -49,7 +48,7 @@ export async function getStreamLog(
   let streamRows: StreamRow[];
   let lastSync: string | undefined;
 
-  const lastSyncPromise = getLastSync("spotify");
+  const lastSyncPromise = getLastSync();
 
   const isNumericCursorId = Boolean(cursorId && /^\d+$/.test(cursorId));
   const cursorClause = !cursorTimestamp
@@ -69,12 +68,7 @@ export async function getStreamLog(
         t.name AS title,
         COALESCE(ar.name, t.artist_name, '') AS artist,
         COALESCE(al.name, t.album_name, '') AS album,
-        t.duration_ms,
-        CASE 
-            WHEN t.enrichment_status = 'delisted' THEN '[DELISTED]'
-            WHEN p.played_at >= NOW() - INTERVAL '30 minutes' THEN '[PLAYING]'
-            ELSE '[FULL]'
-        END AS status
+        t.duration_ms
     FROM plays p
     JOIN tracks t ON p.track_id = t.id
     LEFT JOIN albums al ON t.album_id = al.id
@@ -156,17 +150,7 @@ export async function getStreamLog(
       streakDays: currentStreak,
     };
 
-    const totalPlaysStr = totalPlays.toLocaleString();
-    const uniqueTracksStr = uniqueTracks.toLocaleString();
-    const uniqueArtistsStr = uniqueArtists.toLocaleString();
-    const streakStr = `${currentStreak} ${currentStreak === 1 ? "DAY" : "DAYS"}`;
-
-    metrics = [
-      totalPlaysStr,
-      uniqueTracksStr,
-      uniqueArtistsStr,
-      streakStr,
-    ];
+    metrics = formatStreamLogMetrics(rawMetrics);
   } else {
     const [streamRowsResult, lastSyncResult] = await Promise.all([
       streamRowsPromise,
@@ -186,7 +170,7 @@ export async function getStreamLog(
   const context = pagedRows.length ? await getCompleteSessionRows({newest:pagedRows[0],oldest:pagedRows[pagedRows.length-1]}) : [];
   const sessions = calculateSessions(context.map(p=>({...p,playedAt:new Date(p.played_at).toISOString(),durationMs:p.duration_ms,trackId:p.track_id,artistId:p.artist_id,albumId:p.album_id})));
   const summaryByPlay = new Map(sessions.flatMap(session=>session.plays.map(play=>[play.id,session] as const)));
-  const sittingGapMap = new Map<number,NonNullable<StreamLogItem["sessionGap"]>>();
+  const sessionGapMap = new Map<number,NonNullable<StreamLogItem["sessionGap"]>>();
   for (let i=0;i<pagedRows.length;i++) {
     const previous = i ? pagedRows[i-1].played_at : prevPlayedAt;
     if (!previous) continue;
@@ -195,7 +179,7 @@ export async function getStreamLog(
     const session=summaryByPlay.get(pagedRows[i].id);
     if (!session) continue;
     const count=session.plays.length;
-    sittingGapMap.set(i,{durationMs:gap,sessionId:session.id,trackCount:count,runtimeMs:session.runtimeMs});
+    sessionGapMap.set(i,{durationMs:gap,sessionId:session.id,trackCount:count,runtimeMs:session.runtimeMs});
   }
 
   const entries: StreamLogItem[] = [];
@@ -203,7 +187,7 @@ export async function getStreamLog(
   for (let i = 0; i < pagedRows.length; i++) {
     const row = pagedRows[i];
 
-    const sessionGap = sittingGapMap.get(i);
+    const sessionGap = sessionGapMap.get(i);
 
     entries.push({
       id: row.id,
@@ -217,7 +201,6 @@ export async function getStreamLog(
       artist: row.artist,
       album: row.album,
       durationMs: row.duration_ms,
-      status: row.status,
       sessionGap,
     });
   }

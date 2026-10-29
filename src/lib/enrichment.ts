@@ -61,7 +61,7 @@ export async function runEnrichmentBatch(
   const bucket = options.bucket || (options.trackIds && options.trackIds.length > 0 ? "dynamic" : "cron");
 
   // 1. Check global rate limit cooldown (HTTP 429)
-  const cooldown = await getActiveApiCooldown("spotify");
+  const cooldown = await getActiveApiCooldown();
   if (cooldown.active) {
     const progress = await getEnrichmentProgress();
     return {

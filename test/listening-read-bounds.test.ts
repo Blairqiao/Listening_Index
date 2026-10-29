@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { NextRequest } from 'next/server';
 import { createSessionToken } from '../src/lib/admin-auth';
-import { getMockStreamLog } from '../src/lib/mock-data';
+import { getMockStreamLog } from '../src/lib/mock-listening-data';
 import * as auth from '../src/lib/admin-auth';
 import * as routeUtils from '../src/lib/route-utils';
 import * as asyncUtils from '../src/lib/async-utils';
@@ -25,7 +25,7 @@ function loadStreamRoute() {
     '@/lib/db/server-cache': {
       getOrFetchStreamLog: async (limit: number, _tz: string, fetcher: () => Promise<unknown>) => { cacheLimits.push(limit); return fetcher(); },
     },
-    '@/lib/mock-data': { getMockStreamLog },
+    '@/lib/mock-listening-data': { getMockStreamLog },
     '@/lib/admin-auth': auth,
     '@/lib/route-utils': routeUtils,
   };

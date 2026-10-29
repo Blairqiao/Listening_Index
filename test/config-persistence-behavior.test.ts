@@ -19,7 +19,7 @@ test('config route returns an error when neither database nor local file persist
     path: { default: { join: (...parts: string[]) => parts.join('/') } },
     '@/lib/db': { isDbConfigured: () => false },
     '@/lib/db/queries': {}, '@/config': { siteConfig: configUtils.DEFAULT_SITE_CONFIG },
-    '@/lib/auth-utils': { isSameOriginRequest: () => true, isAuthorizedAdminRequest: () => true },
+    '@/lib/admin-auth': { isSameOriginRequest: () => true, isAuthorizedAdminRequest: () => true },
     '@/lib/config-utils': configUtils,
   });
   const response = await routes.POST(new NextRequest('http://localhost:8888/api/config', { method: 'POST', body: JSON.stringify(configUtils.DEFAULT_SITE_CONFIG) })) as Response;
@@ -59,8 +59,53 @@ test('config reset clears deprecated client ID while preserving Owner Token colu
     './schema': { ensureTablesExist: async () => {} }, './cache': { siteConfigCache: { invalidate: () => {} } },
   });
   const result = await config.resetActiveSiteConfig() as configUtils.SiteConfigState;
-  assert.equal(result.spotifyClientId, '');
   assert.equal(result.livePlayerLayout, 'stacked');
-  assert.match(statements.join(''), /spotify_client_id\s*=\s*EXCLUDED\.spotify_client_id/);
+  assert.doesNotMatch(statements.join(''), /spotify_client_id/);
   assert.doesNotMatch(statements.join(''), /owner_playback_token\s*=/);
+});
+
+test('POST /api/config preserves existing database Site Config fields on partial update', async () => {
+  let savedConfig: configUtils.SiteConfigState | null = null;
+  const currentDbConfig: configUtils.SiteConfigState = {
+    ...configUtils.DEFAULT_SITE_CONFIG,
+    title: "Custom Title From DB",
+    ownerName: "Custom Owner From DB",
+    accentColor: "#ff0077",
+    siteUrl: "https://custom.example.com",
+    githubUrl: "https://github.com/custom/repo",
+    livePlayerLayout: "split",
+  };
+
+  const routes = evaluate(readFileSync('src/app/api/config/route.ts', 'utf8'), {
+    'next/server': { NextRequest, NextResponse },
+    'fs/promises': { default: { writeFile: async () => {} } },
+    path: { default: { join: (...parts: string[]) => parts.join('/') } },
+    '@/lib/db': { isDbConfigured: () => true },
+    '@/lib/db/queries': {
+      getActiveSiteConfig: async () => currentDbConfig,
+      saveActiveSiteConfig: async (cfg: configUtils.SiteConfigState) => {
+        savedConfig = cfg;
+        return true;
+      },
+      resetActiveSiteConfig: async () => configUtils.DEFAULT_SITE_CONFIG,
+    },
+    '@/config': { siteConfig: configUtils.DEFAULT_SITE_CONFIG },
+    '@/lib/admin-auth': { isSameOriginRequest: () => true, isAuthorizedAdminRequest: () => true },
+    '@/lib/config-utils': configUtils,
+  });
+
+  const response = await routes.POST(new NextRequest('http://localhost:8888/api/config', {
+    method: 'POST',
+    body: JSON.stringify({ livePlayerLayout: 'stacked' }),
+  })) as Response;
+
+  assert.equal(response.status, 200);
+  assert.ok(savedConfig, "saveActiveSiteConfig must be called");
+  const finalConfig: configUtils.SiteConfigState = savedConfig;
+  assert.equal(finalConfig.livePlayerLayout, 'stacked');
+  assert.equal(finalConfig.title, "Custom Title From DB");
+  assert.equal(finalConfig.ownerName, "Custom Owner From DB");
+  assert.equal(finalConfig.accentColor, "#ff0077");
+  assert.equal(finalConfig.siteUrl, "https://custom.example.com");
+  assert.equal(finalConfig.githubUrl, "https://github.com/custom/repo");
 });

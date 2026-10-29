@@ -2,7 +2,7 @@ import { isValidIanaTimezone } from "@/lib/timezone-utils";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { ListeningView } from "@/components/ListeningView";
-import { MOCK_DATA } from "@/lib/mock-data";
+import { MOCK_DATA } from "@/lib/mock-listening-data";
 import { getInitialMusicData, getActiveSiteConfig } from "@/lib/db/queries";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
@@ -24,7 +24,7 @@ interface PageProps {
   searchParams?: Promise<{
     mode?: string;
     range?: string;
-    sitting?: string;
+    session?: string;
     config?: string;
   }>;
 }
@@ -52,9 +52,12 @@ export default async function Page({ searchParams }: PageProps) {
       : 0;
 
   const activeConfig = isForceMock ? {
-    title: "Listening Index", ownerName: "YOUR NAME", accentColor: "#1DB954",
-    siteUrl: "https://open.spotify.com/", githubUrl: "https://github.com/Blairqiao/listening_index",
-    spotifyClientId: "", livePlayerLayout: "split" as const,
+    title: "Listening Index",
+    ownerName: "YOUR NAME",
+    accentColor: "#76FF49",
+    siteUrl: "https://open.spotify.com/",
+    githubUrl: "https://github.com/Blairqiao/listening_index",
+    livePlayerLayout: "split" as const,
   } : await getActiveSiteConfig();
   let cookieTimezone = cookieStore.get("listening_timezone")?.value;
   try { if (cookieTimezone) cookieTimezone = decodeURIComponent(cookieTimezone); } catch { cookieTimezone = undefined; }

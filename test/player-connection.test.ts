@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSingleFlight } from "../src/lib/player-connection";
+import { createSingleFlight } from "../src/lib/async-utils";
 
 test("AC-6a: createSingleFlight coalesces concurrent executions into a single invocation", async () => {
   const singleFlight = createSingleFlight<string>();

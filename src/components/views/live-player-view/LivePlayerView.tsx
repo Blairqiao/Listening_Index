@@ -122,7 +122,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     playerStatus,
     errorMessage,
     isLinked,
-    activeDevice,
     currentTrack,
     position,
     duration,
@@ -131,7 +130,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     shuffle,
     repeatMode,
     checkTokenStatus,
-    handleTransferPlayback,
     handleTogglePlay,
     handlePrevious,
     handleNext,
@@ -151,16 +149,6 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
   const toggleSourceMode = onToggleSourceMode ?? useCallback(() => {
     setInternalSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
   }, []);
-
-  // const handleToggleLayout = useCallback(() => {
-  //   const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
-  //   updateConfig({ livePlayerLayout: next });
-  //   void fetch("/api/config", {
-  //     method: "POST",
-  //     headers: { "Content-Type": "application/json" },
-  //     body: JSON.stringify({ livePlayerLayout: next }),
-  //   }).catch(() => { });
-  // }, [config.livePlayerLayout, updateConfig]);
 
   const displayTrack = resolveDisplayTrack({
     currentTrack,

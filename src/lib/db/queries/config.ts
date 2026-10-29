@@ -19,7 +19,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     accentColor: siteConfig.accentColor,
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
-    spotifyClientId: "",
     livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
 
@@ -32,7 +31,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
       await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
-        SELECT title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout
+        SELECT title, owner_name, accent_color, site_url, github_url, live_player_layout
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
@@ -46,9 +45,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           accentColor: row.accent_color || fallback.accentColor,
           siteUrl: row.site_url || fallback.siteUrl,
           githubUrl: row.github_url || fallback.githubUrl,
-          // Empty string is a legitimate value here (player disabled), so
-          // fall back only when the column is absent or null.
-          spotifyClientId: row.spotify_client_id ?? fallback.spotifyClientId,
           livePlayerLayout:
             row.live_player_layout === "stacked" || row.live_player_layout === "split"
               ? row.live_player_layout
@@ -58,7 +54,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
 
       // Auto-seed table on first cold start with default config
       await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
+        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
         VALUES (
           'active',
           ${fallback.title},
@@ -66,7 +62,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           ${fallback.accentColor},
           ${fallback.siteUrl},
           ${fallback.githubUrl},
-          ${fallback.spotifyClientId},
           ${fallback.livePlayerLayout},
           NOW()
         )
@@ -93,7 +88,7 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
       VALUES (
         'active',
         ${config.title},
@@ -101,7 +96,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         ${config.accentColor},
         ${config.siteUrl},
         ${config.githubUrl},
-        ${config.spotifyClientId},
         ${config.livePlayerLayout || "split"},
         NOW()
       )
@@ -111,7 +105,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         accent_color = EXCLUDED.accent_color,
         site_url = EXCLUDED.site_url,
         github_url = EXCLUDED.github_url,
-        spotify_client_id = EXCLUDED.spotify_client_id,
         live_player_layout = EXCLUDED.live_player_layout,
         updated_at = NOW();
     `;
@@ -133,7 +126,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     accentColor: siteConfig.accentColor,
     siteUrl: siteConfig.siteUrl,
     githubUrl: siteConfig.githubUrl,
-    spotifyClientId: "",
     livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
   };
 
@@ -141,7 +133,7 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
     await ensureTablesExist();
     const sql = getDb();
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, spotify_client_id, live_player_layout, updated_at)
+      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
       VALUES (
         'active',
         ${defaults.title},
@@ -149,7 +141,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
         ${defaults.accentColor},
         ${defaults.siteUrl},
         ${defaults.githubUrl},
-        ${defaults.spotifyClientId},
         ${defaults.livePlayerLayout},
         NOW()
       )
@@ -159,7 +150,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
         accent_color = EXCLUDED.accent_color,
         site_url = EXCLUDED.site_url,
         github_url = EXCLUDED.github_url,
-        spotify_client_id = EXCLUDED.spotify_client_id,
         live_player_layout = EXCLUDED.live_player_layout,
         updated_at = NOW();
     `;
@@ -207,6 +197,7 @@ export async function rotateOwnerPlaybackToken(
   const rows = await getDb()`
     UPDATE site_settings
     SET owner_playback_token = ${token},
+        owner_token_updated_at = NOW(),
         updated_at = NOW()
     WHERE id = 'active' AND owner_token_revision = ${expectedRevision}::bigint
       AND owner_playback_token = ${previousToken}

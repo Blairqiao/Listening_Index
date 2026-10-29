@@ -46,7 +46,7 @@ export function useListeningUrlSync({
           fetchOverview(rangeKey);
         }
       }
-      const sess = params.get("session") || params.get("sitting");
+      const sess = params.get("session");
       if (sess) {
         if (setSelectedSessionId) setSelectedSessionId(sess);
       }

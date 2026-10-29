@@ -21,6 +21,10 @@ test("AC-1: config queries deprecate DB spotify_client_id and clear owner_spotif
     !saveOwnerFn.includes("spotify_client_id"),
     "saveOwnerPlaybackToken should deprecate spotify_client_id from site_settings INSERT"
   );
+  assert.ok(
+    !content.includes("spotify_client_id"),
+    "config.ts must not reference deprecated spotify_client_id"
+  );
 });
 
 test("AC-2: dev script binds to 127.0.0.1 and layout includes loopback normalizer", () => {

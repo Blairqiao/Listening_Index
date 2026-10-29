@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
-import { getStreamLog, getActiveSiteConfig } from "@/lib/db/queries";
+import { getStreamLog } from "@/lib/db/queries";
 import { getOrFetchStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { getMockStreamLog } from "@/lib/mock-data";
+import { getMockStreamLog } from "@/lib/mock-listening-data";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
 
     const rawCursor = searchParams.get("cursor");
     const rawCursorId = searchParams.get("cursorId");
-    const rawPrevDayGroup = searchParams.get("prevDayGroup");
     const rawPrevPlayedAt = searchParams.get("prevPlayedAt");
 
     const mock = !isDbConfigured() || process.env.FORCE_MOCK_DATA === "true";
@@ -51,19 +50,18 @@ export async function GET(request: NextRequest) {
 
     const cursor = rawCursor ?? undefined;
     const cursorId = rawCursorId ?? undefined;
-    const prevDayGroup = rawPrevDayGroup ?? undefined;
     const prevPlayedAt = rawPrevPlayedAt ?? undefined;
     const tzParam = effectiveRequestTimezone(request);
 
     // Zero-config preview fallback when DATABASE_URL is not configured or FORCE_MOCK_DATA is enabled
     if (mock) {
-      const mockData = getMockStreamLog(limit, cursor, cursorId, prevDayGroup, prevPlayedAt);
+      const mockData = getMockStreamLog(limit, cursor, cursorId, prevPlayedAt);
       return jsonNoCache(mockData);
     }
 
-    const fetcher = () => getStreamLog(limit, tzParam, cursor, cursorId, prevDayGroup, prevPlayedAt);
+    const fetcher = () => getStreamLog(limit, tzParam, cursor, cursorId, prevPlayedAt);
     const data = limit > 250 ? await fetcher() : await getOrFetchStreamLog(limit, tzParam, fetcher, {
-      cursor, cursorId, prevDayGroup, prevPlayedAt,
+      cursor, cursorId, prevPlayedAt,
     });
     return jsonNoCache(data);
   } catch (error: unknown) {
