@@ -87,5 +87,3 @@ export function clearDbQueryCaches(): void {
   catalogTotalsCache.invalidate();
 }
 
-registerCacheClearListener(clearDbQueryCaches);
-

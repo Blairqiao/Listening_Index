@@ -1,10 +1,8 @@
 "use client";
 
 import React from "react";
-import { Mode } from "@/lib/mock-listening-data";
 
 interface ListeningFooterProps {
-  mode: Mode;
   isLive: boolean;
   syncedAgo: string;
   isSyncing?: boolean;
@@ -13,7 +11,6 @@ interface ListeningFooterProps {
 }
 
 export const ListeningFooter: React.FC<ListeningFooterProps> = ({
-  mode,
   isLive,
   syncedAgo,
   isSyncing = false,

@@ -14,13 +14,13 @@ import {
   beginLoginPopup,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
-import { resolvePlayRequest, shouldToggleInPlace, isSameContext } from "@/lib/player-playback";
-import { createSingleFlight } from "@/lib/player-connection";
+import { resolvePlayRequest, shouldToggleInPlace, isSameContext, PlaybackContextSelection } from "@/lib/player-playback";
+import { createSingleFlight } from "@/lib/async-utils";
 import { usePlayerPlaylists, UserPlaylistSummary } from "./player-context/usePlayerPlaylists";
 import { usePlayerInitialContext } from "./player-context/usePlayerInitialContext";
 import { loadSpotifySdk } from "./player-context/useSpotifySdk";
 
-export type { UserPlaylistSummary };
+export type { UserPlaylistSummary, PlaybackContextSelection };
 
 const DEVICE_NAME = "Listening Index";
 
@@ -63,12 +63,6 @@ export interface PlayerContextValue {
   selectContext: (ctx: PlaybackContextSelection) => Promise<void>;
   userPlaylists: UserPlaylistSummary[];
   loadPlaylists: () => Promise<void>;
-}
-
-export interface PlaybackContextSelection {
-  type: "auto" | "playlist";
-  name: string;
-  uri?: string;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -169,7 +163,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const userPlaylistsRef = useRef(userPlaylists);
   userPlaylistsRef.current = userPlaylists;
 
-  // Query Spotify API for active playback device & current song
+  // Query Spotify API for active playback device & current track
   const probeActivePlayback = useCallback(async (localId: string | null) => {
     try {
       const tokenRes = await fetch("/api/player/token");
@@ -313,7 +307,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             .then((r) => {
               if (r.status === 401) {
                 setPlayerStatus("error");
-                setErrorMessage("Admin session expired. Press 'L' to log in.");
+                setErrorMessage("Admin session expired. Click the navigation bar lock icon to log in.");
                 return null;
               }
               return r.json();
@@ -397,7 +391,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
         setIsLinked(false);
         setPlayerStatus("unlinked");
-        setErrorMessage("Spotify session expired or token rejected. Please re-link via Spotify modal (S).");
+        setErrorMessage("Spotify session expired or token rejected. Please re-link via the Spotify status icon in the navigation bar.");
       });
 
       player.addListener("initialization_error", (e) => {
@@ -478,7 +472,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (res.status === 401) {
             teardownPlayer();
             setPlayerStatus("error");
-            setErrorMessage("Admin session expired. Press 'L' to log in.");
+            setErrorMessage("Admin session expired. Click the navigation bar lock icon to log in.");
             return;
           }
 
@@ -587,25 +581,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Unlink Spotify handler
   const handleUnlink = useCallback(async () => {
-    if (connectionTimeoutRef.current) {
-      clearTimeout(connectionTimeoutRef.current);
-      connectionTimeoutRef.current = null;
-    }
-    connectionAttemptRef.current++;
+    teardownPlayer();
     try {
       await fetch("/api/player/token", { method: "DELETE" });
     } catch (e) {
       console.warn("[PLAYER] Failed to unlink Spotify:", e);
     }
-    playerRef.current?.disconnect();
-    playerRef.current = null;
-    deviceIdRef.current = null;
-    setDeviceId(null);
-    setState(null);
-    setActiveDevice(null);
-    setIsLinked(false);
-    setPlayerStatus("unlinked");
-  }, []);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("spotify-status-changed", { detail: { connected: false } })
+      );
+    }
+  }, [teardownPlayer]);
 
   // Transfer playback to Listening Index device
   const handleTransferPlayback = useCallback(async () => {

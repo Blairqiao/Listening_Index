@@ -255,3 +255,35 @@ test("getRedirectUri resolves production HTTPS origins, loopback origins, and av
   }
 });
 
+test("DELETE /api/owner/spotify is deleted and /api/player/token handles token revocation", async () => {
+  const ownerSpotifyRoute = await import("../src/app/api/owner/spotify/route");
+  assert.equal(
+    (ownerSpotifyRoute as Record<string, unknown>).DELETE,
+    undefined,
+    "/api/owner/spotify must not export a DELETE method"
+  );
+
+  const { DELETE } = await import("../src/app/api/player/token/route");
+  const unauthReq = new NextRequest("http://127.0.0.1:8888/api/player/token", {
+    method: "DELETE",
+  });
+  const unauthRes = await DELETE(unauthReq);
+  assert.equal(unauthRes.status, 401);
+  const unauthData = await unauthRes.json();
+  assert.equal(unauthData.code, "ADMIN_AUTH_REQUIRED");
+
+  const adminToken = createSessionToken();
+  const authReq = new NextRequest("http://127.0.0.1:8888/api/player/token", {
+    method: "DELETE",
+    headers: {
+      cookie: `${ADMIN_COOKIE_NAME}=${adminToken}`,
+      host: "127.0.0.1:8888",
+      origin: "http://127.0.0.1:8888",
+    },
+  });
+  const authRes = await DELETE(authReq);
+  assert.equal(authRes.status, 200);
+  const data = await authRes.json();
+  assert.equal(data.success, true);
+});
+

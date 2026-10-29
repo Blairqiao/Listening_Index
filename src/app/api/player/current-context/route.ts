@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { isDbConfigured } from "@/lib/db";
 import { getStreamLog } from "@/lib/db/queries/stream-log";
 import { DEFAULT_FALLBACK_TRACK } from "@/components/views/live-player-view/LivePlayerView";

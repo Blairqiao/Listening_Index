@@ -5,7 +5,6 @@
  */
 
 import { isConfigured } from "@/lib/db";
-import { getActiveSiteConfig } from "@/lib/db/queries";
 import { getOwnerCredential, rotateOwnerCredential } from "@/lib/owner-spotify";
 
 /** Resolve the current database connection before reusing credentials. */
@@ -19,11 +18,9 @@ export async function resolveCredentials(): Promise<{
 } | null> {
   const stored = await getOwnerCredential();
   if (!stored) return null;
-  const config = await getActiveSiteConfig();
   const clientId =
     process.env.SPOTIFY_CLIENT_ID ||
-    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ||
-    config.spotifyClientId;
+    process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
   if (!clientId) return null;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   return {

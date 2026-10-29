@@ -71,7 +71,7 @@ function hashString(s: string): number {
 /**
  * A plausible-looking spectrum built from layered oscillators rather than real
  * audio. Bass bands pulse on a beat, mids drift, treble shimmers. The seed ties
- * the pattern to a track so switching songs visibly changes the shape.
+ * the pattern to a track so switching tracks visibly changes the shape.
  */
 export class SyntheticSpectrumSource implements SpectrumSource {
   private smoothed = new Float32Array(BAND_COUNT);

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { getOwnerSpotifyStatus } from "@/lib/db/queries";
-import { canStoreOwnerCredential, clearOwnerCredential } from "@/lib/owner-spotify";
-import { resetSpotifyTokenCache } from "@/lib/spotify";
+import { canStoreOwnerCredential } from "@/lib/owner-spotify";
 import { calculateTokenExpiration, getRedirectUri } from "@/lib/spotify-auth";
 
 export const dynamic = "force-dynamic";
@@ -33,17 +32,4 @@ export async function GET(request: NextRequest) {
     redirectUri: getRedirectUri(request),
     canConnect: canStoreOwnerCredential(),
   });
-}
-
-/** Disconnects: deletes the stored credential, not merely hides it. */
-export async function DELETE(request: NextRequest) {
-  if (!isAuthorizedAdminRequest(request)) {
-    return NextResponse.json({ error: "Admin sign-in required." }, { status: 401 });
-  }
-  if (!isSameOriginRequest(request)) {
-    return NextResponse.json({ error: "Cross-origin request not permitted." }, { status: 403 });
-  }
-  await clearOwnerCredential();
-  resetSpotifyTokenCache();
-  return NextResponse.json({ connected: false });
 }

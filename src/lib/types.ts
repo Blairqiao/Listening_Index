@@ -52,7 +52,6 @@ export interface SessionItem {
   swatchColor: string;
   albumImageUrl?: string | null;
   status?: string;
-  isActive?: boolean;
   isFirstPlay?: boolean;
 }
 
@@ -135,7 +134,6 @@ export interface OverviewData {
   topTracks: TrackSummary[];
   topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
   topAlbums: AlbumSummary[];
-  clockBuckets?: number[]; // 24 values
   activityCadence: ActivityBucket[]; // Multi-scale activity distribution
   lastSyncedAt?: string;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { SessionHistogramData } from "@/lib/mock-listening-data";
+import { SessionHistogramData } from "@/lib/types";
 
 const DEFAULT_HISTOGRAM: SessionHistogramData = {
   avgRuntimeMinutes: 0,

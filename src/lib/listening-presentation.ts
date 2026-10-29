@@ -12,7 +12,7 @@ export function presentStreamLog(entries: readonly StreamLogItem[], timezone: st
     return { ...entry, timeStr: formatHHmmTz(date, timezone), duration: formatDurationMs(entry.durationMs || 0), dayGroup,
       sessionGap: entry.sessionGap ? { ...entry.sessionGap,
         durationStr: formatDurationHoursMinutes(entry.sessionGap.durationMs),
-        sittingLabel: 'PREVIOUS SESSION',
+        sessionGapLabel: 'PREVIOUS SESSION',
       } : undefined };
   });
 }

@@ -17,9 +17,23 @@ test("AC-1: package.json has test script and removes auth:spotify; scripts/get-s
     undefined,
     "package.json must not contain auth:spotify script"
   );
+  assert.equal(
+    pkg.scripts?.["test:rate-limit"],
+    undefined,
+    "package.json must not contain test:rate-limit script"
+  );
+  assert.equal(
+    pkg.scripts?.["sync:spotify"],
+    undefined,
+    "package.json must not contain duplicate sync:spotify script"
+  );
   assert.ok(
     !fs.existsSync(path.join(root, "scripts/get-spotify-token.ts")),
     "scripts/get-spotify-token.ts must be deleted"
+  );
+  assert.ok(
+    !fs.existsSync(path.join(root, "scripts/test-rate-limit.ts")),
+    "scripts/test-rate-limit.ts must be deleted"
   );
 });
 

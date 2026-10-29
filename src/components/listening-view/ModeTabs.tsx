@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Mode } from "@/lib/mock-listening-data";
+import { Mode } from "@/lib/types";
 import { useConfig } from "@/context/ConfigContext";
 import { Menu, Upload, Lock, Unlock, Music2 } from "lucide-react";
 

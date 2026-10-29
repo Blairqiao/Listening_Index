@@ -27,7 +27,7 @@ export async function getInitialMusicData(initialRange: RangeKey = "1w", timezon
     const tz = sanitizeTimezone(timezone);
     const overviewPromise = getOrFetchOverview(initialRange, tz, () => getOverviewData(initialRange, tz));
     const streamLogPromise = getOrFetchStreamLog(50, tz, () => getStreamLog(50, tz));
-    const sessionPromise = getOrFetchSession(tz, () => getCurrentSession(tz));
+    const sessionPromise = getOrFetchSession(tz, () => getCurrentSession());
 
     const [overviewResult, streamLogResult, sessionResult] = await Promise.allSettled([
       overviewPromise,

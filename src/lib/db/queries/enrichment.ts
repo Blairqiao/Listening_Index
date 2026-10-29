@@ -174,7 +174,7 @@ export async function recordApiCooldown(
  * Checks if an active API cooldown exists.
  * Queries daily_api_usage for any active cooldown.
  */
-export async function getActiveApiCooldown(_: string = "spotify"): Promise<{
+export async function getActiveApiCooldown(): Promise<{
   active: boolean;
   cooldownUntil?: string;
   reason?: string;
@@ -312,38 +312,6 @@ export async function checkAndIncrementApiQuota(
     remaining: Math.min(remainingInBucket, remainingInTotal),
     totalToday: newTotal,
     bucketToday: newBucket,
-  };
-}
-
-export async function getDailyApiQuotaStatus(): Promise<{
-  cronCount: number;
-  dynamicCount: number;
-  totalCount: number;
-  remainingCron: number;
-  remainingDynamic: number;
-  remainingTotal: number;
-}> {
-  await ensureTablesExist();
-  const sql = getDb();
-  const todayUtc = new Date().toISOString().slice(0, 10);
-  const rows = ((await sql`
-    SELECT cron_count, dynamic_count, total_count
-    FROM daily_api_usage
-    WHERE usage_date = ${todayUtc}::date
-    LIMIT 1;
-  `));
-
-  const cron = Number(rows[0]?.cron_count || 0);
-  const dynamic = Number(rows[0]?.dynamic_count || 0);
-  const total = Number(rows[0]?.total_count || 0);
-
-  return {
-    cronCount: cron,
-    dynamicCount: dynamic,
-    totalCount: total,
-    remainingCron: Math.max(0, DAILY_API_QUOTA_CRON - cron),
-    remainingDynamic: Math.max(0, DAILY_API_QUOTA_DYNAMIC - dynamic),
-    remainingTotal: Math.max(0, DAILY_API_QUOTA_TOTAL - total),
   };
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isDbConfigured } from "@/lib/db";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/admin-auth";
 import {
   bulkUpsertTracks,
   bulkInsertPlays,
@@ -17,6 +17,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { success: false, error: "Unauthorized: Admin authorization required to import streaming history." },
       { status: 401 }
+    );
+  }
+
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json(
+      { error: "Cross-origin request not permitted." },
+      { status: 403 }
     );
   }
 

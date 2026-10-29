@@ -2,16 +2,6 @@ import { getDb } from "../index";
 import { formatDayGroupTz } from "./helpers";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
 
-export interface CadenceRow {
-  day?: string;
-  block?: number;
-  hour_key?: string;
-  ym?: string;
-  play_year?: number;
-  count?: number | string;
-  [key: string]: unknown;
-}
-
 export function buildCadenceQuery(range: RangeKey, tz: string) {
   const sql = getDb();
 
@@ -87,17 +77,15 @@ export function buildActivityCadence(params: {
   now?: Date;
   cadenceRows: Record<string, unknown>[];
   minDateRow?: { log_start_date?: string | null };
-}): { clockBuckets?: number[]; activityCadence: ActivityBucket[] } {
+}): { activityCadence: ActivityBucket[] } {
   const { range, tz, cadenceRows, minDateRow } = params;
   const now = params.now || new Date();
-  let clockBuckets: number[] | undefined = undefined;
   const activityCadence: ActivityBucket[] = [];
 
   if (range === "1d") {
     const hourMap = new Map<string, number>(
       cadenceRows.map((r) => [String(r.hour_key), Number(r.count)])
     );
-    clockBuckets = new Array(24).fill(0);
 
     for (let i = 23; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 3600000);
@@ -112,7 +100,6 @@ export function buildActivityCadence(params: {
       const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
       const hourKey = `${m.year}-${m.month}-${m.day} ${m.hour}`;
       const count = hourMap.get(hourKey) || 0;
-      clockBuckets[23 - i] = count;
 
       const [yr, mo, dy, hr] = [Number(m.year), Number(m.month) - 1, Number(m.day), Number(m.hour)];
       const bucketStart = new Date(Date.UTC(yr, mo, dy, hr, 0, 0, 0));
@@ -311,5 +298,5 @@ export function buildActivityCadence(params: {
     }
   }
 
-  return { clockBuckets, activityCadence };
+  return { activityCadence };
 }

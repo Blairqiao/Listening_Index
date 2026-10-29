@@ -942,7 +942,7 @@ export const MOCK_DATA: MockListeningData = {
 },
 
   // -------------------------------------------------------------------------
-  // Mode 2: Session View (20 Previous Sittings, Active Sitting, Full Sittings)
+  // Mode 2: Session View (20 Previous Sessions, Active Session, Full Sessions)
   // -------------------------------------------------------------------------
   session: {
   "sessions": [

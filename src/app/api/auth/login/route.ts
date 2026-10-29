@@ -4,11 +4,19 @@ import {
   verifyAdminPassword,
   createSessionToken,
   getSessionCookieHeader,
+  isSameOriginRequest,
 } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json(
+      { success: false, error: "Cross-origin request not permitted." },
+      { status: 403 }
+    );
+  }
+
   if (!isAdminPasswordConfigured()) {
     return NextResponse.json(
       {

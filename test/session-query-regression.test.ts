@@ -13,7 +13,7 @@ test('complete Session context survives the old 600-row cutoff and Stream Log pa
     const times=Array.from({length:605},(_,i)=>new Date(base+i*31000).toISOString());
     times.push(new Date(base+605*31000+3600000).toISOString());
     await sql`INSERT INTO plays (played_at,track_id,ms_played) SELECT t::timestamptz,${trackId},30000 FROM UNNEST(${times}::text[]) t`;
-    const session=await getCurrentSession('UTC');
+    const session=await getCurrentSession();
     assert.equal(session.sessions?.[1].trackCount,605);
     assert.equal('sittings' in session,false);
     assert.equal('dateStr' in session.sessions![0],false);

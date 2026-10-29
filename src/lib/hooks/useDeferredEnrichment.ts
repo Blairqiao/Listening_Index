@@ -80,7 +80,6 @@ export function useDeferredEnrichment({
           body: JSON.stringify({
             trackIds: pendingCandidates,
             source: "dynamic",
-            limit: pendingCandidates.length,
           }),
         });
 

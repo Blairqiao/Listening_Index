@@ -28,10 +28,9 @@ test("AC-1: async-utils provides shared createSingleFlight and server-cache uses
   assert.equal(res2, 42);
   assert.equal(runs, 1, "createSingleFlight must coalesce concurrent executions");
 
-  const playerConnContent = fs.readFileSync(path.join(root, "src/lib/player-connection.ts"), "utf-8");
   assert.ok(
-    playerConnContent.includes("async-utils"),
-    "player-connection.ts must import createSingleFlight from async-utils"
+    !fs.existsSync(path.join(root, "src/lib/player-connection.ts")),
+    "player-connection.ts shim must be deleted in favor of async-utils"
   );
 });
 

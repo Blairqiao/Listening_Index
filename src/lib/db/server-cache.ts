@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache";
 import type { OverviewData, StreamLogData, SessionData } from "./queries/types";
-import type { RangeKey } from "@/lib/mock-listening-data";
+import type { RangeKey } from "@/lib/types";
 import { KeyedAsyncCache } from "@/lib/async-utils";
 import { sanitizeTimezone } from "./queries/helpers";
 
@@ -44,7 +44,6 @@ export function getOrFetchOverview<T extends OverviewData = OverviewData>(
 export interface StreamLogPageIdentity {
   cursor?: string;
   cursorId?: string;
-  prevDayGroup?: string;
   prevPlayedAt?: string;
 }
 
@@ -56,7 +55,7 @@ export function getOrFetchStreamLog<T extends StreamLogData = StreamLogData>(
 ): Promise<T> {
   if (limit > 250) return fetcher();
   const key = JSON.stringify([cacheEpoch, "stream-log", limit, timezoneIdentity(timezone), page.cursor ?? null,
-    page.cursorId ?? null, page.prevDayGroup ?? null, page.prevPlayedAt ?? null]);
+    page.cursorId ?? null, page.prevPlayedAt ?? null]);
   return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
 }
 

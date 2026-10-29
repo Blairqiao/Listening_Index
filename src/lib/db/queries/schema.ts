@@ -110,7 +110,7 @@ export async function ensureTablesExist(): Promise<void> {
             owner_token_revision BIGINT NOT NULL DEFAULT 0,
             owner_oauth_nonce TEXT,
             live_player_layout TEXT NOT NULL DEFAULT 'split',
-            owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
+            owner_token_updated_at TIMESTAMPTZ,
             owner_spotify_name TEXT,
             owner_spotify_url TEXT,
             cron_key TEXT,
@@ -124,7 +124,7 @@ export async function ensureTablesExist(): Promise<void> {
             ADD COLUMN IF NOT EXISTS owner_token_revision BIGINT NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS owner_oauth_nonce TEXT,
             ADD COLUMN IF NOT EXISTS live_player_layout TEXT NOT NULL DEFAULT 'split',
-            ADD COLUMN IF NOT EXISTS owner_token_updated_at TIMESTAMPTZ DEFAULT NOW(),
+            ADD COLUMN IF NOT EXISTS owner_token_updated_at TIMESTAMPTZ,
             ADD COLUMN IF NOT EXISTS owner_spotify_name TEXT,
             ADD COLUMN IF NOT EXISTS owner_spotify_url TEXT,
             ADD COLUMN IF NOT EXISTS cron_key TEXT;

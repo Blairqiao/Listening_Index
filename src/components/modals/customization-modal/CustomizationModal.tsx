@@ -324,7 +324,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   </div>
                 </div>
 
-                <div className="space-y-1 mb-[-10]">
+                <div className="space-y-1">
                   <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
                     GITHUB REPOSITORY URL
                   </label>
@@ -359,7 +359,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                 <button
                   type="button"
                   onClick={handleResetColor}
-                  title="Reset color to factory default (#1DB954)"
+                  title={`Reset color to deployed default (${deployedConfig.accentColor})`}
                   className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" />

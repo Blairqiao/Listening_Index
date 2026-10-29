@@ -55,6 +55,9 @@ worktrees/
 .agent-docs
 .agent-docs/
 .agent-docs/*
+.artifacts
+.artifacts/
+.artifacts/*
 
 # next.js agent rules (regenerated on every build)
 AGENTS.md

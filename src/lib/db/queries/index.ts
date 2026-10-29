@@ -29,7 +29,6 @@ export { ensureTablesExist } from "./schema";
 
 // Ingestion & Sync Ledger
 export {
-  getExistingPlayKeys,
   getExistingEntityIds,
   recordLastSync,
   getLastSync,
@@ -51,7 +50,6 @@ export {
   DAILY_API_QUOTA_CRON,
   DAILY_API_QUOTA_DYNAMIC,
   checkAndIncrementApiQuota,
-  getDailyApiQuotaStatus,
   isCatalogFullyEnriched,
 } from "./enrichment";
 

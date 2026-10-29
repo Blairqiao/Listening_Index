@@ -153,7 +153,7 @@ for (let i=1;i<ALL_MOCK_STREAM_LOG_ENTRIES.length;i++) {
   entry.sessionGap={durationMs:gap,sessionId:session.id,trackCount:session.plays.length,runtimeMs:session.runtimeMs};
 }
 
-export function getMockStreamLog(limit=50,cursor?:string,cursorId?:string,_prevDayGroup?:string,_prevPlayedAt?:string) {
+export function getMockStreamLog(limit=50,cursor?:string,cursorId?:string,_prevPlayedAt?:string) {
   const found=cursorId?ALL_MOCK_STREAM_LOG_ENTRIES.findIndex(e=>e.id===cursorId):cursor?ALL_MOCK_STREAM_LOG_ENTRIES.findIndex(e=>e.playedAt===cursor):-1;
   const startIndex=found+1;
   const entries=ALL_MOCK_STREAM_LOG_ENTRIES.slice(startIndex,startIndex+limit);

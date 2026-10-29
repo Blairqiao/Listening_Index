@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Mode, RangeKey } from "@/lib/mock-listening-data";
+import { Mode, RangeKey } from "@/lib/types";
 import { compactDate } from "@/lib/format-utils";
 
 interface ControlRowProps {

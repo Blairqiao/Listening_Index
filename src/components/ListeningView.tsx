@@ -187,12 +187,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialRange = "1w",
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [, setIsUploadProcessing] = useState(false);
 
   const {
     config,
     visitorTimezone,
     updateConfig,
+    markAsDeployed,
     openModal,
     isAuthenticated,
     isAdminSpotifyModalOpen,
@@ -263,14 +263,23 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, []);
 
   const handleToggleLayout = useCallback(() => {
-    const next = config.livePlayerLayout === "stacked" ? "split" : "stacked";
+    const next: "split" | "stacked" = config.livePlayerLayout === "stacked" ? "split" : "stacked";
+    const nextConfig = { ...config, livePlayerLayout: next };
     updateConfig({ livePlayerLayout: next });
+    markAsDeployed(nextConfig);
     void fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ livePlayerLayout: next }),
+    }).then(async (res) => {
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.config) {
+          markAsDeployed(data.config);
+        }
+      }
     }).catch(() => { });
-  }, [config.livePlayerLayout, updateConfig]);
+  }, [config, updateConfig, markAsDeployed]);
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
   useEffect(() => {
@@ -438,7 +447,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       return;
     }
 
-    // Reset track stats on cache miss when initiating a new fetch so stale stats from the previous song don't linger while loading
+    // Reset track stats on cache miss when initiating a new fetch so stale stats from the previous track don't linger while loading
     setTrackStats(null);
 
     let isSubscribed = true;
@@ -556,7 +565,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return () => clearInterval(interval);
   }, [lastSyncedAt, computeSyncedAgo]);
 
-  // Active session sitting state for Mode 3
+  // Active session state for Mode 3
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
   // Fetch Overview data from server (cached on server, reset on sync)
@@ -1219,7 +1228,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
         {/* 6. Footer (System status only, fixed to bottom) */}
         <ListeningFooter
-          mode={activeMode}
           isLive={isSystemLive}
           syncedAgo={syncedAgoStr}
           isSyncing={isSyncing}
@@ -1236,7 +1244,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadComplete={handleUploadComplete}
-        onProcessingChange={setIsUploadProcessing}
         isDbConfigured={isDbConfigured}
       />
 

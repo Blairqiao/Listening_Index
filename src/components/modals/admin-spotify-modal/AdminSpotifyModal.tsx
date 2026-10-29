@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useConfig } from "@/context/ConfigContext";
 import {
+  beginLogin,
   beginLoginPopup,
   getRedirectUri,
   resolveRedirectUriDisplay,
@@ -20,7 +21,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 export interface SpotifyOwnerStatus {
   connected: boolean;
-  source: "environment" | "database" | null;
+  source: "database" | null;
   displayName: string | null;
   profileUrl?: string | null;
   connectedAt: string | null;
@@ -232,12 +233,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
   };
 
   const handleConnect = async () => {
+    if (status?.canConnect === false) return;
     setIsBusy(true);
     setError(null);
     try {
       const ok = await beginLoginPopup();
       if (ok === null) {
-        setError("Popup was blocked by your browser. Please allow popups for this site.");
+        await beginLogin();
+        return;
       } else if (ok) {
         await refreshStatus();
         if (typeof window !== "undefined") {
@@ -259,7 +262,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
     setIsBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/owner/spotify", { method: "DELETE" });
+      const res = await fetch("/api/player/token", { method: "DELETE" });
       if (res.ok) {
         await refreshStatus();
         if (typeof window !== "undefined") {
@@ -335,21 +338,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
   );
 
   const effectiveDaysRemaining = useMemo(() => {
-    if (currentMode === "expiring") {
-      if (
-        status?.daysRemaining === undefined ||
-        status?.daysRemaining === null ||
-        status.daysRemaining > 14
-      ) {
-        return 6;
-      }
-      return status.daysRemaining;
+    if (initialModeOverride === "expiring") {
+      return status?.daysRemaining ?? 6;
     }
-    if (status?.daysRemaining !== null && status?.daysRemaining !== undefined) {
-      return status.daysRemaining;
+    if (initialModeOverride === "connected") {
+      return status?.daysRemaining ?? 175;
     }
-    return 175;
-  }, [currentMode, status?.daysRemaining]);
+    return status?.daysRemaining ?? null;
+  }, [initialModeOverride, status?.daysRemaining]);
 
   if (!shouldRender || (!initialModeOverride && !config.isAuthenticated)) return null;
 
@@ -507,7 +503,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     <button
                       type="button"
                       onClick={handleConnect}
-                      disabled={isBusy}
+                      disabled={isBusy || status?.canConnect === false}
                       className="w-full py-2.5 px-4 bg-music-accent text-black font-mono text-[11px] font-bold tracking-[0.08em] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
                     >
                       {isBusy ? (
@@ -519,6 +515,11 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <span>Connect Spotify Account</span>
                       )}
                     </button>
+                    {status?.canConnect === false && (
+                      <div className="font-mono text-[10px] text-amber-400/90 leading-relaxed">
+                        A database is required to connect Spotify. Configure DATABASE_URL in your deployment environment.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -551,7 +552,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         TOKEN LIFECYCLE
                       </span>
                       <span className="text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-[0.12em] text-[#EDEDE8] font-bold shrink-0 whitespace-nowrap">
-                        {effectiveDaysRemaining} days remaining
+                        {effectiveDaysRemaining !== null ? `${effectiveDaysRemaining} days remaining` : "Connected"}
                       </span>
                     </div>
                   </div>
@@ -566,8 +567,8 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     <button
                       type="button"
                       onClick={handleConnect}
-                      disabled={isBusy}
-                      className="flex-1 py-2 px-3 border border-music-accent text-music-accent hover:bg-music-accent/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                      disabled={isBusy || status?.canConnect === false}
+                      className="flex-1 py-2 px-3 border border-music-accent text-music-accent hover:bg-music-accent/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isBusy ? (
                         <>
@@ -578,17 +579,15 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <span>Refresh Token</span>
                       )}
                     </button>
-                    {status?.source !== "environment" && (
-                      <button
-                        type="button"
-                        onClick={handleDisconnect}
-                        disabled={isBusy}
-                        className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] transition-colors cursor-pointer disabled:opacity-50"
-                        title="Disconnect Spotify account"
-                      >
-                        Disconnect
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={isBusy}
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] transition-colors cursor-pointer disabled:opacity-50"
+                      title="Disconnect Spotify account"
+                    >
+                      Disconnect
+                    </button>
                   </div>
 
                   {/* SCHEDULED SYNC (CRON) */}
@@ -633,7 +632,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         TOKEN LIFECYCLE
                       </span>
                       <span className="text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-[0.12em] text-amber-400 font-bold shrink-0 whitespace-nowrap">
-                        {effectiveDaysRemaining} days remaining
+                        {effectiveDaysRemaining !== null ? `${effectiveDaysRemaining} days remaining` : "Expiring soon"}
                       </span>
                     </div>
                   </div>
@@ -648,8 +647,8 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     <button
                       type="button"
                       onClick={handleConnect}
-                      disabled={isBusy}
-                      className="flex-1 py-2 px-3 border border-amber-400 text-amber-400 hover:bg-amber-400/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                      disabled={isBusy || status?.canConnect === false}
+                      className="flex-1 py-2 px-3 border border-amber-400 text-amber-400 hover:bg-amber-400/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isBusy ? (
                         <>
@@ -660,17 +659,15 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <span>Re-link / Refresh Token</span>
                       )}
                     </button>
-                    {status?.source !== "environment" && (
-                      <button
-                        type="button"
-                        onClick={handleDisconnect}
-                        disabled={isBusy}
-                        className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] uppercase transition-colors cursor-pointer disabled:opacity-50"
-                        title="Disconnect Spotify account"
-                      >
-                        Disconnect
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      disabled={isBusy}
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] uppercase transition-colors cursor-pointer disabled:opacity-50"
+                      title="Disconnect Spotify account"
+                    >
+                      Disconnect
+                    </button>
                   </div>
 
                   {/* SCHEDULED SYNC (CRON) */}

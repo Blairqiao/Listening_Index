@@ -9,7 +9,6 @@ export interface SiteConfigState {
   accentColor: string;
   siteUrl: string;
   githubUrl: string;
-  spotifyClientId?: string;
   livePlayerLayout: LivePlayerLayout;
 }
 
@@ -19,7 +18,6 @@ export const DEFAULT_SITE_CONFIG: SiteConfigState = {
   accentColor: normalizeHex(siteConfig.accentColor),
   siteUrl: siteConfig.siteUrl,
   githubUrl: siteConfig.githubUrl,
-  spotifyClientId: (siteConfig as { spotifyClientId?: string }).spotifyClientId || "",
   livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
 };
 
@@ -43,10 +41,6 @@ export function normalizeSiteConfig(
     accentColor: patch.accentColor ? normalizeHex(patch.accentColor, base.accentColor) : base.accentColor,
     siteUrl: patch.siteUrl !== undefined ? String(patch.siteUrl).trim() : base.siteUrl,
     githubUrl: patch.githubUrl !== undefined ? String(patch.githubUrl).trim() : base.githubUrl,
-    spotifyClientId:
-      patch.spotifyClientId !== undefined
-        ? String(patch.spotifyClientId).trim()
-        : base.spotifyClientId || "",
     livePlayerLayout: validLayout,
   };
 }
@@ -61,7 +55,6 @@ export function areSiteConfigsEqual(a: SiteConfigState, b: SiteConfigState): boo
     normalizeHex(a.accentColor) === normalizeHex(b.accentColor) &&
     a.siteUrl === b.siteUrl &&
     a.githubUrl === b.githubUrl &&
-    (a.spotifyClientId || "") === (b.spotifyClientId || "") &&
     a.livePlayerLayout === b.livePlayerLayout
   );
 }

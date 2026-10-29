@@ -21,7 +21,6 @@ interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUploadComplete?: () => void;
-  onProcessingChange?: (isProcessing: boolean) => void;
   isDbConfigured: boolean;
 }
 
@@ -31,7 +30,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
   onClose,
   onUploadComplete,
-  onProcessingChange,
   isDbConfigured,
 }) => {
   const [step, setStep] = useState<UploadStep>("idle");
@@ -44,7 +42,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   // Ingestion Progress
   const [stage1Current, setStage1Current] = useState<number>(0);
   const [stage1Total, setStage1Total] = useState<number>(0);
-  // const [totalNewPlays, setTotalNewPlays] = useState<number>(0);
 
   // Overall Database Catalog Enrichment Status
   const [enrichmentProgress, setEnrichmentProgress] = useState<EnrichmentProgress | null>(null);
@@ -115,13 +112,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
    */
   const processFiles = async (files: File[]) => {
     isProcessingRef.current = true;
-    if (onProcessingChange) onProcessingChange(true);
     setStep("inspecting");
     setStatusMessage("Inspecting uploaded files...");
     setErrorMessage("");
     setStage1Current(0);
     setStage1Total(0);
-    // setTotalNewPlays(0);
 
     try {
       const tasks: Array<{ name: string; getText: () => Promise<string> }> = [];
@@ -201,7 +196,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           const resJson = await response.json();
           totalNew += resJson.newPlays || 0;
           setStage1Current((prev) => prev + chunk.length);
-          // setTotalNewPlays(totalNew);
         }
       }
 
@@ -216,7 +210,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       setErrorMessage(err instanceof Error ? err.message : "Upload failed unexpectedly");
     } finally {
       isProcessingRef.current = false;
-      if (onProcessingChange) onProcessingChange(false);
     }
   };
 
@@ -226,7 +219,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     setErrorMessage("");
     setStage1Current(0);
     setStage1Total(0);
-    // setTotalNewPlays(0);
   };
 
   if (!shouldRender) return null;

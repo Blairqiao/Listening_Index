@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { getDb, isDbConfigured } from "@/lib/db";
 import { CATALOG } from "@/lib/mock-listening-data";
 

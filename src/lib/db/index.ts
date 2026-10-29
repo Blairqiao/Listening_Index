@@ -1,4 +1,4 @@
-import { neon, Pool, NeonQueryFunction } from "@neondatabase/serverless";
+import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 
 /**
  * Neon Serverless PostgreSQL Database Client Scaffolding
@@ -6,12 +6,9 @@ import { neon, Pool, NeonQueryFunction } from "@neondatabase/serverless";
  * For serverless Next.js API route handlers and Server Actions, HTTP-based queries
  * via `neon()` are recommended due to connection pooling, sub-10ms connection setup,
  * and zero persistent connection overhead.
- *
- * `Pool` is also exported if multi-query transactions are needed.
  */
 
 let cachedSql: NeonQueryFunction<false, false> | null = null;
-let cachedPool: Pool | null = null;
 
 /**
  * Checks whether an environment variable or setting is populated with a real value
@@ -64,17 +61,6 @@ export function getDb(): NeonQueryFunction<false, false> {
 }
 
 /**
- * Returns a pooled connection instance for transactions or session-level states.
- */
-export function getPool(): Pool {
-  if (!cachedPool) {
-    const url = getDatabaseUrl();
-    cachedPool = new Pool({ connectionString: url });
-  }
-  return cachedPool;
-}
-
-/**
  * Default sql tagged-template runner.
  * Automatically delegates to getDb() on invocation.
  */
@@ -82,5 +68,3 @@ export const sql: NeonQueryFunction<false, false> = ((...args: Parameters<NeonQu
   const db = getDb();
   return db(...args);
 }) as NeonQueryFunction<false, false>;
-
-export { Pool };

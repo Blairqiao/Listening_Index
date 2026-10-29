@@ -9,7 +9,7 @@ import {
   type SiteConfigState,
 } from "@/lib/db/queries";
 import { siteConfig } from "@/config";
-import { isSameOriginRequest, isAuthorizedAdminRequest } from "@/lib/auth-utils";
+import { isSameOriginRequest, isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { generateConfigTsCode, normalizeSiteConfig } from "@/lib/config-utils";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
       targetConfig = await resetActiveSiteConfig();
       wroteToDatabase = isDbConfigured();
     } else {
-      targetConfig = normalizeSiteConfig(body, siteConfig);
+      const baseConfig = isDbConfigured() ? await getActiveSiteConfig() : siteConfig;
+      targetConfig = normalizeSiteConfig(body, baseConfig);
 
       if (isDbConfigured()) {
         wroteToDatabase = await saveActiveSiteConfig(targetConfig);

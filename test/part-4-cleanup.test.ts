@@ -186,9 +186,8 @@ test("AC-5: PlayerContext delegates SDK script and lifecycle to src/context/play
   );
 });
 
-test("AC-6: isAuthorizedAdminRequest and isSameOriginRequest are consolidated into admin-auth.ts and re-exported by auth-utils.ts", async () => {
+test("AC-6: isAuthorizedAdminRequest and isSameOriginRequest are consolidated into admin-auth.ts", async () => {
   const adminAuth = await import("../src/lib/admin-auth");
-  const authUtils = await import("../src/lib/auth-utils");
 
   assert.equal(
     typeof adminAuth.isAuthorizedAdminRequest,
@@ -199,17 +198,6 @@ test("AC-6: isAuthorizedAdminRequest and isSameOriginRequest are consolidated in
     typeof adminAuth.isSameOriginRequest,
     "function",
     "admin-auth must export isSameOriginRequest"
-  );
-
-  assert.equal(
-    authUtils.isAuthorizedAdminRequest,
-    adminAuth.isAuthorizedAdminRequest,
-    "auth-utils must re-export isAuthorizedAdminRequest from admin-auth"
-  );
-  assert.equal(
-    authUtils.isSameOriginRequest,
-    adminAuth.isSameOriginRequest,
-    "auth-utils must re-export isSameOriginRequest from admin-auth"
   );
 
   // Test isSameOriginRequest logic
@@ -229,6 +217,11 @@ test("AC-6: isAuthorizedAdminRequest and isSameOriginRequest are consolidated in
   } finally {
     (process.env as Record<string, string>).NODE_ENV = origEnv;
   }
+
+  assert.ok(
+    !fs.existsSync(path.join(root, "src/lib/auth-utils.ts")),
+    "src/lib/auth-utils.ts must be deleted in favor of admin-auth.ts"
+  );
 });
 
 test("AC-7: CONTEXT.md and README.md reflect current quotas and interface state", () => {

@@ -21,12 +21,12 @@ export const SessionView: React.FC<SessionViewProps> = ({
   selectedSessionId: externalSelectedSessionId,
 }) => {
   const { visitorTimezone } = useConfig();
-  const sittings = useMemo(() => sessions.map(session => presentSession(session, visitorTimezone)), [sessions, visitorTimezone]);
+  const presentedSessions = useMemo(() => sessions.map(session => presentSession(session, visitorTimezone)), [sessions, visitorTimezone]);
   const histogram = useMemo(() => presentSessionHistogram(sessions, visitorTimezone), [sessions, visitorTimezone]);
   const onSelect = onSelectSession;
-  const selectedSessionId = externalSelectedSessionId || sittings[0]?.id;
+  const selectedSessionId = externalSelectedSessionId || presentedSessions[0]?.id;
   const selectedSessionIdValue = selectedSessionId;
-  const isOpen = sittings[0]?.isOpen || false;
+  const isOpen = presentedSessions[0]?.isOpen || false;
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -75,8 +75,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
   // Active session lookup
   const activeSession = useMemo(() => {
-    return sittings.find((s) => s.id === selectedSessionId) || sittings[0];
-  }, [sittings, selectedSessionId]);
+    return presentedSessions.find((s) => s.id === selectedSessionId) || presentedSessions[0];
+  }, [presentedSessions, selectedSessionId]);
 
   // Tracks for active session
   const activeTracks: PresentedSessionItem[] = useMemo(() => {
@@ -95,13 +95,13 @@ export const SessionView: React.FC<SessionViewProps> = ({
     };
   }, [activeTracks]);
 
-  const sitsList: PreviousSession[] = useMemo(() => sittings.slice(0, 20).map(session => ({
+  const sessionList: PreviousSession[] = useMemo(() => presentedSessions.slice(0, 20).map(session => ({
     id: session.id, dateStr: session.dateStr, durationStr: session.runtimeStr,
     tracksCountStr: `${session.trackCount} ${session.trackCount === 1 ? "track" : "tracks"}`,
     runtimeMinutes: session.runtimeMinutes, trackCount: session.trackCount,
-  })), [sittings]);
+  })), [presentedSessions]);
 
-  const visibleSits = isMobile && !isSessionsExpanded ? sitsList.slice(0, 5) : sitsList;
+  const visibleSessions = isMobile && !isSessionsExpanded ? sessionList.slice(0, 5) : sessionList;
 
   // Placeholder rows count (at least slotCount rows total)
   const placeholderCount = Math.max(0, slotCount - activeTracks.length);
@@ -129,7 +129,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
           >
             {/* Active Session Track Rows */}
             {visibleTracks.map((track, idx) => {
-              const isSpotifyTrackId = track.id && !track.id.startsWith("tr-");
+              const isSpotifyTrackId = track.id && !track.id.includes(":");
               const trackHref = isSpotifyTrackId
                 ? `https://open.spotify.com/track/${track.id}`
                 : `https://open.spotify.com/search/${encodeURIComponent(`${track.title} ${track.artist}`)}`;
@@ -257,16 +257,16 @@ export const SessionView: React.FC<SessionViewProps> = ({
               className="h-auto md:h-[180px] overflow-y-auto scrollbar-hidden"
               role="list"
             >
-              {visibleSits.map((sitting, idx) => {
-                const sessionId = sitting.id || `s${idx + 1}`;
+              {visibleSessions.map((sessionItem, idx) => {
+                const sessionId = sessionItem.id || `s${idx + 1}`;
                 const isSelected = sessionId === selectedSessionIdValue;
-                const rawCount = sitting.tracksCountStr
+                const rawCount = sessionItem.tracksCountStr
                   .replace(" tracks", "")
                   .replace(" track", "");
 
                 return (
                   <div
-                    key={`${sitting.dateStr}-${idx}`}
+                    key={`${sessionItem.dateStr}-${idx}`}
                     role="listitem"
                     tabIndex={0}
                     onClick={() => handleSelectSession(sessionId)}
@@ -283,7 +283,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                   >
                     {/* Date (mono 11px, #4A4A46) */}
                     <span className="font-mono text-[11px] text-[#4A4A46] tabular-nums select-none">
-                      {sitting.dateStr}
+                      {sessionItem.dateStr}
                     </span>
 
                     {/* Runtime (Space Grotesk 13px, text-music-accent when selected) */}
@@ -291,7 +291,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                       className={`font-sans text-[13px] truncate select-none ${isSelected ? "text-music-accent font-medium" : "text-[#EDEDE8]"
                         }`}
                     >
-                      {sitting.durationStr}
+                      {sessionItem.durationStr}
                     </span>
 
                     {/* Count (mono 11px #8A8A83, right-aligned) */}
@@ -303,13 +303,13 @@ export const SessionView: React.FC<SessionViewProps> = ({
               })}
             </div>
 
-            {sitsList.length > 5 && (
+            {sessionList.length > 5 && (
               <button
                 type="button"
                 onClick={() => setIsSessionsExpanded((prev) => !prev)}
                 className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
               >
-                {isSessionsExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${sitsList.length} SESSIONS ⌄`}
+                {isSessionsExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${sessionList.length} SESSIONS ⌄`}
               </button>
             )}
           </div>

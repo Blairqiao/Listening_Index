@@ -235,3 +235,20 @@ test('disconnect during the code exchange prevents a late callback from restorin
     assert.equal(writes, writesBefore);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('GET /api/player/login without database configuration returns 503 rather than throwing 500', async () => {
+  const prevUrl = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  try {
+    const authCookie = `${ADMIN_COOKIE_NAME}=${createSessionToken()}`;
+    const res = await login(new NextRequest('https://preview.example/api/player/login', {
+      headers: { cookie: authCookie },
+    }));
+    assert.equal(res.status, 503);
+    const body = await res.json();
+    assert.match(body.error, /database/i);
+  } finally {
+    process.env.DATABASE_URL = prevUrl;
+  }
+});
+
