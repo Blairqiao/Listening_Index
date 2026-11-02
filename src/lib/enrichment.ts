@@ -338,21 +338,16 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
       })
     );
 
+    let batchRateLimited = false;
+    let maxRetryAfterSeconds = 10;
+
     for (const r of results) {
       if ("rateLimited" in r && r.rateLimited) {
-        await recordApiCooldown(r.retryAfterSeconds, "HTTP 429 Too Many Requests");
-        if (enrichedItems.length > 0 || delistedIds.length > 0) {
-          await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+        batchRateLimited = true;
+        if (typeof r.retryAfterSeconds === "number" && r.retryAfterSeconds > maxRetryAfterSeconds) {
+          maxRetryAfterSeconds = r.retryAfterSeconds;
         }
-        const progress = await getEnrichmentProgress();
-        return {
-          enrichedCount: enrichedItems.length,
-          delistedCount: delistedIds.length,
-          rateLimited: true,
-          retryAfterSeconds: r.retryAfterSeconds,
-          isComplete: false,
-          progress,
-        };
+        continue;
       }
 
       if ("isDelisted" in r && r.isDelisted) {
@@ -386,6 +381,25 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
         albumName: album.name || "Unknown Album",
         albumImageUrl: album.images?.[0]?.url || null,
       });
+    }
+
+    if (batchRateLimited) {
+      await recordApiCooldown(maxRetryAfterSeconds, "HTTP 429 Too Many Requests");
+      if (enrichedItems.length > 0 || delistedIds.length > 0) {
+        await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+      }
+      clearServerCache();
+      const progress = await getEnrichmentProgress();
+      return {
+        enrichedCount: enrichedItems.length,
+        delistedCount: delistedIds.length,
+        rateLimited: true,
+        retryAfterSeconds: maxRetryAfterSeconds,
+        isComplete: false,
+        enriched: enrichedItems,
+        delistedIds,
+        progress,
+      };
     }
   }
 
