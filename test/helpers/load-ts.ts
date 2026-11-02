@@ -7,7 +7,7 @@ import ts from 'typescript';
 /** Evaluate the real module with controlled boundary dependencies. */
 export function loadTs(file: string, stubs: Record<string, unknown> = {}): Record<string, (...args: any[]) => any> {
   const absolute=path.resolve(file);
-  const source=ts.transpileModule(fs.readFileSync(absolute,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+  const source=ts.transpileModule(fs.readFileSync(absolute,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,jsx:ts.JsxEmit.React}}).outputText;
   const module={exports:{}};
   const nativeRequire=createRequire(absolute);
   const require=(name:string)=>{
