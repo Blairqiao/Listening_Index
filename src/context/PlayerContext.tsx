@@ -441,6 +441,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       connectionTimeoutRef.current = null;
     }
     connectionAttemptRef.current++;
+    connectingRef.current = false;
     if (playerRef.current) {
       playerRef.current.pause().catch(() => {});
       playerRef.current.disconnect();
@@ -532,6 +533,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         connectionTimeoutRef.current = null;
       }
       attemptRef.current++;
+      connectingRef.current = false;
       playerRef.current?.disconnect();
       playerRef.current = null;
       deviceIdRef.current = null;
