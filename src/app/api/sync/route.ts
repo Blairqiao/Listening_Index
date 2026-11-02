@@ -3,7 +3,7 @@ import { syncSpotify } from "@/lib/spotify-sync";
 import { clearServerCache } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
-import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
+import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/admin-auth";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -11,21 +11,52 @@ export const maxDuration = 60; // Up to 60s execution allowance for serverless
 
 let isSyncInProgress = false;
 
-async function isAuthorized(request: NextRequest): Promise<boolean> {
-  // 1. Browser-initiated requests from UI require admin authorization session
-  if (isAuthorizedAdminRequest(request)) {
-    return true;
+async function authorizeSyncRequest(
+  request: NextRequest
+): Promise<{ authorized: boolean; errorResponse?: NextResponse }> {
+  // 1. Explicit machine-to-machine cron authorization (?key=, ?secret=, Bearer cron key)
+  if (await isAuthorizedCronRequest(request, { allowLegacySecret: true })) {
+    return { authorized: true };
   }
 
-  return isAuthorizedCronRequest(request,{allowLegacySecret:true});
+  // 2. GET requests are strictly reserved for cron calls to prevent cross-site navigation CSRF via SameSite=Lax admin cookies
+  if (request.method === "GET") {
+    return {
+      authorized: false,
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized. Provide valid Bearer token or ?key= query parameter." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  // 3. POST requests from UI require valid admin authorization and must originate from the same origin
+  if (isAuthorizedAdminRequest(request)) {
+    if (!isSameOriginRequest(request)) {
+      return {
+        authorized: false,
+        errorResponse: NextResponse.json(
+          { error: "Cross-origin request not permitted." },
+          { status: 403 }
+        ),
+      };
+    }
+    return { authorized: true };
+  }
+
+  return {
+    authorized: false,
+    errorResponse: NextResponse.json(
+      { error: "Unauthorized. Provide valid Bearer token or ?key= query parameter." },
+      { status: 401 }
+    ),
+  };
 }
 
 async function handleSync(request: NextRequest) {
-  if (!(await isAuthorized(request))) {
-    return NextResponse.json(
-      { error: "Unauthorized. Provide valid Bearer token or ?key= query parameter." },
-      { status: 401 }
-    );
+  const auth = await authorizeSyncRequest(request);
+  if (!auth.authorized) {
+    return auth.errorResponse!;
   }
 
   // Gracefully handle unconfigured credentials/database when deployed in demo mode
