@@ -28,6 +28,7 @@ import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigCont
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
+import { overviewRefreshOrder } from "./listening-view/listening-helpers";
 import type {
   OverviewData,
   StreamLogData,
@@ -842,23 +843,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         setLastSyncedAt(syncTimestamp);
         setSyncedAgoStr("JUST NOW");
 
-        // Concurrently recall endpoints (server cache was purged by /api/sync)
-        // Keep existing views frozen and visible (dimmed) during sync - DO NOT wipe cache upfront
-        const range = activeRangeRef.current;
-        const generation = requestGenerationRef.current;
-        const [newOverview] = await Promise.all([
-          fetchOverview(range),
+        // Server cache was purged by /api/sync. Existing views stay visible (dimmed) until
+        // each range's fresh, enrichment-patched response replaces it.
+        await Promise.all([
+          ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
           fetchStreamLog(),
           fetchSession(),
         ]);
-
-        // Keep the patched cache entry for the active range and drop other ranges
-        if (generation === requestGenerationRef.current) {
-          setOverviewCache((prev) => {
-            const activeEntry = prev[range] || newOverview;
-            return activeEntry ? { [range]: activeEntry } : {};
-          });
-        }
       } else {
         const errorMsg =
           syncData?.error ||
@@ -875,32 +866,28 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }
   }, [isSyncing, isAuthenticated, fetchOverview, fetchStreamLog, fetchSession]);
 
-  // Background silent refetch helper (used by auto-sync schedule and focus revalidation)
+  // Background silent refetch (auto-sync schedule and focus revalidation) of every range
   const refetchActiveData = useCallback(async () => {
     try {
       await Promise.all([
-        fetchOverview(activeRangeRef.current),
+        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
         fetchStreamLog(),
         fetchSession(),
       ]);
-
     } catch (err) {
       console.error("[AUTO REFETCH] Error updating telemetry:", err);
     }
   }, [fetchOverview, fetchStreamLog, fetchSession]);
 
-  // When an upload batch completes, invalidate cached overview metrics across all ranges and refetch
+  // When an upload batch completes, refetch every range so all of them include the imported plays
   const handleUploadComplete = useCallback(async () => {
     requestGenerationRef.current++;
     try {
-      // Invalidate client range cache so switching ranges displays the newly imported plays
-      setOverviewCache({});
       await Promise.all([
-        fetchOverview(activeRangeRef.current),
+        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
         fetchStreamLog(),
         fetchSession(),
       ]);
-
     } catch (err) {
       console.error("[UPLOAD COMPLETE] Error refreshing listening data:", err);
     }

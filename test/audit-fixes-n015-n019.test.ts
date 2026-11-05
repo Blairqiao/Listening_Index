@@ -324,7 +324,7 @@ test("N018: handleToggleLayout marks as deployed only after POST succeeds and ro
 // Fix 1 & 2 (N015): handleTriggerSync ok && success checks and active range overview preservation
 // ---------------------------------------------------------------------------
 
-test("N015: handleTriggerSync checks res.ok and body.success and keeps patched overview for active range", () => {
+test("N015: handleTriggerSync checks res.ok and body.success and refetches every range", () => {
   const source = fs.readFileSync(path.resolve(__dirname, "../src/components/ListeningView.tsx"), "utf-8");
 
   const syncIdx = source.indexOf("const handleTriggerSync =");
@@ -344,10 +344,10 @@ test("N015: handleTriggerSync checks res.ok and body.success and keeps patched o
     "handleTriggerSync must not overwrite enrichment-patched overview with unpatched newOverview"
   );
 
-  // Must preserve patched cache for active range
+  // Every range is refetched; fetchOverview applies the enrichment patch to each response
   assert.ok(
-    syncFn.includes("prev[range]"),
-    "handleTriggerSync must preserve prev[range] for the active range"
+    syncFn.includes("overviewRefreshOrder("),
+    "handleTriggerSync must refetch every range through overviewRefreshOrder"
   );
 
   // 409 means not connected. There is no 429 any more: the per-instance sync lock was removed.
