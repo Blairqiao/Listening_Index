@@ -1,4 +1,5 @@
 import { neon, NeonQueryFunction } from "@neondatabase/serverless";
+import { isConfigured } from "@/lib/env-value";
 
 /**
  * Neon Serverless PostgreSQL Database Client Scaffolding
@@ -10,21 +11,7 @@ import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 
 let cachedSql: NeonQueryFunction<false, false> | null = null;
 
-/**
- * Checks whether an environment variable or setting is populated with a real value
- * (i.e. not empty, and not an uninitialized placeholder like "todo").
- */
-export function isConfigured(value?: string | null): value is string {
-  if (!value) return false;
-  const trimmed = value.trim().toLowerCase();
-  return (
-    trimmed !== "" &&
-    trimmed !== "todo" &&
-    trimmed !== "placeholder" &&
-    !trimmed.startsWith("todo") &&
-    !trimmed.startsWith("placeholder")
-  );
-}
+export { isConfigured };
 
 /**
  * Convenience helper to verify if a real PostgreSQL DATABASE_URL is present.

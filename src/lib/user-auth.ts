@@ -3,6 +3,7 @@
  */
 
 import crypto from "node:crypto";
+import { isConfigured } from "@/lib/env-value";
 
 const VERIFIER_TTL_SECONDS = 10 * 60; // one login attempt
 
@@ -42,7 +43,7 @@ export interface OwnerAuthorizationState {
 
 function authorizationKey(): Buffer {
   const secret = process.env.ADMIN_PASSWORD;
-  if (!secret || secret === "todo" || secret === "placeholder") {
+  if (!isConfigured(secret)) {
     throw new Error("Admin authentication must be configured before connecting Spotify.");
   }
   return crypto.createHash("sha256").update(`owner-spotify-oauth:${secret}`).digest();

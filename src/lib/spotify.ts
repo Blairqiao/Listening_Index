@@ -265,27 +265,17 @@ export async function getAccessToken(): Promise<string> {
   }
 }
 
-export interface FetchRecentlyPlayedOptions {
-  limit?: number;
-  after?: number;
-}
-
 /**
  * Fetches the user's recently played tracks from the Spotify Web API.
  * Endpoint: GET https://api.spotify.com/v1/me/player/recently-played?limit=50
+ * No after cursor: the endpoint returns only the latest 50, and a cursor would skip
+ * Plays that end while a sync is running. bulkInsertPlays dedupes the overlap.
  */
-export async function fetchRecentlyPlayed(
-  options: number | FetchRecentlyPlayedOptions = 50
-): Promise<SpotifyRecentlyPlayedResponse> {
-  const opts = typeof options === "number" ? { limit: options } : options;
-  const limit = opts.limit ?? 50;
+export async function fetchRecentlyPlayed(limit = 50): Promise<SpotifyRecentlyPlayedResponse> {
   const clampedLimit = Math.min(Math.max(1, limit), 50);
 
   const token = await getAccessToken();
   const searchParams = new URLSearchParams({ limit: String(clampedLimit) });
-  if (typeof opts.after === "number" && !isNaN(opts.after) && opts.after > 0) {
-    searchParams.set("after", String(Math.floor(opts.after)));
-  }
 
   const url = `https://api.spotify.com/v1/me/player/recently-played?${searchParams.toString()}`;
 

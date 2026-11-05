@@ -289,8 +289,9 @@ export async function runEnrichmentBatch(
             resolvedTrackIds.add(seed.id);
           }
         }
-      } catch {
-        // Continue to next album cluster
+      } catch (err) {
+        // One bad album cluster should not stop the run; its Tracks fall through to singular lookups.
+        console.error("[enrichment] Album fan-out failed, continuing:", err);
       }
     }
   }
