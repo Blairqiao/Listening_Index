@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { NextRequest } from "next/server";
+import { readModuleSource } from "./helpers/module-source";
 
 const root = path.resolve(__dirname, "..");
 
@@ -176,10 +177,7 @@ test("AC-5: PlayerContext delegates SDK script and lifecycle to src/context/play
     "useSpotifySdk.ts must exist in src/context/player-context/"
   );
 
-  const playerContextSource = fs.readFileSync(
-    path.join(root, "src/context/PlayerContext.tsx"),
-    "utf-8"
-  );
+  const playerContextSource = readModuleSource(path.join(root, "src/context/PlayerContext.tsx"));
   assert.ok(
     playerContextSource.includes("useSpotifySdk") || playerContextSource.includes("loadSpotifySdk"),
     "PlayerContext must import and use useSpotifySdk or loadSpotifySdk from player-context/"

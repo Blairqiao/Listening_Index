@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
-function callback(name: string, scope: Record<string, unknown>) {
-  const source = readFileSync('src/components/ListeningView.tsx', 'utf8');
+function callback(file: string, name: string, scope: Record<string, unknown>) {
+  const source = readFileSync(file, 'utf8');
   const start = source.indexOf(`  const ${name} = useCallback(`);
   const ending = source.indexOf('\n  }, [', start);
   const end = source.indexOf('\n', ending + 1);
@@ -18,7 +18,7 @@ test('background response is stored only under the range captured before its req
   let resolve!: (value: object) => void;
   const pending = new Promise<object>(r => { resolve = r; });
   const writes: Record<string, unknown>[] = [];
-  const refetch = callback('refetchActiveData', {
+  const refetch = callback('src/components/listening-view/useListeningSync.ts', 'refetchActiveData', {
     activeRangeRef,
     overviewRefreshOrder: (active: string) => [active],
     fetchOverview: () => pending,
@@ -39,7 +39,7 @@ test('a response from a previous timezone generation cannot update current cache
   const tzRef = { current: 'UTC' };
   const requestGenerationRef = { current: 0 };
   const writes: unknown[] = [];
-  const fetchOverview = callback('fetchOverview', {
+  const fetchOverview = callback('src/components/listening-view/useListeningData.ts', 'fetchOverview', {
     fetch: () => pending, tzRef, requestGenerationRef,
     activeRangeRef: { current: '1w' },
     enrichmentOverlayRef: { current: new Map() }, delistedSetRef: { current: new Set() },

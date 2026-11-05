@@ -5,6 +5,7 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { GET } from "../src/app/api/player/auto-queue/route";
 import { ADMIN_COOKIE_NAME, createSessionToken } from "../src/lib/admin-auth";
+import { readModuleSource } from "./helpers/module-source";
 
 process.env.ADMIN_PASSWORD = "test-admin-secret-password-123";
 
@@ -49,7 +50,7 @@ test("auto-queue SQL query adheres to schema with t.name and t.artist_name (no t
 
 test("PlayerContext starts Auto Play when selectedContext is auto", () => {
   const contextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(contextPath, "utf-8");
+  const content = readModuleSource(contextPath);
 
   assert.ok(
     content.includes("/api/player/auto-queue"),

@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { loadSpotifySdk } from "../src/context/player-context/useSpotifySdk";
+import { readModuleSource } from "./helpers/module-source";
 
 test("F14: loadSpotifySdk cleans up failed script tag and allows retry after error", async () => {
   const appendedScripts: unknown[] = [];
@@ -69,10 +69,7 @@ test("F14: loadSpotifySdk cleans up failed script tag and allows retry after err
 });
 
 test("F15: not_ready clears device id and readiness, and superseded connection attempts are ignored", () => {
-  const playerContextSource = readFileSync(
-    path.resolve(__dirname, "../src/context/PlayerContext.tsx"),
-    "utf-8"
-  );
+  const playerContextSource = readModuleSource(path.resolve(__dirname, "../src/context/PlayerContext.tsx"));
 
   // Check that not_ready clears deviceId
   const notReadyListener = playerContextSource.match(/addListener\(\s*["']not_ready["'][\s\S]*?\);/);
@@ -93,10 +90,7 @@ test("F15: not_ready clears device id and readiness, and superseded connection a
 });
 
 test("F16: playback PUT in selectContext checks status and handles 403, 404, 429 and network errors", () => {
-  const playerContextSource = readFileSync(
-    path.resolve(__dirname, "../src/context/PlayerContext.tsx"),
-    "utf-8"
-  );
+  const playerContextSource = readModuleSource(path.resolve(__dirname, "../src/context/PlayerContext.tsx"));
 
   // Verify that selectContext inspects the response status
   const selectContextMatch = playerContextSource.match(/const selectContext = useCallback\([\s\S]*?^ {2}\);/m);

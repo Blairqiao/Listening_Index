@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("ControlRow Mode 3 removes manual link and unlink buttons", () => {
   const controlRowPath = path.resolve(__dirname, "../src/components/listening-view/ControlRow.tsx");
@@ -28,7 +29,7 @@ test("ControlRow Mode 3 removes manual link and unlink buttons", () => {
 
 test("PlayerContext synchronizes token status through trusted status events and popup completion", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // Must listen to spotify-status-changed event
   assert.ok(
@@ -55,7 +56,7 @@ test("AdminSpotifyModal dispatches spotify-status-changed on connect and disconn
 
 test("ListeningView re-probes token status on Mode 3 entry", () => {
   const listeningViewPath = path.resolve(__dirname, "../src/components/ListeningView.tsx");
-  const content = fs.readFileSync(listeningViewPath, "utf-8");
+  const content = readModuleSource(listeningViewPath);
 
   assert.ok(
     content.includes("checkTokenStatus"),

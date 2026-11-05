@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("ListeningView does not contain demo mode variables, query params, or mock props", () => {
   const filePath = path.resolve(__dirname, "../src/components/ListeningView.tsx");
-  const content = fs.readFileSync(filePath, "utf-8");
+  const content = readModuleSource(filePath);
 
   // Must not have demo state variables
   assert.ok(

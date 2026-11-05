@@ -5,6 +5,7 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { GET } from "../src/app/api/player/current-context/route";
 import { ADMIN_COOKIE_NAME, createSessionToken } from "../src/lib/admin-auth";
+import { readModuleSource } from "./helpers/module-source";
 
 process.env.ADMIN_PASSWORD = "test-admin-secret-password-123";
 
@@ -38,7 +39,7 @@ test("GET /api/player/current-context returns last played track and auto-play co
 test("PlayerContext integrates /api/player/current-context and probeActivePlayback for current song detection", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
   const hookPath = path.resolve(__dirname, "../src/context/player-context/usePlayerInitialContext.ts");
-  const content = fs.readFileSync(playerContextPath, "utf-8") +
+  const content = readModuleSource(playerContextPath) +
     (fs.existsSync(hookPath) ? fs.readFileSync(hookPath, "utf-8") : "");
 
   assert.ok(

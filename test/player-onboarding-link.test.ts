@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("AC-1: config queries deprecate DB spotify_client_id and clear owner_spotify_url on delete", () => {
   const configQueryPath = path.resolve(__dirname, "../src/lib/db/queries/config.ts");
@@ -45,7 +46,7 @@ test("AC-2: dev script binds to 127.0.0.1 and layout includes loopback normalize
 
 test("AC-3: PlayerContext implements idempotent connectPlayer and non-blocking active playback probe", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // connectPlayer must check if playerRef.current and deviceIdRef.current are already connected
   assert.ok(
@@ -87,7 +88,7 @@ test("AC-4: LivePlayerView has no link button and notifies user to link Spotify 
 
 test("AC-5: handleTogglePlay supports API fallback with track URI when SDK state is empty", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // handleTogglePlay must support trackId/URI and call Spotify Web API play endpoint
   assert.ok(
@@ -116,7 +117,7 @@ test("AC-6: src/app/page.tsx passes initialIsAuthenticated for zero-latency auto
   );
 
   const listeningViewPath = path.resolve(__dirname, "../src/components/ListeningView.tsx");
-  const lvContent = fs.readFileSync(listeningViewPath, "utf-8");
+  const lvContent = readModuleSource(listeningViewPath);
   assert.ok(
     lvContent.includes("initialIsAuthenticated"),
     "ListeningView must accept and pass initialIsAuthenticated to ConfigProvider"

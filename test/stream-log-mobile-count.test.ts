@@ -5,6 +5,7 @@ import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
+import { readModuleSource } from "./helpers/module-source";
 
 test("ControlRow: renders exact count and handles 0 tracks without defaulting to 50", () => {
   // Test count 25
@@ -73,10 +74,7 @@ test("StreamLogView: declares onVisibleCountChange prop and notifies of visible 
 });
 
 test("ListeningView: passes visibleStreamLogCount to ControlRow and wires onVisibleCountChange", () => {
-  const listeningViewSource = fs.readFileSync(
-    path.resolve(__dirname, "../src/components/ListeningView.tsx"),
-    "utf-8"
-  );
+  const listeningViewSource = readModuleSource(path.resolve(__dirname, "../src/components/ListeningView.tsx"));
 
   assert.ok(
     listeningViewSource.includes("visibleStreamLogCount"),

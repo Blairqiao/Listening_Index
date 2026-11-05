@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { getSpotifyTabState } from "../src/components/listening-view/ModeTabs";
+import { readModuleSource } from "./helpers/module-source";
 
 test("ModeTabs is sole AdminSpotifyModal trigger while ListeningFooter is dedicated strictly to telemetry and CustomizationModal omits Spotify section", () => {
   const root = path.resolve(__dirname, "..");
   const modeTabsContent = fs.readFileSync(path.join(root, "src/components/listening-view/ModeTabs.tsx"), "utf-8");
   const footerContent = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
   const customizationContent = fs.readFileSync(path.join(root, "src/components/modals/customization-modal/CustomizationModal.tsx"), "utf-8");
-  const listeningViewContent = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
+  const listeningViewContent = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
 
   // ModeTabs checks
   assert.ok(

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 const root = path.resolve(__dirname, "..");
 
@@ -110,7 +111,7 @@ test("AC-5: usePlayerPlaylists and usePlayerInitialContext are extracted to src/
   assert.ok(fs.existsSync(playlistsHookFile), "usePlayerPlaylists.ts must exist");
   assert.ok(fs.existsSync(initialContextHookFile), "usePlayerInitialContext.ts must exist");
 
-  const playerContextContent = fs.readFileSync(path.join(root, "src/context/PlayerContext.tsx"), "utf-8");
+  const playerContextContent = readModuleSource(path.join(root, "src/context/PlayerContext.tsx"));
   assert.ok(
     playerContextContent.includes("usePlayerPlaylists"),
     "PlayerContext.tsx must import usePlayerPlaylists"
@@ -125,7 +126,7 @@ test("AC-6: useListeningUrlSync is extracted to src/components/listening-view/ a
   const urlSyncHookFile = path.join(root, "src/components/listening-view/useListeningUrlSync.ts");
   assert.ok(fs.existsSync(urlSyncHookFile), "useListeningUrlSync.ts must exist");
 
-  const listeningViewContent = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
+  const listeningViewContent = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
   assert.ok(
     listeningViewContent.includes("useListeningUrlSync"),
     "ListeningView.tsx must import useListeningUrlSync"
