@@ -5,7 +5,6 @@ import React from "react";
 export interface EnrichmentProgress {
   pending: number;
   enriched: number;
-  delisted: number;
   total: number;
 }
 
@@ -15,11 +14,11 @@ export interface CatalogEnrichmentCardProps {
 
 export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ progress }) => {
   const percentage = progress.total > 0
-    ? Math.round(((progress.enriched + progress.delisted) / progress.total) * 100)
+    ? Math.round((progress.enriched / progress.total) * 100)
     : 0;
 
   const barWidth = progress.total > 0
-    ? Math.min(100, ((progress.enriched + progress.delisted) / progress.total) * 100)
+    ? Math.min(100, (progress.enriched / progress.total) * 100)
     : 0;
 
   return (
@@ -32,7 +31,7 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
         <span className="text-[#EDEDE8] font-bold">
           {percentage}%{" "}
           <span className="text-[#6A6A64] font-normal">
-            ({(progress.enriched + progress.delisted).toLocaleString()} / {progress.total.toLocaleString()} tracks)
+            ({progress.enriched.toLocaleString()} / {progress.total.toLocaleString()} tracks)
           </span>
         </span>
       </div>
@@ -52,11 +51,6 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
         <span>
           STILL NEEDS ENRICHMENT: <strong className="text-amber-500">{progress.pending.toLocaleString()}</strong>
         </span>
-        {progress.delisted > 0 && (
-          <span>
-            DELISTED: <strong className="text-[#A8A8A2]">{progress.delisted.toLocaleString()}</strong>
-          </span>
-        )}
       </div>
     </div>
   );

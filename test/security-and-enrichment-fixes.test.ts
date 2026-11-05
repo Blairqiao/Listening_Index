@@ -235,7 +235,7 @@ test('upload/enrich: dynamic bucket requires same-origin and validates trackIds 
     '@/lib/admin-auth': {
       isSameOriginRequest: (req: NextRequest) => req.headers.get('sec-fetch-site') === 'same-origin',
     },
-    '@/lib/enrichment': { runEnrichmentBatch: async () => ({ progress: { pending: 0, enriched: 0, delisted: 0, total: 0 }, isComplete: true }) },
+    '@/lib/enrichment': { runEnrichmentBatch: async () => ({ progress: { pending: 0, enriched: 0, total: 0 }, isComplete: true }) },
   });
 
   // Cross-origin dynamic request -> 403
@@ -286,7 +286,7 @@ test('runEnrichmentBatch: does not write to DB, run full counts or clearServerCa
       getActiveApiCooldown: async () => ({ active: false }),
       getPendingTracksForEnrichment: async () => [], // Nothing pending
       checkAndIncrementApiQuota: async () => { quotaCalls++; return { allowed: true, remaining: 200 }; },
-      getEnrichmentProgress: async () => { fullCountCalls++; return { pending: 0, enriched: 10, delisted: 0, total: 10 }; },
+      getEnrichmentProgress: async () => { fullCountCalls++; return { pending: 0, enriched: 10, total: 10 }; },
       bulkApplyEnrichment: async () => {},
     },
     '@/lib/spotify': { getAccessToken: async () => 'mock-token' },
@@ -312,7 +312,7 @@ test('runEnrichmentBatch: cron run with nothing pending reports real catalog pro
       getActiveApiCooldown: async () => ({ active: false }),
       getPendingTracksForEnrichment: async () => [],
       checkAndIncrementApiQuota: async () => ({ allowed: true, remaining: 700 }),
-      getEnrichmentProgress: async () => ({ pending: 0, enriched: 10, delisted: 0, total: 10 }),
+      getEnrichmentProgress: async () => ({ pending: 0, enriched: 10, total: 10 }),
       bulkApplyEnrichment: async () => {},
     },
     '@/lib/spotify': { getAccessToken: async () => 'mock-token' },
@@ -321,7 +321,7 @@ test('runEnrichmentBatch: cron run with nothing pending reports real catalog pro
 
   const result = await enrichmentModule.runEnrichmentBatch({ bucket: 'cron' });
   assert.equal(result.isComplete, true);
-  assert.deepEqual(result.progress, { pending: 0, enriched: 10, delisted: 0, total: 10 });
+  assert.deepEqual(result.progress, { pending: 0, enriched: 10, total: 10 });
   assert.equal(cacheClearCalls, 0);
 });
 
@@ -351,7 +351,7 @@ test('runEnrichmentBatch: only calls clearServerCache when rows were actually en
           { id: '4iV5W9uYEdYUVa79Axb7Rh', name: 'Track', artistName: 'Art', albumName: 'Alb', albumGroupKey: 'art::alb' },
         ],
         checkAndIncrementApiQuota: async () => ({ allowed: true, remaining: 200 }),
-        getEnrichmentProgress: async () => ({ pending: 0, enriched: 1, delisted: 0, total: 1 }),
+        getEnrichmentProgress: async () => ({ pending: 0, enriched: 1, total: 1 }),
         bulkApplyEnrichment: async () => { bulkApplyCalls++; },
       },
       '@/lib/spotify': { getAccessToken: async () => 'mock-token' },

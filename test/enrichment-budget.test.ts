@@ -10,7 +10,7 @@ function harness(remaining=700) {
     getPendingTracksForEnrichment:async(limit:number)=>pending.slice(0,limit),
     getPendingTracksInAlbum:async(key:string)=>[{id:key.replace('group','seed'),name:'Track',artistName:'Artist'},{id:`${key}-b`,name:'B',artistName:'Artist'},{id:`${key}-c`,name:'C',artistName:'Artist'}],
     bulkApplyEnrichment:async()=>undefined,recordApiCooldown:async()=>undefined,
-    getEnrichmentProgress:async()=>({pending:14,enriched:0,delisted:0,total:14}),
+    getEnrichmentProgress:async()=>({pending:14,enriched:0,total:14}),
   };
   const engine=loadTs('src/lib/enrichment.ts',{'@/lib/db/queries':queries,'@/lib/spotify':{getAccessToken:async()=>'test-token'},'@/lib/db/server-cache':{clearServerCache:()=>undefined}});
   const fetch=async(url:RequestInfo|URL)=>{calls.push(String(url));return Response.json(String(url).includes('/albums/')?{items:[],next:'https://api.spotify.com/v1/albums/album/tracks?offset=50'}:{name:'Track',duration_ms:1000,artists:[{id:'artist',name:'Artist'}],album:{id:'album',name:'Album',images:[]}});};

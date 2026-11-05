@@ -35,7 +35,6 @@ function setupEngineHarness() {
     getEnrichmentProgress: async () => ({
       pending: 3 - persistedEnriched.length - persistedDelisted.length,
       enriched: persistedEnriched.length,
-      delisted: persistedDelisted.length,
       total: 3,
     }),
   };
