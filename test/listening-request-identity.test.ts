@@ -20,6 +20,7 @@ test('background response is stored only under the range captured before its req
   const writes: Record<string, unknown>[] = [];
   const refetch = callback('refetchActiveData', {
     activeRangeRef,
+    overviewRefreshOrder: (active: string) => [active],
     fetchOverview: () => pending,
     fetchStreamLog: async () => undefined,
     fetchSession: async () => undefined,
