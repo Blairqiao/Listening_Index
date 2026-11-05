@@ -1,6 +1,5 @@
 import { fetchRecentlyPlayed } from "@/lib/spotify";
 import {
-  ensureTablesExist,
   bulkUpsertArtists,
   bulkUpsertAlbums,
   bulkUpsertTracks,
@@ -35,9 +34,6 @@ export async function syncSpotify(): Promise<SyncResult> {
   const startTime = performance.now();
 
   try {
-    // 0. Ensure database tables exist (self-healing for fresh deployments)
-    await ensureTablesExist();
-
     // 1. Fetch Recently Played Tracks
     // No after cursor: the endpoint only returns the latest 50, and bulkInsertPlays dedupes overlap.
     const recentlyPlayed = await fetchRecentlyPlayed(50);

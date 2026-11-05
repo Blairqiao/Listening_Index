@@ -23,7 +23,7 @@ export {
 } from "./cache";
 
 // Schema
-export { ensureTablesExist } from "./schema";
+export { migrateSchema } from "./schema";
 
 // Ingestion & Sync Ledger
 export {

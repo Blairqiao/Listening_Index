@@ -18,9 +18,6 @@ test("N019: regenerateCronKey throws when isDbConfigured is false", async () => 
       isDbConfigured: () => false,
       getDb: () => { throw new Error("Should not connect to DB"); },
     },
-    "@/lib/db/queries/schema": {
-      ensureTablesExist: async () => undefined,
-    },
   });
 
   await assert.rejects(
@@ -165,7 +162,6 @@ test("N016: syncSpotify does not skip Plays that end during a run (no last-sync 
       },
     },
     "@/lib/db/queries": {
-      ensureTablesExist: async () => undefined,
       getLastSync: async () => mockLastSyncTimestamp,
       recordLastSync: async () => new Date(),
       bulkUpsertArtists: async () => undefined,

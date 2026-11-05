@@ -135,7 +135,6 @@ test('N001: overlapping import does not insert near-duplicate plays when multipl
 
   const ingestionModule = loadTs('src/lib/db/queries/ingestion.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './cache': { syncCache: { set: () => undefined } },
     '@/lib/db/server-cache': { clearServerCache: () => undefined },
   });
@@ -169,7 +168,6 @@ test('N002: cross-batch near duplicate merges greater duration into stored play'
 
   const ingestionModule = loadTs('src/lib/db/queries/ingestion.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './cache': { syncCache: { set: () => undefined } },
     '@/lib/db/server-cache': { clearServerCache: () => undefined },
   });
@@ -200,7 +198,6 @@ test('N014: symmetric cooldown prevents near-duplicates when stored play duratio
 
   const ingestionModule = loadTs('src/lib/db/queries/ingestion.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './cache': { syncCache: { set: () => undefined } },
     '@/lib/db/server-cache': { clearServerCache: () => undefined },
   });
@@ -222,7 +219,6 @@ test('N014: concurrent imports for the same track serialize and do not insert ne
 
   const ingestionModule = loadTs('src/lib/db/queries/ingestion.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './cache': { syncCache: { set: () => undefined } },
     '@/lib/db/server-cache': { clearServerCache: () => undefined },
   });
@@ -251,7 +247,6 @@ test('N014: advisory lock runs as its own statement before the insert in one tra
 
   const ingestionModule = loadTs('src/lib/db/queries/ingestion.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './cache': { syncCache: { set: () => undefined } },
     '@/lib/db/server-cache': { clearServerCache: () => undefined },
   });

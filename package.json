@@ -5,10 +5,11 @@
   "scripts": {
     "lint": "eslint .",
     "test": "tsx --test test/*.test.ts",
-    "dev": "next dev -H 127.0.0.1 -p 8888",
-    "build": "next build",
+    "dev": "tsx scripts/migrate.ts && next dev -H 127.0.0.1 -p 8888",
+    "build": "tsx scripts/migrate.ts && next build",
     "start": "next start",
-    "sync": "tsx scripts/sync-spotify.ts"
+    "sync": "tsx scripts/sync-spotify.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

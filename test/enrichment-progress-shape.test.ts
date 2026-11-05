@@ -7,7 +7,6 @@ test('getEnrichmentProgress reports pending, enriched and total only', async () 
   const sql = async () => [{ pending: 2, enriched: 3, total: 5 }];
   const mod = loadTs('src/lib/db/queries/enrichment.ts', {
     '../index': { getDb: () => sql },
-    './schema': { ensureTablesExist: async () => undefined },
     './ingestion': {},
     './cache': { catalogStatusCache: {} },
   });

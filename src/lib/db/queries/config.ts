@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { getDb, isDbConfigured } from "../index";
 import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
-import { ensureTablesExist } from "./schema";
 import { siteConfigCache } from "./cache";
 import type { SiteConfigState } from "./types";
 
@@ -39,7 +38,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
 
   return siteConfigCache.get(async () => {
     try {
-      await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
         SELECT title, owner_name, accent_color, site_url, github_url, live_player_layout
@@ -81,7 +79,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
   }
 
   try {
-    await ensureTablesExist();
     const sql = getDb();
     await ensureActiveSettingsRow(sql);
     await sql`
@@ -109,7 +106,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
  */
 export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
   if (isDbConfigured()) {
-    await ensureTablesExist();
     const sql = getDb();
     await ensureActiveSettingsRow(sql);
     await sql`
@@ -140,7 +136,6 @@ export async function getOwnerPlaybackCredential(): Promise<{
   revision: string;
 } | null> {
   if (!isDbConfigured()) return null;
-  await ensureTablesExist();
   const rows = await getDb()`
     SELECT owner_playback_token, owner_spotify_name, owner_token_revision
     FROM site_settings WHERE id = 'active' LIMIT 1;
@@ -164,7 +159,6 @@ export async function rotateOwnerPlaybackToken(
   token: string
 ): Promise<string | null> {
   if (!isDbConfigured()) return null;
-  await ensureTablesExist();
   const rows = await getDb()`
     UPDATE site_settings
     SET owner_playback_token = ${token},
@@ -180,7 +174,6 @@ export async function rotateOwnerPlaybackToken(
 /** Register one pending owner authorization attempt without changing the connection. */
 export async function beginOwnerAuthorization(nonce: string): Promise<string> {
   if (!isDbConfigured()) throw new Error("A database is required to connect Spotify.");
-  await ensureTablesExist();
   const sql = getDb();
   await ensureActiveSettingsRow(sql);
   const rows = await sql`
@@ -195,7 +188,6 @@ export async function beginOwnerAuthorization(nonce: string): Promise<string> {
 /** Claim a sealed attempt once, including when the callback changes loopback hosts. */
 export async function consumeOwnerAuthorization(nonce: string, revision: string): Promise<boolean> {
   if (!isDbConfigured()) return false;
-  await ensureTablesExist();
   const rows = await getDb()`
     UPDATE site_settings SET owner_oauth_nonce = NULL
     WHERE id = 'active' AND owner_oauth_nonce = ${nonce}
@@ -216,7 +208,6 @@ export async function saveOwnerPlaybackToken(
 ): Promise<boolean> {
   if (!isDbConfigured()) return false;
   try {
-    await ensureTablesExist();
     const sql = getDb();
     await ensureActiveSettingsRow(sql);
     if (expectedRevision !== undefined) {
@@ -263,7 +254,6 @@ export async function getOwnerSpotifyStatus(): Promise<{
     return { connected: false, displayName: null, profileUrl: null, updatedAt: null };
   }
   try {
-    await ensureTablesExist();
     const sql = getDb();
     const rows = (await sql`
       SELECT owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at
@@ -294,7 +284,6 @@ export async function deleteOwnerPlaybackToken(): Promise<void> {
     return;
   }
   try {
-    await ensureTablesExist();
     const sql = getDb();
     await sql`
       UPDATE site_settings
@@ -324,7 +313,6 @@ export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}):
   }
 
   try {
-    await ensureTablesExist();
     const sql = getDb();
     const rows = (await sql`
       SELECT cron_key
@@ -368,7 +356,6 @@ export async function regenerateCronKey(): Promise<string> {
   const newKey = crypto.randomBytes(16).toString("hex");
 
   try {
-    await ensureTablesExist();
     const sql = getDb();
     await ensureActiveSettingsRow(sql);
     await sql`

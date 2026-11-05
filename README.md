@@ -80,7 +80,7 @@ Setup is split into two straightforward parts: provisioning on Vercel, followed 
 #### 2. Add Neon Database
 1. In your Vercel project dashboard, navigate to the **Storage** tab.
 2. Click **Connect Database** and select **Neon Postgres**.
-3. Vercel provisions the database and automatically populates `DATABASE_URL`. The application initializes its database schema on first sync.
+3. Vercel provisions the database and automatically populates `DATABASE_URL`. The database schema is created during the next production build (the deploy in step 3).
 
 #### 3. Setup Environment Variables
 1. **Get Spotify API Credentials**:
@@ -218,6 +218,7 @@ To connect real data locally, copy `.env.example` to `.env.local` and add your `
 | `npm run build` | Build production Next.js application |
 | `npm run start` | Start production Next.js server locally |
 | `npm run sync` | Ingest recent stream events from Spotify into database |
+| `npm run db:migrate` | Create or update the database schema. `dev` and `build` run it first; Vercel Preview builds skip it |
 | `npm test` | Run test suite |
 
 ---
