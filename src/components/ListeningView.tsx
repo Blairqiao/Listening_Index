@@ -864,8 +864,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           syncData?.error ||
           (res.status === 409
             ? "Sync conflict: not connected"
-            : res.status === 429
-            ? "Sync already in progress"
             : `Sync failed (${res.status || "error"})`);
         setSyncError(errorMsg);
       }

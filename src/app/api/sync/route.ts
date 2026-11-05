@@ -9,8 +9,6 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Up to 60s execution allowance for serverless
 
-let isSyncInProgress = false;
-
 async function authorizeSyncRequest(
   request: NextRequest
 ): Promise<{ authorized: boolean; errorResponse?: NextResponse }> {
@@ -71,14 +69,6 @@ async function handleSync(request: NextRequest) {
     );
   }
 
-  if (isSyncInProgress) {
-    return NextResponse.json(
-      { error: "Sync operation already in progress" },
-      { status: 429 }
-    );
-  }
-
-  isSyncInProgress = true;
   try {
     const result = await syncSpotify();
 
@@ -102,8 +92,6 @@ async function handleSync(request: NextRequest) {
   } catch (error: unknown) {
     console.error("[API ERROR · /api/sync]", error);
     return NextResponse.json({ success: false, error: "Sync failed" }, { status: 500 });
-  } finally {
-    isSyncInProgress = false;
   }
 }
 
