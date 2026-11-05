@@ -35,7 +35,7 @@ test('concurrent initial cron key requests return the authoritative first key',a
    }
    return [];
  };
- const config=loadTs('src/lib/db/queries/config.ts',{'../index':{getDb:()=>sql,isDbConfigured:()=>true},'@/config':{siteConfig:{}},'./schema':{ensureTablesExist:async()=>undefined},'./cache':{siteConfigCache:{invalidate:()=>undefined}}});
+ const config=loadTs('src/lib/db/queries/config.ts',{'../index':{getDb:()=>sql,isDbConfigured:()=>true},'@/config':{siteConfig:{}},'./cache':{siteConfigCache:{invalidate:()=>undefined}}});
  const keys=await Promise.all(Array.from({length:8},()=>config.getCronKey()));
  assert.equal(new Set(keys).size,1);assert.equal(keys[0],key);
 });

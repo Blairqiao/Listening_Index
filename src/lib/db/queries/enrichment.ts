@@ -1,5 +1,4 @@
 import { getDb } from "../index";
-import { ensureTablesExist } from "./schema";
 import { bulkUpsertArtists, bulkUpsertAlbums } from "./ingestion";
 import { catalogStatusCache } from "./cache";
 import type { EnrichedTrackItem } from "./types";
@@ -9,7 +8,6 @@ export async function getEnrichmentProgress(): Promise<{
   enriched: number;
   total: number;
 }> {
-  await ensureTablesExist();
   const sql = getDb();
   const rows = ((await sql`
     SELECT 
@@ -29,7 +27,6 @@ export async function bulkApplyEnrichment(data: {
   enriched: EnrichedTrackItem[];
   delistedIds: string[];
 }): Promise<void> {
-  await ensureTablesExist();
   const sql = getDb();
 
   // 1. Purge delisted tracks and their associated plays so they never remain in the system
@@ -109,7 +106,6 @@ export async function getPendingTracksForEnrichment(
     trackIds?: string[];
   } = {}
 ): Promise<Array<{ id: string; name: string; artistName: string; albumName: string; albumGroupKey: string }>> {
-  await ensureTablesExist();
   const sql = getDb();
 
   const trackFilter =
@@ -149,7 +145,6 @@ export async function recordApiCooldown(
   cooldownSeconds: number,
   reason: string
 ): Promise<void> {
-  await ensureTablesExist();
   const sql = getDb();
   const safeSeconds =
     Number.isFinite(cooldownSeconds) && cooldownSeconds > 0
@@ -177,7 +172,6 @@ export async function getActiveApiCooldown(): Promise<{
   reason?: string;
 }> {
   try {
-    await ensureTablesExist();
     const sql = getDb();
     const rows = ((await sql`
       SELECT cooldown_until, cooldown_reason
@@ -202,7 +196,6 @@ export async function getActiveApiCooldown(): Promise<{
 export async function getPendingTracksInAlbum(
   albumGroupKey: string
 ): Promise<Array<{ id: string; name: string; artistName: string }>> {
-  await ensureTablesExist();
   const sql = getDb();
   const rows = ((await sql`
     SELECT id, name, artist_name FROM tracks
@@ -229,7 +222,6 @@ export async function checkAndIncrementApiQuota(
   bucket: "cron" | "dynamic",
   requestedCount: number = 1
 ): Promise<{ allowed: boolean; remaining: number; totalToday: number; bucketToday: number }> {
-  await ensureTablesExist();
   const sql = getDb();
 
   const todayUtc = new Date().toISOString().slice(0, 10);
@@ -319,7 +311,6 @@ export async function checkAndIncrementApiQuota(
 export async function isCatalogFullyEnriched(): Promise<boolean> {
   return catalogStatusCache.get(async () => {
     try {
-      await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
         SELECT 1 FROM tracks

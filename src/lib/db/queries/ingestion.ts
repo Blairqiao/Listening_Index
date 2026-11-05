@@ -1,5 +1,4 @@
 import { getDb } from "../index";
-import { ensureTablesExist } from "./schema";
 import {
   makeArtistGroupKey,
   makeAlbumGroupKey,
@@ -13,7 +12,6 @@ import type { TrackUpsertItem, PlayInsertItem } from "./types";
  * Records the most recent sync execution timestamp in daily_api_usage.
  */
 export async function recordLastSync(): Promise<Date> {
-  await ensureTablesExist();
   const sql = getDb();
   const todayUtc = new Date().toISOString().slice(0, 10);
   const rows = ((await sql`
@@ -35,7 +33,6 @@ export async function recordLastSync(): Promise<Date> {
 export async function getLastSync(): Promise<string | undefined> {
   return lastSyncCache.get(async () => {
     try {
-      await ensureTablesExist();
       const sql = getDb();
       const rows = ((await sql`
         SELECT last_synced_at FROM daily_api_usage WHERE last_synced_at IS NOT NULL ORDER BY last_synced_at DESC LIMIT 1;
@@ -55,7 +52,6 @@ export async function getLastSync(): Promise<string | undefined> {
 
 export async function bulkUpsertArtists(artists: Array<{ id: string; name: string }>): Promise<void> {
   if (artists.length === 0) return;
-  await ensureTablesExist();
   const sorted = [...artists].sort((a, b) => a.id.localeCompare(b.id));
   const ids = sorted.map((a) => a.id);
   const names = sorted.map((a) => a.name);
@@ -71,7 +67,6 @@ export async function bulkUpsertAlbums(
   albums: Array<{ id: string; name: string; imageUrl?: string | null; artistId: string }>
 ): Promise<void> {
   if (albums.length === 0) return;
-  await ensureTablesExist();
   const sorted = [...albums].sort((a, b) => a.id.localeCompare(b.id));
   const ids = sorted.map((a) => a.id);
   const names = sorted.map((a) => a.name);
@@ -92,7 +87,6 @@ export async function bulkUpsertTracks(
   tracks: TrackUpsertItem[]
 ): Promise<void> {
   if (tracks.length === 0) return;
-  await ensureTablesExist();
 
   // Deduplicate and aggregate highest observed playback
   const map = new Map<string, TrackUpsertItem>();
@@ -194,7 +188,6 @@ export async function bulkInsertPlays(
   plays: PlayInsertItem[]
 ): Promise<{ insertedCount: number }> {
   if (plays.length === 0) return { insertedCount: 0 };
-  await ensureTablesExist();
 
   // 1. Debounce candidate plays within the incoming batch first
   const { debounced: batchDebounced } = debouncePlays(plays, 30_000);
