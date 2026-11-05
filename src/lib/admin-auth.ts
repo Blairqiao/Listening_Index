@@ -1,14 +1,12 @@
 import crypto from "node:crypto";
 import { NextRequest } from "next/server";
+import { isConfigured } from "@/lib/env-value";
 
 export const ADMIN_COOKIE_NAME = "admin_session";
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export function isAdminPasswordConfigured(): boolean {
-  const pass = process.env.ADMIN_PASSWORD;
-  if (!pass) return false;
-  const trimmed = pass.trim();
-  return trimmed !== "" && trimmed !== "todo" && trimmed !== "placeholder";
+  return isConfigured(process.env.ADMIN_PASSWORD);
 }
 
 export function verifyAdminPassword(candidate: string): boolean {

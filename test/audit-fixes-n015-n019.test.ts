@@ -102,10 +102,10 @@ test("N019: GET /api/player/token returns real remaining expiresIn instead of ha
 });
 
 // ---------------------------------------------------------------------------
-// Fix 6 (N016): fetchRecentlyPlayed options, after cursor, and fromDatabase removal
+// Fix 6 (N016): fetchRecentlyPlayed limit, no after cursor, and fromDatabase removal
 // ---------------------------------------------------------------------------
 
-test("N016: fetchRecentlyPlayed supports { limit, after } options", async () => {
+test("N016: fetchRecentlyPlayed sends the limit and never an after cursor", async () => {
   let capturedUrl = "";
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL | Request) => {
@@ -127,10 +127,10 @@ test("N016: fetchRecentlyPlayed supports { limit, after } options", async () => 
 
     // Mock getAccessToken by injecting tokenCache or mocking refresh
     process.env.SPOTIFY_CLIENT_ID = "test-id";
-    // Call fetchRecentlyPlayed with options object
-    await spotifyModule.fetchRecentlyPlayed({ limit: 25, after: 1730000000000 });
+    await spotifyModule.fetchRecentlyPlayed(25);
     assert.ok(capturedUrl.includes("limit=25"), `URL should contain limit=25: ${capturedUrl}`);
-    assert.ok(capturedUrl.includes("after=1730000000000"), `URL should contain after=1730000000000: ${capturedUrl}`);
+    // An after cursor would skip Plays that end during a sync run.
+    assert.ok(!capturedUrl.includes("after="), `URL must not contain an after cursor: ${capturedUrl}`);
   } finally {
     globalThis.fetch = originalFetch;
   }
