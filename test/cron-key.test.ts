@@ -213,15 +213,20 @@ test("AC-2b: saveActiveSiteConfig preserves cron_key in site_settings", async ()
     title: `Title Preservation Check ${Date.now()}`,
   };
 
-  const saveSuccess = await saveActiveSiteConfig(updatedConfig);
-  assert.equal(saveSuccess, true, "saveActiveSiteConfig must succeed");
+  try {
+    const saveSuccess = await saveActiveSiteConfig(updatedConfig);
+    assert.equal(saveSuccess, true, "saveActiveSiteConfig must succeed");
 
-  const keyAfterSave = await getCronKey();
-  assert.equal(
-    keyAfterSave,
-    existingKey,
-    "saveActiveSiteConfig must preserve the existing cron_key"
-  );
+    const keyAfterSave = await getCronKey();
+    assert.equal(
+      keyAfterSave,
+      existingKey,
+      "saveActiveSiteConfig must preserve the existing cron_key"
+    );
+  } finally {
+    // This test writes to the configured database; put the owner's settings back.
+    await saveActiveSiteConfig(currentConfig);
+  }
 });
 
 test("AC-7b: AdminSpotifyModal guards Copy URL button when sync key is not yet loaded", () => {
