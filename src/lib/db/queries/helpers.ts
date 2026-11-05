@@ -10,28 +10,26 @@ export function formatDurationHoursMinutes(ms: number): string {
   return `${m}m`;
 }
 
-export function getTimezone(): string {
-  return "UTC";
-}
+const DEFAULT_TIMEZONE = "UTC";
 
 /**
  * Validates and sanitizes a timezone string.
- * Gracefully falls back to getTimezone() if tz is undefined, empty, or not a recognized IANA timezone identifier.
+ * Gracefully falls back to DEFAULT_TIMEZONE if tz is undefined, empty, or not a recognized IANA timezone identifier.
  * Prevents PostgreSQL 'time zone not recognized' runtime query crashes from untrusted query params or headers.
  */
 export function sanitizeTimezone(tz?: string | null): string {
-  if (!tz || typeof tz !== "string") return getTimezone();
+  if (!tz || typeof tz !== "string") return DEFAULT_TIMEZONE;
   const trimmed = tz.trim();
-  if (!trimmed) return getTimezone();
+  if (!trimmed) return DEFAULT_TIMEZONE;
   try {
     Intl.DateTimeFormat(undefined, { timeZone: trimmed });
     return trimmed;
   } catch {
-    return getTimezone();
+    return DEFAULT_TIMEZONE;
   }
 }
 
-export function formatTimeTz(date: Date, tz = getTimezone()): string {
+export function formatTimeTz(date: Date, tz = DEFAULT_TIMEZONE): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
@@ -49,7 +47,7 @@ export function formatTimeTz(date: Date, tz = getTimezone()): string {
   }
 }
 
-export function formatHHmmTz(date: Date, tz = getTimezone()): string {
+export function formatHHmmTz(date: Date, tz = DEFAULT_TIMEZONE): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
@@ -65,7 +63,7 @@ export function formatHHmmTz(date: Date, tz = getTimezone()): string {
   }
 }
 
-export function formatDayGroupTz(date: Date, tz = getTimezone()): string {
+export function formatDayGroupTz(date: Date, tz = DEFAULT_TIMEZONE): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
@@ -80,7 +78,7 @@ export function formatDayGroupTz(date: Date, tz = getTimezone()): string {
   }
 }
 
-export function formatLogStartDate(date: Date, tz = getTimezone()): string {
+export function formatLogStartDate(date: Date, tz = DEFAULT_TIMEZONE): string {
   try {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
@@ -109,6 +107,4 @@ export function formatSessionAge(ageMs: number): string {
   const ageDays = Math.floor(ageHours / 24);
   return `${ageDays}D`;
 }
-
-/** Legacy alias for backwards compatibility */
 

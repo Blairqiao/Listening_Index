@@ -42,3 +42,16 @@ export function syncLocalTimezoneCookie(tz: string): void {
   const validTz = isValidIanaTimezone(tz) ? tz : "UTC";
   document.cookie = `listening_timezone=${encodeURIComponent(validTz)}; path=/; max-age=31536000; SameSite=Lax`;
 }
+
+/**
+ * Safely decodes a raw listening_timezone cookie string.
+ */
+export function parseTimezoneCookie(rawCookie?: string | null): string | undefined {
+  if (!rawCookie) return undefined;
+  try {
+    return decodeURIComponent(rawCookie);
+  } catch {
+    return undefined;
+  }
+}
+

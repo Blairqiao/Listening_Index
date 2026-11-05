@@ -5,7 +5,6 @@ import {
   bulkUpsertAlbums,
   bulkUpsertTracks,
   bulkInsertPlays,
-  getExistingEntityIds,
   recordLastSync,
   TrackUpsertItem,
   PlayInsertItem,
@@ -46,6 +45,7 @@ export async function syncSpotify(): Promise<SyncResult> {
 
     // 1. Fetch Recently Played Tracks
     console.log("[1/3] Fetching recently played tracks from Spotify Web API...");
+    // No after cursor: the endpoint only returns the latest 50, and bulkInsertPlays dedupes overlap.
     const recentlyPlayed = await fetchRecentlyPlayed(50);
     const rawCount = recentlyPlayed.items.length;
     console.log(`      Received ${rawCount} items from Spotify cursor`);
@@ -94,7 +94,7 @@ export async function syncSpotify(): Promise<SyncResult> {
       console.log(`      Debounced ${debouncedDuplicatesCount} rapid duplicate/resumption stream events`);
     }
 
-    // 2d. Pre-filter existing artists, albums, and tracks in batch to avoid redundant upserts
+    // 2d. Gather candidate artists, albums, and tracks from the batch
     const candidateArtistIds = new Set<string>();
     const candidateAlbumIds = new Set<string>();
     const candidateTrackIds = new Set<string>();
@@ -108,68 +108,58 @@ export async function syncSpotify(): Promise<SyncResult> {
       if (track?.id) candidateTrackIds.add(track.id);
     }
 
-    const { existingArtistIds, existingAlbumIds, existingTrackIds } = await getExistingEntityIds({
-      artistIds: Array.from(candidateArtistIds),
-      albumIds: Array.from(candidateAlbumIds),
-      trackIds: Array.from(candidateTrackIds),
-    });
-
     console.log(
-      `      Entities in batch: ${candidateArtistIds.size} artists (${existingArtistIds.size} existing), ` +
-        `${candidateAlbumIds.size} albums (${existingAlbumIds.size} existing), ` +
-        `${candidateTrackIds.size} tracks (${existingTrackIds.size} existing)`
+      `      Entities in batch: ${candidateArtistIds.size} artists, ` +
+        `${candidateAlbumIds.size} albums, ` +
+        `${candidateTrackIds.size} tracks`
     );
 
     // 3. Foreign-Key Cascade Ingestion
     console.log("[2/3] Ingesting entities in strict foreign-key order...");
 
     // 3a. Bulk Upsert Artists
-    const artistsToUpsert = Array.from(candidateArtistIds)
-      .filter((id) => !existingArtistIds.has(id))
-      .map((id) => {
-        const item = newStreamItems.find((i) => i.track.artists[0].id === id)!;
-        return { id, name: item.track.artists[0].name };
-      });
+    const artistsToUpsert = Array.from(candidateArtistIds).map((id) => {
+      const item = newStreamItems.find((i) => i.track.artists[0].id === id)!;
+      return { id, name: item.track.artists[0].name };
+    });
     const artistsUpserted = artistsToUpsert.length;
     await bulkUpsertArtists(artistsToUpsert);
 
     // 3b. Bulk Upsert Albums
-    const albumsToUpsert = Array.from(candidateAlbumIds)
-      .filter((id) => !existingAlbumIds.has(id))
-      .map((id) => {
-        const item = newStreamItems.find((i) => i.track.album.id === id)!;
-        const album = item.track.album;
-        const imageUrl = album.images && album.images.length > 0 ? album.images[0].url : null;
-        return {
-          id,
-          name: album.name,
-          imageUrl,
-          artistId: item.track.artists[0].id,
-        };
-      });
+    const albumsToUpsert = Array.from(candidateAlbumIds).map((id) => {
+      const item = newStreamItems.find((i) => i.track.album.id === id)!;
+      const album = item.track.album;
+      const imageUrl = album.images && album.images.length > 0 ? album.images[0].url : null;
+      return {
+        id,
+        name: album.name,
+        imageUrl,
+        artistId: item.track.artists[0].id,
+      };
+    });
     const albumsUpserted = albumsToUpsert.length;
     await bulkUpsertAlbums(albumsToUpsert);
 
     // 3c. Bulk Upsert Tracks
-    const tracksToUpsert: TrackUpsertItem[] = Array.from(candidateTrackIds)
-      .map((id) => {
-        const item = newStreamItems.find((i) => i.track.id === id)!;
-        const track = item.track;
-        return {
-          id: track.id,
-          name: track.name,
-          artistName: track.artists[0]?.name || "Unknown Artist",
-          albumName: track.album?.name || "Unknown Album",
-          artistId: track.artists[0]?.id || null,
-          albumId: track.album?.id || null,
-          durationMs: track.duration_ms,
-          enrichmentStatus: "enriched",
-        };
-      });
+    const tracksToUpsert: TrackUpsertItem[] = Array.from(candidateTrackIds).map((id) => {
+      const item = newStreamItems.find((i) => i.track.id === id)!;
+      const track = item.track;
+      return {
+        id: track.id,
+        name: track.name,
+        artistName: track.artists[0]?.name || "Unknown Artist",
+        albumName: track.album?.name || "Unknown Album",
+        artistId: track.artists[0]?.id || null,
+        albumId: track.album?.id || null,
+        durationMs: track.duration_ms,
+        enrichmentStatus: "enriched",
+      };
+    });
     const tracksUpserted = tracksToUpsert.length;
     await bulkUpsertTracks(tracksToUpsert);
 
     // 3d. Bulk Insert Plays
+    // Spotify recently-played omits ms_played, so duration_ms is stored as an approximation.
     const playsToInsert: PlayInsertItem[] = newStreamItems.map((item) => ({
       playedAt: item.played_at,
       trackId: item.track.id,
@@ -195,9 +185,9 @@ export async function syncSpotify(): Promise<SyncResult> {
       console.warn(`      [WARN] Cron micro-enrichment skipped: ${msg}`);
     }
 
-    console.log(`      ✓ Upserted ${artistsUpserted} new artist entities`);
-    console.log(`      ✓ Upserted ${albumsUpserted} new album entities`);
-    console.log(`      ✓ Upserted ${tracksUpserted} new track entities`);
+    console.log(`      ✓ Upserted ${artistsUpserted} artist entities`);
+    console.log(`      ✓ Upserted ${albumsUpserted} album entities`);
+    console.log(`      ✓ Upserted ${tracksUpserted} track entities`);
     console.log(`      ✓ Ingested ${playsIngested} play events`);
 
     // 4. Summary Telemetry
@@ -205,7 +195,7 @@ export async function syncSpotify(): Promise<SyncResult> {
     console.log("[3/3] Ingestion cycle successfully completed.");
     console.log("------------------------------------------------------------");
     console.log(
-      `[SUMMARY] Processed ${playsIngested} plays (${candidateArtistIds.size} artists [${artistsUpserted} new], ${candidateAlbumIds.size} albums [${albumsUpserted} new], ${candidateTrackIds.size} tracks [${tracksUpserted} new]) in ${durationMs}ms`
+      `[SUMMARY] Processed ${playsIngested} plays (${artistsUpserted} artists, ${albumsUpserted} albums, ${tracksUpserted} tracks) in ${durationMs}ms`
     );
     console.log("------------------------------------------------------------");
 

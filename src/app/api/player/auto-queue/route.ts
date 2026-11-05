@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { getDb, isDbConfigured } from "@/lib/db";
-import { CATALOG } from "@/lib/mock-listening-data";
+import { CATALOG } from "@/lib/mock/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
         JOIN tracks t ON p.track_id = t.id
         LEFT JOIN artists a ON t.artist_id = a.id
         WHERE p.played_at >= NOW() - INTERVAL '30 days'
-          AND t.id NOT LIKE 'synthetic:%'
         GROUP BY t.id, t.name, t.artist_name, a.name
         ORDER BY COUNT(*) DESC
         LIMIT 100;

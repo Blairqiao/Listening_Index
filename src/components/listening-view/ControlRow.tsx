@@ -18,6 +18,7 @@ interface ControlRowProps {
   sessionNumber?: number;
   sessionIndex?: number;
   totalSessions?: number;
+  syncError?: string | null;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
@@ -50,6 +51,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   sessionNumber,
   sessionIndex,
   totalSessions,
+  syncError,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -174,7 +176,9 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         );
       }
       case 2: {
-        const sessionContent = isSyncing
+        const sessionContent = syncError
+          ? `[ ${syncError.toUpperCase()} ]`
+          : isSyncing
           ? "[ SYNCING... ]"
           : isSessionOpen
           ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
@@ -184,7 +188,11 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           return (
             <span
               className={`font-mono text-[11px] tracking-[0.08em] ${
-                isSessionOpen ? "text-music-accent" : "text-[#6A6A64]"
+                syncError
+                  ? "text-[#FF6B6B]"
+                  : isSessionOpen
+                  ? "text-music-accent"
+                  : "text-[#6A6A64]"
               }`}
             >
               {sessionContent}
@@ -197,9 +205,11 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             type="button"
             onClick={onTriggerSync}
             disabled={isSyncing}
-            title="Click to trigger manual sync"
+            title={syncError || "Click to trigger manual sync"}
             className={`font-mono text-[11px] tracking-[0.08em] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
-              isSyncing
+              syncError
+                ? "text-[#FF6B6B]"
+                : isSyncing
                 ? "text-music-accent cursor-wait"
                 : isSessionOpen
                 ? "text-music-accent"
@@ -238,6 +248,11 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       {/* Left Slot: Scope Label */}
       <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4">
         {getScopeLabel()}
+        {syncError && mode !== 2 && (
+          <span className="ml-2 text-[#FF6B6B] tracking-[0.08em]">
+            [ {syncError.toUpperCase()} ]
+          </span>
+        )}
       </span>
 
       {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}

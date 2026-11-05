@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOverviewData, RangeKey } from "@/lib/db/queries";
+import { RANGE_KEYS } from "@/lib/types";
 import { getOrFetchOverview } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { MOCK_DATA } from "@/lib/mock-listening-data";
+import { MOCK_DATA } from "@/lib/mock/overview-data";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
-
-const VALID_RANGES: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const rangeParam = searchParams.get("range") || "1w";
 
-    if (!VALID_RANGES.includes(rangeParam as RangeKey)) {
+    if (!RANGE_KEYS.includes(rangeParam as RangeKey)) {
       return NextResponse.json(
         {
-          error: `Invalid range parameter: '${rangeParam}'. Must be one of: ${VALID_RANGES.join(", ")}`,
+          error: `Invalid range parameter: '${rangeParam}'. Must be one of: ${RANGE_KEYS.join(", ")}`,
         },
         { status: 400 }
       );

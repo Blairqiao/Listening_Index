@@ -51,7 +51,6 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
       : sql`COUNT(DISTINCT t.artist_group_key)::bigint`;
     return sql`
       SELECT 
-        COALESCE(SUM(p.ms_played) / 60000, 0)::bigint AS minutes,
         COUNT(DISTINCT p.track_id)::bigint AS tracks,
         ${artistExpr} AS artists,
         COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,

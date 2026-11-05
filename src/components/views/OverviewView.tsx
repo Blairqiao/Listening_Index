@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
 import { Artwork } from "../Artwork";
 import { formatCadenceTooltip } from "@/lib/format-utils";
+import { useConfig } from "@/context/ConfigContext";
 
 interface OverviewViewProps {
   range: RangeKey;
@@ -31,6 +32,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   activityCadence = [],
   isLoading = false,
 }) => {
+  let visitorTimezone = "UTC";
+  try {
+    visitorTimezone = useConfig().visitorTimezone || "UTC";
+  } catch {
+    // Rendered outside ConfigProvider
+  }
+
   const displayTracks = topTracks;
 
   const maxCadence = useMemo(() => {
@@ -389,7 +397,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
                   const tooltipText =
                     item.startTime && item.endTime
-                      ? formatCadenceTooltip(item, range, "UTC")
+                      ? formatCadenceTooltip(item, range, visitorTimezone)
                       : `${item.date} — ${item.count} plays`;
 
                   return (

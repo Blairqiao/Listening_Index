@@ -59,8 +59,33 @@ export async function runEnrichmentBatch(
 ): Promise<EnrichmentBatchResult> {
   const quotaResetAt = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)).toISOString();
   const bucket = options.bucket || (options.trackIds && options.trackIds.length > 0 ? "dynamic" : "cron");
+  const batchCeiling = bucket === "dynamic" ? 5 : 14;
 
-  // 1. Check global rate limit cooldown (HTTP 429)
+  // 1. Fetch pending tracks first to avoid quota writes or full counts when nothing is pending
+  const pendingTracks = await getPendingTracksForEnrichment(batchCeiling, {
+    trackIds: options.trackIds,
+  });
+
+  if (pendingTracks.length === 0) {
+    // Dynamic calls are unauthenticated, so skip the full count. Requested IDs not
+    // being pending says nothing about the rest of the catalog.
+    if (options.trackIds && options.trackIds.length > 0) {
+      return {
+        enrichedCount: 0,
+        delistedCount: 0,
+        isComplete: false,
+        progress: { pending: 0, enriched: 0, delisted: 0, total: 0 },
+      };
+    }
+    return {
+      enrichedCount: 0,
+      delistedCount: 0,
+      isComplete: true,
+      progress: await getEnrichmentProgress(),
+    };
+  }
+
+  // 2. Check global rate limit cooldown (HTTP 429)
   const cooldown = await getActiveApiCooldown();
   if (cooldown.active) {
     const progress = await getEnrichmentProgress();
@@ -75,7 +100,7 @@ export async function runEnrichmentBatch(
     };
   }
 
-  // 2. Check persistent daily quota ledger
+  // 3. Check persistent daily quota ledger
   const initialQuotaCheck = await checkAndIncrementApiQuota(bucket, 0);
   if (!initialQuotaCheck.allowed || initialQuotaCheck.remaining <= 0) {
     const progress = await getEnrichmentProgress();
@@ -90,8 +115,8 @@ export async function runEnrichmentBatch(
     };
   }
 
-  const batchCeiling = bucket === "dynamic" ? 5 : 14;
   const limit = Math.max(1, Math.min(batchCeiling, initialQuotaCheck.remaining));
+  const tracksToProcess = pendingTracks.slice(0, limit);
   let requestCount = 0;
   let quotaDenied = false;
   async function reserveRequests(count: number): Promise<boolean> {
@@ -109,26 +134,6 @@ export async function runEnrichmentBatch(
     return true;
   }
 
-
-  // 3. Fetch pending tracks (explicit trackIds for viewport, or chronologically ordered for cron)
-  const pendingTracks = await getPendingTracksForEnrichment(limit, {
-    trackIds: options.trackIds,
-  });
-
-  if (pendingTracks.length === 0) {
-    const progress = await getEnrichmentProgress();
-    const isComplete = progress.pending === 0;
-    if (isComplete) {
-      clearServerCache();
-    }
-    return {
-      enrichedCount: 0,
-      delistedCount: 0,
-      isComplete,
-      progress,
-    };
-  }
-
   const token = await getAccessToken();
   const enrichedItems: EnrichedTrackItem[] = [];
   const delistedIds: string[] = [];
@@ -136,8 +141,8 @@ export async function runEnrichmentBatch(
 
   // 4. Density-Gated Fan-Out Analysis (Exclusively for background cron)
   if (bucket === "cron") {
-    const albumGroups = new Map<string, Array<(typeof pendingTracks)[0]>>();
-    for (const track of pendingTracks) {
+    const albumGroups = new Map<string, Array<(typeof tracksToProcess)[0]>>();
+    for (const track of tracksToProcess) {
       const key = track.albumGroupKey;
       const existing = albumGroups.get(key) || [];
       existing.push(track);
@@ -171,6 +176,7 @@ export async function runEnrichmentBatch(
             await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
             if (enrichedItems.length > 0 || delistedIds.length > 0) {
               await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+              clearServerCache();
             }
             const progress = await getEnrichmentProgress();
             return {
@@ -230,9 +236,10 @@ export async function runEnrichmentBatch(
 
                 if (albumTracksRes.status === 429) {
                   const retryAfter = parseInt(albumTracksRes.headers.get("Retry-After") || "10", 10);
-await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
+                  await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
                   if (enrichedItems.length > 0 || delistedIds.length > 0) {
                     await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+                    clearServerCache();
                   }
                   const progress = await getEnrichmentProgress();
                   return {
@@ -289,7 +296,7 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
   }
 
   // 5. Resolve remaining tracks via singular GET /v1/tracks/:id
-  const remainingTracks = pendingTracks.filter((t) => !resolvedTrackIds.has(t.id));
+  const remainingTracks = tracksToProcess.filter((t) => !resolvedTrackIds.has(t.id));
   const CONCURRENCY = bucket === "dynamic" ? 5 : 3;
 
   for (let i = 0; i < remainingTracks.length; i += CONCURRENCY) {
@@ -387,8 +394,8 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
       await recordApiCooldown(maxRetryAfterSeconds, "HTTP 429 Too Many Requests");
       if (enrichedItems.length > 0 || delistedIds.length > 0) {
         await bulkApplyEnrichment({ enriched: enrichedItems, delistedIds });
+        clearServerCache();
       }
-      clearServerCache();
       const progress = await getEnrichmentProgress();
       return {
         enrichedCount: enrichedItems.length,
@@ -404,15 +411,16 @@ await recordApiCooldown(retryAfter, "HTTP 429 Too Many Requests");
   }
 
   // 6. Apply enrichment in PostgreSQL
-  await bulkApplyEnrichment({
-    enriched: enrichedItems,
-    delistedIds,
-  });
+  if (enrichedItems.length > 0 || delistedIds.length > 0) {
+    await bulkApplyEnrichment({
+      enriched: enrichedItems,
+      delistedIds,
+    });
+    clearServerCache();
+  }
 
   const progress = await getEnrichmentProgress();
   const isComplete = progress.pending === 0;
-
-  clearServerCache();
 
   return {
     enrichedCount: enrichedItems.length,

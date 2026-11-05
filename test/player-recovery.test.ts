@@ -107,13 +107,10 @@ test("F16: playback PUT in selectContext checks status and handles 403, 404, 429
     selectContextBody.includes("res.ok") || selectContextBody.includes("res.status === 204"),
     "selectContext must check response status of playback PUT"
   );
+  // 403/404/429 messages live in formatPlayErrorMessage (tested in player-playback tests).
   assert.ok(
-    selectContextBody.includes("403") && selectContextBody.includes("404"),
-    "selectContext must handle 403 and 404 status codes"
-  );
-  assert.ok(
-    selectContextBody.includes("429"),
-    "selectContext must handle 429 rate limit status code"
+    selectContextBody.includes("formatPlayErrorMessage(res.status"),
+    "selectContext must map failed playback statuses through formatPlayErrorMessage"
   );
   assert.ok(
     selectContextBody.includes("armedContextRef.current = true"),

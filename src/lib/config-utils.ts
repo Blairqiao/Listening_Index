@@ -13,12 +13,12 @@ export interface SiteConfigState {
 }
 
 export const DEFAULT_SITE_CONFIG: SiteConfigState = {
-  title: siteConfig.title,
-  ownerName: siteConfig.ownerName,
-  accentColor: normalizeHex(siteConfig.accentColor),
-  siteUrl: siteConfig.siteUrl,
-  githubUrl: siteConfig.githubUrl,
-  livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
+  title: siteConfig?.title || "Listening Index",
+  ownerName: siteConfig?.ownerName || "Site Owner",
+  accentColor: normalizeHex(siteConfig?.accentColor, "#76FF49"),
+  siteUrl: siteConfig?.siteUrl || "",
+  githubUrl: siteConfig?.githubUrl || "",
+  livePlayerLayout: (siteConfig?.livePlayerLayout as string | undefined) === "stacked" ? "stacked" : "split",
 };
 
 /**

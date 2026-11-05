@@ -217,3 +217,51 @@ export async function getStreamLog(
       : undefined),
   };
 }
+
+export interface LatestPlayRow {
+  id: string;
+  trackId: string;
+  title: string;
+  artist: string;
+  album: string;
+  albumImageUrl: string | null;
+  durationMs: number;
+  playedAt: string;
+}
+
+/**
+ * Retrieves only the single most recent Play row without running lifetime metrics or recursive streak queries.
+ */
+export async function getLatestPlay(): Promise<LatestPlayRow | null> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 
+        p.id::text,
+        p.played_at,
+        p.track_id,
+        al.image_url AS album_image_url,
+        t.name AS title,
+        COALESCE(ar.name, t.artist_name, '') AS artist,
+        COALESCE(al.name, t.album_name, '') AS album,
+        t.duration_ms
+    FROM plays p
+    JOIN tracks t ON p.track_id = t.id
+    LEFT JOIN albums al ON t.album_id = al.id
+    LEFT JOIN artists ar ON t.artist_id = ar.id
+    ORDER BY p.played_at DESC, p.id DESC
+    LIMIT 1;
+  `;
+
+  if (!rows || rows.length === 0) return null;
+  const row = rows[0];
+  return {
+    id: row.id,
+    trackId: row.track_id,
+    title: row.title,
+    artist: row.artist,
+    album: row.album,
+    albumImageUrl: row.album_image_url || null,
+    durationMs: Number(row.duration_ms || 0),
+    playedAt: new Date(row.played_at).toISOString(),
+  };
+}

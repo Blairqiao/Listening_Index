@@ -29,19 +29,13 @@ test("AC-1: types.ts is authoritative and mock fixtures live in src/lib/mock/", 
     "src/lib/mock/overview-data.ts must exist"
   );
 
-  const mockAggregator = fs.readFileSync(path.join(root, "src/lib/mock-listening-data.ts"), "utf-8");
   assert.ok(
-    mockAggregator.includes("CATALOG"),
-    "src/lib/mock-listening-data.ts must re-export CATALOG"
+    fs.existsSync(path.join(root, "src/lib/mock/stream-log.ts")),
+    "src/lib/mock/stream-log.ts must exist"
   );
   assert.ok(
-    mockAggregator.includes("MOCK_DATA"),
-    "src/lib/mock-listening-data.ts must re-export MOCK_DATA"
-  );
-  const mockLines = mockAggregator.split("\n").length;
-  assert.ok(
-    mockLines < 200,
-    `src/lib/mock-listening-data.ts should be a concise re-export module (< 200 lines, was ${mockLines})`
+    !fs.existsSync(path.join(root, "src/lib/mock-listening-data.ts")),
+    "src/lib/mock-listening-data.ts shim must be deleted"
   );
 });
 

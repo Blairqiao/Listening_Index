@@ -1,12 +1,13 @@
-import { isValidIanaTimezone } from "@/lib/timezone-utils";
+import { isValidIanaTimezone, parseTimezoneCookie } from "@/lib/timezone-utils";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { ListeningView } from "@/components/ListeningView";
-import { MOCK_DATA } from "@/lib/mock-listening-data";
+import { MOCK_DATA } from "@/lib/mock/overview-data";
 import { getInitialMusicData, getActiveSiteConfig } from "@/lib/db/queries";
+import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
-import type { Mode, RangeKey } from "@/lib/types";
+import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,6 @@ export async function generateMetadata(): Promise<Metadata> {
     description: "Personal Spotify listening data aggregator and 24-hour index.",
   };
 }
-
-const VALID_RANGES: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
 interface PageProps {
   searchParams?: Promise<{
@@ -41,7 +40,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   const rangeParam = resolvedParams?.range;
   const initialRange: RangeKey =
-    rangeParam && VALID_RANGES.includes(rangeParam as RangeKey)
+    rangeParam && (RANGE_KEYS as readonly string[]).includes(rangeParam)
       ? (rangeParam as RangeKey)
       : "1w";
 
@@ -51,16 +50,8 @@ export default async function Page({ searchParams }: PageProps) {
       ? (parseInt(modeParam, 10) as Mode)
       : 0;
 
-  const activeConfig = isForceMock ? {
-    title: "Listening Index",
-    ownerName: "YOUR NAME",
-    accentColor: "#76FF49",
-    siteUrl: "https://open.spotify.com/",
-    githubUrl: "https://github.com/Blairqiao/listening_index",
-    livePlayerLayout: "split" as const,
-  } : await getActiveSiteConfig();
-  let cookieTimezone = cookieStore.get("listening_timezone")?.value;
-  try { if (cookieTimezone) cookieTimezone = decodeURIComponent(cookieTimezone); } catch { cookieTimezone = undefined; }
+  const activeConfig = isForceMock ? DEFAULT_SITE_CONFIG : await getActiveSiteConfig();
+  const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
   const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
   const initialData = isConfigured ? await getInitialMusicData(initialRange, initialVisitorTimezone) : {
     overview: MOCK_DATA.overview[initialRange], streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session,

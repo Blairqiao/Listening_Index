@@ -56,6 +56,7 @@ test('config reset clears deprecated client ID while preserving Owner Token colu
   const config = evaluate(readFileSync('src/lib/db/queries/config.ts', 'utf8'), {
     'node:crypto': {}, '../index': { isDbConfigured: () => true, getDb: () => async (strings: TemplateStringsArray) => { statements.push(strings.join('?')); return []; } },
     '@/config': { siteConfig: { ...configUtils.DEFAULT_SITE_CONFIG, livePlayerLayout: 'stacked' } },
+    '@/lib/config-utils': { ...configUtils, DEFAULT_SITE_CONFIG: { ...configUtils.DEFAULT_SITE_CONFIG, livePlayerLayout: 'stacked' } },
     './schema': { ensureTablesExist: async () => {} }, './cache': { siteConfigCache: { invalidate: () => {} } },
   });
   const result = await config.resetActiveSiteConfig() as configUtils.SiteConfigState;

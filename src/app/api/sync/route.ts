@@ -67,7 +67,7 @@ async function handleSync(request: NextRequest) {
         success: false,
         message: "Sync not executed: the database or Spotify is not connected yet. Connect your database, then connect Spotify from the settings menu or admin prompt.",
       },
-      { status: 200 }
+      { status: 409 }
     );
   }
 
@@ -101,8 +101,7 @@ async function handleSync(request: NextRequest) {
     );
   } catch (error: unknown) {
     console.error("[API ERROR · /api/sync]", error);
-    const message = error instanceof Error ? error.message : "Sync failed";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Sync failed" }, { status: 500 });
   } finally {
     isSyncInProgress = false;
   }

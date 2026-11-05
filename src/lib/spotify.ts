@@ -12,7 +12,6 @@ export async function resolveCredentials(): Promise<{
   clientId: string;
   clientSecret: string | undefined;
   refreshToken: string;
-  fromDatabase: boolean;
   displayName: string | null;
   revision: string;
 } | null> {
@@ -27,13 +26,12 @@ export async function resolveCredentials(): Promise<{
     clientId,
     clientSecret: isConfigured(clientSecret) ? clientSecret : undefined,
     refreshToken: stored.refreshToken,
-    fromDatabase: true,
     displayName: stored.displayName,
     revision: stored.revision ?? "0",
   };
 }
 
-/** True when the owner's Spotify is reachable by either route. */
+/** True when the owner's Spotify connection is configured in the database. */
 export async function isOwnerSpotifyConfigured(): Promise<boolean> {
   return (await resolveCredentials()) !== null;
 }
@@ -124,6 +122,14 @@ let tokenCacheGeneration = 0;
 export function resetSpotifyTokenCache(): void {
   tokenCache = null;
   tokenCacheGeneration += 1;
+}
+
+/**
+ * Returns the expiration timestamp (ms) of the currently cached access token,
+ * or null if no token is cached.
+ */
+export function getCachedTokenExpiresAt(): number | null {
+  return tokenCache ? tokenCache.expiresAt : null;
 }
 
 /**
@@ -259,17 +265,29 @@ export async function getAccessToken(): Promise<string> {
   }
 }
 
+export interface FetchRecentlyPlayedOptions {
+  limit?: number;
+  after?: number;
+}
+
 /**
  * Fetches the user's recently played tracks from the Spotify Web API.
  * Endpoint: GET https://api.spotify.com/v1/me/player/recently-played?limit=50
  */
 export async function fetchRecentlyPlayed(
-  limit = 50
+  options: number | FetchRecentlyPlayedOptions = 50
 ): Promise<SpotifyRecentlyPlayedResponse> {
-  const token = await getAccessToken();
+  const opts = typeof options === "number" ? { limit: options } : options;
+  const limit = opts.limit ?? 50;
   const clampedLimit = Math.min(Math.max(1, limit), 50);
 
-  const url = `https://api.spotify.com/v1/me/player/recently-played?limit=${clampedLimit}`;
+  const token = await getAccessToken();
+  const searchParams = new URLSearchParams({ limit: String(clampedLimit) });
+  if (typeof opts.after === "number" && !isNaN(opts.after) && opts.after > 0) {
+    searchParams.set("after", String(Math.floor(opts.after)));
+  }
+
+  const url = `https://api.spotify.com/v1/me/player/recently-played?${searchParams.toString()}`;
 
   const response = await fetch(url, {
     method: "GET",

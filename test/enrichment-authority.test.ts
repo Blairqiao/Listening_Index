@@ -11,14 +11,16 @@ test('enrichment route rejects anonymous cron, empty work and rotated keys befor
   '@/lib/spotify':{isOwnerSpotifyConfigured:async()=>true},
  };
  const route=loadTs('src/app/api/upload/enrich/route.ts',stubs);
- const request=(body:unknown,token?:string)=>new NextRequest('http://127.0.0.1:8888/api/upload/enrich',{method:'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});
- for(const body of [{},{source:'cron'},{source:'cron',trackIds:['track']}]) {
+ const id='4iV5W9uYEdYUVa79Axb7Rh';
+ const request=(body:unknown,token?:string)=>new NextRequest('http://127.0.0.1:8888/api/upload/enrich',{method:'POST',headers:{'content-type':'application/json',origin:'http://127.0.0.1:8888',host:'127.0.0.1:8888',...(token?{authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});
+ for(const body of [{},{source:'cron'},{source:'cron',trackIds:[id]}]) {
   const response=await route.POST(request(body));assert.equal(response.status,401);assert.equal(calls,0);
  }
  assert.equal((await route.POST(request({source:'cron'},'wrong'))).status,401);assert.equal(calls,0);
- assert.equal((await route.POST(request({source:'dynamic',trackIds:['track']}))).status,200);assert.equal(calls,1);
+ assert.equal((await route.POST(request({source:'dynamic',trackIds:[id]}))).status,200);assert.equal(calls,1);
  assert.equal((await route.POST(request({source:'dynamic'}))).status,400);assert.equal(calls,1);
  assert.equal((await route.POST(request({source:'cron'},key))).status,200);assert.equal(calls,2);
+ assert.equal((await route.POST(request({source:'dynamic',trackIds:['track']}))).status,400);assert.equal(calls,2);
  key='rotated-key';assert.equal((await route.POST(request({source:'cron'},'current-key'))).status,401);assert.equal(calls,2);
 });
 test('concurrent initial cron key requests return the authoritative first key',async()=>{
@@ -26,9 +28,9 @@ test('concurrent initial cron key requests return the authoritative first key',a
  const sql=async(strings:TemplateStringsArray,...values:unknown[])=>{
    const text=strings.join('?');
    if(text.includes('SELECT cron_key'))return [];
-   if(text.includes('INSERT INTO site_settings')){
+   if(text.includes('COALESCE(site_settings.cron_key')){
      const proposed=values.find(v=>typeof v==='string'&&/^[a-f0-9]{32}$/.test(v)) as string;
-     if(text.includes('COALESCE(site_settings.cron_key'))key=key||proposed;else key=proposed;
+     key=key||proposed;
      return [{cron_key:key}];
    }
    return [];

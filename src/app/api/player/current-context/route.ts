@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { isDbConfigured } from "@/lib/db";
-import { getStreamLog } from "@/lib/db/queries/stream-log";
-import { DEFAULT_FALLBACK_TRACK } from "@/components/views/live-player-view/LivePlayerView";
+import { getLatestPlay } from "@/lib/db/queries/stream-log";
+import { DEFAULT_FALLBACK_TRACK } from "@/lib/fallback-track";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +26,8 @@ export async function GET(request: NextRequest) {
 
   if (isDbConfigured()) {
     try {
-      const streamLog = await getStreamLog(1);
-      if (streamLog.entries && streamLog.entries.length > 0) {
-        const entry = streamLog.entries[0];
+      const entry = await getLatestPlay();
+      if (entry) {
         latestTrack = {
           id: entry.trackId || entry.id,
           trackId: entry.trackId || entry.id,
@@ -40,7 +39,7 @@ export async function GET(request: NextRequest) {
         };
       }
     } catch (error) {
-      console.warn("[CURRENT-CONTEXT] Failed to read stream log, using fallback:", error);
+      console.warn("[CURRENT-CONTEXT] Failed to read latest play, using fallback:", error);
     }
   }
 

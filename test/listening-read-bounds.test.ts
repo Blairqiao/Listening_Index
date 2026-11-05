@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { NextRequest } from 'next/server';
 import { createSessionToken } from '../src/lib/admin-auth';
-import { getMockStreamLog } from '../src/lib/mock-listening-data';
+import { getMockStreamLog } from '../src/lib/mock/stream-log';
 import * as auth from '../src/lib/admin-auth';
 import * as routeUtils from '../src/lib/route-utils';
 import * as asyncUtils from '../src/lib/async-utils';
@@ -25,7 +25,7 @@ function loadStreamRoute() {
     '@/lib/db/server-cache': {
       getOrFetchStreamLog: async (limit: number, _tz: string, fetcher: () => Promise<unknown>) => { cacheLimits.push(limit); return fetcher(); },
     },
-    '@/lib/mock-listening-data': { getMockStreamLog },
+    '@/lib/mock/stream-log': { getMockStreamLog },
     '@/lib/admin-auth': auth,
     '@/lib/route-utils': routeUtils,
   };
@@ -71,7 +71,6 @@ test('listening cache separates effective timezone for every query and normalize
   for (const get of [
     (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchOverview('1w', tz, fetcher),
     (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchStreamLog(50, tz, fetcher),
-    (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchSession(tz, fetcher),
   ]) {
     let calls = 0;
     const fetcher = async () => ({ marker: ++calls } as OverviewData & StreamLogData & SessionData & { marker: number });
@@ -80,6 +79,14 @@ test('listening cache separates effective timezone for every query and normalize
     assert.equal((await get('Etc/UTC', fetcher)).marker, 1);
     assert.equal(calls, 2);
   }
+
+  // Session cache does not key by timezone
+  clearServerCache();
+  let sessionCalls = 0;
+  const sessionFetcher = async () => ({ marker: ++sessionCalls } as unknown as SessionData);
+  assert.equal(((await getOrFetchSession(sessionFetcher)) as unknown as { marker: number }).marker, 1);
+  assert.equal(((await getOrFetchSession(sessionFetcher)) as unknown as { marker: number }).marker, 1);
+  assert.equal(sessionCalls, 1);
 });
 
 test('completed cache evicts LRU at 128 entries and removes expired entries', () => {

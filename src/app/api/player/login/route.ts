@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error: unknown) {
     console.error("[PLAYER LOGIN ERROR]", error);
-    const errorMsg = error instanceof Error ? error.message : "Failed to initiate Spotify authorization.";
+    const errorMsg = "Failed to initiate Spotify authorization.";
     if (wantsHtml) {
       return renderPopup(origin, false, errorMsg, AUTH_MESSAGE, `${origin}/`);
     }

@@ -3,6 +3,8 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import { isDbConfigured } from "@/lib/db";
 import { runEnrichmentBatch } from "@/lib/enrichment";
 import { isOwnerSpotifyConfigured } from "@/lib/spotify";
+import { isSameOriginRequest } from "@/lib/admin-auth";
+import { getEnrichmentProgress } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,22 +25,43 @@ export async function POST(request: NextRequest) {
 
     try {
       const body = (await request.json()) as { trackIds?: string[]; source?: "cron" | "dynamic" };
-      if (Array.isArray(body?.trackIds) && body.trackIds.length > 0) {
-        trackIds = body.trackIds.slice(0, 10);
-      }
       if (body?.source === "cron" || body?.source === "dynamic") {
         source = body.source;
+      }
+      if (body?.trackIds !== undefined) {
+        if (
+          !Array.isArray(body.trackIds) ||
+          body.trackIds.length === 0 ||
+          body.trackIds.length > 10 ||
+          !body.trackIds.every(
+            (id: unknown) => typeof id === "string" && /^[A-Za-z0-9]{22}$/.test(id)
+          )
+        ) {
+          return NextResponse.json(
+            { error: "Invalid trackIds: must be an array of up to 10 22-character Spotify track IDs." },
+            { status: 400 }
+          );
+        }
+        trackIds = body.trackIds;
       }
     } catch {
       // Use default parameters if no body
     }
 
     const bucket = source || (trackIds ? "dynamic" : "cron");
-    if (bucket === "dynamic" && !trackIds?.length) {
-      return NextResponse.json({error:"Dynamic enrichment requires Track IDs."},{status:400});
+    if (bucket === "dynamic") {
+      if (!isSameOriginRequest(request)) {
+        return NextResponse.json(
+          { error: "Forbidden: cross-origin requests are not permitted." },
+          { status: 403 }
+        );
+      }
+      if (!trackIds?.length) {
+        return NextResponse.json({ error: "Dynamic enrichment requires Track IDs." }, { status: 400 });
+      }
     }
     if (bucket === "cron" && !(await isAuthorizedCronRequest(request))) {
-      return NextResponse.json({error:"Unauthorized. Provide the current cron key."},{status:401});
+      return NextResponse.json({ error: "Unauthorized. Provide the current cron key." }, { status: 401 });
     }
 
     if (!(await isOwnerSpotifyConfigured())) {
@@ -64,8 +87,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("[API ERROR · /api/upload/enrich]", error);
-    const message = error instanceof Error ? error.message : "Metadata enrichment failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Metadata enrichment failed" }, { status: 500 });
   }
 }
 
@@ -77,7 +99,6 @@ export async function GET() {
         { status: 500 }
       );
     }
-    const { getEnrichmentProgress } = await import("@/lib/db/queries");
     const progress = await getEnrichmentProgress();
     return NextResponse.json({
       success: true,
@@ -85,8 +106,7 @@ export async function GET() {
     });
   } catch (error: unknown) {
     console.error("[API ERROR · GET /api/upload/enrich]", error);
-    const message = error instanceof Error ? error.message : "Failed to fetch enrichment progress";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch enrichment progress" }, { status: 500 });
   }
 }
 

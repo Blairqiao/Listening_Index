@@ -180,9 +180,6 @@ export interface DebouncePlayItem {
   msPlayed?: number;
 }
 
-/** Canonical domain alias: stream events prior to meeting the Play Threshold */
-export type DebounceStreamEventItem = DebouncePlayItem;
-
 /**
  * Filters out rapid duplicate stream events of the same track occurring within < cooldownMs (default: 30,000ms / 30s).
  *
@@ -197,8 +194,7 @@ export type DebounceStreamEventItem = DebouncePlayItem;
  */
 export function debouncePlays<T extends DebouncePlayItem>(
   plays: T[],
-  fallbackCooldownMs: number = 30_000,
-  initialLastSeen?: Map<string, number>
+  fallbackCooldownMs: number = 30_000
 ): { debounced: T[]; droppedCount: number } {
   if (plays.length === 0) {
     return { debounced: [], droppedCount: 0 };
@@ -209,7 +205,7 @@ export function debouncePlays<T extends DebouncePlayItem>(
     (a, b) => new Date(a.playedAt).getTime() - new Date(b.playedAt).getTime()
   );
 
-  const lastAcceptedTimeMs = new Map<string, number>(initialLastSeen);
+  const lastAcceptedTimeMs = new Map<string, number>();
   const lastAcceptedIndex = new Map<string, number>();
   const debounced: T[] = [];
   let droppedCount = 0;
@@ -256,6 +252,3 @@ export function debouncePlays<T extends DebouncePlayItem>(
 
   return { debounced, droppedCount };
 }
-
-/** Canonical domain alias for stream event debouncing */
-export const debounceStreamEvents = debouncePlays;

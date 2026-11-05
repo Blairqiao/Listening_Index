@@ -9,7 +9,9 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
     const calls: unknown[][] = [];
     const deps: Record<string, unknown> = {
       'next/headers': { cookies: async () => ({ get: (key: string) => key === 'listening_timezone' && cookie ? { value: encodeURIComponent(cookie) } : undefined }) },
-      '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock-listening-data': {},
+      '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock/overview-data': {},
+      '@/lib/config-utils': { DEFAULT_SITE_CONFIG: {} },
+      '@/lib/types': { RANGE_KEYS: ['1d', '1w', '1m', '6m', '1y', 'all'] },
       '@/lib/db/queries': { getActiveSiteConfig: async () => ({}), getInitialMusicData: async (...args: unknown[]) => { calls.push(args); return {}; } },
       '@/lib/db': { isDbConfigured: () => true }, '@/lib/admin-auth': { ADMIN_COOKIE_NAME: 'admin_session', verifySessionToken: () => false },
       '@/lib/timezone-utils': timezoneUtils,

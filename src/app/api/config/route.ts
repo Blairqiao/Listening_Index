@@ -89,12 +89,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("[CONFIG API ERROR]", error);
-    const message = error instanceof Error ? error.message : "Failed to update configuration";
-
     return NextResponse.json(
       {
         success: false,
-        error: message,
+        error: "Failed to update configuration",
       },
       { status: 500 }
     );

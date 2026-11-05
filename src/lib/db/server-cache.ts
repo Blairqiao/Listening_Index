@@ -60,8 +60,7 @@ export function getOrFetchStreamLog<T extends StreamLogData = StreamLogData>(
 }
 
 export function getOrFetchSession<T extends SessionData = SessionData>(
-  timezone: string,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  return cacheStore.getOrFetch(JSON.stringify([cacheEpoch, "session", timezoneIdentity(timezone)]), fetcher, () => cacheEpoch) as Promise<T>;
+  return cacheStore.getOrFetch(JSON.stringify([cacheEpoch, "session"]), fetcher, () => cacheEpoch) as Promise<T>;
 }

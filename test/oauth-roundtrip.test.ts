@@ -33,7 +33,7 @@ neonConfig.fetchFunction = async (_url: unknown, init?: RequestInit) => {
     nonce = null;
     return result();
   }
-  if (query.includes('owner_oauth_nonce') && query.includes('INSERT INTO')) {
+  if (query.includes('owner_oauth_nonce') && !query.includes('owner_playback_token =') && !query.includes('owner_oauth_nonce = NULL')) {
     nonce = params.find((value: string) => /^[a-f0-9]{64}$/.test(value));
     return result({ owner_token_revision: revision });
   }

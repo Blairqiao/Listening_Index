@@ -90,3 +90,20 @@ export function isSameContext(
   if (current.type === "auto") return true;
   return Boolean(current.uri && incoming.uri && current.uri === incoming.uri);
 }
+
+export function formatPlayErrorMessage(
+  status: number,
+  errData?: { error?: { message?: string } } | null,
+  fallbackAction = "Playback"
+): string {
+  return (
+    errData?.error?.message ||
+    (status === 403
+      ? "Spotify Premium is required for Web Playback."
+      : status === 404
+      ? "No track queued to play. Select a track or enter Spotify URL."
+      : status === 429
+      ? "Spotify rate limit reached. Try again shortly."
+      : `${fallbackAction} failed (${status}).`)
+  );
+}

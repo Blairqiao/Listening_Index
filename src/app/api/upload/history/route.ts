@@ -37,16 +37,50 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as { plays?: CompactPlayEvent[] };
-    const plays = body.plays;
+    const plays = body?.plays;
 
     if (!Array.isArray(plays) || plays.length === 0) {
-      return NextResponse.json({ success: true, processed: 0, newPlays: 0 });
+      return NextResponse.json({ success: true, processed: 0, newPlays: 0, skipped: 0 });
+    }
+
+    if (plays.length > 5000) {
+      return NextResponse.json(
+        { error: "Batch size exceeds maximum limit of 5000 items." },
+        { status: 413 }
+      );
+    }
+
+    let skipped = 0;
+    const validPlays: CompactPlayEvent[] = [];
+
+    for (const p of plays) {
+      if (
+        !p ||
+        typeof p.playedAt !== "string" ||
+        isNaN(Date.parse(p.playedAt)) ||
+        typeof p.trackId !== "string" ||
+        p.trackId.trim() === "" ||
+        typeof p.trackName !== "string" ||
+        typeof p.artistName !== "string" ||
+        typeof p.albumName !== "string" ||
+        typeof p.msPlayed !== "number" ||
+        !Number.isFinite(p.msPlayed) ||
+        p.msPlayed < 0
+      ) {
+        skipped++;
+        continue;
+      }
+      validPlays.push(p);
+    }
+
+    if (validPlays.length === 0) {
+      return NextResponse.json({ success: true, processed: 0, newPlays: 0, skipped });
     }
 
     // 2. Aggregate unique tracks in-memory
     const trackMap = new Map<string, TrackUpsertItem>();
 
-    for (const p of plays) {
+    for (const p of validPlays) {
       const existingTrack = trackMap.get(p.trackId);
       if (!existingTrack) {
         trackMap.set(p.trackId, {
@@ -68,7 +102,7 @@ export async function POST(request: NextRequest) {
     await bulkUpsertTracks(Array.from(trackMap.values()));
 
     const { insertedCount } = await bulkInsertPlays(
-      plays.map((p) => ({
+      validPlays.map((p) => ({
         playedAt: p.playedAt,
         trackId: p.trackId,
         msPlayed: p.msPlayed,
@@ -80,12 +114,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      processed: plays.length,
+      processed: validPlays.length,
       newPlays: insertedCount,
+      skipped,
     });
   } catch (error: unknown) {
     console.error("[API ERROR · /api/upload/history]", error);
-    const message = error instanceof Error ? error.message : "History ingestion failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "History ingestion failed" }, { status: 500 });
   }
 }
