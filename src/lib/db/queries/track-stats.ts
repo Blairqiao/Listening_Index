@@ -1,6 +1,7 @@
 import { getDb, isDbConfigured } from "../index";
 import { catalogTotalsCache } from "./cache";
 import { isCatalogFullyEnriched } from "./enrichment";
+import { makeArtistGroupKey } from "@/lib/history-parser";
 
 export interface TrackTelemetryStats {
   track: {
@@ -95,7 +96,7 @@ export async function getTrackTelemetryStats(params: {
     let resolvedTrackId: string | undefined = cleanTrackId;
     let resolvedTrackName: string | undefined = cleanTitle;
     let resolvedArtistName: string = cleanArtist || "";
-    let resolvedArtistGroupKey: string | undefined = cleanArtist ? cleanArtist.trim().toLowerCase() : undefined;
+    let resolvedArtistGroupKey: string | undefined = cleanArtist ? makeArtistGroupKey(cleanArtist) : undefined;
     let resolvedArtistId: string | undefined = undefined;
     let trackPlays = 0;
 
@@ -130,7 +131,7 @@ export async function getTrackTelemetryStats(params: {
             FROM tracks t
             JOIN plays p ON p.track_id = t.id
             WHERE lower(trim(t.name)) = lower(trim(${cleanTitle}))
-              AND t.artist_group_key = lower(trim(${cleanArtist}))
+              AND t.artist_group_key = ${makeArtistGroupKey(cleanArtist)}
             GROUP BY t.id, t.name, t.artist_name, t.artist_group_key, t.artist_id
             ORDER BY plays DESC
             LIMIT 1
