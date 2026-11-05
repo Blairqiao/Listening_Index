@@ -1,7 +1,8 @@
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
 
 export type Mode = 0 | 1 | 2 | 3; // 0 = Overview, 1 = Stream Log, 2 = Session, 3 = Live Player
-export type RangeKey = "1d" | "1w" | "1m" | "6m" | "1y" | "all";
+export const RANGE_KEYS = ["1d", "1w", "1m", "6m", "1y", "all"] as const;
+export type RangeKey = (typeof RANGE_KEYS)[number];
 
 export interface TrackSummary {
   id: string;

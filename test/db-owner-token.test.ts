@@ -7,7 +7,6 @@ import {
 } from "../src/lib/db/queries/config";
 import {
   getOwnerCredential,
-  saveOwnerCredential,
 } from "../src/lib/owner-spotify";
 
 test("saveOwnerPlaybackToken updates token and tracks display name", async () => {
@@ -31,7 +30,4 @@ test("saveOwnerPlaybackToken handles unconfigured database safely", async () => 
 test("owner-spotify helpers handle unconfigured database safely", async () => {
   const cred = await getOwnerCredential();
   assert.equal(cred, null);
-  await assert.doesNotReject(async () => {
-    await saveOwnerCredential("test-token", "Test Account");
-  });
 });

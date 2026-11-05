@@ -8,7 +8,7 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
   if (range === "1d") {
     return sql`
       SELECT 
-          TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM-DD HH24') AS hour_key,
+          TO_CHAR(DATE_TRUNC('hour', p.played_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:00:00"Z"') AS hour_key,
           COUNT(*)::int AS count
       FROM plays p
       WHERE p.played_at >= NOW() - INTERVAL '24 hours'
@@ -23,7 +23,7 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
           FLOOR(EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${tz}) / 6)::int AS block,
           COUNT(*)::int AS count
       FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '8 days'
+      WHERE p.played_at >= NOW() - INTERVAL '7 days'
       GROUP BY day, block;
     `;
   }
@@ -45,7 +45,7 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           COUNT(*)::int AS count
       FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '182 days'
+      WHERE p.played_at >= NOW() - INTERVAL '180 days'
       GROUP BY day;
     `;
   }
@@ -71,6 +71,37 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
   `;
 }
 
+function getLocalCalendarParts(date: Date, tz: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return {
+    year: Number(m.year),
+    month: Number(m.month),
+    day: Number(m.day),
+    hour: Number(m.hour),
+    minute: Number(m.minute),
+    second: Number(m.second),
+  };
+}
+
+function offsetCalendarDay(base: { year: number; month: number; day: number }, daysAgo: number) {
+  const d = new Date(Date.UTC(base.year, base.month - 1, base.day - daysAgo, 12, 0, 0));
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+  const dayKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return { year, month, day, dayKey };
+}
+
 export function buildActivityCadence(params: {
   range: RangeKey;
   tz: string;
@@ -83,27 +114,31 @@ export function buildActivityCadence(params: {
   const activityCadence: ActivityBucket[] = [];
 
   if (range === "1d") {
-    const hourMap = new Map<string, number>(
-      cadenceRows.map((r) => [String(r.hour_key), Number(r.count)])
-    );
+    const hourMap = new Map<string, number>();
+    for (const r of cadenceRows) {
+      const k = String(r.hour_key);
+      const count = Number(r.count) || 0;
+      hourMap.set(k, count);
+    }
 
-    for (let i = 23; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 3600000);
+    const windowStartMs = now.getTime() - 24 * 3600000;
+    const earliestHourMs = Math.floor(windowStartMs / 3600000) * 3600000;
+    const latestHourMs = Math.floor(now.getTime() / 3600000) * 3600000;
+
+    for (let h = earliestHourMs; h <= latestHourMs; h += 3600000) {
+      const bucketStart = new Date(h);
+      const bucketEnd = new Date(h + 3600000 - 1);
+
+      const isoKey = bucketStart.toISOString().slice(0, 13) + ":00:00Z";
+
       const parts = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
         hour: "2-digit",
         hourCycle: "h23",
-      }).formatToParts(d);
+      }).formatToParts(bucketStart);
       const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-      const hourKey = `${m.year}-${m.month}-${m.day} ${m.hour}`;
-      const count = hourMap.get(hourKey) || 0;
 
-      const [yr, mo, dy, hr] = [Number(m.year), Number(m.month) - 1, Number(m.day), Number(m.hour)];
-      const bucketStart = new Date(Date.UTC(yr, mo, dy, hr, 0, 0, 0));
-      const bucketEnd = new Date(Date.UTC(yr, mo, dy, hr, 59, 59, 999));
+      const count = hourMap.get(isoKey) ?? 0;
 
       activityCadence.push({
         date: `${m.hour}:00`,
@@ -123,17 +158,13 @@ export function buildActivityCadence(params: {
       "18:00–24:00",
     ];
 
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 86400000);
-      const dayKey = new Intl.DateTimeFormat("en-CA", {
-        timeZone: tz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(d);
+    const baseDate = getLocalCalendarParts(now, tz);
+    const numDaysAgo = (baseDate.hour > 0 || baseDate.minute > 0 || baseDate.second > 0) ? 7 : 6;
+
+    for (let daysAgo = numDaysAgo; daysAgo >= 0; daysAgo--) {
+      const { year, month, day, dayKey } = offsetCalendarDay(baseDate, daysAgo);
       const dayLabel = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
       const dayNumber = dayLabel.split(" ")[0];
-      const [year, month, day] = dayKey.split("-").map(Number);
 
       for (let b = 0; b < 4; b++) {
         const count = blockMap.get(`${dayKey}_${b}`) || 0;
@@ -157,18 +188,14 @@ export function buildActivityCadence(params: {
     const countMap = new Map<string, number>(
       cadenceRows.map((r) => [String(r.day), Number(r.count)])
     );
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 86400000);
-      const dayKey = new Intl.DateTimeFormat("en-CA", {
-        timeZone: tz,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }).format(d);
+    const baseDate = getLocalCalendarParts(now, tz);
+    const numDaysAgo = (baseDate.hour > 0 || baseDate.minute > 0 || baseDate.second > 0) ? 30 : 29;
+
+    for (let daysAgo = numDaysAgo; daysAgo >= 0; daysAgo--) {
+      const { year, month, day, dayKey } = offsetCalendarDay(baseDate, daysAgo);
       const label = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
-      const idx = 29 - i;
-      const isMarker = idx === 0 || idx === 7 || idx === 14 || idx === 21 || idx === 29;
-      const [year, month, day] = dayKey.split("-").map(Number);
+      const idx = numDaysAgo - daysAgo;
+      const isMarker = idx === 0 || idx === 7 || idx === 14 || idx === 21 || idx === numDaysAgo;
       const startTime = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
       const endTime = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
 
@@ -185,6 +212,7 @@ export function buildActivityCadence(params: {
     const countMap = new Map<string, number>(
       cadenceRows.map((r) => [String(r.day), Number(r.count)])
     );
+    const baseDate = getLocalCalendarParts(now, tz);
     let lastMonth = "";
     for (let w = 25; w >= 0; w--) {
       let weekCount = 0;
@@ -192,17 +220,13 @@ export function buildActivityCadence(params: {
       let weekEndKey = "";
       for (let dayOffset = 6; dayOffset >= 0; dayOffset--) {
         const totalDaysAgo = w * 7 + dayOffset;
-        const d = new Date(now.getTime() - totalDaysAgo * 86400000);
-        const dayKey = new Intl.DateTimeFormat("en-CA", {
-          timeZone: tz,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(d);
+        if (totalDaysAgo > 180) continue;
+        const { dayKey } = offsetCalendarDay(baseDate, totalDaysAgo);
         if (!weekStartKey) weekStartKey = dayKey;
-        if (dayOffset === 0) weekEndKey = dayKey;
+        if (dayOffset === 0 || totalDaysAgo === 0) weekEndKey = dayKey;
         weekCount += countMap.get(dayKey) || 0;
       }
+      if (!weekEndKey) weekEndKey = weekStartKey;
 
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
@@ -231,15 +255,12 @@ export function buildActivityCadence(params: {
       cadenceRows.map((r) => [String(r.ym), Number(r.count)])
     );
 
-    const nowParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      year: "numeric",
-      month: "numeric",
-    }).formatToParts(now);
-    const curYear = Number(nowParts.find((p) => p.type === "year")?.value || now.getUTCFullYear());
-    const curMonth = Number(nowParts.find((p) => p.type === "month")?.value || (now.getUTCMonth() + 1));
+    const baseDate = getLocalCalendarParts(now, tz);
+    const curYear = baseDate.year;
+    const curMonth = baseDate.month;
+    const numMonths = (baseDate.day > 1 || baseDate.hour > 0 || baseDate.minute > 0 || baseDate.second > 0) ? 12 : 11;
 
-    for (let m = 11; m >= 0; m--) {
+    for (let m = numMonths; m >= 0; m--) {
       let targetMonth = curMonth - m;
       let targetYear = curYear;
       while (targetMonth <= 0) {
@@ -269,9 +290,11 @@ export function buildActivityCadence(params: {
     const countMap = new Map<number, number>(
       cadenceRows.map((r) => [Number(r.play_year), Number(r.count)])
     );
+    const nowLocal = getLocalCalendarParts(now, tz);
+    const currentYear = nowLocal.year;
     const minRowYear = minDateRow?.log_start_date
-      ? new Date(minDateRow.log_start_date).getFullYear()
-      : now.getFullYear() - 1;
+      ? getLocalCalendarParts(new Date(minDateRow.log_start_date), tz).year
+      : currentYear - 1;
 
     let minYear = minRowYear;
     if (cadenceRows && cadenceRows.length > 0) {
@@ -280,7 +303,6 @@ export function buildActivityCadence(params: {
         minYear = Math.min(minYear, minPlayYear);
       }
     }
-    const currentYear = now.getFullYear();
     const startYear = Math.min(minYear, currentYear);
     const maxPlayYear = cadenceRows.length > 0
       ? Math.max(...cadenceRows.map((r) => Number(r.play_year)))

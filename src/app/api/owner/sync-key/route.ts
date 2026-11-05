@@ -36,13 +36,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cross-origin request not permitted." }, { status: 403 });
   }
 
-  const cronKey = await regenerateCronKey();
-  const origin = requestOrigin(request);
-  const syncUrl = `${origin}/api/sync?key=${cronKey}`;
+  try {
+    const cronKey = await regenerateCronKey();
+    const origin = requestOrigin(request);
+    const syncUrl = `${origin}/api/sync?key=${cronKey}`;
 
-  return NextResponse.json({
-    success: true,
-    cronKey,
-    syncUrl,
-  });
+    return NextResponse.json({
+      success: true,
+      cronKey,
+      syncUrl,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to rotate sync key.";
+    const isDbMissing = message.includes("database is required");
+    return NextResponse.json(
+      { error: isDbMissing ? "A database is required to rotate the sync key." : message },
+      { status: isDbMissing ? 503 : 500 }
+    );
+  }
 }

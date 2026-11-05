@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedAdminRequest, isSameOriginRequest } from "@/lib/admin-auth";
 import {
   getAccessToken,
+  getCachedTokenExpiresAt,
   resetSpotifyTokenCache,
   SpotifyApiError,
 } from "@/lib/spotify";
@@ -33,10 +34,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const accessToken = await getAccessToken();
+    const expiresAt = getCachedTokenExpiresAt();
+    const expiresIn = expiresAt
+      ? Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
+      : 3600;
     return NextResponse.json({
       linked: true,
       accessToken,
-      expiresIn: 3600,
+      expiresIn,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to refresh Spotify token";

@@ -1,29 +1,40 @@
 import crypto from "node:crypto";
 import { getDb, isDbConfigured } from "../index";
-import { siteConfig } from "@/config";
+import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { ensureTablesExist } from "./schema";
 import { siteConfigCache } from "./cache";
 import type { SiteConfigState } from "./types";
 
 /**
+ * Ensures the singleton 'active' row exists in site_settings.
+ */
+async function ensureActiveSettingsRow(sql = getDb()): Promise<void> {
+  await sql`
+    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
+    VALUES (
+      'active',
+      ${DEFAULT_SITE_CONFIG.title},
+      ${DEFAULT_SITE_CONFIG.ownerName},
+      ${DEFAULT_SITE_CONFIG.accentColor},
+      ${DEFAULT_SITE_CONFIG.siteUrl},
+      ${DEFAULT_SITE_CONFIG.githubUrl},
+      ${DEFAULT_SITE_CONFIG.livePlayerLayout},
+      NOW()
+    )
+    ON CONFLICT (id) DO NOTHING;
+  `;
+}
+
+/**
  * Retrieves the active site configuration.
  * Priority:
  * 1. Neon Database (site_settings table with id = 'active')
- * 2. Fallback to default siteConfig from src/config.ts
+ * 2. Fallback to DEFAULT_SITE_CONFIG
  * Deduplicates concurrent calls via in-flight promise latch and caches for 60 seconds.
  */
 export async function getActiveSiteConfig(): Promise<SiteConfigState> {
-  const fallback: SiteConfigState = {
-    title: siteConfig.title,
-    ownerName: siteConfig.ownerName,
-    accentColor: siteConfig.accentColor,
-    siteUrl: siteConfig.siteUrl,
-    githubUrl: siteConfig.githubUrl,
-    livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
-  };
-
   if (!isDbConfigured()) {
-    return fallback;
+    return DEFAULT_SITE_CONFIG;
   }
 
   return siteConfigCache.get(async () => {
@@ -40,38 +51,23 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
       if (rows && rows.length > 0 && rows[0]) {
         const row = rows[0];
         return {
-          title: row.title || fallback.title,
-          ownerName: row.owner_name || fallback.ownerName,
-          accentColor: row.accent_color || fallback.accentColor,
-          siteUrl: row.site_url || fallback.siteUrl,
-          githubUrl: row.github_url || fallback.githubUrl,
+          title: row.title || DEFAULT_SITE_CONFIG.title,
+          ownerName: row.owner_name || DEFAULT_SITE_CONFIG.ownerName,
+          accentColor: row.accent_color || DEFAULT_SITE_CONFIG.accentColor,
+          siteUrl: row.site_url || DEFAULT_SITE_CONFIG.siteUrl,
+          githubUrl: row.github_url || DEFAULT_SITE_CONFIG.githubUrl,
           livePlayerLayout:
             row.live_player_layout === "stacked" || row.live_player_layout === "split"
               ? row.live_player_layout
-              : fallback.livePlayerLayout,
+              : DEFAULT_SITE_CONFIG.livePlayerLayout,
         };
       }
 
-      // Auto-seed table on first cold start with default config
-      await sql`
-        INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
-        VALUES (
-          'active',
-          ${fallback.title},
-          ${fallback.ownerName},
-          ${fallback.accentColor},
-          ${fallback.siteUrl},
-          ${fallback.githubUrl},
-          ${fallback.livePlayerLayout},
-          NOW()
-        )
-        ON CONFLICT (id) DO NOTHING;
-      `;
-
-      return fallback;
+      await ensureActiveSettingsRow(sql);
+      return DEFAULT_SITE_CONFIG;
     } catch (error) {
       console.warn("[SITE CONFIG] Could not load active config from Neon DB, falling back to src/config.ts:", error);
-      return fallback;
+      return DEFAULT_SITE_CONFIG;
     }
   });
 }
@@ -87,26 +83,18 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
   try {
     await ensureTablesExist();
     const sql = getDb();
+    await ensureActiveSettingsRow(sql);
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
-      VALUES (
-        'active',
-        ${config.title},
-        ${config.ownerName},
-        ${config.accentColor},
-        ${config.siteUrl},
-        ${config.githubUrl},
-        ${config.livePlayerLayout || "split"},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        title = EXCLUDED.title,
-        owner_name = EXCLUDED.owner_name,
-        accent_color = EXCLUDED.accent_color,
-        site_url = EXCLUDED.site_url,
-        github_url = EXCLUDED.github_url,
-        live_player_layout = EXCLUDED.live_player_layout,
-        updated_at = NOW();
+      UPDATE site_settings
+      SET
+        title = ${config.title},
+        owner_name = ${config.ownerName},
+        accent_color = ${config.accentColor},
+        site_url = ${config.siteUrl},
+        github_url = ${config.githubUrl},
+        live_player_layout = ${config.livePlayerLayout || "split"},
+        updated_at = NOW()
+      WHERE id = 'active';
     `;
     siteConfigCache.invalidate();
     return true;
@@ -120,43 +108,26 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
  * Resets the active configuration in Neon database back to default src/config.ts
  */
 export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
-  const defaults: SiteConfigState = {
-    title: siteConfig.title,
-    ownerName: siteConfig.ownerName,
-    accentColor: siteConfig.accentColor,
-    siteUrl: siteConfig.siteUrl,
-    githubUrl: siteConfig.githubUrl,
-    livePlayerLayout: (siteConfig as { livePlayerLayout?: string }).livePlayerLayout === "stacked" ? "stacked" : "split",
-  };
-
   if (isDbConfigured()) {
     await ensureTablesExist();
     const sql = getDb();
+    await ensureActiveSettingsRow(sql);
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
-      VALUES (
-        'active',
-        ${defaults.title},
-        ${defaults.ownerName},
-        ${defaults.accentColor},
-        ${defaults.siteUrl},
-        ${defaults.githubUrl},
-        ${defaults.livePlayerLayout},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        title = EXCLUDED.title,
-        owner_name = EXCLUDED.owner_name,
-        accent_color = EXCLUDED.accent_color,
-        site_url = EXCLUDED.site_url,
-        github_url = EXCLUDED.github_url,
-        live_player_layout = EXCLUDED.live_player_layout,
-        updated_at = NOW();
+      UPDATE site_settings
+      SET
+        title = ${DEFAULT_SITE_CONFIG.title},
+        owner_name = ${DEFAULT_SITE_CONFIG.ownerName},
+        accent_color = ${DEFAULT_SITE_CONFIG.accentColor},
+        site_url = ${DEFAULT_SITE_CONFIG.siteUrl},
+        github_url = ${DEFAULT_SITE_CONFIG.githubUrl},
+        live_player_layout = ${DEFAULT_SITE_CONFIG.livePlayerLayout},
+        updated_at = NOW()
+      WHERE id = 'active';
     `;
     siteConfigCache.invalidate();
   }
 
-  return defaults;
+  return DEFAULT_SITE_CONFIG;
 }
 
 /**
@@ -210,11 +181,12 @@ export async function rotateOwnerPlaybackToken(
 export async function beginOwnerAuthorization(nonce: string): Promise<string> {
   if (!isDbConfigured()) throw new Error("A database is required to connect Spotify.");
   await ensureTablesExist();
-  const rows = await getDb()`
-    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, owner_oauth_nonce)
-    VALUES ('active', ${siteConfig.title}, ${siteConfig.ownerName}, ${siteConfig.accentColor},
-      ${siteConfig.siteUrl}, ${siteConfig.githubUrl}, ${nonce})
-    ON CONFLICT (id) DO UPDATE SET owner_oauth_nonce = EXCLUDED.owner_oauth_nonce
+  const sql = getDb();
+  await ensureActiveSettingsRow(sql);
+  const rows = await sql`
+    UPDATE site_settings
+    SET owner_oauth_nonce = ${nonce}
+    WHERE id = 'active'
     RETURNING owner_token_revision;
   `;
   return String(rows[0].owner_token_revision);
@@ -246,6 +218,7 @@ export async function saveOwnerPlaybackToken(
   try {
     await ensureTablesExist();
     const sql = getDb();
+    await ensureActiveSettingsRow(sql);
     if (expectedRevision !== undefined) {
       const rows = await sql`
         UPDATE site_settings SET owner_playback_token = ${token},
@@ -259,28 +232,16 @@ export async function saveOwnerPlaybackToken(
       return rows.length === 1;
     }
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, owner_playback_token, owner_spotify_name, owner_spotify_url, owner_token_updated_at, updated_at)
-      VALUES (
-        'active',
-        ${siteConfig.title},
-        ${siteConfig.ownerName},
-        ${siteConfig.accentColor},
-        ${siteConfig.siteUrl},
-        ${siteConfig.githubUrl},
-        ${token},
-        ${displayName || null},
-        ${profileUrl || null},
-        NOW(),
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        owner_playback_token = EXCLUDED.owner_playback_token,
+      UPDATE site_settings
+      SET
+        owner_playback_token = ${token},
         owner_token_revision = site_settings.owner_token_revision + 1,
         owner_oauth_nonce = NULL,
-        owner_spotify_name = COALESCE(EXCLUDED.owner_spotify_name, site_settings.owner_spotify_name),
-        owner_spotify_url = COALESCE(EXCLUDED.owner_spotify_url, site_settings.owner_spotify_url),
+        owner_spotify_name = COALESCE(${displayName || null}, site_settings.owner_spotify_name),
+        owner_spotify_url = COALESCE(${profileUrl || null}, site_settings.owner_spotify_url),
         owner_token_updated_at = NOW(),
-        updated_at = NOW();
+        updated_at = NOW()
+      WHERE id = 'active';
     `;
     return true;
   } catch (error) {
@@ -377,22 +338,14 @@ export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}):
     }
 
     // Auto-generate 32-character random hex string if missing on database connection
+    await ensureActiveSettingsRow(sql);
     const newKey = crypto.randomBytes(16).toString("hex");
     const seeded = await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, cron_key, updated_at)
-      VALUES (
-        'active',
-        ${siteConfig.title},
-        ${siteConfig.ownerName},
-        ${siteConfig.accentColor},
-        ${siteConfig.siteUrl},
-        ${siteConfig.githubUrl},
-        ${newKey},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        cron_key = COALESCE(site_settings.cron_key, EXCLUDED.cron_key),
+      UPDATE site_settings
+      SET
+        cron_key = COALESCE(site_settings.cron_key, ${newKey}),
         updated_at = NOW()
+      WHERE id = 'active'
       RETURNING cron_key;
     `;
     return seeded[0]?.cron_key ?? null;
@@ -405,32 +358,25 @@ export async function getCronKey(options: {allowLegacyFallback?: boolean} = {}):
 /**
  * Rotates the scheduled sync key (cron_key) in site_settings.
  * Generates a new 32-character hex string, persists it, and returns it.
+ * Throws when the database is not configured.
  */
 export async function regenerateCronKey(): Promise<string> {
-  const newKey = crypto.randomBytes(16).toString("hex");
-
   if (!isDbConfigured()) {
-    return newKey;
+    throw new Error("A database is required to rotate the sync key.");
   }
+
+  const newKey = crypto.randomBytes(16).toString("hex");
 
   try {
     await ensureTablesExist();
     const sql = getDb();
+    await ensureActiveSettingsRow(sql);
     await sql`
-      INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, cron_key, updated_at)
-      VALUES (
-        'active',
-        ${siteConfig.title},
-        ${siteConfig.ownerName},
-        ${siteConfig.accentColor},
-        ${siteConfig.siteUrl},
-        ${siteConfig.githubUrl},
-        ${newKey},
-        NOW()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        cron_key = EXCLUDED.cron_key,
-        updated_at = NOW();
+      UPDATE site_settings
+      SET
+        cron_key = ${newKey},
+        updated_at = NOW()
+      WHERE id = 'active';
     `;
     return newKey;
   } catch (error) {

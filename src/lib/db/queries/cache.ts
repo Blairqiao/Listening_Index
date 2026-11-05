@@ -13,6 +13,7 @@ export interface CacheEntry<T> {
 export class AsyncLatchCache<T> {
   private cached: CacheEntry<T> | null = null;
   private inFlight: Promise<T> | null = null;
+  private generation = 0;
 
   constructor(
     private readonly ttlMs: number,
@@ -38,13 +39,18 @@ export class AsyncLatchCache<T> {
       throw new Error("[AsyncLatchCache] No fetcher provided for cache miss.");
     }
 
+    const currentGen = this.generation;
     this.inFlight = (async () => {
       try {
         const val = await fn();
-        this.cached = { value: val, expiresAt: Date.now() + this.ttlMs };
+        if (this.generation === currentGen) {
+          this.cached = { value: val, expiresAt: Date.now() + this.ttlMs };
+        }
         return val;
       } finally {
-        this.inFlight = null;
+        if (this.generation === currentGen) {
+          this.inFlight = null;
+        }
       }
     })();
 
@@ -55,7 +61,9 @@ export class AsyncLatchCache<T> {
    * Invalidates the cached entry immediately.
    */
   invalidate(): void {
+    this.generation++;
     this.cached = null;
+    this.inFlight = null;
   }
 
   /**
@@ -76,14 +84,4 @@ export const lastSyncCache = new AsyncLatchCache<string | undefined>(15_000);
 export const catalogStatusCache = new AsyncLatchCache<boolean>(60_000);
 export const siteConfigCache = new AsyncLatchCache<SiteConfigState>(60_000);
 export const catalogTotalsCache = new AsyncLatchCache<{ totalTracks: number; totalArtists: number }>(300_000);
-
-/**
- * Purges all database query in-memory caches.
- */
-export function clearDbQueryCaches(): void {
-  lastSyncCache.invalidate();
-  catalogStatusCache.invalidate();
-  siteConfigCache.invalidate();
-  catalogTotalsCache.invalidate();
-}
 

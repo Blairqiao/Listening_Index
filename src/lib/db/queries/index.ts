@@ -3,7 +3,6 @@ export * from "./types";
 
 // Helpers
 export {
-  getTimezone,
   sanitizeTimezone,
   formatDurationMs,
   formatDurationHoursMinutes,
@@ -16,7 +15,6 @@ export {
 
 // Cache
 export {
-  clearDbQueryCaches,
   AsyncLatchCache,
   lastSyncCache,
   catalogStatusCache,
@@ -29,7 +27,6 @@ export { ensureTablesExist } from "./schema";
 
 // Ingestion & Sync Ledger
 export {
-  getExistingEntityIds,
   recordLastSync,
   getLastSync,
   bulkUpsertArtists,
@@ -68,7 +65,7 @@ export {
 
 // Analytical Dashboard Queries (Modes 1, 2, 3)
 export { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "./overview";
-export { getStreamLog } from "./stream-log";
+export { getStreamLog, getLatestPlay, type LatestPlayRow } from "./stream-log";
 export { getCurrentSession } from "./session";
 
 // Composite Initial Music Data

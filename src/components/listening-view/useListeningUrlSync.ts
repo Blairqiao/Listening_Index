@@ -3,7 +3,7 @@ import type { Mode, RangeKey } from "@/lib/types";
 
 export interface UseListeningUrlSyncParams {
   isAuthenticated: boolean;
-  rangeKeys: RangeKey[];
+  rangeKeys: readonly RangeKey[];
   openModal: () => void;
   setActiveMode: (mode: Mode) => void;
   setActiveRange: (range: RangeKey) => void;

@@ -4,7 +4,11 @@ import React from "react";
 import { ExternalLink } from "lucide-react";
 import { useConfig } from "@/context/ConfigContext";
 
-export const ListeningHeader: React.FC = () => {
+interface ListeningHeaderProps {
+  syncError?: string | null;
+}
+
+export const ListeningHeader: React.FC<ListeningHeaderProps> = ({ syncError }) => {
   const { config } = useConfig();
 
   return (
@@ -20,6 +24,11 @@ export const ListeningHeader: React.FC = () => {
             {config.title}<span className="text-music-accent">.</span>
           </h1>
         </a>
+        {syncError && (
+          <span className="font-mono text-[10px] text-[#FF6B6B] tracking-[0.08em] uppercase">
+            [ {syncError} ]
+          </span>
+        )}
       </div>
 
       {/* Owner Profile / External Link */}

@@ -26,14 +26,14 @@ const AdminSpotifyModal = dynamic(
 import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
-import type { Mode, RangeKey } from "@/lib/types";
+import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
-import {
+import type {
   OverviewData,
   StreamLogData,
   SessionData,
-  type TrackTelemetryStats,
-  type EnrichedTrackItem,
+  TrackTelemetryStats,
+  EnrichedTrackItem,
 } from "@/lib/db/queries";
 import {
   patchOverviewCacheWithEnrichment,
@@ -67,8 +67,7 @@ export interface ActiveEntityCandidate {
 
 export function resolveActiveEntity(
   currentTrack?: { id?: string | null; name?: string; artists?: Array<{ name: string }> } | null,
-  streamLogLatest?: { trackId?: string | null; title?: string | null; artist?: string | null } | null,
-  initialTrack?: { id?: string | null; name?: string | null; artist?: string | null } | null
+  streamLogLatest?: { trackId?: string | null; title?: string | null; artist?: string | null } | null
 ): ActiveEntityCandidate | null {
   if (currentTrack) {
     return {
@@ -85,13 +84,6 @@ export function resolveActiveEntity(
       id: streamLogLatest.trackId || undefined,
       title: streamLogLatest.title || undefined,
       artist: streamLogLatest.artist || undefined,
-    };
-  }
-  if (initialTrack) {
-    return {
-      id: initialTrack.id || undefined,
-      title: initialTrack.name || undefined,
-      artist: initialTrack.artist || undefined,
     };
   }
   return null;
@@ -118,8 +110,6 @@ export function computeLivePlayerMetrics(
     trackStats ? formatPlaysDisplay(trackStats.artist.plays) : fallbackPlays,
   ];
 }
-
-const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
 const STREAM_LOG_DEPTH_KEY = "stream_log_depth";
 const STREAM_LOG_DEPTH_TTL_MS = 20 * 60 * 1000; // 20 minutes
@@ -166,11 +156,6 @@ interface ListeningViewProps {
   initialSession?: SessionData | null;
   initialConfig?: SiteConfigState | null;
   initialVisitorTimezone?: string;
-  initialTrack?: {
-    id?: string;
-    name?: string;
-    artist?: string;
-  } | null;
   isDbConfigured?: boolean;
   initialIsAuthenticated?: boolean;
   initialMode?: Mode;
@@ -181,7 +166,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialOverview,
   initialStreamLog,
   initialSession,
-  initialTrack,
   isDbConfigured = true,
   initialMode = 0,
   initialRange = "1w",
@@ -263,22 +247,25 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, []);
 
   const handleToggleLayout = useCallback(() => {
-    const next: "split" | "stacked" = config.livePlayerLayout === "stacked" ? "split" : "stacked";
-    const nextConfig = { ...config, livePlayerLayout: next };
+    const prevLayout = config.livePlayerLayout;
+    const next: "split" | "stacked" = prevLayout === "stacked" ? "split" : "stacked";
     updateConfig({ livePlayerLayout: next });
-    markAsDeployed(nextConfig);
     void fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ livePlayerLayout: next }),
-    }).then(async (res) => {
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.config) {
-          markAsDeployed(data.config);
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          markAsDeployed(data?.config ?? { ...config, livePlayerLayout: next });
+        } else {
+          updateConfig({ livePlayerLayout: prevLayout });
         }
-      }
-    }).catch(() => { });
+      })
+      .catch(() => {
+        updateConfig({ livePlayerLayout: prevLayout });
+      });
   }, [config, updateConfig, markAsDeployed]);
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
@@ -419,11 +406,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
   const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
 
-  // Active track identification resolved atomically across currentTrack -> streamLog -> initialTrack
+  // Active track identification resolved atomically across currentTrack -> streamLog
   const activeEntity = resolveActiveEntity(
     currentTrack,
-    streamLogState?.entries?.[0],
-    initialTrack
+    streamLogState?.entries?.[0]
   );
   const activeTrackId = activeEntity?.id;
   const activeTrackTitle = activeEntity?.title;
@@ -533,6 +519,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return syncTime ? new Date(syncTime) : null;
   });
   const [syncedAgoStr, setSyncedAgoStr] = useState<string>("JUST NOW");
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Track whether real overview data is ready
   const isDataReady = Boolean(
@@ -840,13 +827,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (!isAuthenticated || isSyncing) return;
     requestGenerationRef.current++;
     setIsSyncing(true);
+    setSyncError(null);
     try {
       const res = await fetch("/api/sync", {
         method: "POST",
         headers: { "Cache-Control": "no-cache" },
       });
-      if (res.ok) {
-        const syncData = await res.json();
+      const syncData = await res.json().catch(() => ({}));
+      if (res.ok && syncData?.success === true) {
+        setSyncError(null);
         const syncTimestamp = syncData.syncedAt
           ? new Date(syncData.syncedAt)
           : new Date();
@@ -863,13 +852,26 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           fetchSession(),
         ]);
 
-        // Invalidate stale non-active ranges in overviewCache so switching to them fetches fresh data
-        if (newOverview && generation === requestGenerationRef.current) {
-          setOverviewCache({ [range]: newOverview });
+        // Keep the patched cache entry for the active range and drop other ranges
+        if (generation === requestGenerationRef.current) {
+          setOverviewCache((prev) => {
+            const activeEntry = prev[range] || newOverview;
+            return activeEntry ? { [range]: activeEntry } : {};
+          });
         }
+      } else {
+        const errorMsg =
+          syncData?.error ||
+          (res.status === 409
+            ? "Sync conflict: not connected"
+            : res.status === 429
+            ? "Sync already in progress"
+            : `Sync failed (${res.status || "error"})`);
+        setSyncError(errorMsg);
       }
     } catch (err) {
       console.error("[SYNC TRIGGER] Error triggering sync:", err);
+      setSyncError("Network error triggering sync");
     } finally {
       setIsSyncing(false);
     }
@@ -1130,7 +1132,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       <main className="max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] flex flex-col justify-between ">
         <div className="flex-1">
           {/* 1. Header Row */}
-          <ListeningHeader />
+          <ListeningHeader syncError={syncError} />
 
           {/* 2. Mode Tabs (Underline active styling) */}
           <ModeTabs
@@ -1154,6 +1156,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSyncing={isSyncing}
             isAuthenticated={isAuthenticated}
             onTriggerSync={handleTriggerSync}
+            syncError={syncError}
             streamLogCount={visibleStreamLogCount ?? (streamLogData.entries.length || loadedPlaysCount)}
             streamLogDateSpan={streamLogDateSpan}
             sessionNumber={selectedSessionNumber}

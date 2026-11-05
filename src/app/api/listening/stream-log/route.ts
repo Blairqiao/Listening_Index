@@ -3,7 +3,7 @@ import { isAuthorizedAdminRequest } from "@/lib/admin-auth";
 import { getStreamLog } from "@/lib/db/queries";
 import { getOrFetchStreamLog } from "@/lib/db/server-cache";
 import { isDbConfigured } from "@/lib/db";
-import { getMockStreamLog } from "@/lib/mock-listening-data";
+import { getMockStreamLog } from "@/lib/mock/stream-log";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";

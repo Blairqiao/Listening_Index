@@ -1,4 +1,4 @@
-import type { RangeKey } from "./mock-listening-data";
+import type { RangeKey } from "./types";
 
 export interface OverviewMetricsRaw {
   totalMs: number;
@@ -60,10 +60,11 @@ export function formatCadenceTooltip(
   const startDate = new Date(bucket.startTime);
   const endDate = new Date(bucket.endTime);
   const playsLabel = `${bucket.count.toLocaleString()} ${bucket.count === 1 ? "play" : "plays"}`;
+  const formatTz = range === "1d" ? tz : "UTC";
 
   if (range === "all") {
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       year: "numeric",
     }).format(startDate);
     return `${year} — ${playsLabel}`;
@@ -71,11 +72,11 @@ export function formatCadenceTooltip(
 
   if (range === "1y") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       month: "short",
     }).format(startDate);
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       year: "numeric",
     }).format(startDate);
     return `${month} ${year} — ${playsLabel}`;
@@ -83,14 +84,14 @@ export function formatCadenceTooltip(
 
   if (range === "6m") {
     const startParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       month: "short",
       day: "2-digit",
       year: "numeric",
     }).formatToParts(startDate);
 
     const endParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       month: "short",
       day: "2-digit",
       year: "numeric",
@@ -112,15 +113,15 @@ export function formatCadenceTooltip(
 
   if (range === "1m") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       month: "short",
     }).format(startDate);
     const day = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       day: "2-digit",
     }).format(startDate);
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       year: "numeric",
     }).format(startDate);
     return `${month} ${day}, ${year} — ${playsLabel}`;
@@ -128,20 +129,20 @@ export function formatCadenceTooltip(
 
   if (range === "1w") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       month: "short",
     }).format(startDate);
     const day = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       day: "2-digit",
     }).format(startDate);
     const startHour = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       hour: "2-digit",
       hour12: false,
     }).format(startDate);
     let endHour = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
+      timeZone: formatTz,
       hour: "2-digit",
       hour12: false,
     }).format(endDate);
@@ -153,7 +154,7 @@ export function formatCadenceTooltip(
 
   // 1d
   const hour = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
+    timeZone: formatTz,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,

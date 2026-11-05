@@ -35,16 +35,17 @@ export const PRESET_COLORS: ColorPreset[] = [
 /**
  * Validates a hex color string (#RGB, #RRGGBB, or #RRGGBBAA).
  */
-export function isValidHex(hex: string): boolean {
+export function isValidHex(hex?: string | null): boolean {
+  if (typeof hex !== "string") return false;
   return /^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(hex.trim());
 }
 
 /**
  * Normalizes any valid hex string into standard 6-character '#RRGGBB' uppercase.
  */
-export function normalizeHex(hex: string, fallback = "#76FF49"): string {
+export function normalizeHex(hex?: string | null, fallback = "#76FF49"): string {
   if (!isValidHex(hex)) return fallback.toUpperCase();
-  const clean = hex.trim().replace(/^#/, "");
+  const clean = hex!.trim().replace(/^#/, "");
   if (clean.length === 3) {
     const r = clean[0] + clean[0];
     const g = clean[1] + clean[1];

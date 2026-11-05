@@ -14,7 +14,13 @@ import {
   beginLoginPopup,
 } from "@/lib/spotify-auth";
 import { getStoredVolume, setStoredVolume, sliderToVolume } from "@/lib/volume-utils";
-import { resolvePlayRequest, shouldToggleInPlace, isSameContext, PlaybackContextSelection } from "@/lib/player-playback";
+import {
+  resolvePlayRequest,
+  shouldToggleInPlace,
+  isSameContext,
+  formatPlayErrorMessage,
+  PlaybackContextSelection,
+} from "@/lib/player-playback";
 import { createSingleFlight } from "@/lib/async-utils";
 import { usePlayerPlaylists, UserPlaylistSummary } from "./player-context/usePlayerPlaylists";
 import { usePlayerInitialContext } from "./player-context/usePlayerInitialContext";
@@ -120,6 +126,33 @@ export function getNextRepeatState(current: number): "off" | "context" | "track"
   return "off";
 }
 
+/** Fetch active player access token from server endpoint. */
+export async function fetchPlayerAccessToken(): Promise<string | null> {
+  try {
+    const tokenRes = await fetch("/api/player/token");
+    const tokenData = await tokenRes.json().catch(() => ({}));
+    return typeof tokenData?.accessToken === "string" ? tokenData.accessToken : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch auto queue track URIs from server endpoint. */
+export async function fetchAutoQueueUris(): Promise<string[] | null> {
+  try {
+    const queueRes = await fetch("/api/player/auto-queue");
+    if (queueRes.ok) {
+      const queueData = await queueRes.json();
+      if (Array.isArray(queueData?.uris) && queueData.uris.length > 0) {
+        return queueData.uris;
+      }
+    }
+  } catch (err) {
+    console.warn("[PLAYER] Failed to fetch auto queue:", err);
+  }
+  return null;
+}
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, openModal } = useConfig();
 
@@ -166,9 +199,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Query Spotify API for active playback device & current track
   const probeActivePlayback = useCallback(async (localId: string | null) => {
     try {
-      const tokenRes = await fetch("/api/player/token");
-      const tokenData = await tokenRes.json().catch(() => ({}));
-      const accessToken = tokenData?.accessToken;
+      const accessToken = await fetchPlayerAccessToken();
       if (!accessToken) return;
 
       const res = await fetch("https://api.spotify.com/v1/me/player", {
@@ -604,9 +635,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     armedContextRef.current = false;
 
     try {
-      const tokenRes = await fetch("/api/player/token");
-      const tokenData = await tokenRes.json().catch(() => ({}));
-      const accessToken = tokenData?.accessToken;
+      const accessToken = await fetchPlayerAccessToken();
       if (!accessToken) {
         setErrorMessage("Could not get access token for transfer.");
         return;
@@ -694,9 +723,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       try {
-        const tokenRes = await fetch("/api/player/token");
-        const tokenData = await tokenRes.json().catch(() => ({}));
-        const accessToken = tokenData?.accessToken;
+        const accessToken = await fetchPlayerAccessToken();
         if (!accessToken) {
           setErrorMessage("Could not get access token for playback.");
           return;
@@ -708,23 +735,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           fallbackTrackUri: initialContext.track?.id || undefined,
           fetchAutoQueue:
             selectedContext.type === "auto"
-              ? async () => {
-                  const queueRes = await fetch("/api/player/auto-queue");
-                  if (queueRes.ok) {
-                    const queueData = await queueRes.json();
-                    if (Array.isArray(queueData?.uris) && queueData.uris.length > 0) {
-                      return queueData.uris;
-                    }
-                  }
-                  return null;
-                }
+              ? fetchAutoQueueUris
               : undefined,
         });
 
         const body = playReq ? JSON.stringify(playReq) : undefined;
 
         const res = await fetch(
-          `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`,
+          `https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`,
           {
             method: "PUT",
             headers: {
@@ -741,16 +759,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         } else {
           armedContextRef.current = true;
           const errData = await res.json().catch(() => ({}));
-          const msg =
-            errData?.error?.message ||
-            (res.status === 403
-              ? "Spotify Premium is required for Web Playback."
-              : res.status === 404
-              ? "No track queued to play. Select a track or enter Spotify URL."
-              : res.status === 429
-              ? "Spotify rate limit reached. Try again shortly."
-              : `Playback failed (${res.status}).`);
-          setErrorMessage(msg);
+          setErrorMessage(formatPlayErrorMessage(res.status, errData, "Playback"));
         }
       } catch (error) {
         armedContextRef.current = true;
@@ -779,26 +788,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Smart trigger: If music is already streaming, immediately switch playback to selected context
       if (state && !state.paused && targetDeviceId) {
         try {
-          const tokenRes = await fetch("/api/player/token");
-          const tokenData = await tokenRes.json().catch(() => ({}));
-          const accessToken = tokenData?.accessToken;
+          const accessToken = await fetchPlayerAccessToken();
           if (!accessToken) return;
 
-          let body: string | undefined;
-          if (ctx.type === "playlist" && ctx.uri) {
-            body = JSON.stringify({ context_uri: ctx.uri });
-          } else if (ctx.type === "auto") {
-            const queueRes = await fetch("/api/player/auto-queue");
-            if (queueRes.ok) {
-              const queueData = await queueRes.json();
-              if (Array.isArray(queueData?.uris) && queueData.uris.length > 0) {
-                body = JSON.stringify({ uris: queueData.uris });
-              }
-            }
-          }
+          const playReq = await resolvePlayRequest({
+            selectedContext: ctx,
+            fetchAutoQueue: ctx.type === "auto" ? fetchAutoQueueUris : undefined,
+          });
 
-          if (body) {
-            const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`, {
+          if (playReq) {
+            const body = JSON.stringify(playReq);
+            const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}`, {
               method: "PUT",
               headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -812,16 +812,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             } else {
               armedContextRef.current = true;
               const errData = await res.json().catch(() => ({}));
-              const msg =
-                errData?.error?.message ||
-                (res.status === 403
-                  ? "Spotify Premium is required for Web Playback."
-                  : res.status === 404
-                  ? "No track queued to play. Select a track or enter Spotify URL."
-                  : res.status === 429
-                  ? "Spotify rate limit reached. Try again shortly."
-                  : `Playback switch failed (${res.status}).`);
-              setErrorMessage(msg);
+              setErrorMessage(formatPlayErrorMessage(res.status, errData, "Playback switch"));
             }
           }
         } catch (e) {
@@ -856,40 +847,48 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleToggleShuffle = useCallback(async () => {
     try {
-      const tokenRes = await fetch("/api/player/token");
-      const tokenData = await tokenRes.json().catch(() => ({}));
-      const accessToken = tokenData?.accessToken;
+      const accessToken = await fetchPlayerAccessToken();
       if (!accessToken) return;
 
       const nextState = !(state?.shuffle ?? false);
-      await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${nextState}`, {
+      const res = await fetch(`https://api.spotify.com/v1/me/player/shuffle?state=${nextState}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setState((prev) => (prev ? { ...prev, shuffle: nextState } : null));
+      if (res.ok || res.status === 204) {
+        setState((prev) => (prev ? { ...prev, shuffle: nextState } : null));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMessage(formatPlayErrorMessage(res.status, errData, "Shuffle"));
+      }
     } catch (e) {
       console.warn("[PLAYER] Failed to toggle shuffle:", e);
+      setErrorMessage(e instanceof Error ? e.message : "Failed to toggle shuffle");
     }
   }, [state?.shuffle]);
 
   const handleCycleRepeat = useCallback(async () => {
     try {
-      const tokenRes = await fetch("/api/player/token");
-      const tokenData = await tokenRes.json().catch(() => ({}));
-      const accessToken = tokenData?.accessToken;
+      const accessToken = await fetchPlayerAccessToken();
       if (!accessToken) return;
 
       const currentMode = state?.repeat_mode ?? 0;
       const nextMode = cycleRepeatMode(currentMode);
       const nextState = getNextRepeatState(currentMode);
 
-      await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${nextState}`, {
+      const res = await fetch(`https://api.spotify.com/v1/me/player/repeat?state=${nextState}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      setState((prev) => (prev ? { ...prev, repeat_mode: nextMode } : null));
+      if (res.ok || res.status === 204) {
+        setState((prev) => (prev ? { ...prev, repeat_mode: nextMode } : null));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMessage(formatPlayErrorMessage(res.status, errData, "Repeat"));
+      }
     } catch (e) {
       console.warn("[PLAYER] Failed to cycle repeat mode:", e);
+      setErrorMessage(e instanceof Error ? e.message : "Failed to cycle repeat mode");
     }
   }, [state?.repeat_mode]);
 

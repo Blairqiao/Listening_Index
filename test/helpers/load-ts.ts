@@ -12,7 +12,11 @@ export function loadTs(file: string, stubs: Record<string, unknown> = {}): Recor
   const nativeRequire=createRequire(absolute);
   const require=(name:string)=>{
     if(Object.hasOwn(stubs,name)) return stubs[name];
-    if(name.startsWith('@/'))return loadTs(`src/${name.slice(2)}.ts`,stubs);
+    if(name.startsWith('@/')) {
+      const rel = `src/${name.slice(2)}`;
+      const target = fs.existsSync(`${rel}.ts`) ? `${rel}.ts` : `${rel}/index.ts`;
+      return loadTs(target, stubs);
+    }
     return nativeRequire(name);
   };
   new Function('require','module','exports','__dirname',source)(require,module,module.exports,path.dirname(absolute));

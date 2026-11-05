@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { EnrichedTrackItem } from "@/lib/db/queries";
+import type { EnrichedTrackItem } from "@/lib/db/queries";
 
 interface DeferredTrackCandidate {
   id: string;
@@ -18,10 +18,6 @@ interface UseDeferredEnrichmentOptions {
 
 // Module-level cache of requested IDs so requests are not repeated across component re-renders
 export const sessionRequestedTrackIds = new Set<string>();
-
-export function clearSessionRequestedTrackIds(): void {
-  sessionRequestedTrackIds.clear();
-}
 
 const QUOTA_REACHED_KEY = "spotify_quota_reached";
 const QUOTA_RESET_AT_KEY = "spotify_quota_reset_at";
@@ -193,27 +189,27 @@ export function useDeferredEnrichment({
           onEnrichedRef.current?.(data.enriched || [], data.delistedIds || []);
         }
 
-        // Release candidate IDs that were not resolved (e.g. rate-limited or transient failure)
-        const resolvedIds = new Set<string>();
-        if (Array.isArray(data.enriched)) {
-          for (const e of data.enriched) {
-            const id = e.requestedId || (e as unknown as { id: string }).id;
-            if (id) resolvedIds.add(id);
-          }
-        }
-        if (Array.isArray(data.delistedIds)) {
-          for (const d of data.delistedIds) {
-            resolvedIds.add(d);
-          }
-        }
-
-        for (const id of pendingCandidates) {
-          if (!resolvedIds.has(id)) {
-            sessionRequestedTrackIds.delete(id);
-          }
-        }
-
         if (data.rateLimited) {
+          // If rate-limited, release unresolved candidate IDs so they can be retried after cooldown
+          const resolvedIds = new Set<string>();
+          if (Array.isArray(data.enriched)) {
+            for (const e of data.enriched) {
+              const id = e.requestedId || (e as unknown as { id: string }).id;
+              if (id) resolvedIds.add(id);
+            }
+          }
+          if (Array.isArray(data.delistedIds)) {
+            for (const d of data.delistedIds) {
+              resolvedIds.add(d);
+            }
+          }
+
+          for (const id of pendingCandidates) {
+            if (!resolvedIds.has(id)) {
+              sessionRequestedTrackIds.delete(id);
+            }
+          }
+
           const cooldownSec = data.retryAfterSeconds || 10;
           if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
           retryTimerRef.current = setTimeout(() => {

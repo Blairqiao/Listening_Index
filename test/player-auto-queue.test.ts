@@ -44,7 +44,7 @@ test("auto-queue SQL query adheres to schema with t.name and t.artist_name (no t
   assert.ok(!content.includes("t.artist,"), "SQL query must not reference non-existent t.artist");
   assert.ok(content.includes("t.name"), "SQL query must select t.name");
   assert.ok(content.includes("artist_name"), "SQL query must select artist_name");
-  assert.ok(content.includes("synthetic:"), "SQL query must exclude synthetic non-Spotify track IDs");
+  assert.ok(!content.includes("synthetic:"), "SQL query does not filter synthetic track IDs");
 });
 
 test("PlayerContext starts Auto Play when selectedContext is auto", () => {

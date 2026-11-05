@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
     response.headers.set("Set-Cookie", cookieHeader);
     return response;
   } catch (err) {
-    const error = err instanceof Error ? err.message : "Unknown error";
+    console.error("[API ERROR · /api/auth/login]", err);
     return NextResponse.json(
-      { success: false, error: "Authentication failed unexpectedly: " + error },
+      { success: false, error: "Authentication failed unexpectedly" },
       { status: 500 }
     );
   }

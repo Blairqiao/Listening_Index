@@ -10,46 +10,7 @@ import { lastSyncCache, catalogStatusCache } from "./cache";
 import type { TrackUpsertItem, PlayInsertItem } from "./types";
 
 /**
- * 6. Retrieves existing artist, album, and track IDs in batch to skip redundant metadata queries.
- */
-export async function getExistingEntityIds(params: {
-  artistIds: string[];
-  albumIds: string[];
-  trackIds: string[];
-}): Promise<{
-  existingArtistIds: Set<string>;
-  existingAlbumIds: Set<string>;
-  existingTrackIds: Set<string>;
-}> {
-  const sql = getDb();
-  const artistsPromise =
-    params.artistIds.length > 0
-      ? sql`SELECT id FROM artists WHERE id = ANY(${params.artistIds}::text[]);`
-      : Promise.resolve([]);
-  const albumsPromise =
-    params.albumIds.length > 0
-      ? sql`SELECT id FROM albums WHERE id = ANY(${params.albumIds}::text[]);`
-      : Promise.resolve([]);
-  const tracksPromise =
-    params.trackIds.length > 0
-      ? sql`SELECT id FROM tracks WHERE id = ANY(${params.trackIds}::text[]);`
-      : Promise.resolve([]);
-
-  const [artists, albums, tracks] = (await Promise.all([
-    artistsPromise,
-    albumsPromise,
-    tracksPromise,
-  ])) ;
-
-  return {
-    existingArtistIds: new Set<string>(artists.map((r) => r.id)),
-    existingAlbumIds: new Set<string>(albums.map((r) => r.id)),
-    existingTrackIds: new Set<string>(tracks.map((r) => r.id)),
-  };
-}
-
-/**
- * 7. Records the most recent sync execution timestamp in daily_api_usage.
+ * Records the most recent sync execution timestamp in daily_api_usage.
  */
 export async function recordLastSync(): Promise<Date> {
   await ensureTablesExist();
@@ -68,7 +29,7 @@ export async function recordLastSync(): Promise<Date> {
 }
 
 /**
- * 8. Retrieves the most recent sync execution timestamp from daily_api_usage.
+ * Retrieves the most recent sync execution timestamp from daily_api_usage.
  * Deduplicates concurrent calls via in-flight promise latch and caches for 15 seconds.
  */
 export async function getLastSync(): Promise<string | undefined> {
@@ -235,69 +196,94 @@ export async function bulkInsertPlays(
   if (plays.length === 0) return { insertedCount: 0 };
   await ensureTablesExist();
 
-  // 1. Check DB boundary for candidate tracks to populate initialLastSeen
-  const candidateTrackIds = Array.from(new Set(plays.map((p) => p.trackId)));
-  const timesMs = plays.map((p) => new Date(p.playedAt).getTime());
-  const maxCandidateDuration = Math.max(30_000, ...plays.map((p) => p.msPlayed || 0));
-  const minTime = new Date(Math.min(...timesMs) - maxCandidateDuration).toISOString();
-  const maxTime = new Date(Math.max(...timesMs) + 30_000).toISOString();
+  // 1. Debounce candidate plays within the incoming batch first
+  const { debounced: batchDebounced } = debouncePlays(plays, 30_000);
+  if (batchDebounced.length === 0) return { insertedCount: 0 };
 
-  const sql = getDb();
-  const existingRecentPlays = (await sql`
-    SELECT track_id, played_at
-    FROM plays
-    WHERE track_id = ANY(${candidateTrackIds}::text[])
-      AND played_at >= ${minTime}::timestamptz
-      AND played_at <= ${maxTime}::timestamptz
-    ;
-  `) as Array<{ track_id: string; played_at: Date | string }>;
-
-  const initialLastSeen = new Map<string, number>();
-  const existingKeys = new Set<string>();
-  for (const ep of existingRecentPlays) {
-    const timestamp = new Date(ep.played_at).getTime();
-    initialLastSeen.set(ep.track_id, Math.max(initialLastSeen.get(ep.track_id) ?? -Infinity, timestamp));
-    existingKeys.add(`${truncateToSeconds(ep.played_at)}::${ep.track_id}`);
-  }
-
-  // 2. Debounce candidate plays with cross-batch continuity
-  const exact = plays.filter(p => existingKeys.has(`${truncateToSeconds(p.playedAt)}::${p.trackId}`));
-  const candidates = plays.filter(p => !existingKeys.has(`${truncateToSeconds(p.playedAt)}::${p.trackId}`));
-  const { debounced: newPlays } = debouncePlays(candidates, 30_000, initialLastSeen);
-  const debounced = [...exact, ...newPlays];
-  if (debounced.length === 0) return { insertedCount: 0 };
-
-  // 3. Deduplicate on truncated UTC seconds in JS to prevent Postgres ON CONFLICT batch error
+  // 2. Truncate to whole seconds and deduplicate on (played_at, track_id) within the batch
   const seen = new Map<string, PlayInsertItem>();
-  for (const p of debounced) {
+  for (const p of batchDebounced) {
     const truncated = truncateToSeconds(p.playedAt);
     const key = `${truncated}::${p.trackId}`;
     const previous = seen.get(key);
-    seen.set(key, { ...p, playedAt: truncated, msPlayed: Math.max(previous?.msPlayed || 0, p.msPlayed) });
+    seen.set(key, {
+      ...p,
+      playedAt: truncated,
+      msPlayed: Math.max(previous?.msPlayed || 0, p.msPlayed || 0),
+    });
   }
 
-  // Sort by (played_at, track_id) to enforce deterministic lock ordering and prevent deadlocks
+  // Sort deterministically by (played_at, track_id) to enforce lock ordering and prevent deadlocks
   const deduped = Array.from(seen.values()).sort(
     (a, b) => a.playedAt.localeCompare(b.playedAt) || a.trackId.localeCompare(b.trackId)
   );
 
   const playedAts = deduped.map((p) => p.playedAt);
   const trackIds = deduped.map((p) => p.trackId);
-  const msPlayeds = deduped.map((p) => Math.max(0, Math.round(p.msPlayed)));
+  const msPlayeds = deduped.map((p) => Math.max(0, Math.round(p.msPlayed || 0)));
 
-  const inserted = ((await sql`
-    INSERT INTO plays (played_at, track_id, ms_played)
-    SELECT u.played_at::timestamptz, u.track_id, u.ms_played
-    FROM UNNEST(
-      ${playedAts}::text[],
-      ${trackIds}::text[],
-      ${msPlayeds}::int[]
-    ) AS u(played_at, track_id, ms_played)
-    ON CONFLICT (played_at, track_id) DO UPDATE SET
-      ms_played = GREATEST(plays.ms_played, EXCLUDED.ms_played)
-    RETURNING (xmax = 0) AS was_inserted;
-  `));
+  const sql = getDb();
 
-  const insertedCount = inserted.filter((r) => Boolean(r.was_inserted)).length;
+  // 3. Race-safe insert and duration merge. The advisory locks are taken in a
+  // separate statement first: under READ COMMITTED each statement gets a fresh
+  // snapshot, so the insert sees any Play a concurrent import committed before
+  // releasing its lock. A lock inside the insert statement would not.
+  const distinctTrackIds = Array.from(new Set(trackIds)).sort();
+  const [, insertedResult] = (await sql.transaction([
+    sql`
+      SELECT pg_advisory_xact_lock(hashtext(st.t))
+      FROM (SELECT t FROM UNNEST(${distinctTrackIds}::text[]) AS s(t) ORDER BY t) AS st;
+    `,
+    sql`
+    WITH candidates AS (
+      SELECT
+        u.played_at::timestamptz AS played_at,
+        u.track_id,
+        u.ms_played
+      FROM UNNEST(
+        ${playedAts}::text[],
+        ${trackIds}::text[],
+        ${msPlayeds}::int[]
+      ) AS u(played_at, track_id, ms_played)
+    ),
+    updated AS (
+      UPDATE plays p
+      SET ms_played = GREATEST(p.ms_played, c_agg.max_ms)
+      FROM (
+        SELECT
+          p.id AS play_id,
+          MAX(c.ms_played) AS max_ms
+        FROM plays p
+        JOIN candidates c ON p.track_id = c.track_id
+          AND (
+            p.played_at = c.played_at
+            OR ABS(EXTRACT(EPOCH FROM (p.played_at - c.played_at))) * 1000 < GREATEST(30000, ROUND(GREATEST(COALESCE(p.ms_played, 0), COALESCE(c.ms_played, 0)) * 0.90))
+          )
+        GROUP BY p.id
+      ) c_agg
+      WHERE p.id = c_agg.play_id
+      RETURNING p.id
+    ),
+    inserted AS (
+      INSERT INTO plays (played_at, track_id, ms_played)
+      SELECT c.played_at, c.track_id, c.ms_played
+      FROM candidates c
+      WHERE NOT EXISTS (
+        SELECT 1 FROM plays p
+        WHERE p.track_id = c.track_id
+          AND (
+            p.played_at = c.played_at
+            OR ABS(EXTRACT(EPOCH FROM (p.played_at - c.played_at))) * 1000 < GREATEST(30000, ROUND(GREATEST(COALESCE(p.ms_played, 0), COALESCE(c.ms_played, 0)) * 0.90))
+          )
+      )
+      ON CONFLICT (played_at, track_id) DO UPDATE SET
+        ms_played = GREATEST(plays.ms_played, EXCLUDED.ms_played)
+      RETURNING (xmax = 0) AS was_inserted
+    )
+    SELECT COUNT(*)::int AS inserted_count FROM inserted WHERE was_inserted;
+  `,
+  ])) as [unknown, Array<{ inserted_count?: number | string }>];
+
+  const insertedCount = Number(insertedResult[0]?.inserted_count ?? 0);
   return { insertedCount };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectLocalTimezone, isValidIanaTimezone, syncLocalTimezoneCookie } from "../src/lib/timezone-utils";
+import { detectLocalTimezone, isValidIanaTimezone, syncLocalTimezoneCookie, parseTimezoneCookie } from "../src/lib/timezone-utils";
 
 test("isValidIanaTimezone validates valid and invalid IANA timezone identifiers", () => {
   assert.equal(isValidIanaTimezone("America/Chicago"), true);
@@ -42,3 +42,13 @@ test("syncLocalTimezoneCookie sets listening_timezone cookie in document", () =>
     (globalThis as { document?: unknown }).document = originalDocument;
   }
 });
+
+test("parseTimezoneCookie safely decodes cookie values and handles malformed strings", () => {
+  assert.equal(parseTimezoneCookie("America%2FChicago"), "America/Chicago");
+  assert.equal(parseTimezoneCookie("Asia/Tokyo"), "Asia/Tokyo");
+  assert.equal(parseTimezoneCookie("%E0%A4%A"), undefined);
+  assert.equal(parseTimezoneCookie(""), undefined);
+  assert.equal(parseTimezoneCookie(undefined), undefined);
+  assert.equal(parseTimezoneCookie(null), undefined);
+});
+

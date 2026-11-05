@@ -180,7 +180,6 @@ test("isOwnerSpotifyConfigured and resolveCredentials support database tokens wi
       clientId: "test-client-id",
       clientSecret: "test-client-secret",
       refreshToken: "mock-db-refresh-token",
-      fromDatabase: true,
       displayName: "Test Owner",
       revision: "0",
     });

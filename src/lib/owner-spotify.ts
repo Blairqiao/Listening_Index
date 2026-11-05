@@ -4,8 +4,6 @@ import { isDbConfigured } from "@/lib/db";
 import {
   getOwnerPlaybackCredential,
   rotateOwnerPlaybackToken,
-  saveOwnerPlaybackToken,
-  deleteOwnerPlaybackToken,
 } from "@/lib/db/queries/config";
 
 export interface OwnerCredential {
@@ -35,16 +33,6 @@ export async function getOwnerCredential(): Promise<OwnerCredential | null> {
   return getOwnerPlaybackCredential();
 }
 
-export async function saveOwnerCredential(
-  refreshToken: string,
-  displayName: string | null = null
-): Promise<void> {
-  await saveOwnerPlaybackToken(refreshToken, displayName);
-}
-
-export async function clearOwnerCredential(): Promise<void> {
-  await deleteOwnerPlaybackToken();
-}
 
 export async function rotateOwnerCredential(
   credential: OwnerCredential,

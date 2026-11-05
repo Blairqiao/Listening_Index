@@ -119,7 +119,7 @@ export function isAuthorizedAdminRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const bearer = authHeader.slice(7).trim();
-    if (verifySessionToken(bearer) || verifyAdminPassword(bearer)) {
+    if (verifySessionToken(bearer)) {
       return true;
     }
   }
