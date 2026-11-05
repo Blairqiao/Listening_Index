@@ -30,7 +30,6 @@ export interface EnrichmentBatchResult {
   progress: {
     pending: number;
     enriched: number;
-    delisted: number;
     total: number;
   };
 }
@@ -74,7 +73,7 @@ export async function runEnrichmentBatch(
         enrichedCount: 0,
         delistedCount: 0,
         isComplete: false,
-        progress: { pending: 0, enriched: 0, delisted: 0, total: 0 },
+        progress: { pending: 0, enriched: 0, total: 0 },
       };
     }
     return {

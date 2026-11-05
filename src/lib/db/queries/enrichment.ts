@@ -7,7 +7,6 @@ import type { EnrichedTrackItem } from "./types";
 export async function getEnrichmentProgress(): Promise<{
   pending: number;
   enriched: number;
-  delisted: number;
   total: number;
 }> {
   await ensureTablesExist();
@@ -16,14 +15,12 @@ export async function getEnrichmentProgress(): Promise<{
     SELECT 
       COUNT(*) FILTER (WHERE enrichment_status = 'pending')::int AS pending,
       COUNT(*) FILTER (WHERE enrichment_status = 'enriched')::int AS enriched,
-      0::int AS delisted,
       COUNT(*)::int AS total
     FROM tracks;
   `));
   return {
     pending: rows[0]?.pending ?? 0,
     enriched: rows[0]?.enriched ?? 0,
-    delisted: 0,
     total: rows[0]?.total ?? 0,
   };
 }
