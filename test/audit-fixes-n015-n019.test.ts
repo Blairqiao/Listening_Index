@@ -350,10 +350,8 @@ test("N015: handleTriggerSync checks res.ok and body.success and keeps patched o
     "handleTriggerSync must preserve prev[range] for the active range"
   );
 
-  // Must handle 409 and 429
-  assert.ok(
-    syncFn.includes("409") && syncFn.includes("429"),
-    "handleTriggerSync must handle 409 conflict and 429 rate limit statuses"
-  );
+  // 409 means not connected. There is no 429 any more: the per-instance sync lock was removed.
+  assert.ok(syncFn.includes("409"), "handleTriggerSync must handle the 409 not-connected status");
+  assert.ok(!syncFn.includes("429"), "handleTriggerSync must not expect a 429 sync-in-progress status");
 });
 

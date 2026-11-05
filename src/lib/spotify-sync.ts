@@ -33,22 +33,14 @@ export interface SyncResult {
  */
 export async function syncSpotify(): Promise<SyncResult> {
   const startTime = performance.now();
-  console.log("------------------------------------------------------------");
-  console.log("[ETL · SPOTIFY SYNC] Ingestion run initiated");
-  console.log(`[TIMESTAMP] ${new Date().toISOString()}`);
-  console.log("------------------------------------------------------------");
 
   try {
     // 0. Ensure database tables exist (self-healing for fresh deployments)
-    console.log("[0/3] Verifying database schema...");
     await ensureTablesExist();
 
     // 1. Fetch Recently Played Tracks
-    console.log("[1/3] Fetching recently played tracks from Spotify Web API...");
     // No after cursor: the endpoint only returns the latest 50, and bulkInsertPlays dedupes overlap.
     const recentlyPlayed = await fetchRecentlyPlayed(50);
-    const rawCount = recentlyPlayed.items.length;
-    console.log(`      Received ${rawCount} items from Spotify cursor`);
 
     // 2. Filter out local audio files and malformed payloads
     const streamItems = recentlyPlayed.items.filter((item) => {
@@ -61,14 +53,7 @@ export async function syncSpotify(): Promise<SyncResult> {
       return !isLocal && hasArtist && hasAlbum && hasId;
     });
 
-    const skippedLocalCount = rawCount - streamItems.length;
-    if (skippedLocalCount > 0) {
-      console.log(`      Filtered out ${skippedLocalCount} local/malformed items`);
-    }
-    console.log(`      Valid stream events to process: ${streamItems.length}`);
-
     if (streamItems.length === 0) {
-      console.log("[INFO] No external streaming events found in batch. Exiting.");
       await recordLastSync();
       return {
         processed: 0,
@@ -80,7 +65,7 @@ export async function syncSpotify(): Promise<SyncResult> {
     const reversedItems = [...streamItems].reverse();
 
     // 2c. Debounce rapid duplicate stream events (< 30s gap or < track duration per track)
-    const { debounced: newStreamItems, droppedCount: debouncedDuplicatesCount } = debouncePlays(
+    const { debounced: newStreamItems } = debouncePlays(
       reversedItems.map((item) => ({
         ...item,
         playedAt: item.played_at,
@@ -89,10 +74,6 @@ export async function syncSpotify(): Promise<SyncResult> {
       })),
       30_000
     );
-
-    if (debouncedDuplicatesCount > 0) {
-      console.log(`      Debounced ${debouncedDuplicatesCount} rapid duplicate/resumption stream events`);
-    }
 
     // 2d. Gather candidate artists, albums, and tracks from the batch
     const candidateArtistIds = new Set<string>();
@@ -108,21 +89,13 @@ export async function syncSpotify(): Promise<SyncResult> {
       if (track?.id) candidateTrackIds.add(track.id);
     }
 
-    console.log(
-      `      Entities in batch: ${candidateArtistIds.size} artists, ` +
-        `${candidateAlbumIds.size} albums, ` +
-        `${candidateTrackIds.size} tracks`
-    );
-
     // 3. Foreign-Key Cascade Ingestion
-    console.log("[2/3] Ingesting entities in strict foreign-key order...");
 
     // 3a. Bulk Upsert Artists
     const artistsToUpsert = Array.from(candidateArtistIds).map((id) => {
       const item = newStreamItems.find((i) => i.track.artists[0].id === id)!;
       return { id, name: item.track.artists[0].name };
     });
-    const artistsUpserted = artistsToUpsert.length;
     await bulkUpsertArtists(artistsToUpsert);
 
     // 3b. Bulk Upsert Albums
@@ -137,7 +110,6 @@ export async function syncSpotify(): Promise<SyncResult> {
         artistId: item.track.artists[0].id,
       };
     });
-    const albumsUpserted = albumsToUpsert.length;
     await bulkUpsertAlbums(albumsToUpsert);
 
     // 3c. Bulk Upsert Tracks
@@ -155,7 +127,6 @@ export async function syncSpotify(): Promise<SyncResult> {
         enrichmentStatus: "enriched",
       };
     });
-    const tracksUpserted = tracksToUpsert.length;
     await bulkUpsertTracks(tracksToUpsert);
 
     // 3d. Bulk Insert Plays
@@ -169,51 +140,19 @@ export async function syncSpotify(): Promise<SyncResult> {
 
     // Run quota-budgeted cron micro-enrichment
     try {
-      console.log("[2b/3] Running quota-budgeted cron micro-enrichment (up to 14 calls)...");
-      const cronEnrichmentResult = await runEnrichmentBatch({ bucket: "cron" });
-      if (cronEnrichmentResult.enrichedCount > 0 || cronEnrichmentResult.delistedCount > 0) {
-        console.log(
-          `      ✓ Cron micro-enrichment: ${cronEnrichmentResult.enrichedCount} tracks enriched, ${cronEnrichmentResult.delistedCount} delisted (${cronEnrichmentResult.progress.pending} pending remaining)`
-        );
-      } else if (cronEnrichmentResult.quotaReached) {
-        console.log("      ℹ Cron micro-enrichment paused: daily quota limit reached");
-      } else {
-        console.log("      ℹ Cron micro-enrichment idle: no pending tracks to enrich");
-      }
+      await runEnrichmentBatch({ bucket: "cron" });
     } catch (enrichErr: unknown) {
       const msg = enrichErr instanceof Error ? enrichErr.message : String(enrichErr);
-      console.warn(`      [WARN] Cron micro-enrichment skipped: ${msg}`);
+      console.warn(`[spotify-sync] Cron enrichment skipped: ${msg}`);
     }
 
-    console.log(`      ✓ Upserted ${artistsUpserted} artist entities`);
-    console.log(`      ✓ Upserted ${albumsUpserted} album entities`);
-    console.log(`      ✓ Upserted ${tracksUpserted} track entities`);
-    console.log(`      ✓ Ingested ${playsIngested} play events`);
-
-    // 4. Summary Telemetry
     const durationMs = Number((performance.now() - startTime).toFixed(1));
-    console.log("[3/3] Ingestion cycle successfully completed.");
-    console.log("------------------------------------------------------------");
-    console.log(
-      `[SUMMARY] Processed ${playsIngested} plays (${artistsUpserted} artists, ${albumsUpserted} albums, ${tracksUpserted} tracks) in ${durationMs}ms`
-    );
-    console.log("------------------------------------------------------------");
 
     await recordLastSync();
     return { processed: playsIngested, durationMs };
   } catch (error: unknown) {
     const durationMs = Number((performance.now() - startTime).toFixed(1));
-    console.error("------------------------------------------------------------");
-    console.error(`[ERROR · ETL FAILED] Execution halted after ${durationMs}ms`);
-    if (error instanceof Error) {
-      console.error(`[MESSAGE] ${error.message}`);
-      if (error.stack) {
-        console.error(`[STACK]\n${error.stack}`);
-      }
-    } else {
-      console.error("[UNKNOWN ERROR]", error);
-    }
-    console.error("------------------------------------------------------------");
+    console.error(`[spotify-sync] Failed after ${durationMs}ms:`, error);
     throw error;
   }
 }
