@@ -2,10 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("PlayerContext exports selectedContext, selectContext, contextName, and userPlaylists", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   assert.ok(
     content.includes("selectedContext"),
@@ -53,7 +54,7 @@ test("LivePlayerView renders the context selector with Auto Play, user playlists
 
 test("ListeningView and LivePlayerView prevent stacked view controls from getting pushed out of bounds", () => {
   const listeningViewPath = path.resolve(__dirname, "../src/components/ListeningView.tsx");
-  const listeningViewContent = fs.readFileSync(listeningViewPath, "utf-8");
+  const listeningViewContent = readModuleSource(listeningViewPath);
 
   assert.ok(
     listeningViewContent.includes("activeMode === 3") &&

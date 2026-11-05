@@ -181,7 +181,7 @@ test("N006: teardownPlayer releases connectingRef lock so subsequent connectPlay
       getStoredVolume: () => 100,
       setStoredVolume: () => undefined,
     },
-    "./player-context/useSpotifySdk": {
+    "./useSpotifySdk": {
       loadSpotifySdk: () => {
         connectCallCount++;
         return new Promise<void>((resolve) => {

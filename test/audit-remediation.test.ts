@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
 import { NextRequest } from "next/server";
+import { readModuleSource } from "./helpers/module-source";
 
 const root = path.resolve(__dirname, "..");
 
@@ -77,7 +78,7 @@ test("TASK-2: POST /api/upload/enrich does not require admin authorization (F8)"
 });
 
 test("TASK-2: Manual sync UI button is admin-locked in ListeningView, ListeningFooter, and ControlRow (F11)", () => {
-  const listeningView = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
+  const listeningView = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
   const listeningFooter = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
   const controlRow = fs.readFileSync(path.join(root, "src/components/listening-view/ControlRow.tsx"), "utf-8");
 
@@ -194,11 +195,8 @@ test("TASK-4: Obsolete files deleted and types.ts deduplicated (F9)", () => {
 });
 
 test("TASK-5: Duplicate query param useEffect consolidated, labels updated, hint preserved (F15)", () => {
-  const listeningView = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
-  const urlSyncHook = fs.existsSync(path.join(root, "src/components/listening-view/useListeningUrlSync.ts"))
-    ? fs.readFileSync(path.join(root, "src/components/listening-view/useListeningUrlSync.ts"), "utf-8")
-    : "";
-  const combined = listeningView + urlSyncHook;
+  // Includes the listening-view hooks, useListeningUrlSync among them
+  const combined = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
   const searchMatches = combined.match(/window\.location\.search/g) || [];
   assert.equal(
     searchMatches.length,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { ListeningHeader } from "@/components/listening-view/ListeningHeader";
 import { ModeTabs } from "@/components/listening-view/ModeTabs";
@@ -27,129 +27,27 @@ import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLogi
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
-import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
-import { overviewRefreshOrder } from "./listening-view/listening-helpers";
-import type {
-  OverviewData,
-  StreamLogData,
-  SessionData,
-  TrackTelemetryStats,
-  EnrichedTrackItem,
-} from "@/lib/db/queries";
-import {
-  patchOverviewCacheWithEnrichment,
-  patchStreamLogWithEnrichment,
-  patchSessionWithEnrichment,
-  type EnrichmentPatchData,
-} from "@/lib/enrichment-patch";
+import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
-  formatRankDisplay,
-  formatPlaysDisplay,
   formatStreamLogDateSpan,
 } from "@/lib/format-utils";
-
-export function getTrackStatsCacheKey(params: {
-  trackId?: string | null;
-  title?: string | null;
-  artist?: string | null;
-}): string {
-  return `${params.trackId || ""}:${params.title || ""}:${params.artist || ""}`;
-}
-
-export interface ActiveEntityCandidate {
-  id?: string;
-  title?: string;
-  artist?: string;
-}
-
-export function resolveActiveEntity(
-  currentTrack?: { id?: string | null; name?: string; artists?: Array<{ name: string }> } | null,
-  streamLogLatest?: { trackId?: string | null; title?: string | null; artist?: string | null } | null
-): ActiveEntityCandidate | null {
-  if (currentTrack) {
-    return {
-      id: currentTrack.id || undefined,
-      title: currentTrack.name || undefined,
-      artist:
-        currentTrack.artists?.map((a) => a.name).join(", ") ||
-        currentTrack.artists?.[0]?.name ||
-        undefined,
-    };
-  }
-  if (streamLogLatest) {
-    return {
-      id: streamLogLatest.trackId || undefined,
-      title: streamLogLatest.title || undefined,
-      artist: streamLogLatest.artist || undefined,
-    };
-  }
-  return null;
-}
-
-export function computeLivePlayerMetrics(
-  trackStats: TrackTelemetryStats | null,
-  trackRankFormat: "rank" | "percentile" = "rank",
-  artistRankFormat: "rank" | "percentile" = "rank",
-  fallbackPlays = "--"
-): [string, string, string, string] {
-  return [
-    formatRankDisplay(
-      trackStats?.track?.rank ?? null,
-      trackStats?.track?.totalTracks ?? 0,
-      trackRankFormat
-    ),
-    trackStats ? formatPlaysDisplay(trackStats.track.plays) : fallbackPlays,
-    formatRankDisplay(
-      trackStats?.artist?.rank ?? null,
-      trackStats?.artist?.totalArtists ?? 0,
-      artistRankFormat
-    ),
-    trackStats ? formatPlaysDisplay(trackStats.artist.plays) : fallbackPlays,
-  ];
-}
-
-const STREAM_LOG_DEPTH_KEY = "stream_log_depth";
-const STREAM_LOG_DEPTH_TTL_MS = 20 * 60 * 1000; // 20 minutes
-
-function getCachedStreamLogDepth(): number {
-  if (typeof window === "undefined") return 50;
-  try {
-    const raw = localStorage.getItem(STREAM_LOG_DEPTH_KEY);
-    if (!raw) return 50;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.count === "number" && typeof parsed.timestamp === "number") {
-      if (Date.now() - parsed.timestamp < STREAM_LOG_DEPTH_TTL_MS) {
-        return Math.max(50, parsed.count);
-      }
-    }
-  } catch (error) {
-    console.error("[STREAM LOG DEPTH] Error reading cached depth:", error);
-  }
-  return 50;
-}
-
-function setCachedStreamLogDepth(count: number) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      STREAM_LOG_DEPTH_KEY,
-      JSON.stringify({ count, timestamp: Date.now() })
-    );
-  } catch (error) {
-    console.error("[STREAM LOG DEPTH] Error setting cached depth:", error);
-  }
-}
-
-export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
-  if (mode === 3 && !isAuthenticated) {
-    return 0;
-  }
-  return mode;
-}
+import { useListeningUrlSync } from "./listening-view/useListeningUrlSync";
+import { useListeningData } from "./listening-view/useListeningData";
+import { useListeningSync } from "./listening-view/useListeningSync";
+import { usePersistedToggle } from "./listening-view/usePersistedToggle";
+import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
+import { useTrackStats } from "./listening-view/useTrackStats";
+import {
+  computeLivePlayerMetrics,
+  resolveActiveEntity,
+  sanitizeActiveMode,
+  EMPTY_OVERVIEW,
+  EMPTY_STREAM_LOG,
+} from "./listening-view/listening-helpers";
 
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
@@ -184,51 +82,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     openAdminSpotifyModal,
   } = useConfig();
 
-  const [spotifyStatus, setSpotifyStatus] = useState<{
-    connected: boolean;
-    isExpiringSoon: boolean;
-    daysRemaining?: number | null;
-    displayName?: string | null;
-  } | null>(null);
+  const spotifyStatus = useSpotifyStatus(isAuthenticated, isAdminSpotifyModalOpen);
 
-  // Fetch owner Spotify status when authenticated
-  const fetchSpotifyStatus = useCallback(async () => {
-    if (!isAuthenticated) {
-      setSpotifyStatus(null);
-      return;
-    }
-    try {
-      const res = await fetch("/api/owner/spotify", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setSpotifyStatus({
-          connected: Boolean(data.connected),
-          isExpiringSoon: Boolean(data.isExpiringSoon),
-          daysRemaining: typeof data.daysRemaining === "number" ? data.daysRemaining : null,
-          displayName: data.displayName || null,
-        });
-      }
-    } catch (err) {
-      console.warn("[SPOTIFY STATUS] Error probing status:", err);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      void fetchSpotifyStatus();
-    } else {
-      setSpotifyStatus(null);
-    }
-  }, [isAuthenticated, fetchSpotifyStatus]);
-
-  // When AdminSpotifyModal closes, re-fetch status to ensure prompts immediately reflect updates
-  const prevAdminSpotifyModalOpenRef = useRef(isAdminSpotifyModalOpen);
-  useEffect(() => {
-    if (prevAdminSpotifyModalOpenRef.current && !isAdminSpotifyModalOpen && isAuthenticated) {
-      void fetchSpotifyStatus();
-    }
-    prevAdminSpotifyModalOpenRef.current = isAdminSpotifyModalOpen;
-  }, [isAdminSpotifyModalOpen, isAuthenticated, fetchSpotifyStatus]);
   const {
     currentTrack,
     checkTokenStatus,
@@ -236,8 +91,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     playerStatus,
     handleTransferPlayback,
   } = usePlayer();
-  const tzRef = useRef<string>(visitorTimezone);
-  const requestGenerationRef = useRef(0);
+
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(initialMode, isAuthenticated));
 
@@ -279,328 +133,76 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }
   }, [isAuthenticated, activeMode]);
 
-  // Mode 3 rank format state: "rank" | "percentile", default "rank"
-  const [trackRankFormat, setTrackRankFormat] = useState<"rank" | "percentile">("rank");
-  const [artistRankFormat, setArtistRankFormat] = useState<"rank" | "percentile">("rank");
+  const [trackRankFormat, handleToggleTrackRank] = usePersistedToggle(
+    "listening_track_rank_format",
+    ["rank", "percentile"] as const
+  );
+  const [artistRankFormat, handleToggleArtistRank] = usePersistedToggle(
+    "listening_artist_rank_format",
+    ["rank", "percentile"] as const
+  );
+  const [overviewTimeUnit, handleToggleTimeUnit] = usePersistedToggle(
+    "listening_overview_time_unit",
+    ["minutes", "hours"] as const
+  );
 
-  useEffect(() => {
-    try {
-      const savedTrack = localStorage.getItem("listening_track_rank_format");
-      if (savedTrack === "rank" || savedTrack === "percentile") {
-        setTrackRankFormat(savedTrack);
-      }
-      const savedArtist = localStorage.getItem("listening_artist_rank_format");
-      if (savedArtist === "rank" || savedArtist === "percentile") {
-        setArtistRankFormat(savedArtist);
-      }
-    } catch (error) {
-      console.error("[LISTENING VIEW] Error reading cached rank formats:", error);
-    }
-  }, []);
-
-  const handleToggleTrackRank = useCallback(() => {
-    setTrackRankFormat((prev) => {
-      const next = prev === "rank" ? "percentile" : "rank";
-      try {
-        localStorage.setItem("listening_track_rank_format", next);
-      } catch (error) {
-        console.error("[LISTENING VIEW] Error setting cached track rank format:", error);
-      }
-      return next;
-    });
-  }, []);
-
-  const handleToggleArtistRank = useCallback(() => {
-    setArtistRankFormat((prev) => {
-      const next = prev === "rank" ? "percentile" : "rank";
-      try {
-        localStorage.setItem("listening_artist_rank_format", next);
-      } catch (error) {
-        console.error("[LISTENING VIEW] Error setting cached artist rank format:", error);
-      }
-      return next;
-    });
-  }, []);
-
-  // Range state: "1d" | "1w" | "1m" | "6m" | "1y" | "all"
-  const [activeRange, setActiveRange] = useState<RangeKey>(initialRange);
-  // Displayed range stays frozen until the new range dataset has been fetched and cached
-  const [displayedRange, setDisplayedRange] = useState<RangeKey>(initialRange);
-
-  // Overview time unit state: "minutes" | "hours", initialized to "minutes" for SSR consistency
-  const [overviewTimeUnit, setOverviewTimeUnit] = useState<"minutes" | "hours">("minutes");
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("listening_overview_time_unit");
-      if (saved === "hours" || saved === "minutes") {
-        setOverviewTimeUnit(saved);
-      }
-    } catch (error) {
-      console.error("[LISTENING VIEW] Error reading cached overview time unit:", error);
-    }
-  }, []);
-
-  const handleToggleTimeUnit = useCallback(() => {
-    setOverviewTimeUnit((prev) => {
-      const next = prev === "minutes" ? "hours" : "minutes";
-      try {
-        localStorage.setItem("listening_overview_time_unit", next);
-      } catch (error) {
-        console.error("[LISTENING VIEW] Error setting cached overview time unit:", error);
-      }
-      return next;
-    });
-  }, []);
-
-  // In-memory client cache per range key to eliminate flash and jitter on range toggling
-  const [overviewCache, setOverviewCache] = useState<Partial<Record<RangeKey, OverviewData>>>(() => {
-    const initial: Partial<Record<RangeKey, OverviewData>> = {};
-    if (initialOverview) {
-      if ("1d" in initialOverview || "1w" in initialOverview) {
-        return { ...(initialOverview as Record<RangeKey, OverviewData>) };
-      }
-      initial[initialRange] = initialOverview as OverviewData;
-    }
-    return initial;
+  const {
+    activeRange,
+    setActiveRange,
+    displayedRange,
+    setDisplayedRange,
+    isRangeLoading,
+    selectRange,
+    activeRangeRef,
+    requestGenerationRef,
+    overviewCache,
+    overviewCacheRef,
+    streamLogState,
+    loadedPlaysCount,
+    isLoadingMorePlays,
+    sessionState,
+    lastSyncedAt,
+    setLastSyncedAt,
+    handleCentralEnriched,
+    fetchOverview,
+    fetchStreamLog,
+    fetchSession,
+    handleLoadMoreStreamLog,
+  } = useListeningData({
+    initialOverview,
+    initialStreamLog,
+    initialSession,
+    initialRange,
+    visitorTimezone,
   });
 
-  // Active range ref to guard against race conditions on fast switching
-  const activeRangeRef = React.useRef<RangeKey>(activeRange);
-  useEffect(() => {
-    activeRangeRef.current = activeRange;
-  }, [activeRange]);
-
-  const overviewCacheRef = React.useRef(overviewCache);
-  useEffect(() => {
-    overviewCacheRef.current = overviewCache;
-  }, [overviewCache]);
-
-  // Manual sync state
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-
-  // Dynamic API state (seeded from server props)
-  const [streamLogState, setStreamLogState] = useState<StreamLogData | null>(() => {
-    return initialStreamLog || null;
+  const { isSyncing, syncError, syncedAgoStr, handleTriggerSync, handleUploadComplete } = useListeningSync({
+    isAuthenticated,
+    activeRangeRef,
+    requestGenerationRef,
+    fetchOverview,
+    fetchStreamLog,
+    fetchSession,
+    lastSyncedAt,
+    setLastSyncedAt,
   });
-  const [loadedPlaysCount, setLoadedPlaysCount] = useState<number>(() => {
-    return initialStreamLog?.entries?.length || 50;
-  });
+
   const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       return Math.min(25, initialStreamLog?.entries?.length || 25);
     }
     return null;
   });
-  const loadedPlaysCountRef = useRef<number>(loadedPlaysCount);
-  useEffect(() => {
-    loadedPlaysCountRef.current = loadedPlaysCount;
-  }, [loadedPlaysCount]);
 
-  const [isLoadingMorePlays, setIsLoadingMorePlays] = useState<boolean>(false);
-
-  const [sessionState, setSessionState] = useState<SessionData | null>(() => {
-    return initialSession || null;
-  });
-
-  // In-memory track stats cache to avoid re-fetching on already-seen tracks
-  const trackStatsCacheRef = useRef<Map<string, TrackTelemetryStats>>(new Map());
-  const [trackStats, setTrackStats] = useState<TrackTelemetryStats | null>(null);
-
-  // Active track identification resolved atomically across currentTrack -> streamLog
-  const activeEntity = resolveActiveEntity(
-    currentTrack,
-    streamLogState?.entries?.[0]
-  );
-  const activeTrackId = activeEntity?.id;
-  const activeTrackTitle = activeEntity?.title;
-  const activeTrackArtist = activeEntity?.artist;
-
-  useEffect(() => {
-    if (!activeTrackId && !activeTrackTitle && !activeTrackArtist) {
-      setTrackStats(null);
-      return;
-    }
-
-    const key = getTrackStatsCacheKey({
-      trackId: activeTrackId,
-      title: activeTrackTitle,
-      artist: activeTrackArtist,
-    });
-
-    const cached = trackStatsCacheRef.current.get(key);
-    if (cached) {
-      setTrackStats(cached);
-      return;
-    }
-
-    // Reset track stats on cache miss when initiating a new fetch so stale stats from the previous track don't linger while loading
-    setTrackStats(null);
-
-    let isSubscribed = true;
-    const params = new URLSearchParams();
-    if (activeTrackId) params.set("trackId", activeTrackId);
-    if (activeTrackTitle) params.set("title", activeTrackTitle);
-    if (activeTrackArtist) params.set("artist", activeTrackArtist);
-
-    fetch(`/api/listening/track-stats?${params.toString()}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<TrackTelemetryStats>;
-      })
-      .then((data) => {
-        if (!isSubscribed) return;
-        trackStatsCacheRef.current.set(key, data);
-        setTrackStats(data);
-      })
-      .catch((err) => {
-        console.error("[TRACK STATS FETCH] Error loading stats:", err);
-      });
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [activeTrackId, activeTrackTitle, activeTrackArtist]);
-
-  // Session-accumulated enrichment overlays and delisted IDs to persist artwork across mode and range switches
-  const enrichmentOverlayRef = useRef<Map<string, EnrichmentPatchData>>(new Map());
-  const delistedSetRef = useRef<Set<string>>(new Set());
-
-  const handleCentralEnriched = useCallback(
-    (enriched: EnrichedTrackItem[], delistedIds: string[]) => {
-      if (enriched.length === 0 && delistedIds.length === 0) return;
-
-      for (const item of enriched) {
-        enrichmentOverlayRef.current.set(item.requestedId, {
-          albumImageUrl: item.albumImageUrl,
-          artistId: item.artistId,
-          albumId: item.albumId,
-        });
-      }
-      for (const id of delistedIds) {
-        delistedSetRef.current.add(id);
-      }
-
-      setOverviewCache((prev) => {
-        const { updatedCache, changed } = patchOverviewCacheWithEnrichment(
-          prev,
-          enrichmentOverlayRef.current,
-          delistedSetRef.current
-        );
-        return changed ? updatedCache : prev;
-      });
-
-      setStreamLogState((prev) =>
-        patchStreamLogWithEnrichment(
-          prev,
-          enrichmentOverlayRef.current,
-          delistedSetRef.current
-        )
-      );
-
-      setSessionState((prev) =>
-        patchSessionWithEnrichment(
-          prev,
-          enrichmentOverlayRef.current,
-          delistedSetRef.current
-        )
-      );
-    },
-    []
-  );
-
-  const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
-
-  // Dynamic sync telemetry tracking
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(() => {
-    const syncTime =
-      initialSession?.lastSyncedAt ||
-      initialStreamLog?.lastSyncedAt ||
-      (initialOverview && "lastSyncedAt" in initialOverview ? (initialOverview as OverviewData).lastSyncedAt : undefined);
-    return syncTime ? new Date(syncTime) : null;
-  });
-  const [syncedAgoStr, setSyncedAgoStr] = useState<string>("JUST NOW");
-  const [syncError, setSyncError] = useState<string | null>(null);
+  // Active Track resolved from the live player, falling back to the latest Play
+  const activeEntity = resolveActiveEntity(currentTrack, streamLogState?.entries?.[0]);
+  const trackStats = useTrackStats(activeEntity);
 
   // Track whether real overview data is ready
-  const isDataReady = Boolean(
-    overviewCache[displayedRange] || initialOverview
-  );
+  const isDataReady = Boolean(overviewCache[displayedRange] || initialOverview);
 
-  // Helper to compute human-readable elapsed time
-  const computeSyncedAgo = useCallback((date: Date | null): string => {
-    if (!date) return "JUST NOW";
-    const diffMs = Date.now() - date.getTime();
-    if (diffMs < 0) return "JUST NOW";
-    const diffSec = Math.floor(diffMs / 1000);
-    if (diffSec < 45) return "JUST NOW";
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin === 1) return "1M AGO";
-    if (diffMin < 60) return `${diffMin}M AGO`;
-    const diffHours = Math.floor(diffMin / 60);
-    if (diffHours === 1) return "1H AGO";
-    if (diffHours < 24) return `${diffHours}H AGO`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}D AGO`;
-  }, []);
-
-  // Recalculate human-readable elapsed time every 10 seconds
-  useEffect(() => {
-    setSyncedAgoStr(computeSyncedAgo(lastSyncedAt));
-    const interval = setInterval(() => {
-      setSyncedAgoStr(computeSyncedAgo(lastSyncedAt));
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [lastSyncedAt, computeSyncedAgo]);
-
-  // Active session state for Mode 3
+  // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
-
-  // Fetch Overview data from server (cached on server, reset on sync)
-  const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
-    const timezone = tzRef.current;
-    const generation = requestGenerationRef.current;
-    try {
-      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
-      const url = `/api/listening/overview?range=${rangeToFetch}${tzQuery}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as OverviewData;
-        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return null;
-        if (data && data.metrics) {
-          setOverviewCache((prev) => {
-            const next = { ...prev, [rangeToFetch]: data };
-            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
-              return patchOverviewCacheWithEnrichment(
-                next,
-                enrichmentOverlayRef.current,
-                delistedSetRef.current
-              ).updatedCache;
-            }
-            return next;
-          });
-          if (activeRangeRef.current === rangeToFetch) {
-            setDisplayedRange(rangeToFetch);
-          }
-          if (data.lastSyncedAt) {
-            const syncDate = new Date(data.lastSyncedAt);
-            setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
-          }
-          return data;
-        }
-      }
-    } catch (err) {
-      console.error("[API FETCH] Overview query error:", err);
-    }
-    // Fallback if fetch returned error: unfreeze to requested range
-    if (generation === requestGenerationRef.current && timezone === tzRef.current && activeRangeRef.current === rangeToFetch) {
-      setDisplayedRange(rangeToFetch);
-    }
-    return null;
-  }, []);
 
   // Support query params for direct URL inspection of all modes and states
   useListeningUrlSync({
@@ -617,333 +219,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     sanitizeActiveMode,
   });
 
-  // Fetch Stream Log from server (cached on server, reset on sync)
-  const fetchStreamLog = useCallback(async (countToFetch?: number, aggregatesOnly = false) => {
-    const timezone = tzRef.current;
-    const generation = requestGenerationRef.current;
-    try {
-      // Background / revalidation fetches only head slice (50) to prevent downloading hundreds of historical rows
-      const depth = aggregatesOnly ? 1 : countToFetch || 50;
-      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
-      const url = `/api/listening/stream-log?limit=${depth}${tzQuery}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as StreamLogData;
-        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
-        if (data && data.entries) {
-          setStreamLogState((prev) => {
-            if (aggregatesOnly && prev) return { ...prev, rawMetrics: data.rawMetrics, metrics: data.metrics };
-            let next: StreamLogData;
-            if (!prev || countToFetch) {
-              next = data;
-            } else {
-              // Merge head slice entries with existing entries by ID
-              const existingIds = new Set(data.entries.map((e) => e.id));
-              const retained = prev.entries.filter((e) => !existingIds.has(e.id));
-              next = {
-                ...data,
-                entries: [...data.entries, ...retained],
-                hasMore: prev.hasMore,
-                nextCursor: prev.nextCursor,
-                nextCursorId: prev.nextCursorId,
-              };
-            }
-            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
-              return patchStreamLogWithEnrichment(
-                next,
-                enrichmentOverlayRef.current,
-                delistedSetRef.current
-              );
-            }
-            return next;
-          });
-          if (!aggregatesOnly) setLoadedPlaysCount((prev) => (countToFetch ? data.entries.length : Math.max(prev, data.entries.length)));
-          if (data.lastSyncedAt) {
-            const syncDate = new Date(data.lastSyncedAt);
-            setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[API FETCH] Stream log query error:", err);
-    }
-  }, []);
-
-  // Restore cached stream log depth on initial client mount if > 50 and within TTL
-  useEffect(() => {
-    const cachedDepth = getCachedStreamLogDepth();
-    if (cachedDepth > 50) {
-      fetchStreamLog(cachedDepth);
-    }
-  }, [fetchStreamLog]);
-
-  // Load next 50 plays incrementally using keyset cursor pagination
-  const handleLoadMoreStreamLog = useCallback(async () => {
-    if (
-      isLoadingMorePlays ||
-      !streamLogState ||
-      streamLogState.hasMore === false ||
-      !streamLogState.nextCursor
-    ) {
-      return;
-    }
-    const timezone = tzRef.current;
-    const generation = requestGenerationRef.current;
-    setIsLoadingMorePlays(true);
-    try {
-      const cursor = streamLogState.nextCursor;
-      const cursorId = streamLogState.nextCursorId || "";
-      const lastEntry = streamLogState.entries[streamLogState.entries.length - 1];
-      const prevPlayedAt = lastEntry?.playedAt || "";
-
-      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-      const limit = isMobile ? "25" : "50";
-
-      const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
-      const params = new URLSearchParams({
-        limit,
-        cursor,
-        cursorId,
-        prevPlayedAt,
-      });
-
-      const url = `/api/listening/stream-log?${params.toString()}${tzQuery}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as StreamLogData;
-        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
-        if (data && data.entries) {
-          setStreamLogState((prev) => {
-            if (!prev) return data;
-            const next: StreamLogData = {
-              ...prev,
-              entries: [...prev.entries, ...data.entries],
-              nextCursor: data.nextCursor,
-              nextCursorId: data.nextCursorId,
-              hasMore: data.hasMore,
-              lastSyncedAt: data.lastSyncedAt || prev.lastSyncedAt,
-            };
-            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
-              return patchStreamLogWithEnrichment(
-                next,
-                enrichmentOverlayRef.current,
-                delistedSetRef.current
-              );
-            }
-            return next;
-          });
-
-          setLoadedPlaysCount((prev) => {
-            const nextCount = prev + data.entries.length;
-            setCachedStreamLogDepth(nextCount);
-            return nextCount;
-          });
-        }
-      }
-    } catch (err) {
-      console.error("[API FETCH] Stream log load more error:", err);
-    } finally {
-      setIsLoadingMorePlays(false);
-    }
-  }, [isLoadingMorePlays, streamLogState]);
-
-  // Fetch Current Session from server (cached on server, reset on sync)
-  const fetchSession = useCallback(async () => {
-    const timezone = tzRef.current;
-    const generation = requestGenerationRef.current;
-    try {
-      const tzQuery = timezone ? `?tz=${encodeURIComponent(timezone)}` : "";
-      const url = `/api/listening/session${tzQuery}`;
-      const res = await fetch(url, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as SessionData;
-        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
-        if (data && data.sessions) {
-          setSessionState(() => {
-            if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
-              return patchSessionWithEnrichment(
-                data,
-                enrichmentOverlayRef.current,
-                delistedSetRef.current
-              );
-            }
-            return data;
-          });
-          if (data.lastSyncedAt) {
-            const syncDate = new Date(data.lastSyncedAt);
-            setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[API FETCH] Session query error:", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (tzRef.current !== visitorTimezone) {
-      tzRef.current = visitorTimezone;
-      requestGenerationRef.current++;
-      setOverviewCache({});
-      void fetchOverview(activeRangeRef.current);
-      void fetchStreamLog(undefined, true);
-    }
-  }, [visitorTimezone, fetchOverview, fetchStreamLog]);
-
-  // Initial load: fetch all endpoints in background if not already available
-  useEffect(() => {
-    async function init() {
-      const hasOverview = Boolean(overviewCache[activeRange]);
-      const hasStreamLog = Boolean(streamLogState);
-      const hasSession = Boolean(sessionState);
-
-      if (hasOverview && hasStreamLog && hasSession) {
-        return;
-      }
-      try {
-        const promises: Promise<unknown>[] = [];
-        if (!hasOverview) promises.push(fetchOverview(activeRange));
-        if (!hasStreamLog) promises.push(fetchStreamLog());
-        if (!hasSession) promises.push(fetchSession());
-        await Promise.allSettled(promises);
-      } catch (err) {
-        console.error("[INIT FETCH] Error initializing telemetry:", err);
-      }
-    }
-    init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Manual sync trigger: executes ingestion, purges server cache, and refetches active views
-  const handleTriggerSync = useCallback(async () => {
-    if (!isAuthenticated || isSyncing) return;
-    requestGenerationRef.current++;
-    setIsSyncing(true);
-    setSyncError(null);
-    try {
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { "Cache-Control": "no-cache" },
-      });
-      const syncData = await res.json().catch(() => ({}));
-      if (res.ok && syncData?.success === true) {
-        setSyncError(null);
-        const syncTimestamp = syncData.syncedAt
-          ? new Date(syncData.syncedAt)
-          : new Date();
-        setLastSyncedAt(syncTimestamp);
-        setSyncedAgoStr("JUST NOW");
-
-        // Server cache was purged by /api/sync. Existing views stay visible (dimmed) until
-        // each range's fresh, enrichment-patched response replaces it.
-        await Promise.all([
-          ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
-          fetchStreamLog(),
-          fetchSession(),
-        ]);
-      } else {
-        const errorMsg =
-          syncData?.error ||
-          (res.status === 409
-            ? "Sync conflict: not connected"
-            : `Sync failed (${res.status || "error"})`);
-        setSyncError(errorMsg);
-      }
-    } catch (err) {
-      console.error("[SYNC TRIGGER] Error triggering sync:", err);
-      setSyncError("Network error triggering sync");
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [isSyncing, isAuthenticated, fetchOverview, fetchStreamLog, fetchSession]);
-
-  // Background silent refetch (auto-sync schedule and focus revalidation) of every range
-  const refetchActiveData = useCallback(async () => {
-    try {
-      await Promise.all([
-        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
-        fetchStreamLog(),
-        fetchSession(),
-      ]);
-    } catch (err) {
-      console.error("[AUTO REFETCH] Error updating telemetry:", err);
-    }
-  }, [fetchOverview, fetchStreamLog, fetchSession]);
-
-  // When an upload batch completes, refetch every range so all of them include the imported plays
-  const handleUploadComplete = useCallback(async () => {
-    requestGenerationRef.current++;
-    try {
-      await Promise.all([
-        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
-        fetchStreamLog(),
-        fetchSession(),
-      ]);
-    } catch (err) {
-      console.error("[UPLOAD COMPLETE] Error refreshing listening data:", err);
-    }
-  }, [fetchOverview, fetchStreamLog, fetchSession]);
-
-  // Wall-clock auto-sync: triggers 30s after every top-of-hour (:00) and half-hour (:30) cron window
-  useEffect(() => {
-    let timerId: NodeJS.Timeout;
-
-    const scheduleNextCheck = () => {
-      const now = new Date();
-      const minutes = now.getMinutes();
-      const seconds = now.getSeconds();
-      const ms = now.getMilliseconds();
-
-      // Next boundary is minute 30 (if < 30) or minute 60 (if >= 30)
-      const nextTargetMinute = minutes < 30 ? 30 : 60;
-      const msUntilTarget =
-        ((nextTargetMinute - minutes - 1) * 60 + (59 - seconds)) * 1000 +
-        (1000 - ms) +
-        30000; // 30-second buffer for cron job execution and DB commit
-
-      timerId = setTimeout(async () => {
-        await refetchActiveData();
-        scheduleNextCheck();
-      }, msUntilTarget);
-    };
-
-    scheduleNextCheck();
-    return () => clearTimeout(timerId);
-  }, [refetchActiveData]);
-
-  // Tab visibility and focus revalidation: if user returns to tab after a cron window has passed, refetch silently
-  // Protected with a 60-second client-side timestamp check to eliminate duplicate network calls
-  const lastFocusRefetchRef = useRef<number>(0);
-  useEffect(() => {
-    const handleVisibilityOrFocus = () => {
-      const now = Date.now();
-      if (document.visibilityState === "visible") {
-        if (now - lastFocusRefetchRef.current < 60_000) return;
-        // If lastSyncedAt is more than 30 minutes ago or missing, check and refresh
-        if (!lastSyncedAt || now - lastSyncedAt.getTime() >= 30 * 60 * 1000) {
-          lastFocusRefetchRef.current = now;
-          refetchActiveData();
-        }
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
-    window.addEventListener("focus", handleVisibilityOrFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
-      window.removeEventListener("focus", handleVisibilityOrFocus);
-    };
-  }, [lastSyncedAt, refetchActiveData]);
-
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
@@ -959,50 +234,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const handleSelectRange = useCallback(
     (range: RangeKey) => {
       if (isSyncing) return;
-      setActiveRange(range);
-      activeRangeRef.current = range;
-      if (overviewCache[range]) {
-        // Cached in-memory: instantaneous update, 0ms latency, zero flash
-        setDisplayedRange(range);
-        return;
-      }
-      // Not yet cached: keep displayed view frozen on current displayedRange while fetching
-      setIsRangeLoading(true);
-      fetchOverview(range).finally(() => {
-        setIsRangeLoading(false);
-      });
+      selectRange(range);
     },
-    [isSyncing, overviewCache, fetchOverview]
+    [isSyncing, selectRange]
   );
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
-  const currentOverview: OverviewData =
-    overviewCache[displayedRange] || {
-      logStartDate: "--",
-      rawMetrics: {
-        totalMs: 0,
-        trackCount: 0,
-        artistCount: 0,
-        elapsedDays: 1,
-      },
-      metrics: ["--", "--", "--", "--"],
-      topTracks: [],
-      topArtists: [],
-      topAlbums: [],
-      activityCadence: [],
-    };
-
-  const streamLogData: StreamLogData =
-    streamLogState || {
-      rawMetrics: {
-        totalPlays: 0,
-        uniqueTracks: 0,
-        uniqueArtists: 0,
-        streakDays: 0,
-      },
-      metrics: ["--", "--", "--", "--"],
-      entries: [],
-    };
+  const currentOverview: OverviewData = overviewCache[displayedRange] || EMPTY_OVERVIEW;
+  const streamLogData: StreamLogData = streamLogState || EMPTY_STREAM_LOG;
 
   const sessionData: SessionData = sessionState || { sessions: [] };
   const activeSession = React.useMemo(() => {

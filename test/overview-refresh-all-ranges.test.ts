@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { loadTs } from './helpers/load-ts';
 
-const SOURCE = 'src/components/ListeningView.tsx';
+const SOURCE = 'src/components/listening-view/useListeningSync.ts';
 const ALL_RANGES = ['1d', '1w', '1m', '6m', '1y', 'all'];
 
 function callback(name: string, scope: Record<string, unknown>) {

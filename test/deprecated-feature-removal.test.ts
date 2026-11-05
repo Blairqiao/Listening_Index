@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 const root = path.resolve(__dirname, "..");
 
@@ -85,7 +86,7 @@ test("AC-3: Dead localStorage OAuth code is removed from src/lib/spotify-auth.ts
     );
   }
 
-  const playerContextContent = fs.readFileSync(path.join(root, "src/context/PlayerContext.tsx"), "utf-8");
+  const playerContextContent = readModuleSource(path.join(root, "src/context/PlayerContext.tsx"));
   assert.ok(
     !playerContextContent.includes("clearToken"),
     "src/context/PlayerContext.tsx must not call clearToken"
@@ -156,7 +157,7 @@ test("AC-5: resize-utils is deleted, compactDate moved to format-utils, dead pro
     "ControlRow.tsx must not contain commented-out // totalPlays"
   );
 
-  const listeningViewContent = fs.readFileSync(path.join(root, "src/components/ListeningView.tsx"), "utf-8");
+  const listeningViewContent = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
   assert.ok(
     !listeningViewContent.includes("isLinked={isLinked}"),
     "ListeningView.tsx must not pass isLinked to ControlRow"

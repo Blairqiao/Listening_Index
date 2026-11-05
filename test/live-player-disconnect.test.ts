@@ -2,10 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("PlayerContext disconnects SDK and pauses playback when unauthenticated / logging out", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // When isAuthenticated becomes false, playerRef.current must be paused and disconnected
   assert.ok(
@@ -31,7 +32,7 @@ test("PlayerContext disconnects SDK and pauses playback when unauthenticated / l
 
 test("AC-4: PlayerContext omits deprecated keyboard shortcuts and dispatches spotify-status-changed on unlink", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // No deprecated keyboard shortcut hints
   assert.ok(!content.includes("Press 'L'"), "PlayerContext must not mention 'Press L'");

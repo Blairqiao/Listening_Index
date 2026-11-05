@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { loadTs } from "./helpers/load-ts";
+import { readModuleSource } from "./helpers/module-source";
 
 // ---------------------------------------------------------------------------
 // Fix 7 (N019): regenerateCronKey without database & /api/player/token real lifetime
@@ -240,7 +240,7 @@ test("PlayerContext: fetchPlayerAccessToken extracts token or returns null on fa
     globalThis.fetch = (async () => {
       return new Response(JSON.stringify({ accessToken: "test-token-123" }), { status: 200 });
     }) as typeof fetch;
-    const { fetchPlayerAccessToken } = loadTs("src/context/PlayerContext.tsx", stubs);
+    const { fetchPlayerAccessToken } = loadTs("src/context/player-context/player-api.ts", stubs);
     const token = await fetchPlayerAccessToken();
     assert.equal(token, "test-token-123");
 
@@ -269,7 +269,7 @@ test("PlayerContext: fetchAutoQueueUris returns uris or null on failure", async 
     globalThis.fetch = (async () => {
       return new Response(JSON.stringify({ uris: ["spotify:track:abc", "spotify:track:xyz"] }), { status: 200 });
     }) as typeof fetch;
-    const { fetchAutoQueueUris } = loadTs("src/context/PlayerContext.tsx", stubs);
+    const { fetchAutoQueueUris } = loadTs("src/context/player-context/player-api.ts", stubs);
     const uris = await fetchAutoQueueUris();
     assert.deepEqual(uris, ["spotify:track:abc", "spotify:track:xyz"]);
 
@@ -285,15 +285,19 @@ test("PlayerContext: fetchAutoQueueUris returns uris or null on failure", async 
 });
 
 test("PlayerContext: device_id is encoded with encodeURIComponent in play calls", () => {
-  const source = fs.readFileSync(path.resolve(__dirname, "../src/context/PlayerContext.tsx"), "utf-8");
+  const source = readModuleSource(path.resolve(__dirname, "../src/context/PlayerContext.tsx"));
 
   assert.ok(
-    source.includes("device_id=${encodeURIComponent(targetDeviceId)}"),
-    "PlayerContext must encode device_id with encodeURIComponent"
+    source.includes("device_id=${encodeURIComponent(deviceId)}"),
+    "startPlayback must encode device_id with encodeURIComponent"
   );
   assert.ok(
-    !source.includes("device_id=${targetDeviceId}"),
-    "PlayerContext must not interpolate unencoded targetDeviceId into play url"
+    !/device_id=\$\{(targetDeviceId|deviceId)\}/.test(source),
+    "play urls must not interpolate an unencoded device id"
+  );
+  assert.ok(
+    !source.includes("/me/player/play?device_id=${encodeURIComponent(targetDeviceId)}"),
+    "play calls go through startPlayback instead of building the url inline"
   );
 });
 
@@ -302,7 +306,7 @@ test("PlayerContext: device_id is encoded with encodeURIComponent in play calls"
 // ---------------------------------------------------------------------------
 
 test("N018: handleToggleLayout marks as deployed only after POST succeeds and rolls back on failure", () => {
-  const source = fs.readFileSync(path.resolve(__dirname, "../src/components/ListeningView.tsx"), "utf-8");
+  const source = readModuleSource(path.resolve(__dirname, "../src/components/ListeningView.tsx"));
 
   // Extract handleToggleLayout block
   const layoutIdx = source.indexOf("const handleToggleLayout =");
@@ -325,7 +329,7 @@ test("N018: handleToggleLayout marks as deployed only after POST succeeds and ro
 // ---------------------------------------------------------------------------
 
 test("N015: handleTriggerSync checks res.ok and body.success and refetches every range", () => {
-  const source = fs.readFileSync(path.resolve(__dirname, "../src/components/ListeningView.tsx"), "utf-8");
+  const source = readModuleSource(path.resolve(__dirname, "../src/components/ListeningView.tsx"));
 
   const syncIdx = source.indexOf("const handleTriggerSync =");
   assert.ok(syncIdx > 0, "handleTriggerSync must exist in ListeningView.tsx");

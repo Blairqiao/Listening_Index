@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
+import { readModuleSource } from "./helpers/module-source";
 
 test("PlayerContext supports in-place SDK reconnect on token update", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   // connectPlayer must support forced/in-place reconnect when playerRef already exists
   assert.ok(
@@ -32,7 +32,7 @@ test("PlayerContext supports in-place SDK reconnect on token update", () => {
 
 test("teardownPlayer preserves Spotify SDK iframe environment and uses safe timeout", () => {
   const playerContextPath = path.resolve(__dirname, "../src/context/PlayerContext.tsx");
-  const content = fs.readFileSync(playerContextPath, "utf-8");
+  const content = readModuleSource(playerContextPath);
 
   assert.ok(
     !content.includes("querySelectorAll('iframe"),
