@@ -174,9 +174,10 @@ To set permanent defaults directly in code, edit `src/config.ts`:
 export const siteConfig = {
   title: "Listening Index",
   ownerName: "YOUR NAME",
-  accentColor: "#76ff49ff",
+  accentColor: "#76FF49",
   siteUrl: "https://open.spotify.com/",
-  githubUrl: "https://github.com/Blairqiao/listening_index"
+  githubUrl: "https://github.com/Blairqiao/listening_index",
+  livePlayerLayout: "split" as const,
 };
 ```
 
@@ -198,8 +199,8 @@ export const siteConfig = {
 Run the site locally with sample mock data:
 
 ```bash
-git clone https://github.com/Blairqiao/listening-index.git
-cd listening-index
+git clone https://github.com/Blairqiao/Listening_Index.git
+cd Listening_Index
 npm install
 npm run dev
 ```
