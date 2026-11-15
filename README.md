@@ -220,7 +220,7 @@ To connect real data locally, copy `.env.example` to `.env.local` and add your `
 | `npm run start` | Start production Next.js server locally |
 | `npm run sync` | Ingest recent stream events from Spotify into database |
 | `npm run db:migrate` | Create or update the database schema. `dev` and `build` run it first; Vercel Preview builds skip it |
-| `npm test` | Run test suite |
+| `npm test` | Run test suite. It never connects to `DATABASE_URL`. Set `TEST_DATABASE_URL` to a separate database to include the PostgreSQL tests |
 
 ---
 

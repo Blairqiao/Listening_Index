@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "lint": "eslint .",
-    "test": "tsx --test test/*.test.ts",
+    "test": "tsx --import ./test/helpers/scrub-env.ts --test test/*.test.ts",
     "dev": "tsx scripts/migrate.ts && next dev -H 127.0.0.1 -p 8888",
     "build": "tsx scripts/migrate.ts && next build",
     "start": "next start",

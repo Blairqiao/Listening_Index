@@ -4,26 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextRequest } from "next/server";
 import { ADMIN_COOKIE_NAME, createSessionToken } from "../src/lib/admin-auth";
+import { dbTest, useTestDatabase } from "./helpers/test-db";
 
 const root = path.resolve(__dirname, "..");
-
-const envPath = path.join(root, ".env.local");
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  for (const line of envContent.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      const idx = trimmed.indexOf("=");
-      if (idx > 0) {
-        const key = trimmed.slice(0, idx).trim();
-        const value = trimmed.slice(idx + 1).trim();
-        if (!process.env[key]) {
-          process.env[key] = value;
-        }
-      }
-    }
-  }
-}
 
 test("AC-1: site_settings schema contains cron_key TEXT column", async () => {
   const schemaSource = fs.readFileSync(
@@ -40,7 +23,8 @@ test("AC-1: site_settings schema contains cron_key TEXT column", async () => {
   );
 });
 
-test("AC-2: getCronKey auto-generates 32-character hex key and regenerateCronKey rotates it", async () => {
+test("AC-2: getCronKey auto-generates 32-character hex key and regenerateCronKey rotates it", dbTest, async () => {
+  await useTestDatabase();
   const { getCronKey, regenerateCronKey } = await import("../src/lib/db/queries");
 
   assert.equal(typeof getCronKey, "function", "getCronKey must be exported from queries");
@@ -65,7 +49,8 @@ test("AC-2: getCronKey auto-generates 32-character hex key and regenerateCronKey
   assert.equal(keyAfterRotate, newKey, "getCronKey must return the newly rotated key");
 });
 
-test("AC-3 & AC-4: /api/owner/sync-key GET and POST enforce admin authorization and rotate sync key", async () => {
+test("AC-3 & AC-4: /api/owner/sync-key GET and POST enforce admin authorization and rotate sync key", dbTest, async () => {
+  await useTestDatabase();
   const syncKeyRoute = await import("../src/app/api/owner/sync-key/route");
   const { GET, POST } = syncKeyRoute;
 
@@ -115,7 +100,8 @@ test("AC-3 & AC-4: /api/owner/sync-key GET and POST enforce admin authorization 
   assert.ok(postData.syncUrl.includes(postData.cronKey), "syncUrl must include new cronKey");
 });
 
-test("AC-5 & AC-6: /api/sync accepts database cron_key and rejects invalid/rotated keys", async () => {
+test("AC-5 & AC-6: /api/sync accepts database cron_key and rejects invalid/rotated keys", dbTest, async () => {
+  await useTestDatabase();
   const { getCronKey, regenerateCronKey } = await import("../src/lib/db/queries");
   const { POST } = await import("../src/app/api/sync/route");
 
@@ -199,7 +185,8 @@ test("AC-9: README.md documents zero-env-variable scheduled sync setup", () => {
   );
 });
 
-test("AC-2b: saveActiveSiteConfig preserves cron_key in site_settings", async () => {
+test("AC-2b: saveActiveSiteConfig preserves cron_key in site_settings", dbTest, async () => {
+  await useTestDatabase();
   const { getCronKey, saveActiveSiteConfig, getActiveSiteConfig } = await import(
     "../src/lib/db/queries"
   );
@@ -224,7 +211,6 @@ test("AC-2b: saveActiveSiteConfig preserves cron_key in site_settings", async ()
       "saveActiveSiteConfig must preserve the existing cron_key"
     );
   } finally {
-    // This test writes to the configured database; put the owner's settings back.
     await saveActiveSiteConfig(currentConfig);
   }
 });
