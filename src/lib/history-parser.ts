@@ -57,22 +57,24 @@ export function makeAlbumGroupKey(artistName: string, albumName: string): string
   return `${makeArtistGroupKey(artistName)}::${normalizeName(albumName || "Unknown Album")}`;
 }
 
+/** A Spotify Track id is exactly 22 base62 characters. Anything else can never be enriched. */
+export function isSpotifyTrackId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9]{22}$/.test(value);
+}
+
 /**
- * Extracts the 22-character base62 Spotify Track ID from a URI.
+ * Extracts the 22-character base62 Spotify Track ID from a URI or open.spotify.com URL.
  * Example: "spotify:track:6orDsQsMy7BaqGoRWw3fVN" -> "6orDsQsMy7BaqGoRWw3fVN"
  */
 export function extractTrackId(uri?: string | null): string | null {
   if (!uri) return null;
   const trimmed = uri.trim();
   if (trimmed.startsWith("spotify:track:")) {
-    const id = trimmed.slice("spotify:track:".length).trim();
-    return id.length > 0 ? id : null;
+    const id = trimmed.slice("spotify:track:".length);
+    return isSpotifyTrackId(id) ? id : null;
   }
-  const match = trimmed.match(/\/track\/([a-zA-Z0-9]{15,30})/);
-  if (match) {
-    return match[1];
-  }
-  return null;
+  const match = trimmed.match(/\/track\/([A-Za-z0-9]{22})(?![A-Za-z0-9])/);
+  return match ? match[1] : null;
 }
 
 /**

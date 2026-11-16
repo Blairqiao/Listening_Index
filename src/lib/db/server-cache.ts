@@ -8,7 +8,12 @@ type ListeningData = OverviewData | StreamLogData | SessionData;
 const globalForCache = globalThis as unknown as {
   __boundedListeningCache?: KeyedAsyncCache<ListeningData>;
 };
-const cacheStore = globalForCache.__boundedListeningCache ??= new KeyedAsyncCache<ListeningData>(60_000);
+// One refresh asks for six Overview ranges, the Stream Log and Sessions, keyed by timezone,
+// so the default of 16 in-flight keys turns a few concurrent visitors into 429s.
+const MAX_CACHE_ENTRIES = 128;
+const MAX_IN_FLIGHT_KEYS = 64;
+const cacheStore = globalForCache.__boundedListeningCache ??=
+  new KeyedAsyncCache<ListeningData>(60_000, MAX_CACHE_ENTRIES, MAX_IN_FLIGHT_KEYS);
 let cacheEpoch = 0;
 const cacheClearListeners: Array<() => void> = [];
 

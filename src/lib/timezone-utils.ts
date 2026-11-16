@@ -7,6 +7,8 @@
  */
 export function isValidIanaTimezone(tz: unknown): boolean {
   if (typeof tz !== "string" || !tz.trim()) return false;
+  // Intl accepts "+08:00", but Postgres AT TIME ZONE reads a bare offset with the opposite sign.
+  if (/^[+-]\d/.test(tz.trim())) return false;
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz.trim() });
     return true;
