@@ -54,11 +54,36 @@ export const SpectrumCanvas: React.FC<SpectrumCanvasProps> = ({
     syntheticRef.current?.setTrack(trackKey, isLive);
   }, [trackKey, isLive]);
 
+  // Held in a ref so a new callback identity does not restart the capture.
+  const onToggleSourceRef = useRef(onToggleSource);
+  onToggleSourceRef.current = onToggleSource;
+  // The last mode this canvas acted on; null until it has run in synthetic mode.
+  const actedModeRef = useRef<"synthetic" | "live" | null>(null);
+  const fallbackRequestedRef = useRef(false);
+
   // Handle switching between synthetic and live audio modes
   useEffect(() => {
     let cancelled = false;
 
-    if (sourceMode === "live") {
+    const startSynthetic = () => {
+      sourceRef.current?.stop();
+      liveRef.current = null;
+      const { trackKey: k, isLive: l } = trackRef.current;
+      const synthetic = new SyntheticSpectrumSource(k, l);
+      syntheticRef.current = synthetic;
+      sourceRef.current = synthetic;
+    };
+
+    if (sourceMode === "live" && actedModeRef.current !== "synthetic") {
+      // Mounted already in live mode (tab re-entry or a layout switch). The share
+      // picker must only follow the owner's click, so fall back instead of capturing.
+      startSynthetic();
+      if (!fallbackRequestedRef.current) {
+        fallbackRequestedRef.current = true;
+        onToggleSourceRef.current();
+      }
+    } else if (sourceMode === "live") {
+      actedModeRef.current = "live";
       void (async () => {
         try {
           const live = await LiveAudioSpectrumSource.create();
@@ -67,7 +92,7 @@ export const SpectrumCanvas: React.FC<SpectrumCanvasProps> = ({
             return;
           }
           live.onEnded(() => {
-            onToggleSource();
+            onToggleSourceRef.current();
           });
           sourceRef.current?.stop();
           liveRef.current = live;
@@ -75,23 +100,20 @@ export const SpectrumCanvas: React.FC<SpectrumCanvasProps> = ({
           syntheticRef.current = null;
         } catch (e) {
           console.warn("[SPECTRUM] Live audio stream declined or unavailable:", e);
-          if (!cancelled) onToggleSource();
+          if (!cancelled) onToggleSourceRef.current();
         }
       })();
     } else {
-      sourceRef.current?.stop();
-      liveRef.current = null;
-      const { trackKey: k, isLive: l } = trackRef.current;
-      const synthetic = new SyntheticSpectrumSource(k, l);
-      syntheticRef.current = synthetic;
-      sourceRef.current = synthetic;
+      actedModeRef.current = "synthetic";
+      fallbackRequestedRef.current = false;
+      startSynthetic();
     }
 
     return () => {
       cancelled = true;
       sourceRef.current?.stop();
     };
-  }, [sourceMode, onToggleSource]);
+  }, [sourceMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
