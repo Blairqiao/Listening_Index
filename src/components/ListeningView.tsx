@@ -188,12 +188,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     setLastSyncedAt,
   });
 
-  const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      return Math.min(25, initialStreamLog?.entries?.length || 25);
-    }
-    return null;
-  });
+  // Starts null to match the server render; StreamLogView reports the real count after mount.
+  const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(null);
 
   // Active Track resolved from the live player, falling back to the latest Play
   const activeEntity = resolveActiveEntity(currentTrack, streamLogState?.entries?.[0]);

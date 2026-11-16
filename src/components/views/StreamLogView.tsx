@@ -29,12 +29,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   const entries = React.useMemo(() => presentStreamLog(rawEntries, visitorTimezone), [rawEntries, visitorTimezone]);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
-  const [isMobile, setIsMobile] = React.useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
+  // Starts false to match the server render; the resize effect below sets the real value.
+  const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [mobileVisibleCount, setMobileVisibleCount] = React.useState<number>(25);
 
   React.useEffect(() => {

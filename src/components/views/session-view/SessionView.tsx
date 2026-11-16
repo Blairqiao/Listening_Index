@@ -26,12 +26,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const onSelect = onSelectSession;
   const selectedSessionId = externalSelectedSessionId || presentedSessions[0]?.id;
   const selectedSessionIdValue = selectedSessionId;
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
+  // Starts false to match the server render; the resize effect below sets the real value.
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isTracksExpanded, setIsTracksExpanded] = useState(false);
   const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
 
