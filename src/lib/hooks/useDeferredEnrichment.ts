@@ -115,14 +115,15 @@ export function useDeferredEnrichment({
       return;
     }
 
-    // Find up to 5 pending tracks not yet requested this session
+    // Find up to 5 pending Tracks not yet requested this session. A Track played several
+    // times in a row appears once, so repeats do not use up the batch.
     const pendingCandidates: string[] = [];
     for (const item of items) {
       const trackId = item.trackId || item.id;
       if (!trackId) continue;
 
       const isUnenriched = !item.albumImageUrl && item.status !== "[DELISTED]";
-      if (isUnenriched && !sessionRequestedTrackIds.has(trackId)) {
+      if (isUnenriched && !sessionRequestedTrackIds.has(trackId) && !pendingCandidates.includes(trackId)) {
         pendingCandidates.push(trackId);
         if (pendingCandidates.length >= 5) break;
       }
@@ -189,8 +190,9 @@ export function useDeferredEnrichment({
           onEnrichedRef.current?.(data.enriched || [], data.delistedIds || []);
         }
 
-        if (data.rateLimited) {
-          // If rate-limited, release unresolved candidate IDs so they can be retried after cooldown
+        if (data.rateLimited || data.quotaReached) {
+          // The server stopped early: release unresolved candidate IDs so they are requested
+          // again after the cooldown or the quota reset
           const resolvedIds = new Set<string>();
           if (Array.isArray(data.enriched)) {
             for (const e of data.enriched) {
@@ -209,7 +211,9 @@ export function useDeferredEnrichment({
               sessionRequestedTrackIds.delete(id);
             }
           }
+        }
 
+        if (data.rateLimited) {
           const cooldownSec = data.retryAfterSeconds || 10;
           if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
           retryTimerRef.current = setTimeout(() => {

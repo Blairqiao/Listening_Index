@@ -43,6 +43,7 @@ import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import {
   computeLivePlayerMetrics,
+  findSelectedSession,
   resolveActiveEntity,
   sanitizeActiveMode,
   EMPTY_OVERVIEW,
@@ -245,7 +246,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const sessionData: SessionData = sessionState || { sessions: [] };
   const activeSession = React.useMemo(() => {
-    const session = sessionData.sessions.find(session => session.id === selectedSessionId) || sessionData.sessions[0];
+    const session = findSelectedSession(sessionData.sessions, selectedSessionId);
     return session ? presentSession(session, visitorTimezone) : null;
   }, [sessionData.sessions, selectedSessionId, visitorTimezone]);
   const totalSessions = sessionData.sessions.length || 1;
@@ -342,8 +343,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const sessionTagTime =
     activeSession?.tagTime || "--";
+  // Footer status: whether the newest Session is still open, whichever Session is selected
   const isSystemLive = sessionData.sessions[0]?.isOpen || false;
-
 
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
@@ -375,7 +376,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             range={activeRange}
             onSelectRange={handleSelectRange}
             logStartDate={currentOverview.logStartDate}
-            isSessionOpen={isSystemLive}
+            isSessionOpen={activeSession?.isOpen || false}
             sessionTagTime={sessionTagTime}
             isSyncing={isSyncing}
             isAuthenticated={isAuthenticated}

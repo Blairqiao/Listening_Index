@@ -16,6 +16,7 @@ import {
 } from "./CatalogEnrichmentCard";
 import { HistoryDropzone } from "./HistoryDropzone";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { classifyHistoryFile, resolveImportOutcome, stepOnOpen, type UploadStep } from "./upload-outcome";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -23,8 +24,6 @@ interface UploadModalProps {
   onUploadComplete?: () => void;
   isDbConfigured: boolean;
 }
-
-type UploadStep = "idle" | "inspecting" | "stage1" | "completed" | "error";
 
 export const UploadModal: React.FC<UploadModalProps> = ({
   isOpen,
@@ -72,9 +71,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [summary, setSummary] = useState<{
     totalPlays: number;
     newPlays: number;
+    skippedNote: string | null;
   }>({
     totalPlays: 0,
     newPlays: 0,
+    skippedNote: null,
   });
 
   const isProcessingRef = useRef(false);
@@ -93,6 +94,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       timer = setTimeout(() => setShouldRender(false), 200);
     }
     return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Reopening after a finished import shows the dropzone again
+  useEffect(() => {
+    if (isOpen) setStep((current) => stepOnOpen(current));
   }, [isOpen]);
 
   // Handle ESC key
@@ -154,23 +160,22 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
       let totalQualified = 0;
       let totalNew = 0;
+      let skippedFiles = 0;
+      let basicExportFiles = 0;
 
       for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
         setStatusMessage(`Reading ${task.name} (${i + 1}/${tasks.length})...`);
         const jsonText = await task.getText();
 
-        let rawItems: { [key: string]: unknown }[];
-        try {
-          rawItems = JSON.parse(jsonText);
-          if (!Array.isArray(rawItems)) {
-            continue;
-          }
-        } catch {
+        const file = classifyHistoryFile(jsonText);
+        if (file.kind !== "history") {
+          skippedFiles++;
+          if (file.kind === "basic-export") basicExportFiles++;
           continue;
         }
 
-        const plays = parseHistoryRecords(rawItems);
+        const plays = parseHistoryRecords(file.rows);
         totalQualified += plays.length;
         setStage1Total(totalQualified);
 
@@ -199,7 +204,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         }
       }
 
-      setSummary((s) => ({ ...s, totalPlays: totalQualified, newPlays: totalNew }));
+      const outcome = resolveImportOutcome({ qualifiedPlays: totalQualified, skippedFiles, basicExportFiles });
+      if (!outcome.ok) {
+        throw new Error(outcome.error);
+      }
+
+      setSummary({ totalPlays: totalQualified, newPlays: totalNew, skippedNote: outcome.skippedNote });
       setStep("completed");
       setStatusMessage("All streaming history successfully uploaded to your database!");
       fetchEnrichmentProgress();
@@ -364,6 +374,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 All qualified stream events are saved in your database and immediately active on your dashboard.
                 Album artwork and track metadata will enrich automatically in the background and as you browse.
               </p>
+
+              {summary.skippedNote && (
+                <p className="text-[#A8A8A2] text-[11px] leading-relaxed">{summary.skippedNote}</p>
+              )}
 
               <div className="pt-2">
                 <button
