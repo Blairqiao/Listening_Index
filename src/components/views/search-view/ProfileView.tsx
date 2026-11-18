@@ -2,8 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import type { ProfileData, ProfileTarget } from "@/lib/search-types";
-import { formatHHmmTz, formatDayGroupTz, formatDurationHoursMinutes } from "@/lib/db/queries/helpers";
-import { formatDurationMs } from "@/lib/format-utils";
+import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
 
@@ -191,23 +190,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           visitorTimezone={visitorTimezone}
         />
       </div>
-
-      {data.kind === "track" && data.trackStats && (
-        <dl className="flex gap-8 border-y border-[#191917] py-3 font-mono md:col-span-full">
-          <div>
-            <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">TIME PLAYED</dt>
-            <dd className="mt-1 text-sm tabular-nums">
-              {data.trackStats.playedMs < 60_000
-                ? formatDurationMs(data.trackStats.playedMs)
-                : formatDurationHoursMinutes(data.trackStats.playedMs)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">DAYS PLAYED</dt>
-            <dd className="mt-1 text-sm tabular-nums">{data.trackStats.daysPlayed.toLocaleString()}</dd>
-          </div>
-        </dl>
-      )}
 
       {data.kind === "artist" && data.plays > 0 && (
         <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-3">

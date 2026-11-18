@@ -11,8 +11,9 @@ export type SearchSort = (typeof SEARCH_SORT_OPTIONS)[number]["value"];
 export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
 
 export const SEARCH_MAX_CHARS = 100;
-export const DEFAULT_PROFILE_RANGE = "all";
+export const DEFAULT_PROFILE_RANGE: RangeKey = "1y";
 export const PROFILE_RECENT_PLAYS_LIMIT = 20;
+export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
 export const PROFILE_TOP_ALBUMS_LIMIT = 5;
 
@@ -49,6 +50,19 @@ export interface ProfilePlay {
   title: string; artist: string; album: string; durationMs: number; albumImageUrl: string | null;
 }
 
+export interface ProfileAlbumTrack {
+  id: string;
+  name: string;
+  plays: number;
+  isCurrent: boolean;
+}
+
+export interface ProfileTrackStats {
+  artistShare: number | null;
+  bestMonth: { month: string; plays: number } | null;
+  longestStreakDays: number;
+}
+
 export interface ProfileData {
   kind: ProfileKind;
   key: string;                 // canonical: track id, or artist key in the active identity form
@@ -65,7 +79,9 @@ export interface ProfileData {
   activityCadence: ActivityBucket[];
   monthlyCadence?: ActivityBucket[];
   artistKey?: string;
-  trackStats?: { playedMs: number; daysPlayed: number };
+  trackStats?: ProfileTrackStats; // track profiles only
+  hourOfDay?: number[]; // track profiles only, indexed by local hour
+  albumTracks?: ProfileAlbumTrack[]; // track profiles only, ranked in range
   topTracks: ProfileTopTrack[]; // artist profiles only (≤ 10, in range). [] for tracks
   topAlbums: ProfileTopAlbum[]; // artist profiles only (≤ 5, in range). [] for tracks
   recentPlays: ProfilePlay[];   // in range, newest first, ≤ 20

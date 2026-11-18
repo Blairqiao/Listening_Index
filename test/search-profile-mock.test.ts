@@ -162,12 +162,10 @@ test('empty search pages through the catalog with global sort order', () => {
   }
 });
 
-test("All profile cadence includes monthly counts and Track stats", () => {
+test("All profile cadence includes monthly counts", () => {
   const track = getMockSearch("").tracks[0];
   const profile = getMockProfile({ kind: "track", key: track.id }, "all", "America/Chicago")!;
   assert.ok(profile.artistKey);
-  assert.ok(profile.trackStats!.playedMs > 0);
-  assert.ok(profile.trackStats!.daysPlayed > 0 && profile.trackStats!.daysPlayed <= profile.plays);
   assert.equal(profile.monthlyCadence?.reduce((sum, month) => sum + month.count, 0), profile.plays);
   assert.equal(profile.activityCadence.reduce((sum, year) => sum + year.count, 0), profile.plays);
 });
