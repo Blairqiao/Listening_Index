@@ -1,0 +1,544 @@
+import type { RangeKey } from "@/lib/types";
+import {
+  SEARCH_RESULT_LIMIT,
+  PROFILE_RECENT_PLAYS_LIMIT,
+  PROFILE_TOP_TRACKS_LIMIT,
+  PROFILE_TOP_ALBUMS_LIMIT,
+  type ProfileData,
+  type ProfilePlay,
+  type ProfileTarget,
+  type ProfileTopAlbum,
+  type ProfileTopTrack,
+  type SearchArtistResult,
+  type SearchResponse,
+  type SearchTrackResult,
+} from "@/lib/search-types";
+import { normalizeForSearch } from "@/lib/search-utils";
+import { CATALOG } from "./catalog";
+import { ALL_MOCK_STREAM_LOG_ENTRIES } from "./stream-log";
+import { buildActivityCadence } from "@/lib/db/queries/cadence";
+import { OVERVIEW_INTERVAL_CONFIG } from "@/lib/db/queries/overview";
+import { sanitizeTimezone } from "@/lib/db/queries/helpers";
+
+interface NormalizedMockPlay {
+  id: string;
+  trackId: string;
+  playedAt: string;
+  title: string;
+  artist: string;
+  artistId: string;
+  album: string;
+  albumId?: string;
+  durationMs: number;
+  albumImageUrl: string | null;
+}
+
+interface DerivedMockTrack {
+  id: string;
+  name: string;
+  artist: string;
+  album: string;
+  albumImageUrl: string | null;
+  lifetimePlays: number;
+  firstPlayedAt: string;
+  lastPlayedAt: string;
+}
+
+interface DerivedMockArtist {
+  key: string;
+  name: string;
+  lifetimePlays: number;
+  imageUrl: string | null;
+  firstPlayedAt: string;
+  lastPlayedAt: string;
+}
+
+const CATALOG_ENTRIES = Object.values(CATALOG);
+
+function normalizeMockPlays(): NormalizedMockPlay[] {
+  return ALL_MOCK_STREAM_LOG_ENTRIES.map((entry) => {
+    const catalogItem = CATALOG_ENTRIES.find(
+      (c) => c.id === entry.trackId || (c.name === entry.title && c.artist === entry.artist)
+    );
+    const trackId = entry.trackId ?? catalogItem?.id ?? entry.id;
+    const artistId = entry.artistId ?? catalogItem?.artistId ?? "";
+    const albumId = entry.albumId ?? catalogItem?.albumId;
+    const albumImageUrl = entry.albumImageUrl ?? catalogItem?.albumImageUrl ?? null;
+
+    return {
+      id: entry.id,
+      trackId,
+      playedAt: entry.playedAt,
+      title: entry.title,
+      artist: entry.artist,
+      artistId,
+      album: entry.album,
+      albumId,
+      durationMs: entry.durationMs,
+      albumImageUrl,
+    };
+  });
+}
+
+const NORMALIZED_PLAYS: NormalizedMockPlay[] = normalizeMockPlays();
+
+const GLOBAL_TIMESTAMPS = NORMALIZED_PLAYS.map((p) => new Date(p.playedAt).getTime());
+const GLOBAL_MAX_MS = Math.max(...GLOBAL_TIMESTAMPS);
+const GLOBAL_MIN_MS = Math.min(...GLOBAL_TIMESTAMPS);
+
+// Anchor now at the newest mock playedAt + 1 minute.
+const ANCHOR_NOW = new Date(GLOBAL_MAX_MS + 60 * 1000);
+const GLOBAL_OLDEST_PLAY = new Date(GLOBAL_MIN_MS).toISOString();
+
+function deriveUniqueTracks(plays: NormalizedMockPlay[]): Map<string, DerivedMockTrack> {
+  const tracks = new Map<string, DerivedMockTrack>();
+
+  for (const play of plays) {
+    const existing = tracks.get(play.trackId);
+    if (!existing) {
+      tracks.set(play.trackId, {
+        id: play.trackId,
+        name: play.title,
+        artist: play.artist,
+        album: play.album,
+        albumImageUrl: play.albumImageUrl,
+        lifetimePlays: 1,
+        firstPlayedAt: play.playedAt,
+        lastPlayedAt: play.playedAt,
+      });
+      continue;
+    }
+
+    existing.lifetimePlays += 1;
+    if (new Date(play.playedAt).getTime() < new Date(existing.firstPlayedAt).getTime()) {
+      existing.firstPlayedAt = play.playedAt;
+    }
+    if (new Date(play.playedAt).getTime() > new Date(existing.lastPlayedAt).getTime()) {
+      existing.lastPlayedAt = play.playedAt;
+    }
+    if (!existing.albumImageUrl && play.albumImageUrl) {
+      existing.albumImageUrl = play.albumImageUrl;
+    }
+  }
+
+  return tracks;
+}
+
+function deriveUniqueArtists(plays: NormalizedMockPlay[]): Map<string, DerivedMockArtist> {
+  const artists = new Map<
+    string,
+    {
+      key: string;
+      name: string;
+      lifetimePlays: number;
+      firstPlayedAt: string;
+      lastPlayedAt: string;
+      albumCounts: Map<string, { name: string; count: number; imageUrl: string | null }>;
+    }
+  >();
+
+  for (const play of plays) {
+    let artistEntry = artists.get(play.artistId);
+    if (!artistEntry) {
+      artistEntry = {
+        key: play.artistId,
+        name: play.artist,
+        lifetimePlays: 0,
+        firstPlayedAt: play.playedAt,
+        lastPlayedAt: play.playedAt,
+        albumCounts: new Map(),
+      };
+      artists.set(play.artistId, artistEntry);
+    }
+
+    artistEntry.lifetimePlays += 1;
+    if (new Date(play.playedAt).getTime() < new Date(artistEntry.firstPlayedAt).getTime()) {
+      artistEntry.firstPlayedAt = play.playedAt;
+    }
+    if (new Date(play.playedAt).getTime() > new Date(artistEntry.lastPlayedAt).getTime()) {
+      artistEntry.lastPlayedAt = play.playedAt;
+    }
+
+    const albumKey = play.albumId ?? play.album;
+    const albumRecord = artistEntry.albumCounts.get(albumKey) ?? {
+      name: play.album,
+      count: 0,
+      imageUrl: play.albumImageUrl,
+    };
+    albumRecord.count += 1;
+    if (!albumRecord.imageUrl && play.albumImageUrl) {
+      albumRecord.imageUrl = play.albumImageUrl;
+    }
+    artistEntry.albumCounts.set(albumKey, albumRecord);
+  }
+
+  const result = new Map<string, DerivedMockArtist>();
+  for (const [artistId, entry] of artists.entries()) {
+    const sortedAlbums = [...entry.albumCounts.values()].sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
+    const mostPlayedAlbum = sortedAlbums[0];
+
+    result.set(artistId, {
+      key: entry.key,
+      name: entry.name,
+      lifetimePlays: entry.lifetimePlays,
+      imageUrl: mostPlayedAlbum?.imageUrl ?? null,
+      firstPlayedAt: entry.firstPlayedAt,
+      lastPlayedAt: entry.lastPlayedAt,
+    });
+  }
+
+  return result;
+}
+
+const UNIQUE_TRACKS: Map<string, DerivedMockTrack> = deriveUniqueTracks(NORMALIZED_PLAYS);
+const UNIQUE_ARTISTS: Map<string, DerivedMockArtist> = deriveUniqueArtists(NORMALIZED_PLAYS);
+
+export function getMockSearch(query: string): SearchResponse {
+  const trimmed = query.trim();
+  const normalizedQuery = normalizeForSearch(trimmed);
+
+  if (normalizedQuery.length === 0) {
+    return {
+      query: trimmed,
+      artists: [],
+      tracks: [],
+    };
+  }
+
+  const matchedArtists: SearchArtistResult[] = [];
+  for (const artist of UNIQUE_ARTISTS.values()) {
+    if (normalizeForSearch(artist.name).includes(normalizedQuery)) {
+      matchedArtists.push({
+        key: artist.key,
+        name: artist.name,
+        plays: artist.lifetimePlays,
+        imageUrl: artist.imageUrl,
+      });
+    }
+  }
+
+  matchedArtists.sort((a, b) => {
+    if (b.plays !== a.plays) return b.plays - a.plays;
+    return a.name.localeCompare(b.name);
+  });
+
+  const matchedTracks: SearchTrackResult[] = [];
+  for (const track of UNIQUE_TRACKS.values()) {
+    if (
+      normalizeForSearch(track.name).includes(normalizedQuery) ||
+      normalizeForSearch(track.artist).includes(normalizedQuery)
+    ) {
+      matchedTracks.push({
+        id: track.id,
+        name: track.name,
+        artist: track.artist,
+        album: track.album,
+        plays: track.lifetimePlays,
+        albumImageUrl: track.albumImageUrl,
+      });
+    }
+  }
+
+  matchedTracks.sort((a, b) => {
+    if (b.plays !== a.plays) return b.plays - a.plays;
+    return a.name.localeCompare(b.name);
+  });
+
+  return {
+    query: trimmed,
+    artists: matchedArtists.slice(0, SEARCH_RESULT_LIMIT),
+    tracks: matchedTracks.slice(0, SEARCH_RESULT_LIMIT),
+  };
+}
+
+function getWindowCutoff(range: RangeKey, now: Date): number | null {
+  if (range === "all") return null;
+  const days = OVERVIEW_INTERVAL_CONFIG[range].elapsedDays;
+  return now.getTime() - days * 86400000;
+}
+
+function filterPlaysInRange(plays: NormalizedMockPlay[], cutoffMs: number | null): NormalizedMockPlay[] {
+  if (cutoffMs === null) return plays;
+  return plays.filter((p) => new Date(p.playedAt).getTime() >= cutoffMs);
+}
+
+function computeCadenceRows(
+  targetPlays: NormalizedMockPlay[],
+  range: RangeKey,
+  tz: string,
+  now: Date
+): Record<string, unknown>[] {
+  const nowMs = now.getTime();
+  let filtered = targetPlays;
+
+  if (range === "1d") {
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 24 * 3600000);
+  } else if (range === "1w") {
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 8 * 86400000);
+  } else if (range === "1m") {
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 30 * 86400000);
+  } else if (range === "6m") {
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 182 * 86400000);
+  } else if (range === "1y") {
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 365 * 86400000);
+  }
+
+  const counts = new Map<string, number>();
+  const blockEntries = new Map<string, { day: string; block: number; count: number }>();
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+
+  for (const p of filtered) {
+    const parts = formatter.formatToParts(new Date(p.playedAt));
+    const m = Object.fromEntries(parts.map((pt) => [pt.type, pt.value]));
+
+    if (range === "1d") {
+      const key = `${m.year}-${m.month}-${m.day} ${m.hour}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    } else if (range === "1w") {
+      const day = `${m.year}-${m.month}-${m.day}`;
+      const block = Math.floor(Number(m.hour) / 6);
+      const key = `${day}_${block}`;
+      const existing = blockEntries.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        blockEntries.set(key, { day, block, count: 1 });
+      }
+    } else if (range === "1m" || range === "6m") {
+      const day = `${m.year}-${m.month}-${m.day}`;
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+    } else if (range === "1y") {
+      const ym = `${m.year}-${m.month}`;
+      counts.set(ym, (counts.get(ym) ?? 0) + 1);
+    } else {
+      const playYear = String(m.year);
+      counts.set(playYear, (counts.get(playYear) ?? 0) + 1);
+    }
+  }
+
+  if (range === "1d") {
+    return [...counts.entries()].map(([hour_key, count]) => ({ hour_key, count }));
+  }
+  if (range === "1w") {
+    return [...blockEntries.values()];
+  }
+  if (range === "1m" || range === "6m") {
+    return [...counts.entries()].map(([day, count]) => ({ day, count }));
+  }
+  if (range === "1y") {
+    return [...counts.entries()].map(([ym, count]) => ({ ym, count }));
+  }
+  return [...counts.entries()].map(([play_year, count]) => ({ play_year: Number(play_year), count }));
+}
+
+export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: string): ProfileData | null {
+  if (!target || (target.kind !== "track" && target.kind !== "artist")) {
+    return null;
+  }
+
+  const effectiveTz = sanitizeTimezone(tz);
+  const now = ANCHOR_NOW;
+  const cutoffMs = getWindowCutoff(range, now);
+  const allInRangePlays = filterPlaysInRange(NORMALIZED_PLAYS, cutoffMs);
+
+  if (target.kind === "track") {
+    const track = UNIQUE_TRACKS.get(target.key);
+    if (!track) return null;
+
+    const targetLifetimePlays = NORMALIZED_PLAYS.filter((p) => p.trackId === target.key);
+    const targetInRangePlays = filterPlaysInRange(targetLifetimePlays, cutoffMs);
+    const inRangePlayCount = targetInRangePlays.length;
+
+    // Track ranking uses DENSE_RANK over in-range plays
+    const trackCounts = new Map<string, number>();
+    for (const p of allInRangePlays) {
+      trackCounts.set(p.trackId, (trackCounts.get(p.trackId) ?? 0) + 1);
+    }
+    const rankedTotal = trackCounts.size;
+
+    let rank: number | null = null;
+    if (inRangePlayCount > 0) {
+      const distinctCountsDesc = [...new Set(trackCounts.values())].sort((a, b) => b - a);
+      const denseRankIndex = distinctCountsDesc.indexOf(inRangePlayCount);
+      rank = denseRankIndex >= 0 ? denseRankIndex + 1 : null;
+    }
+
+    const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
+    const { activityCadence } = buildActivityCadence({
+      range,
+      tz: effectiveTz,
+      now,
+      cadenceRows,
+      minDateRow: { log_start_date: GLOBAL_OLDEST_PLAY },
+    });
+
+    const recentPlays: ProfilePlay[] = targetInRangePlays
+      .slice()
+      .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime())
+      .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
+      .map((p) => ({
+        id: p.id,
+        trackId: p.trackId,
+        playedAt: p.playedAt,
+        title: p.title,
+        artist: p.artist,
+        album: p.album,
+        durationMs: p.durationMs,
+        albumImageUrl: p.albumImageUrl,
+      }));
+
+    return {
+      kind: "track",
+      key: track.id,
+      name: track.name,
+      artistName: track.artist,
+      albumName: track.album,
+      imageUrl: track.albumImageUrl,
+      range,
+      firstPlayedAt: track.firstPlayedAt,
+      lastPlayedAt: track.lastPlayedAt,
+      plays: inRangePlayCount,
+      rank,
+      rankedTotal,
+      activityCadence,
+      topTracks: [],
+      topAlbums: [],
+      recentPlays,
+    };
+  }
+
+  // target.kind === "artist"
+  const artist = UNIQUE_ARTISTS.get(target.key);
+  if (!artist) return null;
+
+  const targetLifetimePlays = NORMALIZED_PLAYS.filter((p) => p.artistId === target.key);
+  const targetInRangePlays = filterPlaysInRange(targetLifetimePlays, cutoffMs);
+  const inRangePlayCount = targetInRangePlays.length;
+
+  // Artist ranking uses row order (plays DESC, name ASC) over in-range plays
+  const artistCounts = new Map<string, { id: string; name: string; count: number }>();
+  for (const p of allInRangePlays) {
+    const existing = artistCounts.get(p.artistId);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      artistCounts.set(p.artistId, { id: p.artistId, name: p.artist, count: 1 });
+    }
+  }
+  const rankedTotal = artistCounts.size;
+
+  let rank: number | null = null;
+  if (inRangePlayCount > 0) {
+    const sortedArtists = [...artistCounts.values()].sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.name.localeCompare(b.name);
+    });
+    const artistIndex = sortedArtists.findIndex((a) => a.id === target.key);
+    rank = artistIndex >= 0 ? artistIndex + 1 : null;
+  }
+
+  const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
+  const { activityCadence } = buildActivityCadence({
+    range,
+    tz: effectiveTz,
+    now,
+    cadenceRows,
+    minDateRow: { log_start_date: GLOBAL_OLDEST_PLAY },
+  });
+
+  const recentPlays: ProfilePlay[] = targetInRangePlays
+    .slice()
+    .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime())
+    .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
+    .map((p) => ({
+      id: p.id,
+      trackId: p.trackId,
+      playedAt: p.playedAt,
+      title: p.title,
+      artist: p.artist,
+      album: p.album,
+      durationMs: p.durationMs,
+      albumImageUrl: p.albumImageUrl,
+    }));
+
+  const trackAggregates = new Map<string, { id: string; name: string; plays: number; albumImageUrl: string | null }>();
+  for (const p of targetInRangePlays) {
+    const existing = trackAggregates.get(p.trackId);
+    if (existing) {
+      existing.plays += 1;
+      if (!existing.albumImageUrl && p.albumImageUrl) {
+        existing.albumImageUrl = p.albumImageUrl;
+      }
+    } else {
+      trackAggregates.set(p.trackId, {
+        id: p.trackId,
+        name: p.title,
+        plays: 1,
+        albumImageUrl: p.albumImageUrl,
+      });
+    }
+  }
+
+  const topTracks: ProfileTopTrack[] = [...trackAggregates.values()]
+    .sort((a, b) => {
+      if (b.plays !== a.plays) return b.plays - a.plays;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, PROFILE_TOP_TRACKS_LIMIT);
+
+  const albumAggregates = new Map<string, { id?: string; name: string; plays: number; imageUrl: string | null }>();
+  for (const p of targetInRangePlays) {
+    const albumKey = p.albumId ?? p.album;
+    const existing = albumAggregates.get(albumKey);
+    if (existing) {
+      existing.plays += 1;
+      if (!existing.imageUrl && p.albumImageUrl) {
+        existing.imageUrl = p.albumImageUrl;
+      }
+    } else {
+      albumAggregates.set(albumKey, {
+        id: p.albumId,
+        name: p.album,
+        plays: 1,
+        imageUrl: p.albumImageUrl,
+      });
+    }
+  }
+
+  const topAlbums: ProfileTopAlbum[] = [...albumAggregates.values()]
+    .sort((a, b) => {
+      if (b.plays !== a.plays) return b.plays - a.plays;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, PROFILE_TOP_ALBUMS_LIMIT);
+
+  return {
+    kind: "artist",
+    key: artist.key,
+    name: artist.name,
+    artistName: null,
+    albumName: null,
+    imageUrl: artist.imageUrl,
+    range,
+    firstPlayedAt: artist.firstPlayedAt,
+    lastPlayedAt: artist.lastPlayedAt,
+    plays: inRangePlayCount,
+    rank,
+    rankedTotal,
+    activityCadence,
+    topTracks,
+    topAlbums,
+    recentPlays,
+  };
+}
