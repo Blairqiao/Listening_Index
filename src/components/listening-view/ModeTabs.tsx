@@ -19,6 +19,7 @@ export const BASE_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   { id: 0, label: "[ OVERVIEW ]", abbrev: "[ OVR ]" },
   { id: 1, label: "[ STREAM LOG ]", abbrev: "[ LOG ]" },
   { id: 2, label: "[ SESSIONS ]", abbrev: "[ SES ]" },
+  { id: 4, label: "[ SEARCH ]", abbrev: "[ SRCH ]" },
 ];
 
 export const ADMIN_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
@@ -97,7 +98,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
   return (
     <nav
       aria-label="Listening index view modes"
-      className="flex items-center justify-between mt-4 md:mt-5 border-b border-[#1C1C1A] select-none"
+      className="flex flex-wrap items-center justify-between gap-y-1 sm:flex-nowrap mt-4 md:mt-5 border-b border-[#1C1C1A] select-none"
     >
       <div className="flex gap-1.5 sm:gap-6 mr-1.5 sm:mr-4">
         {modes.map((m) => {
@@ -127,7 +128,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
         })}
       </div>
 
-      <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+      <div className="ml-auto flex items-center gap-1 sm:gap-2.5 shrink-0">
         
         {isAuthenticated && onOpenUpload && (
           <button

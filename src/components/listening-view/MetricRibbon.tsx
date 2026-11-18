@@ -37,6 +37,8 @@ export const getRibbonLabels = (
         "ARTIST RANK",
         "ARTIST PLAYS",
       ];
+    case 4:
+      return ["PLAYS", "RANK", "FIRST PLAYED", "LAST PLAYED"];
   }
 };
 

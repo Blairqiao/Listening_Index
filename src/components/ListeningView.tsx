@@ -92,7 +92,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     handleTransferPlayback,
   } = usePlayer();
 
-  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only)
+  // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only), 4 = Search
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(initialMode, isAuthenticated));
 
   // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
@@ -337,6 +337,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     1: streamMetrics,
     2: currentSessionMetrics,
     3: livePlayerMetrics,
+    4: ["--", "--", "--", "--"],
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -450,6 +451,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 onToggleSourceMode={handleToggleSourceMode}
               />
             )}
+
+            {activeMode === 4 && <div />}
           </div>
         </div>
 
