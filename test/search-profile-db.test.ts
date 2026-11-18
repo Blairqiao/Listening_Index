@@ -318,10 +318,12 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
         checkSearchQuery(sub).ok ? searchCatalog(sub) : Promise.resolve(null),
         sql`
           WITH track_plays AS (
-            SELECT t.id, t.name, t.name_search, COUNT(p.id)::int AS plays
+            SELECT t.id, t.name, t.name_search, t.artist_name_search,
+              MAX(ar.name_search) AS ar_name_search, COUNT(p.id)::int AS plays
             FROM tracks t
             JOIN plays p ON p.track_id = t.id
-            GROUP BY t.id, t.name, t.name_search
+            LEFT JOIN artists ar ON t.artist_id = ar.id
+            GROUP BY t.id, t.name, t.name_search, t.artist_name_search
           )
           SELECT tp.id, tp.name, tp.name_search, tp.plays
           FROM track_plays tp
@@ -331,7 +333,9 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
             AND (
               SELECT COUNT(*)
               FROM track_plays tp2
-              WHERE tp2.name_search LIKE '%' || replace(replace(replace(tp.name_search, '!', '!!'), '%', '!%'), '_', '!_') || '%' ESCAPE '!'
+              WHERE (tp2.name_search LIKE '%' || replace(replace(replace(tp.name_search, '!', '!!'), '%', '!%'), '_', '!_') || '%' ESCAPE '!'
+                  OR tp2.artist_name_search LIKE '%' || replace(replace(replace(tp.name_search, '!', '!!'), '%', '!%'), '_', '!_') || '%' ESCAPE '!'
+                  OR tp2.ar_name_search LIKE '%' || replace(replace(replace(tp.name_search, '!', '!!'), '%', '!%'), '_', '!_') || '%' ESCAPE '!')
                 AND (tp2.plays > tp.plays OR (tp2.plays = tp.plays AND tp2.name <= tp.name))
             ) <= 8
           ORDER BY tp.plays DESC, tp.name ASC
@@ -373,6 +377,10 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
       exact.artists.some((a) => a.name === topArtist.name),
       "exact search should include #1 artist"
     );
+    assert.ok(
+      exact.tracks.some((tr) => tr.artist === topArtist.name),
+      "searching the #1 artist's name should list that artist's tracks"
+    );
 
     assert.ok(upper);
     assert.ok(
@@ -400,7 +408,10 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
         assert.ok(normalizeForSearch(a.name).includes(wildcard));
       }
       for (const tr of res.tracks) {
-        assert.ok(normalizeForSearch(tr.name).includes(wildcard));
+        assert.ok(
+          normalizeForSearch(tr.name).includes(wildcard) ||
+            normalizeForSearch(tr.artist).includes(wildcard)
+        );
       }
     }
   });
