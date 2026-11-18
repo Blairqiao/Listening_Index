@@ -219,7 +219,7 @@ test('search route handles unexpected runtime errors with 500', async () => {
 
   const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/search?q=radio'));
   assert.equal(res.status, 500);
-  assert.deepEqual(await res.json(), { error: 'Database connection failed' });
+  assert.deepEqual(await res.json(), { error: 'Internal Server Error' });
 });
 
 test('profile route rejects missing or empty target with 400', async () => {
@@ -356,7 +356,7 @@ test('profile route handles unexpected runtime errors with 500', async () => {
 
   const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/profile?track=track_1'));
   assert.equal(res.status, 500);
-  assert.deepEqual(await res.json(), { error: 'Database query failure' });
+  assert.deepEqual(await res.json(), { error: 'Internal Server Error' });
 });
 
 test('queries barrel exports searchCatalog and getProfile', async () => {

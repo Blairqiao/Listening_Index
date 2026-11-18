@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import dotenv from "dotenv";
 import { getDb } from "../src/lib/db";
 import { getOverviewData } from "../src/lib/db/queries/overview";
-import { ensureTablesExist } from "../src/lib/db/queries/schema";
+import { migrateSchema } from "../src/lib/db/queries/schema";
 import { searchCatalog } from "../src/lib/db/queries/search";
 import { getProfile } from "../src/lib/db/queries/profile";
 import {
@@ -87,7 +87,7 @@ async function captureStableComparison<T>(
 }
 
 test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
-  await ensureTablesExist();
+  await migrateSchema();
   const sql = getDb();
 
   await t.test("ranks and plays match Overview for 1w and all", async () => {
@@ -236,7 +236,13 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
     assert.ok(Date.parse(trackAll.firstPlayedAt) <= Date.parse(trackAll.lastPlayedAt));
     assert.equal(trackAll.topTracks.length, 0);
     assert.equal(trackAll.topAlbums.length, 0);
-    assert.equal(track1d.activityCadence.length, 24);
+    // Main's 1d cadence has 25 hourly buckets unless now falls exactly on the hour.
+    assert.ok([24, 25].includes(track1d.activityCadence.length));
+    assert.equal(
+      track1d.activityCadence.reduce((sum, b) => sum + b.count, 0),
+      track1d.plays,
+      "scoped 1d cadence counts only this track's plays in range"
+    );
     assert.ok(trackAll.recentPlays.length > 0);
     assert.ok(trackAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
 
@@ -263,7 +269,12 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
     assert.ok(artistAll.topAlbums.length > 0);
     assert.ok(artistAll.topAlbums.length <= PROFILE_TOP_ALBUMS_LIMIT);
     assert.ok(artistAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
-    assert.equal(artist1d.activityCadence.length, 24);
+    assert.ok([24, 25].includes(artist1d.activityCadence.length));
+    assert.equal(
+      artist1d.activityCadence.reduce((sum, b) => sum + b.count, 0),
+      artist1d.plays,
+      "scoped 1d cadence counts only this artist's plays in range"
+    );
 
     for (let i = 1; i < artistAll.topTracks.length; i++) {
       assert.ok(artistAll.topTracks[i - 1].plays >= artistAll.topTracks[i].plays);

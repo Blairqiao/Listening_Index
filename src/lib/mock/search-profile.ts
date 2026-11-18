@@ -277,11 +277,11 @@ function computeCadenceRows(
   if (range === "1d") {
     filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 24 * 3600000);
   } else if (range === "1w") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 8 * 86400000);
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 7 * 86400000);
   } else if (range === "1m") {
     filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 30 * 86400000);
   } else if (range === "6m") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 182 * 86400000);
+    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 180 * 86400000);
   } else if (range === "1y") {
     filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 365 * 86400000);
   }
@@ -303,7 +303,8 @@ function computeCadenceRows(
     const m = Object.fromEntries(parts.map((pt) => [pt.type, pt.value]));
 
     if (range === "1d") {
-      const key = `${m.year}-${m.month}-${m.day} ${m.hour}`;
+      // Same UTC hour key as the SQL: 'YYYY-MM-DD"T"HH24:00:00"Z"'.
+      const key = new Date(p.playedAt).toISOString().slice(0, 13) + ":00:00Z";
       counts.set(key, (counts.get(key) ?? 0) + 1);
     } else if (range === "1w") {
       const day = `${m.year}-${m.month}-${m.day}`;
