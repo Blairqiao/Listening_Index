@@ -1,5 +1,4 @@
 import { getDb } from "../index";
-import { ensureTablesExist } from "./schema";
 import { isCatalogFullyEnriched } from "./enrichment";
 import {
   SEARCH_RESULT_LIMIT,
@@ -9,7 +8,6 @@ import {
 } from "@/lib/search-types";
 
 export async function searchCatalog(query: string): Promise<SearchResponse> {
-  await ensureTablesExist();
   const sql = getDb();
   const isEnriched = await isCatalogFullyEnriched();
 

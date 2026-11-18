@@ -84,32 +84,22 @@ test('getMockProfile for track provides all-time counts, lifetime bounds, and re
   assert.equal(oneDayProfile.recentPlays.length, 1);
 });
 
-test('getMockProfile calculates activityCadence with expected bucket lengths', () => {
-  const weirdFishesId = CATALOG.radiohead_weird_fishes.id;
-
-  const profile1d = getMockProfile(
-    { kind: 'track', key: weirdFishesId },
-    '1d',
-    'UTC'
-  );
-  assert.ok(profile1d);
-  assert.equal(profile1d.activityCadence.length, 24);
-
-  const profile1w = getMockProfile(
-    { kind: 'track', key: weirdFishesId },
-    '1w',
-    'UTC'
-  );
-  assert.ok(profile1w);
-  assert.equal(profile1w.activityCadence.length, 28);
-
-  const profile1m = getMockProfile(
-    { kind: 'track', key: weirdFishesId },
-    '1m',
-    'UTC'
-  );
-  assert.ok(profile1m);
-  assert.equal(profile1m.activityCadence.length, 30);
+test('getMockProfile activityCadence matches buildActivityCadence buckets and range plays', () => {
+  const radioheadId = CATALOG.radiohead_weird_fishes.artistId;
+  // The mock anchor is newest play + 1 minute, never on an hour or day boundary,
+  // so buildActivityCadence adds the partial leading bucket (25 hours, 8 days, 31 days).
+  const expectedLengths: Record<string, number> = { '1d': 25, '1w': 32, '1m': 31 };
+  for (const range of ['1d', '1w', '1m', '6m', '1y', 'all'] as const) {
+    for (const tz of ['UTC', 'Asia/Tokyo', 'America/Los_Angeles']) {
+      const profile = getMockProfile({ kind: 'artist', key: radioheadId }, range, tz);
+      assert.ok(profile);
+      if (expectedLengths[range]) {
+        assert.equal(profile.activityCadence.length, expectedLengths[range], `${range} ${tz} length`);
+      }
+      const total = profile.activityCadence.reduce((sum, b) => sum + b.count, 0);
+      assert.equal(total, profile.plays, `${range} ${tz} cadence total equals plays in range`);
+    }
+  }
 });
 
 test('getMockProfile separates artist top lists from track profiles', () => {
