@@ -12,6 +12,7 @@ interface MetricRibbonProps {
   artistRankFormat?: "rank" | "percentile";
   onToggleTrackRank?: () => void;
   onToggleArtistRank?: () => void;
+  onToggleProfileRank?: () => void;
 }
 
 export const getRibbonLabels = (
@@ -50,6 +51,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   onToggleTimeUnit,
   onToggleTrackRank,
   onToggleArtistRank,
+  onToggleProfileRank,
 }) => {
   const labels = getRibbonLabels(mode, overviewTimeUnit);
 
@@ -78,6 +80,11 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
           isToggleable = true;
           onToggle = onToggleArtistRank;
           ariaLabel = "Toggle artist rank format between rank position and percentile";
+          title = "Click to toggle between rank and percentile";
+        } else if (mode === 4 && i === 1 && onToggleProfileRank) {
+          isToggleable = true;
+          onToggle = onToggleProfileRank;
+          ariaLabel = `Rank ${metrics[i]}. Toggle between rank position and percentile`;
           title = "Click to toggle between rank and percentile";
         }
 

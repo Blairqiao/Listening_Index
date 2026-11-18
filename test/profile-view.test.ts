@@ -115,12 +115,10 @@ test("ProfileView: SSR ready state for artist profile", () => {
       data: mockArtistProfile,
       status: "ready",
       visitorTimezone: "UTC",
-      onBack: () => {},
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(markup.includes("[ ← SEARCH ]"), "Must include back button [ ← SEARCH ]");
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
   assert.ok(markup.includes("[ PLAYS / 1M ]"), "Chart must use PLAYS label with range");
   assert.ok(markup.includes('role="img"'), "Chart must retain role=img accessibility attribute");
@@ -139,28 +137,21 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.ok(markup.includes("[ TOP ALBUMS ]"), "Artist profile must render [ TOP ALBUMS ]");
 });
 
-test("ProfileView: SSR ready state for track profile with lifetime block", () => {
+test("ProfileView: SSR ready state for track profile without duplicated lifetime dates", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
       data: mockTrackProfile,
       status: "ready",
       visitorTimezone: "America/Chicago",
-      onBack: () => {},
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(markup.includes("[ ← SEARCH ]"), "Must include back button [ ← SEARCH ]");
   assert.ok(markup.includes("Weird Fishes / Arpeggi"), "Must include track title");
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
   assert.ok(markup.includes("In Rainbows"), "Must include album name");
-  assert.ok(markup.includes("[ LIFETIME ]"), "Track profile must include [ LIFETIME ] block");
-  assert.ok(markup.includes("FIRST PLAYED"), "Must include FIRST PLAYED label");
-  assert.ok(markup.includes("LAST PLAYED"), "Must include LAST PLAYED label");
-  // 2024-01-15T12:00:00Z in America/Chicago (CST = UTC-6) is 06:00 on 15 JAN 2024
-  assert.ok(markup.includes("15 JAN 2024"), "Must format lifetime firstPlayedAt in visitorTimezone");
-  // 2024-11-18T18:30:00Z in America/Chicago (CST = UTC-6) is 12:30 on 18 NOV 2024
-  assert.ok(markup.includes("18 NOV 2024"), "Must format lifetime lastPlayedAt in visitorTimezone");
+  assert.doesNotMatch(markup, /FIRST PLAYED|LAST PLAYED|LIFETIME/);
+  assert.match(markup, /md:col-span-full/);
   assert.ok(markup.includes("12:30"), "Must format recent play time in America/Chicago");
 });
 
@@ -187,12 +178,10 @@ test("ProfileView: SSR zero plays state renders empty message and retains chart"
       data: zeroProfile,
       status: "ready",
       visitorTimezone: "UTC",
-      onBack: () => {},
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(markup.includes("[ ← SEARCH ]"), "Must keep header back button");
   assert.ok(markup.includes("Radiohead"), "Must keep header artist name");
   assert.ok(markup.includes("[ PLAYS / 1M ]"), "Must keep chart header");
   assert.ok(markup.includes('role="img"'), "Must retain chart img role");
@@ -209,12 +198,10 @@ test("ProfileView: SSR error and not_found states", () => {
       data: null,
       status: "not_found",
       visitorTimezone: "UTC",
-      onBack: () => {},
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(notFoundMarkup.includes("[ ← SEARCH ]"), "not_found must include back button");
   assert.ok(notFoundMarkup.includes("[ NOT IN ARCHIVE ]"), "Must display [ NOT IN ARCHIVE ]");
 
   const errorMarkup = renderToStaticMarkup(
@@ -222,12 +209,10 @@ test("ProfileView: SSR error and not_found states", () => {
       data: null,
       status: "error",
       visitorTimezone: "UTC",
-      onBack: () => {},
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(errorMarkup.includes("[ ← SEARCH ]"), "error must include back button");
   assert.ok(
     errorMarkup.includes("[ COULDN&#x27;T LOAD PROFILE ]") ||
       errorMarkup.includes("[ COULDN'T LOAD PROFILE ]"),

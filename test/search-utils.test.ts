@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   RANGE_KEYS,
-  containsCjk,
   checkSearchQuery,
   normalizeForSearch,
   parseRangeKey,
@@ -13,20 +12,8 @@ test('RANGE_KEYS contains the six canonical overview range keys', () => {
   assert.deepEqual(RANGE_KEYS, ['1d', '1w', '1m', '6m', '1y', 'all']);
 });
 
-test('containsCjk identifies Han, Hiragana, Katakana, and Hangul characters', () => {
-  assert.equal(containsCjk('嵐'), true);
-  assert.equal(containsCjk('𠮷'), true);
-  assert.equal(containsCjk('あ'), true);
-  assert.equal(containsCjk('ア'), true);
-  assert.equal(containsCjk('한'), true);
-  assert.equal(containsCjk('abc'), false);
-  assert.equal(containsCjk('123'), false);
-  assert.equal(containsCjk('   '), false);
-  assert.equal(containsCjk(''), false);
-});
-
 test('checkSearchQuery validates lengths and trims search queries', () => {
-  assert.deepEqual(checkSearchQuery('a'), { ok: false, reason: 'too_short' });
+  assert.deepEqual(checkSearchQuery('a'), { ok: true, query: 'a' });
   assert.deepEqual(checkSearchQuery(' ab '), { ok: true, query: 'ab' });
   assert.deepEqual(checkSearchQuery('嵐'), { ok: true, query: '嵐' });
   assert.deepEqual(checkSearchQuery('𠮷'), { ok: true, query: '𠮷' });
@@ -35,8 +22,8 @@ test('checkSearchQuery validates lengths and trims search queries', () => {
   assert.deepEqual(checkSearchQuery('a'.repeat(101)), { ok: false, reason: 'too_long' });
   assert.deepEqual(checkSearchQuery('𠮷'.repeat(100)), { ok: true, query: '𠮷'.repeat(100) });
   assert.deepEqual(checkSearchQuery('𠮷'.repeat(101)), { ok: false, reason: 'too_long' });
-  assert.deepEqual(checkSearchQuery('   '), { ok: false, reason: 'empty' });
-  assert.deepEqual(checkSearchQuery(''), { ok: false, reason: 'empty' });
+  assert.deepEqual(checkSearchQuery('   '), { ok: true, query: '' });
+  assert.deepEqual(checkSearchQuery(''), { ok: true, query: '' });
 });
 
 test('normalizeForSearch strips accents, converts full-width chars, and lowercases', () => {

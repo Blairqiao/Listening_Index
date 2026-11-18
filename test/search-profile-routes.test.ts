@@ -9,7 +9,7 @@ import type { RangeKey } from '../src/lib/types';
 
 interface SearchRouteStubs {
   isDbConfigured?: () => boolean;
-  searchCatalog?: (query: string) => Promise<SearchResponse>;
+  searchCatalog?: (query: string, sort?: string, page?: number) => Promise<SearchResponse>;
   getMockSearch?: (query: string) => SearchResponse;
 }
 
@@ -19,12 +19,12 @@ function loadSearchRoute(stubs: SearchRouteStubs = {}) {
 
   const defaultSearchCatalog = async (query: string): Promise<SearchResponse> => {
     searchCatalogCalls.push(query);
-    return { query, artists: [], tracks: [] };
+    return { query, artists: [], tracks: [], hasMore: false };
   };
 
   const defaultMockSearch = (query: string): SearchResponse => {
     mockSearchCalls.push(query);
-    return { query, artists: [], tracks: [] };
+    return { query, artists: [], tracks: [], hasMore: false };
   };
 
   const mergedStubs = {
@@ -108,15 +108,25 @@ function loadProfileRoute(stubs: ProfileRouteStubs = {}) {
   return { route, getProfileCalls, mockProfileCalls };
 }
 
-test('search route rejects invalid query lengths and empty inputs with 400 and exact error', async () => {
+test('search route accepts an empty query and passes sort and page through', async () => {
+  const calls: unknown[][] = [];
+  const { route } = loadSearchRoute({
+    searchCatalog: async (query, sort, page) => {
+      calls.push([query, sort, page]);
+      return { query, artists: [], tracks: [], hasMore: false };
+    },
+  });
+
+  const response = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/search?sort=oldest&page=2'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, [['', 'oldest', 2]]);
+});
+
+test('search route rejects overlong queries with 400 and exact error', async () => {
   const { route, searchCatalogCalls, mockSearchCalls } = loadSearchRoute();
   assert.equal(route.dynamic, 'force-dynamic');
 
   const cases: Array<{ param: string; expectedReason: string }> = [
-    { param: 'q=a', expectedReason: 'too_short' },
-    { param: 'q=', expectedReason: 'empty' },
-    { param: 'q=%20%20%20', expectedReason: 'empty' },
-    { param: '', expectedReason: 'empty' },
     { param: `q=${'x'.repeat(101)}`, expectedReason: 'too_long' },
   ];
 
@@ -135,6 +145,7 @@ test('search route rejects invalid query lengths and empty inputs with 400 and e
 test('search route with configured database trims query and returns database results', async () => {
   const mockPayload: SearchResponse = {
     query: 'radio',
+    hasMore: false,
     artists: [{ key: 'art_1', name: 'Radiohead', plays: 100, imageUrl: null }],
     tracks: [{ id: 'tr_1', name: 'Reckoner', artist: 'Radiohead', album: 'In Rainbows', plays: 50, albumImageUrl: null }],
   };
@@ -158,6 +169,7 @@ test('search route with configured database trims query and returns database res
 test('search route falls back to mock when database is unconfigured', async () => {
   const mockResult: SearchResponse = {
     query: 'radio',
+    hasMore: false,
     artists: [{ key: 'art_mock', name: 'Radiohead', plays: 10, imageUrl: null }],
     tracks: [],
   };
@@ -183,6 +195,7 @@ test('search route forces mock when FORCE_MOCK_DATA is true despite configured d
   try {
     const mockResult: SearchResponse = {
       query: 'bjork',
+      hasMore: false,
       artists: [],
       tracks: [],
     };

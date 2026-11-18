@@ -1,6 +1,8 @@
 import type { RangeKey } from "@/lib/types";
 import {
+  DEFAULT_SEARCH_SORT,
   SEARCH_RESULT_LIMIT,
+  type SearchSort,
   PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
@@ -196,61 +198,57 @@ function deriveUniqueArtists(plays: NormalizedMockPlay[]): Map<string, DerivedMo
 const UNIQUE_TRACKS: Map<string, DerivedMockTrack> = deriveUniqueTracks(NORMALIZED_PLAYS);
 const UNIQUE_ARTISTS: Map<string, DerivedMockArtist> = deriveUniqueArtists(NORMALIZED_PLAYS);
 
-export function getMockSearch(query: string): SearchResponse {
+export function getMockSearch(
+  query: string,
+  sort: SearchSort = DEFAULT_SEARCH_SORT,
+  page = 1,
+): SearchResponse {
   const trimmed = query.trim();
   const normalizedQuery = normalizeForSearch(trimmed);
+  const offset = (page - 1) * SEARCH_RESULT_LIMIT;
+  const end = offset + SEARCH_RESULT_LIMIT;
+  const matches = (value: string) => normalizeForSearch(value).includes(normalizedQuery);
 
-  if (normalizedQuery.length === 0) {
-    return {
-      query: trimmed,
-      artists: [],
-      tracks: [],
-    };
+  function compare(a: DerivedMockTrack | DerivedMockArtist, b: DerivedMockTrack | DerivedMockArtist) {
+    const recency = Date.parse(b.lastPlayedAt) - Date.parse(a.lastPlayedAt);
+    const order = {
+      "most-plays": b.lifetimePlays - a.lifetimePlays,
+      "least-plays": a.lifetimePlays - b.lifetimePlays,
+      recent: recency,
+      oldest: -recency,
+    }[sort];
+    const aKey = "id" in a ? a.id : a.key;
+    const bKey = "id" in b ? b.id : b.key;
+    return order || a.name.localeCompare(b.name) || aKey.localeCompare(bKey);
   }
 
-  const matchedArtists: SearchArtistResult[] = [];
-  for (const artist of UNIQUE_ARTISTS.values()) {
-    if (normalizeForSearch(artist.name).includes(normalizedQuery)) {
-      matchedArtists.push({
-        key: artist.key,
-        name: artist.name,
-        plays: artist.lifetimePlays,
-        imageUrl: artist.imageUrl,
-      });
-    }
-  }
+  const matchedArtists = [...UNIQUE_ARTISTS.values()]
+    .filter((artist) => matches(artist.name))
+    .sort(compare);
+  const matchedTracks = [...UNIQUE_TRACKS.values()]
+    .filter((track) => matches(track.name) || matches(track.artist))
+    .sort(compare);
 
-  matchedArtists.sort((a, b) => {
-    if (b.plays !== a.plays) return b.plays - a.plays;
-    return a.name.localeCompare(b.name);
-  });
-
-  const matchedTracks: SearchTrackResult[] = [];
-  for (const track of UNIQUE_TRACKS.values()) {
-    if (
-      normalizeForSearch(track.name).includes(normalizedQuery) ||
-      normalizeForSearch(track.artist).includes(normalizedQuery)
-    ) {
-      matchedTracks.push({
-        id: track.id,
-        name: track.name,
-        artist: track.artist,
-        album: track.album,
-        plays: track.lifetimePlays,
-        albumImageUrl: track.albumImageUrl,
-      });
-    }
-  }
-
-  matchedTracks.sort((a, b) => {
-    if (b.plays !== a.plays) return b.plays - a.plays;
-    return a.name.localeCompare(b.name);
-  });
+  const artists: SearchArtistResult[] = matchedArtists.slice(offset, end).map((artist) => ({
+    key: artist.key,
+    name: artist.name,
+    plays: artist.lifetimePlays,
+    imageUrl: artist.imageUrl,
+  }));
+  const tracks: SearchTrackResult[] = matchedTracks.slice(offset, end).map((track) => ({
+    id: track.id,
+    name: track.name,
+    artist: track.artist,
+    album: track.album,
+    plays: track.lifetimePlays,
+    albumImageUrl: track.albumImageUrl,
+  }));
 
   return {
     query: trimmed,
-    artists: matchedArtists.slice(0, SEARCH_RESULT_LIMIT),
-    tracks: matchedTracks.slice(0, SEARCH_RESULT_LIMIT),
+    artists,
+    tracks,
+    hasMore: matchedArtists.length > end || matchedTracks.length > end,
   };
 }
 

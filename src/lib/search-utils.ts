@@ -1,6 +1,9 @@
 import type { RangeKey } from "@/lib/types";
 import {
+  DEFAULT_SEARCH_SORT,
   SEARCH_MAX_CHARS,
+  SEARCH_RESULT_LIMIT,
+  SEARCH_SORT_OPTIONS,
   type ProfileTarget,
 } from "@/lib/search-types";
 
@@ -8,31 +11,28 @@ export const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
 export type SearchQueryCheck =
   | { ok: true; query: string }
-  | { ok: false; reason: "empty" | "too_short" | "too_long" };
-
-const CJK_REGEX = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+  | { ok: false; reason: "too_long" };
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHAR_REGEX = /[\u0000-\u001f\u007f]/;
 
-export function containsCjk(s: string): boolean {
-  return CJK_REGEX.test(s);
-}
-
 export function checkSearchQuery(raw: string): SearchQueryCheck {
   const query = raw.trim();
-  if (query === "") {
-    return { ok: false, reason: "empty" };
-  }
   const charCount = [...query].length;
-  const minChars = containsCjk(query) ? 1 : 2;
-  if (charCount < minChars) {
-    return { ok: false, reason: "too_short" };
-  }
   if (charCount > SEARCH_MAX_CHARS) {
     return { ok: false, reason: "too_long" };
   }
   return { ok: true, query };
+}
+
+export function parseSearchSort(raw: string | null) {
+  return SEARCH_SORT_OPTIONS.find(({ value }) => value === raw)?.value ?? DEFAULT_SEARCH_SORT;
+}
+
+export function parseSearchPage(raw: string | null): number {
+  if (!raw || !/^[1-9][0-9]*$/.test(raw)) return 1;
+  const page = Number(raw);
+  return Number.isSafeInteger(page * SEARCH_RESULT_LIMIT) ? page : 1;
 }
 
 export function normalizeForSearch(s: string): string {

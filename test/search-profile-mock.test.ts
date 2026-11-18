@@ -140,3 +140,24 @@ test('getMockProfile returns null for unknown targets', () => {
     null
   );
 });
+
+test('empty search pages through the catalog with global sort order', () => {
+  const first = getMockSearch('');
+  const next = getMockSearch('', 'most-plays', 2);
+  const least = getMockSearch('', 'least-plays');
+  assert.ok(first.tracks.length > 0 && next.tracks.length > 0);
+  assert.ok(first.tracks.every(track => !next.tracks.some(other => other.id === track.id)));
+  assert.ok(first.tracks.at(-1)!.plays >= next.tracks[0].plays);
+  assert.ok(least.tracks[0].plays < first.tracks[0].plays);
+
+  for (const sort of ['recent', 'oldest'] as const) {
+    const data = getMockSearch('', sort);
+    for (const kind of ['track', 'artist'] as const) {
+      const keys = kind === 'track' ? data.tracks.map(row => row.id) : data.artists.map(row => row.key);
+      const dates = keys.map(key => Date.parse(getMockProfile({ kind, key }, 'all', 'UTC')!.lastPlayedAt!));
+      assert.ok(dates.length > 1);
+      assert.ok(dates.every((date, index) => index === 0 ||
+        (sort === 'recent' ? date <= dates[index - 1] : date >= dates[index - 1])));
+    }
+  }
+});

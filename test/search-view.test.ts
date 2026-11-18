@@ -4,7 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { useSearch } from "../src/components/views/search-view/useSearch";
 import { SearchView } from "../src/components/views/search-view/SearchView";
-import type { SearchResponse } from "../src/lib/search-types";
+import type { SearchResponse, SearchSort } from "../src/lib/search-types";
 
 function createHookHarness() {
   const stateValues: unknown[] = [];
@@ -48,7 +48,7 @@ function createHookHarness() {
     },
   };
 
-  const runTurn = (q: string) => {
+  const runTurn = (q: string, sort?: SearchSort, page?: number) => {
     let result: ReturnType<typeof useSearch> | undefined;
     let passes = 0;
     do {
@@ -57,7 +57,7 @@ function createHookHarness() {
       effectCursor = 0;
       isRendering = true;
       try {
-        result = useSearch(q);
+        result = useSearch(q, sort, page);
       } finally {
         isRendering = false;
       }
@@ -161,36 +161,26 @@ test("SearchView SSR: renders named input, placeholder, maxLength, and desktop s
   );
 });
 
-test("SearchView status line: empty, too_short, too_long, loading, and no_matches", async () => {
-  // 1. Empty query -> status line is empty
-  const emptyHtml = renderToStaticMarkup(
+test("SearchView browses on empty input and accepts a single character", async () => {
+  await primeSearch("", {
+    query: "",
+    hasMore: true,
+    artists: [{ key: "artist-1", name: "Default Artist", plays: 10, imageUrl: null }],
+    tracks: [],
+  });
+  const render = (query: string) => renderToStaticMarkup(
     React.createElement(SearchView, {
-      query: "",
+      query,
       onQueryChange: () => {},
       onOpenProfile: () => {},
     })
   );
-  assert.ok(
-    !emptyHtml.includes("TYPE 2+ CHARACTERS"),
-    "Empty query must not show too_short hint"
-  );
-  assert.ok(
-    !emptyHtml.includes("SEARCHING"),
-    "Empty query must not show SEARCHING"
-  );
-
-  // 2. Too short query
-  const shortHtml = renderToStaticMarkup(
-    React.createElement(SearchView, {
-      query: "r",
-      onQueryChange: () => {},
-      onOpenProfile: () => {},
-    })
-  );
-  assert.ok(
-    shortHtml.includes("TYPE 2+ CHARACTERS (1 FOR 中文 / 日本語 / 한국어)"),
-    "Single ASCII character must show too_short status hint"
-  );
+  assert.match(render(""), /Default Artist/);
+  assert.match(render(""), /aria-label="Next page"/);
+  assert.match(render(""), /Most plays.*Least plays.*Most recent.*Least recent/);
+  const shortHtml = render("r");
+  assert.match(shortHtml, /SEARCHING/);
+  assert.doesNotMatch(shortHtml, /TYPE 2/);
 
   // 3. Too long query (>100 characters)
   const longHtml = renderToStaticMarkup(
@@ -221,6 +211,7 @@ test("SearchView status line: empty, too_short, too_long, loading, and no_matche
   // 5. Ready with no results -> [ NO MATCHES ] (cached via hook execution)
   await primeSearch("noresults", {
     query: "noresults",
+    hasMore: false,
     artists: [],
     tracks: [],
   });
@@ -240,6 +231,7 @@ test("SearchView status line: empty, too_short, too_long, loading, and no_matche
 test("SearchView results rendering: columns, row style, artwork, and buttons without wrapper role", async () => {
   const mockResponse: SearchResponse = {
     query: "radio",
+    hasMore: false,
     artists: [
       {
         key: "4Z8W4fKeB5YxbusRsdQVPb",
@@ -343,8 +335,8 @@ test("useSearch hook behavior: debounce, abort, stale response, error-whitespace
   }) as typeof fetch;
 
   try {
-    // 1. Initial idle query
-    let res = harness.runTurn("");
+    // 1. Overlong queries do not start a request
+    let res = harness.runTurn("a".repeat(101));
     assert.equal(res.status, "idle");
     assert.equal(res.data, null);
     assert.equal(fetchCalls.length, 0);
@@ -419,10 +411,17 @@ test("useSearch hook behavior: debounce, abort, stale response, error-whitespace
     assert.equal(res.status, "ready");
     assert.equal(res.data?.artists[0]?.name, "Artist fast-q", "Stale response must not overwrite current ready data");
 
-    // 6. Idle clearance: clearing query back to "" must clear data to null
-    res = harness.runTurn("");
-    assert.equal(res.status, "idle");
-    assert.equal(res.data, null, "Idle clearance must reset data to null");
+    // Clearing the search returns to the catalog instead of keeping the previous matches.
+    res = harness.runTurn("", "oldest", 2);
+    assert.equal(res.status, "loading");
+    assert.equal(res.data, null);
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    const browseUrl = new URL(fetchCalls.at(-1)!.url, "http://localhost");
+    assert.equal(browseUrl.searchParams.get("q"), "");
+    assert.equal(browseUrl.searchParams.get("sort"), "oldest");
+    assert.equal(browseUrl.searchParams.get("page"), "2");
+    assert.equal(harness.runTurn("", "oldest", 2).status, "ready");
 
     // 7. Regression for Finding (1): non-OK fetch then surrounding whitespace
     res = harness.runTurn("fail-q");

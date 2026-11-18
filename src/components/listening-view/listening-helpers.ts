@@ -169,7 +169,8 @@ export function formatProfileRibbonMetrics(
   status: ProfileStatus,
   target: ProfileTarget | null,
   range: RangeKey,
-  visitorTimezone: string
+  visitorTimezone: string,
+  rankFormat: "rank" | "percentile" = "rank",
 ): [string, string, string, string] {
   if (
     status !== "ready" ||
@@ -185,7 +186,7 @@ export function formatProfileRibbonMetrics(
   const plays = String(data.plays);
   const rank =
     data.rank !== null && data.rank > 0
-      ? `#${String(data.rank).padStart(2, "0")} / ${data.rankedTotal}`
+      ? formatRankDisplay(data.rank, data.rankedTotal, rankFormat)
       : "--";
 
   const formatDate = (iso: string | null): string => {
