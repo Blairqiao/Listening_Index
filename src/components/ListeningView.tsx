@@ -223,6 +223,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     profileData,
     profileStatus,
     handleOpenProfile,
+    handleOpenRelatedProfile,
     handleProfileBack,
     handleSelectProfileRange,
   } = useSearchProfile({
@@ -516,7 +517,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   status={profileStatus}
                   visitorTimezone={visitorTimezone}
                   onBack={handleProfileBack}
-                  onOpenProfile={handleOpenProfile}
+                  onOpenProfile={handleOpenRelatedProfile}
                 />
               ) : (
                 <SearchView

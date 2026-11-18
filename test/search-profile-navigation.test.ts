@@ -454,15 +454,15 @@ test("useSearchProfile: query persistence, activeRange open, reload prange, dimm
       assert.equal(state.profileStatus, "ready");
       assert.equal(state.profileData?.range, "all");
 
-      // 5. Opening a top Track from artist profile uses Overview activeRange ("6m") and clears artist data
-      state.handleOpenProfile({ kind: "track", key: "top-track-1" });
+      // 5. Opening a top Track from the artist profile keeps the profile's range ("all") and clears artist data
+      state.handleOpenRelatedProfile({ kind: "track", key: "top-track-1" });
       state = harness.renderOnce({
         activeMode: 4,
         activeRange: "6m",
         visitorTimezone: "UTC",
         initialRange: "1w",
       });
-      assert.equal(state.profileRange, "6m");
+      assert.equal(state.profileRange, "all");
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
       await flushMicrotasks();

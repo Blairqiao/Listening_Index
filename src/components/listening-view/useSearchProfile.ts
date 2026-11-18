@@ -39,9 +39,8 @@ export function useSearchProfile({
   const profileCacheRef = useRef<Map<string, ProfileData>>(new Map());
   const requestGenerationRef = useRef(0);
 
-  const handleOpenProfile = useCallback(
-    (target: ProfileTarget) => {
-      const nextRange = activeRange;
+  const openProfileAt = useCallback(
+    (target: ProfileTarget, nextRange: RangeKey) => {
       const cacheKey = getProfileCacheKey(target, nextRange, visitorTimezone);
       const cached = profileCacheRef.current.get(cacheKey);
 
@@ -65,7 +64,19 @@ export function useSearchProfile({
       setRawProfileData((prev) => resolveDisplayedProfileData(prev, target));
       setProfileStatus("loading");
     },
-    [activeRange, visitorTimezone]
+    [visitorTimezone]
+  );
+
+  // From Search results: start at Overview's current range.
+  const handleOpenProfile = useCallback(
+    (target: ProfileTarget) => openProfileAt(target, activeRange),
+    [openProfileAt, activeRange]
+  );
+
+  // From inside a profile (a top Track): keep the profile's range, since its lists were ranked in it.
+  const handleOpenRelatedProfile = useCallback(
+    (target: ProfileTarget) => openProfileAt(target, profileRange),
+    [openProfileAt, profileRange]
   );
 
   const handleProfileBack = useCallback(() => {
@@ -232,6 +243,7 @@ export function useSearchProfile({
     profileData,
     profileStatus,
     handleOpenProfile,
+    handleOpenRelatedProfile,
     handleProfileBack,
     handleSelectProfileRange,
   };
