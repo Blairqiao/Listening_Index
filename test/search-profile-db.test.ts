@@ -1,0 +1,412 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import dotenv from "dotenv";
+import { getDb } from "../src/lib/db";
+import { getOverviewData } from "../src/lib/db/queries/overview";
+import { ensureTablesExist } from "../src/lib/db/queries/schema";
+import { searchCatalog } from "../src/lib/db/queries/search";
+import { getProfile } from "../src/lib/db/queries/profile";
+import {
+  PROFILE_RECENT_PLAYS_LIMIT,
+  PROFILE_TOP_ALBUMS_LIMIT,
+  PROFILE_TOP_TRACKS_LIMIT,
+  SEARCH_RESULT_LIMIT,
+} from "../src/lib/search-types";
+import { checkSearchQuery, normalizeForSearch } from "../src/lib/search-utils";
+
+dotenv.config({ path: ".env.local", quiet: true });
+
+const skipWithoutDb = !process.env.DATABASE_URL;
+const MAX_STABLE_SNAPSHOT_ATTEMPTS = 8;
+const STABLE_SNAPSHOT_RETRY_DELAY_MS = 150;
+
+interface DatasetSnapshot {
+  playCount: string;
+  maxPlayId: string;
+  trackCount: string;
+  pendingTrackCount: string;
+  artistCount: string;
+}
+
+async function readDatasetSnapshot(sql: ReturnType<typeof getDb>): Promise<DatasetSnapshot> {
+  const [row] = await sql`
+    SELECT
+      (SELECT COUNT(*)::text FROM plays) AS play_count,
+      (SELECT COALESCE(MAX(id), 0)::text FROM plays) AS max_play_id,
+      (SELECT COUNT(*)::text FROM tracks) AS track_count,
+      (SELECT COUNT(*)::text FROM tracks WHERE enrichment_status = 'pending') AS pending_track_count,
+      (SELECT COUNT(*)::text FROM artists) AS artist_count;
+  `;
+  return {
+    playCount: String(row.play_count),
+    maxPlayId: String(row.max_play_id),
+    trackCount: String(row.track_count),
+    pendingTrackCount: String(row.pending_track_count),
+    artistCount: String(row.artist_count),
+  };
+}
+
+function snapshotsEqual(a: DatasetSnapshot, b: DatasetSnapshot): boolean {
+  return (
+    a.playCount === b.playCount &&
+    a.maxPlayId === b.maxPlayId &&
+    a.trackCount === b.trackCount &&
+    a.pendingTrackCount === b.pendingTrackCount &&
+    a.artistCount === b.artistCount
+  );
+}
+
+async function captureStableComparison<T>(
+  sql: ReturnType<typeof getDb>,
+  label: string,
+  runQueries: () => Promise<T>
+): Promise<T> {
+  const changes: string[] = [];
+
+  for (let attempt = 1; attempt <= MAX_STABLE_SNAPSHOT_ATTEMPTS; attempt++) {
+    const before = await readDatasetSnapshot(sql);
+    const result = await runQueries();
+    const after = await readDatasetSnapshot(sql);
+
+    if (snapshotsEqual(before, after)) {
+      return result;
+    }
+
+    changes.push(
+      `attempt ${attempt}: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`
+    );
+
+    if (attempt < MAX_STABLE_SNAPSHOT_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, STABLE_SNAPSHOT_RETRY_DELAY_MS));
+    }
+  }
+
+  assert.fail(
+    `[${label}] Shared test DB mutated across all ${MAX_STABLE_SNAPSHOT_ATTEMPTS} read-only attempts:\n${changes.join("\n")}`
+  );
+}
+
+test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
+  await ensureTablesExist();
+  const sql = getDb();
+
+  await t.test("ranks and plays match Overview for 1w and all", async () => {
+    for (const range of ["1w", "all"] as const) {
+      const { trackPairs, artistPairs } = await captureStableComparison(
+        sql,
+        `ranks-and-plays-${range}`,
+        async () => {
+          const overview = await getOverviewData(range, "UTC");
+          const tracksToCheck = overview.topTracks.slice(0, 3);
+          const trackProfiles = await Promise.all(
+            tracksToCheck.map((track) => getProfile({ kind: "track", key: track.id }, range, "UTC"))
+          );
+          const trackPairs = tracksToCheck.map((track, idx) => ({
+            track,
+            profile: trackProfiles[idx],
+          }));
+
+          const topArtists = overview.topArtists;
+          const artistCandidates: Array<{
+            index: number;
+            artist: (typeof topArtists)[number];
+          }> = [];
+          for (let i = 0; i < Math.min(3, topArtists.length); i++) {
+            const artist = topArtists[i];
+            if (!artist.id) continue;
+
+            const prevTies =
+              i > 0 &&
+              topArtists[i - 1].count === artist.count &&
+              topArtists[i - 1].name === artist.name;
+            const nextTies =
+              i + 1 < topArtists.length &&
+              topArtists[i + 1].count === artist.count &&
+              topArtists[i + 1].name === artist.name;
+            if (prevTies || nextTies) continue;
+
+            artistCandidates.push({ index: i, artist });
+          }
+
+          const artistProfiles = await Promise.all(
+            artistCandidates.map(({ artist }) =>
+              getProfile({ kind: "artist", key: artist.id! }, range, "UTC")
+            )
+          );
+          const artistPairs = artistCandidates.map((candidate, idx) => ({
+            ...candidate,
+            profile: artistProfiles[idx],
+          }));
+
+          return { trackPairs, artistPairs };
+        }
+      );
+
+      for (const { track, profile } of trackPairs) {
+        assert.ok(profile, `expected track profile for ${track.id} in ${range}`);
+        assert.equal(profile.kind, "track");
+        assert.equal(profile.key, track.id);
+        assert.equal(profile.plays, track.plays);
+        assert.equal(profile.rank, Number(track.rank));
+        assert.ok(profile.rankedTotal >= (profile.rank ?? 0));
+      }
+
+      for (const { index: i, artist, profile } of artistPairs) {
+        assert.ok(profile, `expected artist profile for ${artist.id} in ${range}`);
+        assert.equal(profile.kind, "artist");
+        assert.equal(profile.plays, artist.count);
+        assert.equal(profile.rank, i + 1);
+        assert.ok(profile.rankedTotal >= (profile.rank ?? 0));
+      }
+    }
+  });
+
+  await t.test("artist profile resolves both artist_id and artist_group_key to the same canonical profile", async () => {
+    const { rows, byId, byGroupKey } = await captureStableComparison(
+      sql,
+      "artist-key-forms",
+      async () => {
+        const rows = await sql`
+          SELECT t.artist_id, t.artist_group_key
+          FROM tracks t
+          JOIN plays p ON p.track_id = t.id
+          WHERE t.artist_id IS NOT NULL
+            AND t.artist_group_key IS NOT NULL
+          GROUP BY t.artist_id, t.artist_group_key
+          HAVING (
+            SELECT COUNT(DISTINCT t2.artist_id)
+            FROM tracks t2
+            WHERE t2.artist_group_key = t.artist_group_key
+              AND t2.artist_id IS NOT NULL
+          ) = 1
+          ORDER BY COUNT(p.id) DESC
+          LIMIT 1;
+        `;
+        if (rows.length === 0) {
+          return { rows, byId: null, byGroupKey: null };
+        }
+
+        const { artist_id: artistId, artist_group_key: groupKey } = rows[0] as {
+          artist_id: string;
+          artist_group_key: string;
+        };
+
+        const [byId, byGroupKey] = await Promise.all([
+          getProfile({ kind: "artist", key: artistId }, "all", "UTC"),
+          getProfile({ kind: "artist", key: groupKey }, "all", "UTC"),
+        ]);
+        return { rows, byId, byGroupKey };
+      }
+    );
+
+    assert.ok(rows.length > 0, "expected at least one enriched artist with artist_group_key");
+    assert.ok(byId);
+    assert.ok(byGroupKey);
+    assert.equal(byId.key, byGroupKey.key);
+    assert.equal(byId.plays, byGroupKey.plays);
+    assert.equal(byId.name, byGroupKey.name);
+  });
+
+  await t.test("lifetime fields, recentPlays order/limit, and artist lists", async () => {
+    const { overviewAll, topArtist, track1d, trackAll, artist1d, artistAll } =
+      await captureStableComparison(sql, "lifetime-fields-and-lists", async () => {
+        const overviewAll = await getOverviewData("all", "UTC");
+        const topTrack = overviewAll.topTracks[0];
+        const topArtist = overviewAll.topArtists.find((a) => Boolean(a.id));
+
+        const [track1d, trackAll, artist1d, artistAll] = await Promise.all([
+          topTrack ? getProfile({ kind: "track", key: topTrack.id }, "1d", "UTC") : null,
+          topTrack ? getProfile({ kind: "track", key: topTrack.id }, "all", "UTC") : null,
+          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, "1d", "UTC") : null,
+          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, "all", "UTC") : null,
+        ]);
+
+        return { overviewAll, topArtist, track1d, trackAll, artist1d, artistAll };
+      });
+
+    assert.ok(overviewAll.topTracks.length > 0, "expected top tracks in all-time overview");
+    assert.ok(overviewAll.topArtists.length > 0, "expected top artists in all-time overview");
+
+    assert.ok(track1d);
+    assert.ok(trackAll);
+    assert.ok(trackAll.firstPlayedAt);
+    assert.ok(trackAll.lastPlayedAt);
+    assert.equal(track1d.firstPlayedAt, trackAll.firstPlayedAt);
+    assert.equal(track1d.lastPlayedAt, trackAll.lastPlayedAt);
+    assert.ok(Date.parse(trackAll.firstPlayedAt) <= Date.parse(trackAll.lastPlayedAt));
+    assert.equal(trackAll.topTracks.length, 0);
+    assert.equal(trackAll.topAlbums.length, 0);
+    assert.equal(track1d.activityCadence.length, 24);
+    assert.ok(trackAll.recentPlays.length > 0);
+    assert.ok(trackAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
+
+    for (let i = 1; i < trackAll.recentPlays.length; i++) {
+      const prev = trackAll.recentPlays[i - 1];
+      const curr = trackAll.recentPlays[i];
+      const prevTime = Date.parse(prev.playedAt);
+      const currTime = Date.parse(curr.playedAt);
+      assert.ok(
+        prevTime > currTime || (prevTime === currTime && BigInt(prev.id) > BigInt(curr.id)),
+        "expected recentPlays ordered by played_at DESC, id DESC"
+      );
+    }
+
+    assert.ok(topArtist?.id, "expected an all-time top artist with id");
+    assert.ok(artist1d);
+    assert.ok(artistAll);
+    assert.equal(artistAll.artistName, null);
+    assert.equal(artistAll.albumName, null);
+    assert.equal(artist1d.firstPlayedAt, artistAll.firstPlayedAt);
+    assert.equal(artist1d.lastPlayedAt, artistAll.lastPlayedAt);
+    assert.ok(artistAll.topTracks.length > 0);
+    assert.ok(artistAll.topTracks.length <= PROFILE_TOP_TRACKS_LIMIT);
+    assert.ok(artistAll.topAlbums.length > 0);
+    assert.ok(artistAll.topAlbums.length <= PROFILE_TOP_ALBUMS_LIMIT);
+    assert.ok(artistAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
+    assert.equal(artist1d.activityCadence.length, 24);
+
+    for (let i = 1; i < artistAll.topTracks.length; i++) {
+      assert.ok(artistAll.topTracks[i - 1].plays >= artistAll.topTracks[i].plays);
+    }
+    for (let i = 1; i < artistAll.topAlbums.length; i++) {
+      assert.ok(artistAll.topAlbums[i - 1].plays >= artistAll.topAlbums[i].plays);
+    }
+  });
+
+  await t.test("searchCatalog handles case, substrings, accents, and escaped wildcards", async () => {
+    const {
+      topArtist,
+      exact,
+      upper,
+      sub,
+      subRes,
+      accented,
+      accentedRes,
+      wildcardResults,
+    } = await captureStableComparison(sql, "search-catalog", async () => {
+      const overviewAll = await getOverviewData("all", "UTC");
+      const topArtist = overviewAll.topArtists[0];
+      if (!topArtist) {
+        return {
+          topArtist: undefined,
+          exact: null,
+          upper: null,
+          sub: "",
+          subRes: null,
+          accented: null,
+          accentedRes: null,
+          wildcardResults: [] as Array<{ query: string; res: Awaited<ReturnType<typeof searchCatalog>> }>,
+        };
+      }
+
+      const sub = [...topArtist.name].slice(0, Math.min(3, [...topArtist.name].length)).join("");
+
+      const [exact, upper, subRes, accentedRows, ...wildcards] = await Promise.all([
+        searchCatalog(topArtist.name),
+        searchCatalog(topArtist.name.toUpperCase()),
+        checkSearchQuery(sub).ok ? searchCatalog(sub) : Promise.resolve(null),
+        sql`
+          WITH track_plays AS (
+            SELECT t.id, t.name, t.name_search, COUNT(p.id)::int AS plays
+            FROM tracks t
+            JOIN plays p ON p.track_id = t.id
+            GROUP BY t.id, t.name, t.name_search
+          )
+          SELECT tp.id, tp.name, tp.name_search, tp.plays
+          FROM track_plays tp
+          WHERE tp.name_search IS DISTINCT FROM lower(tp.name)
+            AND char_length(tp.name_search) >= 2
+            AND char_length(tp.name_search) <= 100
+            AND (
+              SELECT COUNT(*)
+              FROM track_plays tp2
+              WHERE tp2.name_search LIKE '%' || replace(replace(replace(tp.name_search, '!', '!!'), '%', '!%'), '_', '!_') || '%' ESCAPE '!'
+                AND (tp2.plays > tp.plays OR (tp2.plays = tp.plays AND tp2.name <= tp.name))
+            ) <= 8
+          ORDER BY tp.plays DESC, tp.name ASC
+          LIMIT 1;
+        `,
+        ...["%%", "__", "％％", "＿＿"].map(async (query) => ({
+          query,
+          res: await searchCatalog(query),
+        })),
+      ]);
+
+      const accented =
+        accentedRows.length > 0
+          ? (accentedRows[0] as { id: string; name: string; name_search: string })
+          : null;
+      const accentedRes =
+        accented && checkSearchQuery(accented.name_search).ok
+          ? await searchCatalog(accented.name_search)
+          : null;
+
+      return {
+        topArtist,
+        exact,
+        upper,
+        sub,
+        subRes,
+        accented,
+        accentedRes,
+        wildcardResults: wildcards,
+      };
+    });
+
+    assert.ok(topArtist, "expected #1 all-time artist");
+    assert.ok(exact);
+    assert.equal(exact.query, topArtist.name);
+    assert.ok(exact.artists.length <= SEARCH_RESULT_LIMIT);
+    assert.ok(exact.tracks.length <= SEARCH_RESULT_LIMIT);
+    assert.ok(
+      exact.artists.some((a) => a.name === topArtist.name),
+      "exact search should include #1 artist"
+    );
+
+    assert.ok(upper);
+    assert.ok(
+      upper.artists.some((a) => a.name === topArtist.name),
+      "uppercase search should include #1 artist"
+    );
+
+    if (subRes) {
+      assert.ok(
+        subRes.artists.some((a) => a.name === topArtist.name),
+        `substring search (${sub}) should include #1 artist`
+      );
+    }
+
+    if (accented && accentedRes) {
+      assert.ok(
+        accentedRes.tracks.some((tr) => tr.id === accented.id),
+        `normalized search for "${accented.name_search}" should include track "${accented.name}"`
+      );
+    }
+
+    for (const { query, res } of wildcardResults) {
+      const wildcard = normalizeForSearch(query);
+      for (const a of res.artists) {
+        assert.ok(normalizeForSearch(a.name).includes(wildcard));
+      }
+      for (const tr of res.tracks) {
+        assert.ok(normalizeForSearch(tr.name).includes(wildcard));
+      }
+    }
+  });
+
+  await t.test("getProfile returns null for unknown targets", async () => {
+    const unknownTrack = await getProfile(
+      { kind: "track", key: "unknown-track-000000000000" },
+      "all",
+      "UTC"
+    );
+    const unknownArtist = await getProfile(
+      { kind: "artist", key: "unknown-artist-000000000000" },
+      "1w",
+      "UTC"
+    );
+
+    assert.equal(unknownTrack, null);
+    assert.equal(unknownArtist, null);
+  });
+});
