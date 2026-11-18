@@ -8,6 +8,7 @@ import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
+import { parseProfileTarget, parseRangeKey } from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,9 @@ interface PageProps {
     range?: string;
     session?: string;
     config?: string;
+    track?: string | string[];
+    artist?: string | string[];
+    prange?: string | string[];
   }>;
 }
 
@@ -50,6 +54,14 @@ export default async function Page({ searchParams }: PageProps) {
       ? (parseInt(modeParam, 10) as Mode)
       : 0;
 
+  const initialProfile =
+    initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;
+  const rawPrange = Array.isArray(resolvedParams?.prange)
+    ? resolvedParams.prange[0]
+    : resolvedParams?.prange;
+  const initialProfileRange =
+    initialMode === 4 ? parseRangeKey(rawPrange) : null;
+
   const activeConfig = isForceMock ? DEFAULT_SITE_CONFIG : await getActiveSiteConfig();
   const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
   const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
@@ -68,6 +80,8 @@ export default async function Page({ searchParams }: PageProps) {
       initialIsAuthenticated={initialIsAuthenticated}
       initialMode={initialMode}
       initialRange={initialRange}
+      initialProfile={initialProfile}
+      initialProfileRange={initialProfileRange}
     />
   );
 }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as timezoneUtils from '../src/lib/timezone-utils';
+import * as searchUtils from '../src/lib/search-utils';
 
 test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all initial queries', async () => {
   for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'UTC'], ['', 'UTC']]) {
@@ -15,6 +16,7 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
       '@/lib/db/queries': { getActiveSiteConfig: async () => ({}), getInitialMusicData: async (...args: unknown[]) => { calls.push(args); return {}; } },
       '@/lib/db': { isDbConfigured: () => true }, '@/lib/admin-auth': { ADMIN_COOKIE_NAME: 'admin_session', verifySessionToken: () => false },
       '@/lib/timezone-utils': timezoneUtils,
+      '@/lib/search-utils': searchUtils,
     };
     const js = ts.transpileModule(readFileSync('src/app/page.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React } }).outputText;
     const mod = { exports: {} as { default: (props: object) => Promise<{ props: Record<string, unknown> }> } };

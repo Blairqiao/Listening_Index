@@ -10,6 +10,8 @@ import { LivePlayerView } from "@/components/views/live-player-view/LivePlayerVi
 import { OverviewView } from "@/components/views/OverviewView";
 import { StreamLogView } from "@/components/views/StreamLogView";
 import { SessionView } from "@/components/views/session-view/SessionView";
+import { SearchView } from "@/components/views/search-view/SearchView";
+import { ProfileView } from "@/components/views/search-view/ProfileView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -27,6 +29,7 @@ import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLogi
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
+import type { ProfileTarget } from "@/lib/search-types";
 import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
@@ -41,8 +44,11 @@ import { useListeningSync } from "./listening-view/useListeningSync";
 import { usePersistedToggle } from "./listening-view/usePersistedToggle";
 import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
+import { useSearchProfile } from "./listening-view/useSearchProfile";
 import {
+  buildListeningUrlSearch,
   computeLivePlayerMetrics,
+  formatProfileRibbonMetrics,
   resolveActiveEntity,
   sanitizeActiveMode,
   EMPTY_OVERVIEW,
@@ -59,6 +65,8 @@ interface ListeningViewProps {
   initialIsAuthenticated?: boolean;
   initialMode?: Mode;
   initialRange?: RangeKey;
+  initialProfile?: ProfileTarget | null;
+  initialProfileRange?: RangeKey | null;
 }
 
 const ListeningViewInner: React.FC<ListeningViewProps> = ({
@@ -68,6 +76,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   isDbConfigured = true,
   initialMode = 0,
   initialRange = "1w",
+  initialProfile = null,
+  initialProfileRange = null,
 }) => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
@@ -204,6 +214,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
+  // Mode 4: Search & Profile state
+  const {
+    searchQuery,
+    setSearchQuery,
+    profileTarget,
+    profileRange,
+    profileData,
+    profileStatus,
+    handleOpenProfile,
+    handleProfileBack,
+    handleSelectProfileRange,
+  } = useSearchProfile({
+    activeMode,
+    activeRange,
+    visitorTimezone,
+    initialRange,
+    initialProfile,
+    initialProfileRange,
+    isSyncing,
+  });
+
   // Support query params for direct URL inspection of all modes and states
   useListeningUrlSync({
     isAuthenticated,
@@ -218,6 +249,23 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     setSelectedSessionId,
     sanitizeActiveMode,
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const currentUrl = new URL(window.location.href);
+    const nextSearch = buildListeningUrlSearch(currentUrl.search, {
+      activeMode,
+      profileTarget,
+      profileRange,
+    });
+    if (nextSearch !== currentUrl.search) {
+      window.history.replaceState(
+        null,
+        "",
+        `${currentUrl.pathname}${nextSearch}${currentUrl.hash}`
+      );
+    }
+  }, [activeMode, profileTarget, profileRange]);
 
   const handleSelectMode = useCallback(
     (mode: Mode) => {
@@ -332,12 +380,20 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     artistRankFormat
   );
 
+  const profileMetrics = formatProfileRibbonMetrics(
+    profileData,
+    profileStatus,
+    profileTarget,
+    profileRange,
+    visitorTimezone
+  );
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
     3: livePlayerMetrics,
-    4: ["--", "--", "--", "--"],
+    4: profileMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -373,8 +429,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           {/* 3. Fixed-Height Control Row (h-[26px], never shifts) */}
           <ControlRow
             mode={activeMode}
-            range={activeRange}
-            onSelectRange={handleSelectRange}
+            range={activeMode === 4 ? profileRange : activeRange}
+            onSelectRange={activeMode === 4 ? handleSelectProfileRange : handleSelectRange}
             logStartDate={currentOverview.logStartDate}
             isSessionOpen={isSystemLive}
             sessionTagTime={sessionTagTime}
@@ -386,6 +442,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             streamLogDateSpan={streamLogDateSpan}
             sessionNumber={selectedSessionNumber}
             totalSessions={totalSessions}
+            profileKind={activeMode === 4 ? profileTarget?.kind ?? null : null}
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
             activeDevice={activeDevice}
@@ -452,7 +509,23 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               />
             )}
 
-            {activeMode === 4 && <div />}
+            {activeMode === 4 && (
+              profileTarget ? (
+                <ProfileView
+                  data={profileData}
+                  status={profileStatus}
+                  visitorTimezone={visitorTimezone}
+                  onBack={handleProfileBack}
+                  onOpenProfile={handleOpenProfile}
+                />
+              ) : (
+                <SearchView
+                  query={searchQuery}
+                  onQueryChange={setSearchQuery}
+                  onOpenProfile={handleOpenProfile}
+                />
+              )
+            )}
           </div>
         </div>
 

@@ -1,5 +1,7 @@
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
+import type { ProfileData, ProfileTarget } from "@/lib/search-types";
+import { formatLogStartDate } from "@/lib/db/queries/helpers";
 import { formatRankDisplay, formatPlaysDisplay } from "@/lib/format-utils";
 
 /** Every Overview range, active first so the visible view refreshes before the rest. */
@@ -142,3 +144,91 @@ export const EMPTY_STREAM_LOG: StreamLogData = {
   metrics: ["--", "--", "--", "--"],
   entries: [],
 };
+
+export type ProfileStatus = "loading" | "ready" | "not_found" | "error";
+
+export function getProfileCacheKey(
+  target: ProfileTarget,
+  range: RangeKey,
+  visitorTimezone: string
+): string {
+  return `${target.kind}:${range}:${visitorTimezone}:${target.key}`;
+}
+
+export function resolveDisplayedProfileData(
+  data: ProfileData | null,
+  target: ProfileTarget | null
+): ProfileData | null {
+  if (!data || !target) return null;
+  if (data.kind !== target.kind || data.key !== target.key) return null;
+  return data;
+}
+
+export function formatProfileRibbonMetrics(
+  data: ProfileData | null,
+  status: ProfileStatus,
+  target: ProfileTarget | null,
+  range: RangeKey,
+  visitorTimezone: string
+): [string, string, string, string] {
+  if (
+    status !== "ready" ||
+    !data ||
+    !target ||
+    data.kind !== target.kind ||
+    data.key !== target.key ||
+    data.range !== range
+  ) {
+    return ["--", "--", "--", "--"];
+  }
+
+  const plays = String(data.plays);
+  const rank =
+    data.rank !== null && data.rank > 0
+      ? `#${String(data.rank).padStart(2, "0")} / ${data.rankedTotal}`
+      : "--";
+
+  const formatDate = (iso: string | null): string => {
+    if (!iso) return "--";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "--";
+    return formatLogStartDate(d, visitorTimezone);
+  };
+
+  return [plays, rank, formatDate(data.firstPlayedAt), formatDate(data.lastPlayedAt)];
+}
+
+export function buildListeningUrlSearch(
+  currentSearch: string,
+  state: {
+    activeMode: Mode;
+    profileTarget: ProfileTarget | null;
+    profileRange: RangeKey;
+  }
+): string {
+  const raw = currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch;
+  const params = new URLSearchParams(raw);
+
+  if (state.activeMode === 4) {
+    params.set("mode", "4");
+    if (state.profileTarget) {
+      params.set(state.profileTarget.kind, state.profileTarget.key);
+      params.delete(state.profileTarget.kind === "track" ? "artist" : "track");
+      params.set("prange", state.profileRange);
+    } else {
+      params.delete("track");
+      params.delete("artist");
+      params.delete("prange");
+    }
+  } else {
+    params.delete("track");
+    params.delete("artist");
+    params.delete("prange");
+    if (params.get("mode") === "4") {
+      params.delete("mode");
+    }
+  }
+
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
