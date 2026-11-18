@@ -2,16 +2,39 @@ import { getDb } from "../index";
 import { formatDayGroupTz } from "./helpers";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
 
-export function buildCadenceQuery(range: RangeKey, tz: string) {
+export type CadenceScope =
+  | { kind: "track"; trackId: string }
+  | { kind: "artist"; column: "artist_id" | "artist_group_key"; value: string };
+
+export function buildCadenceQuery(range: RangeKey, tz: string, scope?: CadenceScope) {
   const sql = getDb();
+
+  const scopeJoin = scope?.kind === "artist"
+    ? sql`
+      JOIN tracks t ON t.id = p.track_id`
+    : sql``;
+
+  const scopeFilter = scope?.kind === "track"
+    ? sql`p.track_id = ${scope.trackId}`
+    : scope?.column === "artist_id"
+      ? sql`t.artist_id = ${scope.value}`
+      : scope
+        ? sql`t.artist_group_key = ${scope.value}`
+        : sql``;
+
+  const scopeAnd = scope ? sql` AND ${scopeFilter}` : sql``;
+  const scopeWhere = scope
+    ? sql`
+    WHERE ${scopeFilter}`
+    : sql``;
 
   if (range === "1d") {
     return sql`
       SELECT 
           TO_CHAR(DATE_TRUNC('hour', p.played_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:00:00"Z"') AS hour_key,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '24 hours'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '24 hours'${scopeAnd}
       GROUP BY hour_key;
     `;
   }
@@ -22,8 +45,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           FLOOR(EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${tz}) / 6)::int AS block,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '7 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '7 days'${scopeAnd}
       GROUP BY day, block;
     `;
   }
@@ -33,8 +56,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '30 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '30 days'${scopeAnd}
       GROUP BY day;
     `;
   }
@@ -44,8 +67,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '180 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '180 days'${scopeAnd}
       GROUP BY day;
     `;
   }
@@ -55,8 +78,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '365 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '365 days'${scopeAnd}
       GROUP BY ym;
     `;
   }
@@ -65,7 +88,7 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
     SELECT 
         EXTRACT(YEAR FROM p.played_at AT TIME ZONE ${tz})::int AS play_year,
         COUNT(*)::int AS count
-    FROM plays p
+    FROM plays p${scopeJoin}${scopeWhere}
     GROUP BY play_year
     ORDER BY play_year ASC;
   `;
