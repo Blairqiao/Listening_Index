@@ -6,12 +6,6 @@ import {
   getSessionCookieHeader,
   isSameOriginRequest,
 } from "@/lib/admin-auth";
-import {
-  checkLoginAttempt,
-  clearLoginFailures,
-  loginClientKey,
-  recordLoginFailure,
-} from "@/lib/login-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -33,28 +27,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const clientKey = loginClientKey(request.headers);
-  const attempt = checkLoginAttempt(clientKey, Date.now());
-  if (!attempt.allowed) {
-    return NextResponse.json(
-      { success: false, error: "Too many login attempts. Try again later." },
-      { status: 429, headers: { "Retry-After": String(attempt.retryAfterSeconds) } }
-    );
-  }
-
   try {
     const body = await request.json().catch(() => ({}));
     const password = typeof body?.password === "string" ? body.password : "";
 
     if (!verifyAdminPassword(password)) {
-      recordLoginFailure(clientKey, Date.now());
       return NextResponse.json(
         { success: false, error: "Invalid admin password" },
         { status: 401 }
       );
     }
 
-    clearLoginFailures(clientKey);
     const token = createSessionToken();
     const cookieHeader = getSessionCookieHeader(token);
 
