@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { SearchResponse } from "@/lib/search-types";
+import { DEFAULT_SEARCH_SORT, type SearchResponse, type SearchSort } from "@/lib/search-types";
 import { checkSearchQuery, type SearchQueryCheck } from "@/lib/search-utils";
 
 export type SearchStatus = "idle" | "loading" | "ready" | "error";
@@ -19,39 +19,43 @@ function setInCache(key: string, value: SearchResponse): void {
   searchCache.set(key, value);
 }
 
-export function useSearch(query: string): {
+export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT, page = 1): {
   status: SearchStatus;
   data: SearchResponse | null;
   check: SearchQueryCheck;
 } {
   const check = checkSearchQuery(query);
-  const effectiveQuery = check.ok ? check.query : null;
+  const requestUrl = check.ok
+    ? "/api/listening/search?" + new URLSearchParams({ q: check.query, sort, page: String(page) })
+    : null;
 
   const [lastReadyData, setLastReadyData] = useState<SearchResponse | null>(null);
-  const [errorQuery, setErrorQuery] = useState<string | null>(null);
-  const [prevEffectiveQuery, setPrevEffectiveQuery] = useState<string | null>(effectiveQuery);
+  const [errorUrl, setErrorUrl] = useState<string | null>(null);
+  const [previousRequestUrl, setPreviousRequestUrl] = useState<string | null>(requestUrl);
 
   // Transition adjustment during render when effective query or invalid state changes
-  if (effectiveQuery !== prevEffectiveQuery) {
-    setPrevEffectiveQuery(effectiveQuery);
-    setErrorQuery(null);
-    if (effectiveQuery === null) {
+  if (requestUrl !== previousRequestUrl) {
+    setPreviousRequestUrl(requestUrl);
+    setErrorUrl(null);
+    if (requestUrl === null || (check.ok && check.query === "")) {
       setLastReadyData(null);
     }
   }
 
-  const cachedHit = effectiveQuery ? searchCache.get(effectiveQuery) ?? null : null;
+  const cachedHit = requestUrl ? searchCache.get(requestUrl) ?? null : null;
 
   if (cachedHit && lastReadyData !== cachedHit) {
     setLastReadyData(cachedHit);
   }
 
+  const delay = check.ok && check.query === "" ? 0 : 250;
+
   useEffect(() => {
-    if (!effectiveQuery) {
+    if (!requestUrl) {
       return;
     }
 
-    if (searchCache.has(effectiveQuery)) {
+    if (searchCache.has(requestUrl)) {
       return;
     }
 
@@ -59,7 +63,7 @@ export function useSearch(query: string): {
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
-          "/api/listening/search?q=" + encodeURIComponent(effectiveQuery),
+          requestUrl,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -68,7 +72,7 @@ export function useSearch(query: string): {
 
         if (!res.ok) {
           if (!controller.signal.aborted) {
-            setErrorQuery(effectiveQuery);
+            setErrorUrl(requestUrl);
           }
           return;
         }
@@ -78,22 +82,22 @@ export function useSearch(query: string): {
           return;
         }
 
-        setInCache(effectiveQuery, json);
+        setInCache(requestUrl, json);
         setLastReadyData(json);
-        setErrorQuery(null);
+        setErrorUrl(null);
       } catch (err: unknown) {
         if ((err as Error)?.name === "AbortError" || controller.signal.aborted) {
           return;
         }
-        setErrorQuery(effectiveQuery);
+        setErrorUrl(requestUrl);
       }
-    }, 250);
+    }, delay);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [effectiveQuery]);
+  }, [requestUrl, delay]);
 
   if (!check.ok) {
     return {
@@ -111,7 +115,7 @@ export function useSearch(query: string): {
     };
   }
 
-  if (errorQuery === effectiveQuery) {
+  if (errorUrl === requestUrl) {
     return {
       status: "error",
       data: null,

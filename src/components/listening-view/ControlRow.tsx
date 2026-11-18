@@ -19,6 +19,7 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
+  onProfileBack?: () => void;
   profileKind?: "track" | "artist" | null;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
@@ -54,6 +55,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   totalSessions,
   syncError,
   profileKind,
+  onProfileBack,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -259,7 +261,15 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     >
       {/* Left Slot: Scope Label */}
       <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4">
-        {getScopeLabel()}
+        {mode === 4 && profileKind && onProfileBack ? (
+          <button
+            type="button"
+            onClick={onProfileBack}
+            className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
+          >
+            ← BACK TO SEARCH
+          </button>
+        ) : getScopeLabel()}
         {syncError && mode !== 2 && (
           <span className="ml-2 text-[#FF6B6B] tracking-[0.08em]">
             [ {syncError.toUpperCase()} ]

@@ -1,6 +1,15 @@
 import type { ActivityBucket, RangeKey } from "@/lib/types";
 
 export const SEARCH_RESULT_LIMIT = 8;
+export const SEARCH_SORT_OPTIONS = [
+  { value: "most-plays", label: "Most plays" },
+  { value: "least-plays", label: "Least plays" },
+  { value: "recent", label: "Most recent" },
+  { value: "oldest", label: "Least recent" },
+] as const;
+export type SearchSort = (typeof SEARCH_SORT_OPTIONS)[number]["value"];
+export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
+
 export const SEARCH_MAX_CHARS = 100;
 export const PROFILE_RECENT_PLAYS_LIMIT = 20;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
@@ -24,8 +33,9 @@ export interface SearchTrackResult {
 
 export interface SearchResponse {
   query: string;           // the trimmed query that was searched
-  artists: SearchArtistResult[]; // ≤ 8, plays DESC, name ASC
-  tracks: SearchTrackResult[];   // ≤ 8, plays DESC, name ASC
+  artists: SearchArtistResult[];
+  tracks: SearchTrackResult[];
+  hasMore: boolean;
 }
 
 export type ProfileKind = "track" | "artist";

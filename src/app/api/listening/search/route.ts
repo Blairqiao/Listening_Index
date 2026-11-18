@@ -3,7 +3,7 @@ import { isDbConfigured } from "@/lib/db";
 import { searchCatalog } from "@/lib/db/queries";
 import { getMockSearch } from "@/lib/mock/search-profile";
 import { jsonNoCache, handleApiError } from "@/lib/route-utils";
-import { checkSearchQuery } from "@/lib/search-utils";
+import { checkSearchQuery, parseSearchPage, parseSearchSort } from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +15,14 @@ export async function GET(request: NextRequest) {
       return jsonNoCache({ error: `Invalid query: ${queryCheck.reason}` }, 400);
     }
 
+    const sort = parseSearchSort(searchParams.get("sort"));
+    const page = parseSearchPage(searchParams.get("page"));
     const mock = !isDbConfigured() || process.env.FORCE_MOCK_DATA === "true";
     if (mock) {
-      return jsonNoCache(getMockSearch(queryCheck.query));
+      return jsonNoCache(getMockSearch(queryCheck.query, sort, page));
     }
 
-    const data = await searchCatalog(queryCheck.query);
+    const data = await searchCatalog(queryCheck.query, sort, page);
     return jsonNoCache(data);
   } catch (error: unknown) {
     return handleApiError("/api/listening/search", error);

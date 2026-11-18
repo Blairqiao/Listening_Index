@@ -29,7 +29,7 @@ import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLogi
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
-import type { ProfileTarget } from "@/lib/search-types";
+import { DEFAULT_SEARCH_SORT, type ProfileTarget, type SearchSort } from "@/lib/search-types";
 import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
@@ -142,6 +142,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       }
     }
   }, [isAuthenticated, activeMode]);
+
+  const [searchSort, setSearchSort] = useState<SearchSort>(DEFAULT_SEARCH_SORT);
+  const [searchPage, setSearchPage] = useState(1);
 
   const [trackRankFormat, handleToggleTrackRank] = usePersistedToggle(
     "listening_track_rank_format",
@@ -386,7 +389,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     profileStatus,
     profileTarget,
     profileRange,
-    visitorTimezone
+    visitorTimezone,
+    profileTarget?.kind === "artist" ? artistRankFormat : trackRankFormat,
   );
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
@@ -443,6 +447,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             streamLogDateSpan={streamLogDateSpan}
             sessionNumber={selectedSessionNumber}
             totalSessions={totalSessions}
+            onProfileBack={handleProfileBack}
             profileKind={activeMode === 4 ? profileTarget?.kind ?? null : null}
             layout={config.livePlayerLayout}
             onToggleLayout={handleToggleLayout}
@@ -451,21 +456,25 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             onTransferPlayback={handleTransferPlayback}
           />
 
-          {/* 4. Metric Ribbon (4 cells, grid dividers show through) */}
-          <MetricRibbon
-            mode={activeMode}
-            metrics={currentMetrics}
-            overviewTimeUnit={overviewTimeUnit}
-            onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
-            trackRankFormat={trackRankFormat}
-            artistRankFormat={artistRankFormat}
-            onToggleTrackRank={handleToggleTrackRank}
-            onToggleArtistRank={handleToggleArtistRank}
-          />
+          {(activeMode !== 4 || profileTarget) && (
+            <MetricRibbon
+              mode={activeMode}
+              metrics={currentMetrics}
+              overviewTimeUnit={overviewTimeUnit}
+              onToggleTimeUnit={activeMode === 0 ? handleToggleTimeUnit : undefined}
+              trackRankFormat={trackRankFormat}
+              artistRankFormat={artistRankFormat}
+              onToggleTrackRank={handleToggleTrackRank}
+              onToggleArtistRank={handleToggleArtistRank}
+              onToggleProfileRank={activeMode === 4 && profileMetrics[1] !== "--"
+                ? profileTarget?.kind === "artist" ? handleToggleArtistRank : handleToggleTrackRank
+                : undefined}
+            />
+          )}
 
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player) */}
           <div
-            className={`h-auto ${activeMode === 3 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+            className={`h-auto ${activeMode === 3 || (activeMode === 4 && profileTarget) ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
               } transition-opacity duration-150 ${isSyncing || (activeMode === 0 && isRangeLoading)
                 ? "opacity-40 pointer-events-none"
                 : "opacity-100"
@@ -516,13 +525,22 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   data={profileData}
                   status={profileStatus}
                   visitorTimezone={visitorTimezone}
-                  onBack={handleProfileBack}
                   onOpenProfile={handleOpenRelatedProfile}
                 />
               ) : (
                 <SearchView
                   query={searchQuery}
-                  onQueryChange={setSearchQuery}
+                  onQueryChange={(query) => {
+                    setSearchPage(1);
+                    setSearchQuery(query);
+                  }}
+                  sort={searchSort}
+                  page={searchPage}
+                  onSortChange={(sort) => {
+                    setSearchPage(1);
+                    setSearchSort(sort);
+                  }}
+                  onPageChange={setSearchPage}
                   onOpenProfile={handleOpenProfile}
                 />
               )

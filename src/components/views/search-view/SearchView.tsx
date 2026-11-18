@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { SEARCH_MAX_CHARS, type ProfileTarget } from "@/lib/search-types";
+import { DEFAULT_SEARCH_SORT, SEARCH_MAX_CHARS, SEARCH_SORT_OPTIONS, type ProfileTarget, type SearchSort } from "@/lib/search-types";
+import { parseSearchSort } from "@/lib/search-utils";
 import { useSearch } from "./useSearch";
 import { Artwork, getFallbackSwatchColor } from "../../Artwork";
 
@@ -9,33 +10,35 @@ export interface SearchViewProps {
   query: string;
   onQueryChange: (q: string) => void;
   onOpenProfile: (target: ProfileTarget) => void;
+  sort?: SearchSort;
+  page?: number;
+  onSortChange?: (sort: SearchSort) => void;
+  onPageChange?: (page: number) => void;
 }
 
 export const SearchView: React.FC<SearchViewProps> = ({
   query,
   onQueryChange,
   onOpenProfile,
+  sort = DEFAULT_SEARCH_SORT,
+  page = 1,
+  onSortChange,
+  onPageChange,
 }) => {
-  const { status, data, check } = useSearch(query);
+  const { status, data } = useSearch(query, sort, page);
 
   let statusText: string | null = null;
   if (status === "loading") {
-    statusText = "SEARCHING…";
+    statusText = query.trim() ? "SEARCHING…" : "LOADING CATALOG…";
   } else if (status === "error") {
     statusText = "SEARCH FAILED";
   } else if (status === "idle") {
-    if (!check.ok) {
-      if (check.reason === "too_short") {
-        statusText = "TYPE 2+ CHARACTERS (1 FOR 中文 / 日本語 / 한국어)";
-      } else if (check.reason === "too_long") {
-        statusText = "QUERY TOO LONG";
-      }
-    }
+    statusText = "QUERY TOO LONG";
   } else if (status === "ready") {
     const hasNoResults =
       !data || (data.artists.length === 0 && data.tracks.length === 0);
     if (hasNoResults) {
-      statusText = "[ NO MATCHES ]";
+      statusText = query.trim() ? "[ NO MATCHES ]" : "[ NO PLAYS IN ARCHIVE ]";
     }
   }
 
@@ -49,7 +52,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
         <input
           type="search"
           name="search"
-          autoFocus
           maxLength={SEARCH_MAX_CHARS * 2}
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
@@ -57,17 +59,51 @@ export const SearchView: React.FC<SearchViewProps> = ({
           aria-label="Search tracks or artists"
           className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 px-1 outline-none transition-none rounded-none"
         />
-        <div
-          className="h-[20px] mt-1.5 px-1 font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] select-none flex items-center"
-          role="status"
-          aria-live="polite"
-        >
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 font-mono text-[11px] text-[#8A8A83]">
+          <label className="flex items-center gap-2">
+            Sort by
+            <select
+              value={sort}
+              onChange={(event) => onSortChange?.(parseSearchSort(event.target.value))}
+              className="min-h-9 border border-[#262622] bg-[#080808] px-2 text-[#EDEDE8] focus-visible:outline-music-accent"
+            >
+              {SEARCH_SORT_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          {(page > 1 || data?.hasMore) && (
+            <nav aria-label="Search results pages" className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={page <= 1 || status === "loading"}
+                onClick={() => onPageChange?.(page - 1)}
+                className="size-9 border border-[#262622] hover:text-[#EDEDE8] disabled:opacity-40"
+              >
+                ←
+              </button>
+              <span className="tabular-nums">{page}</span>
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={status !== "ready" || !data?.hasMore}
+                onClick={() => onPageChange?.(page + 1)}
+                className="size-9 border border-[#262622] hover:text-[#EDEDE8] disabled:opacity-40"
+              >
+                →
+              </button>
+            </nav>
+          )}
+        </div>
+        <div className="px-1 font-mono text-[11px] text-[#8A8A83] empty:hidden" role="status">
           {statusText}
         </div>
       </div>
 
       {/* 2. Scrollable Body Container (h-auto on mobile, bounded with internal scroll on desktop) */}
       <div
+        key={page}
         className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hidden transition-opacity duration-150 ${
           status === "loading" ? "opacity-60" : "opacity-100"
         }`}
