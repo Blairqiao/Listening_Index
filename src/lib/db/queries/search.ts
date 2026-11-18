@@ -29,6 +29,8 @@ export async function searchCatalog(query: string): Promise<SearchResponse> {
     LEFT JOIN artists ar ON t.artist_id = ar.id
     LEFT JOIN albums al ON t.album_id = al.id
     WHERE t.name_search LIKE ${pattern} ESCAPE '!'
+      OR t.artist_name_search LIKE ${pattern} ESCAPE '!'
+      OR ar.name_search LIKE ${pattern} ESCAPE '!'
     GROUP BY t.id, t.name, ar.name, t.artist_name, al.name, t.album_name, al.image_url
     ORDER BY plays DESC, t.name ASC
     LIMIT ${SEARCH_RESULT_LIMIT};
