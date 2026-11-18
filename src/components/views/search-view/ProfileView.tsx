@@ -3,6 +3,8 @@
 import React, { useMemo, useState } from "react";
 import type { ProfileData, ProfileTarget } from "@/lib/search-types";
 import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
+import { formatMonthLabel, formatShare } from "@/lib/profile-stats";
+import { HourHistogram } from "./HourHistogram";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
 
@@ -13,14 +15,14 @@ export interface ProfileViewProps {
   onOpenProfile: (target: ProfileTarget) => void;
 }
 
-function ProfileRankedList({ label, children }: { label: string; children: React.ReactNode }) {
+function ProfileRankedList({ label, heading, children }: { label: string; heading?: string; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const count = React.Children.count(children);
 
   return (
     <div>
       <div className="mb-2 flex justify-between font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-        <span>[ TOP {label} ]</span>
+        <span>{heading ?? <>[ TOP {label} ]</>}</span>
         <span>PLAYS</span>
       </div>
       <div className={`md:max-h-[165px] md:overflow-y-auto scrollbar-hidden ${expanded ? "" : "max-md:[&>*:nth-child(n+4)]:hidden"}`}>
@@ -134,6 +136,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   if (!data) return null;
 
   const artistKey = data.artistKey;
+  const isTrack = data.kind === "track";
+  const bestMonth = data.trackStats?.bestMonth;
+  const streak = data.trackStats?.longestStreakDays ?? 0;
+  const albumTracks = data.albumTracks ?? [];
   const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
     ? `https://open.spotify.com/track/${data.key}`
     : null;
@@ -144,17 +150,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         status === "loading" ? "opacity-60" : ""
       }`}
     >
-      <div className="flex items-center gap-3 min-w-0 md:col-span-full">
+      <div className={`flex items-center gap-3 min-w-0 md:col-span-full${isTrack ? " md:gap-4" : ""}`}>
         <Artwork
           src={data.imageUrl}
           alt={data.name}
-          size={38}
+          size={isTrack ? 88 : 38}
         />
         <div className="min-w-0 flex-1">
-          <div className="font-sans text-[15px] font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none">
+          <div className={`font-sans ${isTrack ? "text-[20px] md:text-[24px]" : "text-[15px]"} font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none`}>
             {data.name}
           </div>
-          {data.kind === "track" && (data.artistName || data.albumName) && (
+          {isTrack && data.artistName && (
             <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
               {artistKey && data.artistName ? (
                 <button
@@ -163,7 +169,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
                 >{data.artistName}</button>
               ) : data.artistName}
-              {data.artistName && data.albumName && " · "}
+            </div>
+          )}
+          {isTrack && data.albumName && (
+            <div className="mt-0.5 truncate font-mono text-[11.5px] leading-tight text-[#6A6A64] select-none">
               {data.albumName}
             </div>
           )}
@@ -173,7 +182,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             href={spotifyUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-none text-right font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] hover:text-music-accent focus-visible:outline-music-accent"
+            className="flex-none self-start text-right font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] hover:text-music-accent focus-visible:outline-music-accent"
           >
             SPOTIFY ↗
           </a>
@@ -190,6 +199,67 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           visitorTimezone={visitorTimezone}
         />
       </div>
+
+      {isTrack && data.plays > 0 && (
+        <>
+          <dl className="flex flex-wrap gap-x-8 gap-y-3 self-start border-y border-[#191917] py-3 font-mono md:col-start-1 md:row-start-3">
+            <div>
+              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">SHARE OF ARTIST</dt>
+              <dd className="mt-1 text-sm tabular-nums">{formatShare(data.trackStats?.artistShare ?? null)}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">BEST MONTH</dt>
+              <dd className="mt-1 text-sm tabular-nums">
+                {bestMonth ? `${formatMonthLabel(bestMonth.month)} · ${bestMonth.plays.toLocaleString()}` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">LONGEST STREAK</dt>
+              <dd className="mt-1 text-sm tabular-nums">
+                {streak === 0 ? "—" : `${streak.toLocaleString()} ${streak === 1 ? "DAY" : "DAYS"}`}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-3 md:row-span-2">
+            {data.hourOfDay && <HourHistogram counts={data.hourOfDay} />}
+            {albumTracks.length >= 2 && (
+              <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
+                {albumTracks.map((track, idx) => {
+                  const rowClass = "group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left border-b border-[#191917]";
+                  const row = (
+                    <>
+                      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <Artwork src={data.imageUrl} alt={track.name} size={38} />
+                      <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
+                        {track.name}
+                      </span>
+                      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                        {track.plays.toLocaleString()}
+                      </span>
+                    </>
+                  );
+
+                  return track.isCurrent ? (
+                    <div key={track.id} aria-current="true" className={rowClass}>{row}</div>
+                  ) : (
+                    <button
+                      key={track.id}
+                      type="button"
+                      onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
+                    >
+                      {row}
+                    </button>
+                  );
+                })}
+              </ProfileRankedList>
+            )}
+          </div>
+        </>
+      )}
 
       {data.kind === "artist" && data.plays > 0 && (
         <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-3">
@@ -249,7 +319,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${data.kind === "track" ? "md:col-span-full" : "md:col-start-1 md:row-start-3"}`}>
+      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${isTrack ? (data.plays > 0 ? "md:col-start-1 md:row-start-4" : "md:col-span-full") : "md:col-start-1 md:row-start-3"}`}>
         {data.plays === 0 ? (
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] py-4 select-none">
             [ NO PLAYS IN THIS RANGE ]
