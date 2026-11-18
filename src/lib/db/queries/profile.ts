@@ -3,11 +3,14 @@ import { isCatalogFullyEnriched } from "./enrichment";
 import { sanitizeTimezone } from "./helpers";
 import { OVERVIEW_INTERVAL_CONFIG } from "./overview";
 import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cadence";
+import { artistShare } from "@/lib/profile-stats";
 import type { RangeKey } from "@/lib/types";
 import {
+  PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
+  type ProfileAlbumTrack,
   type ProfileData,
   type ProfilePlay,
   type ProfileTarget,
@@ -49,7 +52,10 @@ export async function getProfile(
       SELECT
         t.id,
         t.name,
-        COALESCE(t.artist_id, t.artist_group_key) AS artist_key,
+        t.artist_id,
+        t.artist_group_key,
+        t.album_id,
+        t.album_group_key,
         COALESCE(ar.name, t.artist_name) AS artist_name,
         COALESCE(al.name, t.album_name) AS album_name,
         al.image_url,
@@ -61,7 +67,7 @@ export async function getProfile(
       LEFT JOIN artists ar ON t.artist_id = ar.id
       LEFT JOIN albums al ON t.album_id = al.id
       WHERE t.id = ${target.key}
-      GROUP BY t.id, t.name, ar.name, t.artist_name, al.name, t.album_name, al.image_url;
+      GROUP BY t.id, t.name, t.artist_id, t.artist_group_key, t.album_id, t.album_group_key, ar.name, t.artist_name, al.name, t.album_name, al.image_url;
     `;
     const trackRow = trackRows[0];
     if (!trackRow || Number(trackRow.lifetime_plays) === 0) {
@@ -70,7 +76,23 @@ export async function getProfile(
 
     const trackId = String(trackRow.id);
 
-    const [rankAndPlaysRows, rankedTotalRows, cadenceRows, recentPlayRows] =
+    const isEnriched = await isCatalogFullyEnriched();
+    const { artist_id: artistId, artist_group_key: artistGroupKey,
+      album_id: albumId, album_group_key: albumGroupKey } = trackRow;
+    const activeArtistKey = isEnriched ? artistId : artistGroupKey;
+    const artistFilter = isEnriched
+      ? sql`t.artist_id = ${activeArtistKey}`
+      : sql`t.artist_group_key = ${activeArtistKey}`;
+    const albumFilter = albumId != null
+      ? sql`t.album_id = ${albumId}`
+      : albumGroupKey != null && artistGroupKey != null
+        ? sql`t.album_id IS NULL AND t.album_group_key = ${albumGroupKey} AND t.artist_group_key = ${artistGroupKey}`
+        : null;
+
+    const [
+      rankAndPlaysRows, rankedTotalRows, cadenceRows, recentPlayRows,
+      hourRows, monthRows, streakRows, artistPlayRows, albumRows,
+    ] =
       await Promise.all([
         sql`
           SELECT plays::int, rank::int FROM (
@@ -108,6 +130,39 @@ export async function getProfile(
           ORDER BY p.played_at DESC, p.id DESC
           LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
         `,
+        sql`
+          SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays
+          FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
+          GROUP BY 1;
+        `,
+        sql`
+          SELECT to_char(p.played_at AT TIME ZONE ${safeTz}, 'YYYY-MM') AS month, COUNT(*)::int AS plays
+          FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
+          GROUP BY 1 ORDER BY plays DESC, month DESC LIMIT 1;
+        `,
+        sql`
+          WITH distinct_days AS (
+            SELECT DISTINCT (p.played_at AT TIME ZONE ${safeTz})::date AS day
+            FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
+          ), streak_groups AS (
+            SELECT day - (ROW_NUMBER() OVER (ORDER BY day))::int AS streak_start FROM distinct_days
+          )
+          SELECT COALESCE(MAX(days), 0)::int AS streak
+          FROM (SELECT COUNT(*) AS days FROM streak_groups GROUP BY streak_start) streaks;
+        `,
+        activeArtistKey == null ? [] : sql`
+          SELECT COUNT(*)::int AS plays
+          FROM plays p JOIN tracks t ON t.id = p.track_id
+          WHERE ${artistFilter} AND ${timeFilter};
+        `,
+        albumFilter === null ? [] : sql`
+          SELECT t.id, t.name, COUNT(p.id)::int AS plays
+          FROM plays p JOIN tracks t ON t.id = p.track_id
+          WHERE ${albumFilter} AND ${timeFilter}
+          GROUP BY t.id, t.name
+          ORDER BY plays DESC, t.name ASC, t.id ASC
+          LIMIT ${PROFILE_ALBUM_TRACKS_LIMIT};
+        `,
       ]);
 
     const plays = Number(rankAndPlaysRows[0]?.plays ?? 0);
@@ -124,6 +179,18 @@ export async function getProfile(
       minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
     });
 
+    const hourOfDay = Array<number>(24).fill(0);
+    for (const row of hourRows) {
+      hourOfDay[Number(row.hour)] = Number(row.plays);
+    }
+    const bestMonth = monthRows[0];
+    const albumTracks: ProfileAlbumTrack[] = albumRows.map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      plays: Number(row.plays),
+      isCurrent: row.id === trackId,
+    }));
+
     return {
       kind: "track",
       key: trackId,
@@ -138,10 +205,14 @@ export async function getProfile(
       rank,
       rankedTotal,
       ...cadence,
-      artistKey: (trackRow.artist_key as string | null) ?? undefined,
-      trackStats: { artistShare: null, bestMonth: null, longestStreakDays: 0 },
-      hourOfDay: Array(24).fill(0),
-      albumTracks: [],
+      artistKey: (activeArtistKey ?? artistId ?? artistGroupKey ?? undefined) as string | undefined,
+      trackStats: {
+        artistShare: artistShare(plays, Number(artistPlayRows[0]?.plays ?? 0)),
+        bestMonth: bestMonth ? { month: String(bestMonth.month), plays: Number(bestMonth.plays) } : null,
+        longestStreakDays: Number(streakRows[0]?.streak ?? 0),
+      },
+      hourOfDay,
+      albumTracks,
       topTracks: [],
       topAlbums: [],
       recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
