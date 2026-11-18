@@ -272,13 +272,13 @@ test('profile route rejects invalid prange parameter with 400', async () => {
   assert.equal(mockProfileCalls.length, 0);
 });
 
-test('profile route defaults absent prange to All', async () => {
+test('profile route defaults absent prange to 1Y', async () => {
   const { route, getProfileCalls } = loadProfileRoute({ isDbConfigured: () => true });
 
   const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/profile?artist=art_1'));
   assert.equal(res.status, 200);
   assert.equal(getProfileCalls.length, 1);
-  assert.equal(getProfileCalls[0].range, 'all');
+  assert.equal(getProfileCalls[0].range, '1y');
   assert.deepEqual(getProfileCalls[0].target, { kind: 'artist', key: 'art_1' });
 });
 

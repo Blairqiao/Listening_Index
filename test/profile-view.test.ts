@@ -76,7 +76,7 @@ const mockTrackProfile: ProfileData = {
   kind: "track",
   key: "4clD00s1c0rVqP9Ld0vV48",
   artistKey: "radiohead-key",
-  trackStats: { playedMs: 7380000, daysPlayed: 12 },
+  trackStats: { artistShare: null, bestMonth: null, longestStreakDays: 0 },
   name: "Weird Fishes / Arpeggi",
   artistName: "Radiohead",
   albumName: "In Rainbows",
@@ -154,8 +154,6 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
   assert.ok(markup.includes("In Rainbows"), "Must include album name");
   assert.match(markup, /open.spotify.com\/track\/4clD00s1c0rVqP9Ld0vV48/);
-  assert.match(markup, /TIME PLAYED/);
-  assert.match(markup, /DAYS PLAYED/);
   assert.match(markup, /<button[^>]*>Radiohead<\/button>/);
   assert.doesNotMatch(markup, /FIRST PLAYED|LAST PLAYED|LIFETIME/);
   assert.match(markup, /md:col-span-full/);

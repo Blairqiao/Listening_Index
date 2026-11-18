@@ -55,10 +55,7 @@ export async function getProfile(
         al.image_url,
         MIN(p.played_at) AS first_played_at,
         MAX(p.played_at) AS last_played_at,
-        COUNT(p.id)::int AS lifetime_plays,
-        COALESCE(SUM(p.ms_played) FILTER (WHERE ${timeFilter}), 0)::bigint AS played_ms,
-        COUNT(DISTINCT (p.played_at AT TIME ZONE ${safeTz})::date)
-          FILTER (WHERE ${timeFilter})::int AS days_played
+        COUNT(p.id)::int AS lifetime_plays
       FROM tracks t
       JOIN plays p ON p.track_id = t.id
       LEFT JOIN artists ar ON t.artist_id = ar.id
@@ -142,10 +139,9 @@ export async function getProfile(
       rankedTotal,
       ...cadence,
       artistKey: (trackRow.artist_key as string | null) ?? undefined,
-      trackStats: {
-        playedMs: Number(trackRow.played_ms),
-        daysPlayed: Number(trackRow.days_played),
-      },
+      trackStats: { artistShare: null, bestMonth: null, longestStreakDays: 0 },
+      hourOfDay: Array(24).fill(0),
+      albumTracks: [],
       topTracks: [],
       topAlbums: [],
       recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),

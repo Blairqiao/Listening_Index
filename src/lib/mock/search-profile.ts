@@ -389,10 +389,6 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
         albumImageUrl: p.albumImageUrl,
       }));
 
-    const dayFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: effectiveTz, year: "numeric", month: "numeric", day: "numeric",
-    });
-
     return {
       kind: "track",
       key: track.id,
@@ -408,10 +404,9 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       rankedTotal,
       ...cadence,
       artistKey: targetLifetimePlays[0]?.artistId || undefined,
-      trackStats: {
-        playedMs: targetInRangePlays.reduce((sum, play) => sum + play.durationMs, 0),
-        daysPlayed: new Set(targetInRangePlays.map((play) => dayFormatter.format(new Date(play.playedAt)))).size,
-      },
+      trackStats: { artistShare: null, bestMonth: null, longestStreakDays: 0 },
+      hourOfDay: Array(24).fill(0),
+      albumTracks: [],
       topTracks: [],
       topAlbums: [],
       recentPlays,
