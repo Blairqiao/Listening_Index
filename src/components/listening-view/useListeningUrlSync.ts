@@ -32,7 +32,7 @@ export function useListeningUrlSync({
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2" || m === "3") {
+      if (m === "0" || m === "1" || m === "2" || m === "3" || m === "4") {
         setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
       }
       const r = params.get("range");

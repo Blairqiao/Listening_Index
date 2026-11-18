@@ -19,6 +19,7 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
+  profileKind?: "track" | "artist" | null;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
@@ -52,6 +53,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   sessionIndex,
   totalSessions,
   syncError,
+  profileKind,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -117,44 +119,50 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         }
         return <span className="text-music-accent">DEVICE: LISTENING INDEX</span>;
       }
+      case 4:
+        if (profileKind === "track") return "TRACK PROFILE";
+        if (profileKind === "artist") return "ARTIST PROFILE";
+        return "SEARCH";
     }
   };
+
+  const renderRangeButtons = () => (
+    <div
+      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5"
+      role="group"
+      aria-label="Time range filters"
+    >
+      {RANGES.map((r) => {
+        const isActive = range === r.key;
+        return (
+          <button
+            key={r.key}
+            type="button"
+            disabled={isSyncing}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              if (!isSyncing) onSelectRange(r.key);
+            }}
+            className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center ${
+              isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
+            } ${
+              isActive
+                ? "text-music-accent border-music-accent bg-transparent"
+                : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            }`}
+          >
+            {r.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   const renderControls = () => {
     switch (mode) {
       case 0:
-        return (
-          <div
-            className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5"
-            role="group"
-            aria-label="Time range filters"
-          >
-            {RANGES.map((r) => {
-              const isActive = range === r.key;
-              return (
-                <button
-                  key={r.key}
-                  type="button"
-                  disabled={isSyncing}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(e) => {
-                    e.currentTarget.blur();
-                    if (!isSyncing) onSelectRange(r.key);
-                  }}
-                  className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center ${
-                    isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-                  } ${
-                    isActive
-                      ? "text-music-accent border-music-accent bg-transparent"
-                      : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              );
-            })}
-          </div>
-        );
+        return renderRangeButtons();
       case 1: {
         const count = streamLogCount ?? 50;
         if (count === 0) {
@@ -234,13 +242,17 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             </button>
           </div>
         );
+      case 4:
+        return profileKind ? renderRangeButtons() : null;
     }
   };
+
+  const showsRanges = mode === 0 || (mode === 4 && !!profileKind);
 
   return (
     <div
       className={`my-3.5 sm:my-4 md:my-5 select-none ${
-        mode === 0
+        showsRanges
           ? "flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center sm:h-[28px]"
           : "flex justify-between items-center h-[28px]"
       }`}
@@ -255,8 +267,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         )}
       </span>
 
-      {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
-      <div className={`flex items-center ${mode === 0 ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"}`}>
+      <div className={`flex items-center ${showsRanges ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"}`}>
         {renderControls()}
       </div>
     </div>

@@ -46,7 +46,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   const modeParam = resolvedParams?.mode;
   const initialMode: Mode =
-    modeParam === "0" || modeParam === "1" || modeParam === "2"
+    modeParam === "0" || modeParam === "1" || modeParam === "2" || modeParam === "4"
       ? (parseInt(modeParam, 10) as Mode)
       : 0;
 
