@@ -84,8 +84,17 @@ export function buildCadenceQuery(range: RangeKey, tz: string, scope?: CadenceSc
     `;
   }
 
+  if (scope) {
+    return sql`
+      SELECT TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym, COUNT(*)::int AS count
+      FROM plays p${scopeJoin}${scopeWhere}
+      GROUP BY ym
+      ORDER BY ym ASC;
+    `;
+  }
+
   return sql`
-    SELECT 
+    SELECT
         EXTRACT(YEAR FROM p.played_at AT TIME ZONE ${tz})::int AS play_year,
         COUNT(*)::int AS count
     FROM plays p${scopeJoin}${scopeWhere}
@@ -344,4 +353,44 @@ export function buildActivityCadence(params: {
   }
 
   return { activityCadence };
+}
+
+
+export function buildProfileCadence(
+  params: Parameters<typeof buildActivityCadence>[0],
+): { activityCadence: ActivityBucket[]; monthlyCadence?: ActivityBucket[] } {
+  if (params.range !== "all" || params.cadenceRows.length === 0) {
+    return buildActivityCadence(params);
+  }
+
+  const monthCounts = new Map<string, number>();
+  const yearCounts = new Map<number, number>();
+  for (const row of params.cadenceRows) {
+    const month = String(row.ym);
+    const year = Number(month.slice(0, 4));
+    const count = Number(row.count);
+    monthCounts.set(month, count);
+    yearCounts.set(year, (yearCounts.get(year) ?? 0) + count);
+  }
+
+  const monthKeys = [...monthCounts.keys()].sort();
+  const firstMonth = new Date(monthKeys[0] + "-01T00:00:00Z");
+  const latestMonth = new Date(monthKeys[monthKeys.length - 1] + "-01T00:00:00Z");
+  const now = getLocalCalendarParts(params.now ?? new Date(), params.tz);
+  const end = Math.max(latestMonth.getTime(), Date.UTC(now.year, now.month - 1, 1));
+  const label = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  const monthlyCadence: ActivityBucket[] = [];
+  for (const month = new Date(firstMonth); month.getTime() <= end; month.setUTCMonth(month.getUTCMonth() + 1)) {
+    const startTime = month.toISOString();
+    const endTime = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1) - 1).toISOString();
+    monthlyCadence.push({
+      date: label.format(month).toUpperCase(),
+      count: monthCounts.get(startTime.slice(0, 7)) ?? 0,
+      startTime,
+      endTime,
+    });
+  }
+
+  const cadenceRows = [...yearCounts].map(([play_year, count]) => ({ play_year, count }));
+  return { ...buildActivityCadence({ ...params, cadenceRows }), monthlyCadence };
 }

@@ -4,6 +4,7 @@ import { getProfile } from "@/lib/db/queries";
 import { getMockProfile } from "@/lib/mock/search-profile";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
 import { parseProfileTarget, parseRangeKey } from "@/lib/search-utils";
+import { DEFAULT_PROFILE_RANGE } from "@/lib/search-types";
 import type { RangeKey } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     const rawRange = searchParams.get("prange");
     let range: RangeKey;
     if (rawRange === null) {
-      range = "1w";
+      range = DEFAULT_PROFILE_RANGE;
     } else {
       const parsedRange = parseRangeKey(rawRange);
       if (parsedRange === null) {

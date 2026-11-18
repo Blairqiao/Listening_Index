@@ -39,9 +39,7 @@ function makeProfile(overrides: Partial<ProfileData> = {}): ProfileData {
 
 interface UseSearchProfileArgs {
   activeMode: Mode;
-  activeRange: RangeKey;
   visitorTimezone: string;
-  initialRange: RangeKey;
   initialProfile?: ProfileTarget | null;
   initialProfileRange?: RangeKey | null;
   isSyncing?: boolean;
@@ -336,7 +334,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
   );
 });
 
-test("useSearchProfile: query persistence, activeRange open, reload prange, dimmed range retention, and timezone cache", async () => {
+test("useSearchProfile: query persistence, default All, reload prange, dimmed range retention, and timezone cache", async () => {
   const origFetch = globalThis.fetch;
   const fetchCalls: Array<{ url: string; signal?: AbortSignal }> = [];
 
@@ -365,9 +363,7 @@ test("useSearchProfile: query persistence, activeRange open, reload prange, dimm
       // 1. Deep-link mount restores initialProfile and initialProfileRange
       let state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
         initialProfile: { kind: "track", key: "track-deep" },
         initialProfileRange: "all",
       });
@@ -378,9 +374,7 @@ test("useSearchProfile: query persistence, activeRange open, reload prange, dimm
 
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
         initialProfile: { kind: "track", key: "track-deep" },
         initialProfileRange: "all",
       });
@@ -393,9 +387,7 @@ test("useSearchProfile: query persistence, activeRange open, reload prange, dimm
       state.handleProfileBack();
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(state.profileTarget, null);
       assert.equal(state.profileData, null);
@@ -404,101 +396,83 @@ test("useSearchProfile: query persistence, activeRange open, reload prange, dimm
       // Switch to Overview (mode 0) and back to Search (mode 4)
       harness.renderOnce({
         activeMode: 0,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(state.searchQuery, "radio");
 
-      // 3. Opening from search results uses Overview activeRange ("6m")
+      // 3. Opening from search starts at All
       state.handleOpenProfile({ kind: "artist", key: "artist-radio" });
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
+      });
+      assert.equal(state.profileRange, "all");
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(state.profileData, null);
+      await flushMicrotasks();
+
+      state = harness.renderOnce({
+        activeMode: 4,
+        visitorTimezone: "UTC",
+      });
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(state.profileData?.key, "artist-radio");
+      assert.equal(state.profileData?.range, "all");
+
+      // 4. Range switch retains same-target data dimmed during loading
+      state.handleSelectProfileRange("6m");
+      state = harness.renderOnce({
+        activeMode: 4,
+        visitorTimezone: "UTC",
+      });
+      assert.equal(state.profileRange, "6m");
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(state.profileData?.key, "artist-radio");
+      assert.equal(state.profileData?.range, "all");
+      await flushMicrotasks();
+      state = harness.renderOnce({
+        activeMode: 4,
+        visitorTimezone: "UTC",
+      });
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(state.profileData?.range, "6m");
+
+      // 5. Opening a top Track from the artist profile keeps the profile's range ("6m") and clears artist data
+      state.handleOpenRelatedProfile({ kind: "track", key: "top-track-1" });
+      state = harness.renderOnce({
+        activeMode: 4,
+        visitorTimezone: "UTC",
       });
       assert.equal(state.profileRange, "6m");
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
       await flushMicrotasks();
-
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
-      });
-      assert.equal(state.profileStatus, "ready");
-      assert.equal(state.profileData?.key, "artist-radio");
-      assert.equal(state.profileData?.range, "6m");
-
-      // 4. Range switch retains same-target data dimmed during loading
-      state.handleSelectProfileRange("all");
-      state = harness.renderOnce({
-        activeMode: 4,
-        activeRange: "6m",
-        visitorTimezone: "UTC",
-        initialRange: "1w",
-      });
-      assert.equal(state.profileRange, "all");
-      assert.equal(state.profileStatus, "loading");
-      assert.equal(state.profileData?.key, "artist-radio");
-      assert.equal(state.profileData?.range, "6m");
-      await flushMicrotasks();
-      state = harness.renderOnce({
-        activeMode: 4,
-        activeRange: "6m",
-        visitorTimezone: "UTC",
-        initialRange: "1w",
-      });
-      assert.equal(state.profileStatus, "ready");
-      assert.equal(state.profileData?.range, "all");
-
-      // 5. Opening a top Track from the artist profile keeps the profile's range ("all") and clears artist data
-      state.handleOpenRelatedProfile({ kind: "track", key: "top-track-1" });
-      state = harness.renderOnce({
-        activeMode: 4,
-        activeRange: "6m",
-        visitorTimezone: "UTC",
-        initialRange: "1w",
-      });
-      assert.equal(state.profileRange, "all");
-      assert.equal(state.profileStatus, "loading");
-      assert.equal(state.profileData, null);
-      await flushMicrotasks();
-      state = harness.renderOnce({
-        activeMode: 4,
-        activeRange: "6m",
-        visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(state.profileStatus, "ready");
       assert.equal(state.profileData?.key, "top-track-1");
 
       // 6. Switching back to cached range hits cache without fetch; timezone change misses cache and fetches
       const callsBeforeCached = fetchCalls.length;
-      state.handleOpenProfile({ kind: "artist", key: "artist-radio" });
+      state.handleProfileBack();
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
+      assert.equal(state.profileTarget?.key, "artist-radio");
+      assert.equal(state.profileRange, "6m");
       assert.equal(state.profileStatus, "ready");
       assert.equal(fetchCalls.length, callsBeforeCached);
 
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "6m",
         visitorTimezone: "America/Chicago",
-        initialRange: "1w",
       });
       assert.equal(state.profileStatus, "loading");
       assert.equal(fetchCalls.length, callsBeforeCached + 1);
@@ -533,9 +507,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
 
       let state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
         initialProfile: { kind: "artist", key: "stale-artist" },
         initialProfileRange: "1w",
       });
@@ -545,9 +517,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
       state.handleOpenProfile({ kind: "artist", key: "radiohead-alias" });
       harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(requests[0].signal?.aborted, true, "Stale request must be aborted");
       assert.equal(requests.length, 2);
@@ -561,9 +531,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
       await flushMicrotasks();
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
@@ -579,9 +547,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
 
       state = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.deepEqual(state.profileTarget, {
         kind: "artist",
@@ -594,9 +560,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
       // Re-rendering multiple turns must not loop or fetch
       harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(requests.length, 2);
     });
@@ -621,18 +585,14 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
 
       harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
         initialProfile: { kind: "track", key: "nope" },
         initialProfileRange: "1w",
       });
       await flushMicrotasks();
       const notFoundState = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(notFoundState.profileStatus, "not_found");
       assert.equal(notFoundState.profileData, null);
@@ -640,24 +600,18 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
       notFoundState.handleSelectProfileRange("1w");
       assert.equal(harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       }).profileStatus, "not_found");
 
       notFoundState.handleOpenProfile({ kind: "track", key: "boom" });
       harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       await flushMicrotasks();
       const errorState = harness.renderOnce({
         activeMode: 4,
-        activeRange: "1w",
         visitorTimezone: "UTC",
-        initialRange: "1w",
       });
       assert.equal(errorState.profileStatus, "error");
       assert.equal(errorState.profileData, null);

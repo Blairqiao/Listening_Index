@@ -11,6 +11,7 @@ export type SearchSort = (typeof SEARCH_SORT_OPTIONS)[number]["value"];
 export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
 
 export const SEARCH_MAX_CHARS = 100;
+export const DEFAULT_PROFILE_RANGE = "all";
 export const PROFILE_RECENT_PLAYS_LIMIT = 20;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
 export const PROFILE_TOP_ALBUMS_LIMIT = 5;
@@ -62,6 +63,9 @@ export interface ProfileData {
   rank: number | null;         // in range. null when plays = 0
   rankedTotal: number;         // tracks (or artists) with ≥ 1 play in range
   activityCadence: ActivityBucket[];
+  monthlyCadence?: ActivityBucket[];
+  artistKey?: string;
+  trackStats?: { playedMs: number; daysPlayed: number };
   topTracks: ProfileTopTrack[]; // artist profiles only (≤ 10, in range). [] for tracks
   topAlbums: ProfileTopAlbum[]; // artist profiles only (≤ 5, in range). [] for tracks
   recentPlays: ProfilePlay[];   // in range, newest first, ≤ 20

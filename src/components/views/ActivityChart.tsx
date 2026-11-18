@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
 import { formatCadenceTooltip } from "@/lib/format-utils";
 import { useConfig } from "@/context/ConfigContext";
@@ -8,6 +8,7 @@ import { useConfig } from "@/context/ConfigContext";
 export interface ActivityChartProps {
   range: RangeKey;
   activityCadence: ActivityBucket[];
+  monthlyCadence?: ActivityBucket[];
   isLoading?: boolean;
   label?: string;
   visitorTimezone?: string;
@@ -24,7 +25,8 @@ const EMPTY_CADENCE_BAR_COUNTS: Record<RangeKey, number> = {
 
 export const ActivityChart: React.FC<ActivityChartProps> = ({
   range,
-  activityCadence = [],
+  activityCadence: yearlyOrRangeCadence = [],
+  monthlyCadence,
   isLoading = false,
   label = "ACTIVITY",
   visitorTimezone: propTimezone,
@@ -36,6 +38,26 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
     // Rendered outside ConfigProvider
   }
   const tz = propTimezone || contextTimezone || "UTC";
+
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+  const monthCount = range === "all" ? monthlyCadence?.length ?? 0 : 0;
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || monthCount === 0) return;
+    setChartWidth(chart.clientWidth);
+    const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
+    observer.observe(chart);
+    return () => observer.disconnect();
+  }, [monthCount]);
+
+  const showMonths = monthCount > 0 && chartWidth >= monthCount * 6 - 2;
+  const activityCadence = showMonths && monthlyCadence ? monthlyCadence : yearlyOrRangeCadence;
+  const axisLabels = showMonths
+    ? activityCadence.filter((_, i) => i === 0 || i === activityCadence.length - 1 ||
+      (activityCadence.length >= 3 && i === Math.floor(activityCadence.length / 2)))
+    : activityCadence;
 
   const maxCadence = useMemo(() => {
     if (activityCadence.length === 0) return 1;
@@ -56,6 +78,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
       <div>
         <div
+          ref={chartRef}
           className="flex gap-[2px] items-end h-[80px] w-full"
           role="img"
           aria-label="Activity cadence histogram"
@@ -91,7 +114,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
               const tooltipText =
                 item.startTime && item.endTime
-                  ? formatCadenceTooltip(item, range, tz)
+                  ? formatCadenceTooltip(item, showMonths ? "1y" : range, tz)
                   : `${item.date} — ${item.count} plays`;
 
               return (
@@ -228,13 +251,10 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <span>NOW</span>
               </>
             ) : (
-              activityCadence.map((item, i) => {
-                const year = item.startTime
-                  ? new Date(item.startTime).getUTCFullYear()
-                  : item.date;
+              axisLabels.map((item, i) => {
                 return (
-                  <span key={i} className="text-center flex-1">
-                    {year}
+                  <span key={i} className={showMonths ? undefined : "text-center flex-1"}>
+                    {item.date}
                   </span>
                 );
               })
