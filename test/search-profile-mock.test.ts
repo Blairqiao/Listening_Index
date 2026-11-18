@@ -169,3 +169,31 @@ test("All profile cadence includes monthly counts", () => {
   assert.equal(profile.monthlyCadence?.reduce((sum, month) => sum + month.count, 0), profile.plays);
   assert.equal(profile.activityCadence.reduce((sum, year) => sum + year.count, 0), profile.plays);
 });
+
+test("Track stats and album siblings follow the profile range and timezone", () => {
+  const track = getMockSearch("").tracks[0];
+  const target = { kind: "track", key: track.id } as const;
+  const utc = getMockProfile(target, "all", "UTC")!;
+  const tokyo = getMockProfile(target, "all", "Asia/Tokyo")!;
+  assert.ok(utc.trackStats);
+  assert.ok(utc.hourOfDay && tokyo.hourOfDay);
+  assert.equal(utc.hourOfDay.length, 24);
+  assert.equal(utc.hourOfDay.reduce((sum, count) => sum + count, 0), utc.plays);
+  assert.deepEqual(tokyo.hourOfDay, [...utc.hourOfDay.slice(15), ...utc.hourOfDay.slice(0, 15)]);
+  assert.notDeepEqual(tokyo.hourOfDay, utc.hourOfDay);
+  assert.ok(utc.trackStats.longestStreakDays >= 1);
+  const sampledDays = new Set(utc.recentPlays.map((play) => play.playedAt.slice(0, 10)));
+  assert.ok(utc.trackStats.longestStreakDays <= sampledDays.size + utc.plays - utc.recentPlays.length);
+  assert.ok(utc.trackStats.bestMonth);
+  assert.ok(utc.trackStats.bestMonth.plays <= utc.plays);
+  assert.ok(utc.trackStats.artistShare && utc.trackStats.artistShare <= 1);
+  assert.ok(utc.albumTracks);
+  assert.ok(utc.albumTracks.some((row) => row.id === track.id && row.isCurrent));
+  assert.deepEqual(utc.albumTracks, [...utc.albumTracks].sort((a, b) =>
+    b.plays - a.plays || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+  ));
+
+  const day = getMockProfile(target, "1d", "UTC")!;
+  assert.ok(day.plays < utc.plays);
+  assert.equal(day.hourOfDay?.reduce((sum, count) => sum + count, 0), day.plays);
+});
