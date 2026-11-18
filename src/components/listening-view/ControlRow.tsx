@@ -19,6 +19,7 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
+  returnsToArtist?: boolean;
   onProfileBack?: () => void;
   profileKind?: "track" | "artist" | null;
   // Mode 3: Live Player page-level controls
@@ -56,6 +57,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   syncError,
   profileKind,
   onProfileBack,
+  returnsToArtist,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -267,7 +269,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onClick={onProfileBack}
             className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
           >
-            ← BACK TO SEARCH
+            {returnsToArtist ? "← BACK TO ARTIST" : "← BACK TO SEARCH"}
           </button>
         ) : getScopeLabel()}
         {syncError && mode !== 2 && (

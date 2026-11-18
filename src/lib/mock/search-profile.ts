@@ -18,7 +18,7 @@ import {
 import { normalizeForSearch } from "@/lib/search-utils";
 import { CATALOG } from "./catalog";
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from "./stream-log";
-import { buildActivityCadence } from "@/lib/db/queries/cadence";
+import { buildProfileCadence } from "@/lib/db/queries/cadence";
 import { OVERVIEW_INTERVAL_CONFIG } from "@/lib/db/queries/overview";
 import { sanitizeTimezone } from "@/lib/db/queries/helpers";
 
@@ -86,11 +86,9 @@ const NORMALIZED_PLAYS: NormalizedMockPlay[] = normalizeMockPlays();
 
 const GLOBAL_TIMESTAMPS = NORMALIZED_PLAYS.map((p) => new Date(p.playedAt).getTime());
 const GLOBAL_MAX_MS = Math.max(...GLOBAL_TIMESTAMPS);
-const GLOBAL_MIN_MS = Math.min(...GLOBAL_TIMESTAMPS);
 
 // Anchor now at the newest mock playedAt + 1 minute.
 const ANCHOR_NOW = new Date(GLOBAL_MAX_MS + 60 * 1000);
-const GLOBAL_OLDEST_PLAY = new Date(GLOBAL_MIN_MS).toISOString();
 
 function deriveUniqueTracks(plays: NormalizedMockPlay[]): Map<string, DerivedMockTrack> {
   const tracks = new Map<string, DerivedMockTrack>();
@@ -317,12 +315,9 @@ function computeCadenceRows(
     } else if (range === "1m" || range === "6m") {
       const day = `${m.year}-${m.month}-${m.day}`;
       counts.set(day, (counts.get(day) ?? 0) + 1);
-    } else if (range === "1y") {
+    } else {
       const ym = `${m.year}-${m.month}`;
       counts.set(ym, (counts.get(ym) ?? 0) + 1);
-    } else {
-      const playYear = String(m.year);
-      counts.set(playYear, (counts.get(playYear) ?? 0) + 1);
     }
   }
 
@@ -335,10 +330,7 @@ function computeCadenceRows(
   if (range === "1m" || range === "6m") {
     return [...counts.entries()].map(([day, count]) => ({ day, count }));
   }
-  if (range === "1y") {
-    return [...counts.entries()].map(([ym, count]) => ({ ym, count }));
-  }
-  return [...counts.entries()].map(([play_year, count]) => ({ play_year: Number(play_year), count }));
+  return [...counts.entries()].map(([ym, count]) => ({ ym, count }));
 }
 
 export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: string): ProfileData | null {
@@ -374,12 +366,12 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     }
 
     const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
-    const { activityCadence } = buildActivityCadence({
+    const cadence = buildProfileCadence({
       range,
       tz: effectiveTz,
       now,
       cadenceRows,
-      minDateRow: { log_start_date: GLOBAL_OLDEST_PLAY },
+      minDateRow: { log_start_date: track.firstPlayedAt },
     });
 
     const recentPlays: ProfilePlay[] = targetInRangePlays
@@ -397,6 +389,10 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
         albumImageUrl: p.albumImageUrl,
       }));
 
+    const dayFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: effectiveTz, year: "numeric", month: "numeric", day: "numeric",
+    });
+
     return {
       kind: "track",
       key: track.id,
@@ -410,7 +406,12 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       plays: inRangePlayCount,
       rank,
       rankedTotal,
-      activityCadence,
+      ...cadence,
+      artistKey: targetLifetimePlays[0]?.artistId || undefined,
+      trackStats: {
+        playedMs: targetInRangePlays.reduce((sum, play) => sum + play.durationMs, 0),
+        daysPlayed: new Set(targetInRangePlays.map((play) => dayFormatter.format(new Date(play.playedAt)))).size,
+      },
       topTracks: [],
       topAlbums: [],
       recentPlays,
@@ -448,12 +449,12 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
   }
 
   const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
-  const { activityCadence } = buildActivityCadence({
+  const cadence = buildProfileCadence({
     range,
     tz: effectiveTz,
     now,
     cadenceRows,
-    minDateRow: { log_start_date: GLOBAL_OLDEST_PLAY },
+    minDateRow: { log_start_date: artist.firstPlayedAt },
   });
 
   const recentPlays: ProfilePlay[] = targetInRangePlays
@@ -535,7 +536,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     plays: inRangePlayCount,
     rank,
     rankedTotal,
-    activityCadence,
+    ...cadence,
     topTracks,
     topAlbums,
     recentPlays,

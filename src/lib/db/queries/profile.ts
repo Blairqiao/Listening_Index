@@ -2,7 +2,7 @@ import { getDb } from "../index";
 import { isCatalogFullyEnriched } from "./enrichment";
 import { sanitizeTimezone } from "./helpers";
 import { OVERVIEW_INTERVAL_CONFIG } from "./overview";
-import { buildCadenceQuery, buildActivityCadence, type CadenceScope } from "./cadence";
+import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cadence";
 import type { RangeKey } from "@/lib/types";
 import {
   PROFILE_RECENT_PLAYS_LIMIT,
@@ -49,12 +49,16 @@ export async function getProfile(
       SELECT
         t.id,
         t.name,
+        COALESCE(t.artist_id, t.artist_group_key) AS artist_key,
         COALESCE(ar.name, t.artist_name) AS artist_name,
         COALESCE(al.name, t.album_name) AS album_name,
         al.image_url,
         MIN(p.played_at) AS first_played_at,
         MAX(p.played_at) AS last_played_at,
-        COUNT(p.id)::int AS lifetime_plays
+        COUNT(p.id)::int AS lifetime_plays,
+        COALESCE(SUM(p.ms_played) FILTER (WHERE ${timeFilter}), 0)::bigint AS played_ms,
+        COUNT(DISTINCT (p.played_at AT TIME ZONE ${safeTz})::date)
+          FILTER (WHERE ${timeFilter})::int AS days_played
       FROM tracks t
       JOIN plays p ON p.track_id = t.id
       LEFT JOIN artists ar ON t.artist_id = ar.id
@@ -69,7 +73,7 @@ export async function getProfile(
 
     const trackId = String(trackRow.id);
 
-    const [rankAndPlaysRows, rankedTotalRows, cadenceRows, minDateRows, recentPlayRows] =
+    const [rankAndPlaysRows, rankedTotalRows, cadenceRows, recentPlayRows] =
       await Promise.all([
         sql`
           SELECT plays::int, rank::int FROM (
@@ -89,7 +93,6 @@ export async function getProfile(
           WHERE ${timeFilter};
         `,
         buildCadenceQuery(range, safeTz, { kind: "track", trackId }),
-        sql`SELECT MIN(played_at) AS log_start_date FROM plays;`,
         sql`
           SELECT
             p.id::text,
@@ -117,11 +120,11 @@ export async function getProfile(
         : null;
     const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
 
-    const { activityCadence } = buildActivityCadence({
+    const cadence = buildProfileCadence({
       range,
       tz: safeTz,
       cadenceRows: cadenceRows as Record<string, unknown>[],
-      minDateRow: minDateRows[0] as { log_start_date?: string | null } | undefined,
+      minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
     });
 
     return {
@@ -137,7 +140,12 @@ export async function getProfile(
       plays,
       rank,
       rankedTotal,
-      activityCadence,
+      ...cadence,
+      artistKey: (trackRow.artist_key as string | null) ?? undefined,
+      trackStats: {
+        playedMs: Number(trackRow.played_ms),
+        daysPlayed: Number(trackRow.days_played),
+      },
       topTracks: [],
       topAlbums: [],
       recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
@@ -200,7 +208,6 @@ export async function getProfile(
     rankedTotalRows,
     imageRows,
     cadenceRows,
-    minDateRows,
     topTrackRows,
     topAlbumRows,
     recentPlayRows,
@@ -238,7 +245,6 @@ export async function getProfile(
       LIMIT 1;
     `,
     buildCadenceQuery(range, safeTz, scope),
-    sql`SELECT MIN(played_at) AS log_start_date FROM plays;`,
     sql`
       SELECT
         t.id,
@@ -294,11 +300,11 @@ export async function getProfile(
       : null;
   const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
 
-  const { activityCadence } = buildActivityCadence({
+  const cadence = buildProfileCadence({
     range,
     tz: safeTz,
     cadenceRows: cadenceRows as Record<string, unknown>[],
-    minDateRow: minDateRows[0] as { log_start_date?: string | null } | undefined,
+    minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
   });
 
   const topTracks: ProfileTopTrack[] = topTrackRows.map((row) => ({
@@ -328,7 +334,7 @@ export async function getProfile(
     plays,
     rank,
     rankedTotal,
-    activityCadence,
+    ...cadence,
     topTracks,
     topAlbums,
     recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),

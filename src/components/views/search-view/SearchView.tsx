@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
+import { ChevronDown, X } from "lucide-react";
 import { DEFAULT_SEARCH_SORT, SEARCH_MAX_CHARS, SEARCH_SORT_OPTIONS, type ProfileTarget, type SearchSort } from "@/lib/search-types";
 import { parseSearchSort } from "@/lib/search-utils";
 import { useSearch } from "./useSearch";
@@ -25,6 +26,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   onSortChange,
   onPageChange,
 }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
   const { status, data } = useSearch(query, sort, page);
 
   let statusText: string | null = null;
@@ -49,28 +51,48 @@ export const SearchView: React.FC<SearchViewProps> = ({
     <div className="w-full mt-4 md:mt-6 flex flex-col md:h-[560px] select-none">
       {/* 1. Full-width search input & status line */}
       <div className="flex-none mb-3">
-        <input
-          type="search"
-          name="search"
-          maxLength={SEARCH_MAX_CHARS * 2}
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          placeholder="SEARCH TRACKS OR ARTISTS"
-          aria-label="Search tracks or artists"
-          className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 px-1 outline-none transition-none rounded-none"
-        />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1 font-mono text-[11px] text-[#8A8A83]">
-          <label className="flex items-center gap-2">
-            Sort by
-            <select
-              value={sort}
-              onChange={(event) => onSortChange?.(parseSearchSort(event.target.value))}
-              className="min-h-9 border border-[#262622] bg-[#080808] px-2 text-[#EDEDE8] focus-visible:outline-music-accent"
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="search"
+            name="search"
+            maxLength={SEARCH_MAX_CHARS * 2}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="SEARCH TRACKS OR ARTISTS"
+            aria-label="Search tracks or artists"
+            className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 pl-1 pr-10 outline-none transition-none rounded-none [&::-webkit-search-cancel-button]:hidden"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => {
+                onQueryChange("");
+                inputRef.current?.focus();
+              }}
+              className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
             >
-              {SEARCH_SORT_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
+          <label className="flex items-center gap-2">
+            <span className="uppercase">Sort</span>
+            <span className="relative">
+              <select
+                aria-label="Sort by"
+                value={sort}
+                onChange={(event) => onSortChange?.(parseSearchSort(event.target.value))}
+                className="min-h-8 appearance-none cursor-pointer rounded-none border border-[#26261F] bg-transparent pl-2.5 pr-7 uppercase text-[#8A8A83] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent [color-scheme:dark]"
+              >
+                {SEARCH_SORT_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+            </span>
           </label>
           {(page > 1 || data?.hasMore) && (
             <nav aria-label="Search results pages" className="flex items-center gap-2">
@@ -79,17 +101,17 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 aria-label="Previous page"
                 disabled={page <= 1 || status === "loading"}
                 onClick={() => onPageChange?.(page - 1)}
-                className="size-9 border border-[#262622] hover:text-[#EDEDE8] disabled:opacity-40"
+                className="size-8 cursor-pointer rounded-none border border-[#26261F] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent disabled:cursor-default disabled:opacity-40"
               >
                 ←
               </button>
-              <span className="tabular-nums">{page}</span>
+              <span className="tabular-nums text-[#8A8A83]">{String(page).padStart(2, "0")}</span>
               <button
                 type="button"
                 aria-label="Next page"
                 disabled={status !== "ready" || !data?.hasMore}
                 onClick={() => onPageChange?.(page + 1)}
-                className="size-9 border border-[#262622] hover:text-[#EDEDE8] disabled:opacity-40"
+                className="size-8 cursor-pointer rounded-none border border-[#26261F] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent disabled:cursor-default disabled:opacity-40"
               >
                 →
               </button>

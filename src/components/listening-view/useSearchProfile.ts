@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ProfileData, ProfileTarget } from "@/lib/search-types";
+import { DEFAULT_PROFILE_RANGE, type ProfileData, type ProfileTarget } from "@/lib/search-types";
 import type { Mode, RangeKey } from "@/lib/types";
 import {
   getProfileCacheKey,
@@ -9,9 +9,7 @@ import {
 
 export interface UseSearchProfileParams {
   activeMode: Mode;
-  activeRange: RangeKey;
   visitorTimezone: string;
-  initialRange: RangeKey;
   initialProfile?: ProfileTarget | null;
   initialProfileRange?: RangeKey | null;
   isSyncing?: boolean;
@@ -19,9 +17,7 @@ export interface UseSearchProfileParams {
 
 export function useSearchProfile({
   activeMode,
-  activeRange,
   visitorTimezone,
-  initialRange,
   initialProfile,
   initialProfileRange,
   isSyncing = false,
@@ -31,8 +27,9 @@ export function useSearchProfile({
     () => initialProfile ?? null
   );
   const [profileRange, setProfileRange] = useState<RangeKey>(
-    () => initialProfileRange ?? initialRange
+    () => initialProfileRange ?? DEFAULT_PROFILE_RANGE
   );
+  const [artistOrigin, setArtistOrigin] = useState<{ target: ProfileTarget; range: RangeKey } | null>(null);
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
 
@@ -67,24 +64,30 @@ export function useSearchProfile({
     [visitorTimezone]
   );
 
-  // From Search results: start at Overview's current range.
-  const handleOpenProfile = useCallback(
-    (target: ProfileTarget) => openProfileAt(target, activeRange),
-    [openProfileAt, activeRange]
-  );
+  const handleOpenProfile = useCallback((target: ProfileTarget) => {
+    setArtistOrigin(null);
+    openProfileAt(target, DEFAULT_PROFILE_RANGE);
+  }, [openProfileAt]);
 
-  // From inside a profile (a top Track): keep the profile's range, since its lists were ranked in it.
-  const handleOpenRelatedProfile = useCallback(
-    (target: ProfileTarget) => openProfileAt(target, profileRange),
-    [openProfileAt, profileRange]
-  );
+  const handleOpenRelatedProfile = useCallback((target: ProfileTarget) => {
+    setArtistOrigin(profileTarget?.kind === "artist" && target.kind === "track"
+      ? { target: profileTarget, range: profileRange }
+      : null);
+    openProfileAt(target, profileRange);
+  }, [openProfileAt, profileRange, profileTarget]);
 
   const handleProfileBack = useCallback(() => {
+    if (artistOrigin) {
+      setArtistOrigin(null);
+      openProfileAt(artistOrigin.target, artistOrigin.range);
+      return;
+    }
+
     requestGenerationRef.current++;
     setProfileTarget(null);
     setRawProfileData(null);
     setProfileStatus("loading");
-  }, []);
+  }, [artistOrigin, openProfileAt]);
 
   const handleSelectProfileRange = useCallback(
     (range: RangeKey) => {
@@ -245,6 +248,7 @@ export function useSearchProfile({
     handleOpenProfile,
     handleOpenRelatedProfile,
     handleProfileBack,
+    returnsToArtist: artistOrigin !== null,
     handleSelectProfileRange,
   };
 }

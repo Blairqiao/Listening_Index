@@ -228,12 +228,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     handleOpenProfile,
     handleOpenRelatedProfile,
     handleProfileBack,
+    returnsToArtist,
     handleSelectProfileRange,
   } = useSearchProfile({
     activeMode,
-    activeRange,
     visitorTimezone,
-    initialRange,
     initialProfile,
     initialProfileRange,
     isSyncing,
@@ -431,30 +430,35 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             isSyncing={isSyncing}
           />
 
-          {/* 3. Fixed-Height Control Row (h-[26px], never shifts) */}
-          <ControlRow
-            mode={activeMode}
-            range={activeMode === 4 ? profileRange : activeRange}
-            onSelectRange={activeMode === 4 ? handleSelectProfileRange : handleSelectRange}
-            logStartDate={currentOverview.logStartDate}
-            isSessionOpen={isSystemLive}
-            sessionTagTime={sessionTagTime}
-            isSyncing={isSyncing}
-            isAuthenticated={isAuthenticated}
-            onTriggerSync={handleTriggerSync}
-            syncError={syncError}
-            streamLogCount={visibleStreamLogCount ?? (streamLogData.entries.length || loadedPlaysCount)}
-            streamLogDateSpan={streamLogDateSpan}
-            sessionNumber={selectedSessionNumber}
-            totalSessions={totalSessions}
-            onProfileBack={handleProfileBack}
-            profileKind={activeMode === 4 ? profileTarget?.kind ?? null : null}
-            layout={config.livePlayerLayout}
-            onToggleLayout={handleToggleLayout}
-            activeDevice={activeDevice}
-            playerStatus={playerStatus}
-            onTransferPlayback={handleTransferPlayback}
-          />
+          {(activeMode !== 4 || profileTarget) && (
+            <ControlRow
+              mode={activeMode}
+              range={activeMode === 4 ? profileRange : activeRange}
+              onSelectRange={activeMode === 4 ? handleSelectProfileRange : handleSelectRange}
+              logStartDate={currentOverview.logStartDate}
+              isSessionOpen={isSystemLive}
+              sessionTagTime={sessionTagTime}
+              isSyncing={isSyncing}
+              isAuthenticated={isAuthenticated}
+              onTriggerSync={handleTriggerSync}
+              syncError={syncError}
+              streamLogCount={visibleStreamLogCount ?? (streamLogData.entries.length || loadedPlaysCount)}
+              streamLogDateSpan={streamLogDateSpan}
+              sessionNumber={selectedSessionNumber}
+              totalSessions={totalSessions}
+              onProfileBack={() => {
+                handleProfileBack();
+                window.scrollTo(0, 0);
+              }}
+              returnsToArtist={returnsToArtist}
+              profileKind={activeMode === 4 ? profileTarget?.kind ?? null : null}
+              layout={config.livePlayerLayout}
+              onToggleLayout={handleToggleLayout}
+              activeDevice={activeDevice}
+              playerStatus={playerStatus}
+              onTransferPlayback={handleTransferPlayback}
+            />
+          )}
 
           {(activeMode !== 4 || profileTarget) && (
             <MetricRibbon
@@ -525,7 +529,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   data={profileData}
                   status={profileStatus}
                   visitorTimezone={visitorTimezone}
-                  onOpenProfile={handleOpenRelatedProfile}
+                  onOpenProfile={(target) => {
+                    handleOpenRelatedProfile(target);
+                    window.scrollTo(0, 0);
+                  }}
                 />
               ) : (
                 <SearchView
@@ -541,7 +548,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                     setSearchSort(sort);
                   }}
                   onPageChange={setSearchPage}
-                  onOpenProfile={handleOpenProfile}
+                  onOpenProfile={(target) => {
+                    handleOpenProfile(target);
+                    window.scrollTo(0, 0);
+                  }}
                 />
               )
             )}
