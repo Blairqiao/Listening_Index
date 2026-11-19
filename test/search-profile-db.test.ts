@@ -2,11 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import dotenv from "dotenv";
 import { getDb } from "../src/lib/db";
-import { getOverviewData } from "../src/lib/db/queries/overview";
+import { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "../src/lib/db/queries/overview";
 import { migrateSchema } from "../src/lib/db/queries/schema";
 import { searchCatalog } from "../src/lib/db/queries/search";
+import { isCatalogFullyEnriched } from "../src/lib/db/queries/enrichment";
+import { hourHistogram, longestStreak, pickBestMonth } from "../src/lib/profile-stats";
 import { getProfile } from "../src/lib/db/queries/profile";
 import {
+  PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
@@ -282,6 +285,81 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
     for (let i = 1; i < artistAll.topAlbums.length; i++) {
       assert.ok(artistAll.topAlbums[i - 1].plays >= artistAll.topAlbums[i].plays);
     }
+  });
+
+  await t.test("Track stats match raw plays by range and local time", async () => {
+    const comparisons = await captureStableComparison(sql, "track-story", async () => {
+      const [{ id }] = await sql`
+        SELECT track_id AS id FROM plays GROUP BY track_id
+        ORDER BY COUNT(*) DESC, track_id LIMIT 1;
+      `;
+      const enriched = await isCatalogFullyEnriched();
+
+      return Promise.all((["all", "1m"] as const).flatMap((range) =>
+        ["UTC", "America/Chicago"].map(async (tz) => {
+          const timeFilter = range === "all" ? sql`TRUE` :
+            sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+          const [profile, rawPlays, [identity]] = await Promise.all([
+            getProfile({ kind: "track", key: id }, range, tz),
+            sql`SELECT p.played_at FROM plays p WHERE p.track_id = ${id} AND ${timeFilter}`,
+            sql`SELECT artist_id, artist_group_key, album_id, album_group_key FROM tracks WHERE id = ${id}`,
+          ]);
+          const artistKey = enriched ? identity.artist_id : identity.artist_group_key;
+          const artist = artistKey == null ? null : await getProfile({ kind: "artist", key: artistKey }, range, tz);
+          const siblings = await sql`
+            SELECT t.id, t.name, COUNT(*)::int AS plays
+            FROM tracks t JOIN plays p ON p.track_id = t.id
+            WHERE ${timeFilter} AND CASE WHEN ${identity.album_id}::text IS NOT NULL
+              THEN t.album_id = ${identity.album_id}
+              ELSE t.album_id IS NULL AND t.album_group_key = ${identity.album_group_key}
+                AND t.artist_group_key = ${identity.artist_group_key}
+            END
+            GROUP BY t.id, t.name ORDER BY plays DESC, t.name ASC, t.id ASC
+            LIMIT ${PROFILE_ALBUM_TRACKS_LIMIT};
+          `;
+          return { id, tz, profile, rawPlays, artist, siblings };
+        })
+      ));
+    });
+
+    for (const { id, tz, profile, rawPlays, artist, siblings } of comparisons) {
+      assert.ok(profile?.trackStats);
+      assert.ok(profile.hourOfDay);
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", hourCycle: "h23",
+      });
+      const local = rawPlays.map(({ played_at }) => {
+        const parts = Object.fromEntries(formatter.formatToParts(new Date(played_at))
+          .map(({ type, value }) => [type, value]));
+        return { day: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+      });
+      assert.equal(profile.plays, rawPlays.length);
+      assert.deepEqual(profile.hourOfDay, hourHistogram(local.map(({ hour }) => hour)));
+      assert.equal(profile.hourOfDay.reduce((sum, count) => sum + count, 0), profile.plays);
+      assert.deepEqual(profile.trackStats.bestMonth, pickBestMonth(local.map(({ day }) => day.slice(0, 7))));
+      assert.equal(profile.trackStats.longestStreakDays, longestStreak(local.map(({ day }) => day)));
+      assert.equal(profile.trackStats.artistShare, profile.plays && artist?.plays ? profile.plays / artist.plays : null);
+      assert.deepEqual(profile.albumTracks, siblings.map((row) => ({
+        id: row.id, name: row.name, plays: row.plays, isCurrent: row.id === id,
+      })));
+    }
+  });
+
+  await t.test("Track stats are empty when the range has no plays", async () => {
+    const profile = await captureStableComparison(sql, "track-story-empty-range", async () => {
+      const [track] = await sql`
+        SELECT track_id AS id FROM plays GROUP BY track_id
+        HAVING MAX(played_at) < NOW() - INTERVAL '24 hours'
+        ORDER BY MAX(played_at) ASC LIMIT 1;
+      `;
+      return track ? getProfile({ kind: "track", key: track.id }, "1d", "America/Chicago") : null;
+    });
+
+    assert.ok(profile);
+    assert.equal(profile.plays, 0);
+    assert.deepEqual(profile.trackStats, { artistShare: null, bestMonth: null, longestStreakDays: 0 });
+    assert.deepEqual(profile.hourOfDay, Array(24).fill(0));
   });
 
   await t.test("searchCatalog handles case, substrings, accents, and escaped wildcards", async () => {
