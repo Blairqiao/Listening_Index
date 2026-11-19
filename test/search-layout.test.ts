@@ -79,3 +79,25 @@ test("planSideColumn visits each Artist and Album index exactly once", () => {
     }
   }
 });
+
+test("planSideColumn fills every page that has results after it, so the columns end level", () => {
+  for (const [artistTotal, albumTotal] of [[1, 20], [20, 1], [3, 20], [20, 3], [12, 12], [0, 30], [30, 0]]) {
+    for (const sideRows of [2, 4, 7, 9]) {
+      for (let page = 1; ; page += 1) {
+        const slice = planSideColumn({ artistTotal, albumTotal, sideRows, page });
+        const { artistOffset, artistLimit, albumOffset, albumLimit } = slice;
+        if (artistLimit === 0 && albumLimit === 0) break;
+
+        const left = artistTotal - artistOffset - artistLimit + albumTotal - albumOffset - albumLimit;
+        if (left === 0) break; // The last page may be short.
+
+        const expected = artistLimit > 0 && albumLimit > 0 ? sideRows : sideRows + 1;
+        assert.equal(
+          artistLimit + albumLimit,
+          expected,
+          `artistTotal=${artistTotal}, albumTotal=${albumTotal}, sideRows=${sideRows}, page=${page}`,
+        );
+      }
+    }
+  }
+});
