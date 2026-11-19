@@ -241,6 +241,76 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
   );
 });
 
+test("buildListeningUrlSearch keeps only the active profile key, including Album keys", () => {
+  const currentSearch = "?mode=4&track=t1&artist=a1&album=old";
+  assert.equal(buildListeningUrlSearch(currentSearch, {
+    activeMode: 4,
+    profileTarget: { kind: "album", key: "k" },
+    profileRange: "1y",
+  }), "?mode=4&album=k&prange=1y");
+
+  for (const kind of ["track", "artist"] as const) {
+    assert.equal(buildListeningUrlSearch(currentSearch, {
+      activeMode: 4,
+      profileTarget: { kind, key: "k" },
+      profileRange: "1y",
+    }), `?mode=4&${kind}=k&prange=1y`);
+  }
+
+  assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
+    activeMode: 4, profileTarget: null, profileRange: "1y",
+  }), "?mode=4");
+  assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
+    activeMode: 0, profileTarget: { kind: "album", key: "k" }, profileRange: "1y",
+  }), "");
+});
+
+test("useSearchProfile keeps one back origin for Artist to Album and Album to Track", async () => {
+  const origFetch = globalThis.fetch;
+  const requests: URLSearchParams[] = [];
+  const artist: ProfileTarget = { kind: "artist", key: "radiohead" };
+  const album: ProfileTarget = { kind: "album", key: "radiohead::in rainbows" };
+  const track: ProfileTarget = { kind: "track", key: "weird-fishes" };
+  const args = { activeMode: 4, visitorTimezone: "UTC", initialProfileRange: "6m" } as const;
+
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const params = new URL(String(input), "http://127.0.0.1:8888").searchParams;
+      requests.push(params);
+      const target = searchUtils.parseProfileTarget(params);
+      assert.ok(target);
+      return Response.json(makeProfile({ ...target, range: searchUtils.parseRangeKey(params.get("prange")) ?? "1w" }));
+    }) as typeof fetch;
+
+    for (const { initialProfile, related, origin } of [
+      { initialProfile: artist, related: album, origin: artist },
+      { initialProfile: album, related: track, origin: album },
+      { initialProfile: track, related: album, origin: null },
+    ]) {
+      await withHookReact(async (harness) => {
+        const render = () => harness.renderOnce({ ...args, initialProfile });
+        render().handleOpenRelatedProfile(related);
+        await flushMicrotasks();
+
+        const relatedState = render();
+        assert.deepEqual(relatedState.profileTarget, related);
+        assert.equal(relatedState.returnsTo, origin?.kind ?? null);
+        assert.equal(requests.at(-1)?.get(related.kind), related.key);
+        assert.equal(requests.at(-1)?.get("prange"), "6m");
+
+        relatedState.handleSelectProfileRange("1m");
+        render().handleProfileBack();
+        const backState = render();
+        assert.deepEqual(backState.profileTarget, origin);
+        assert.equal(backState.returnsTo, null);
+        if (origin) assert.equal(backState.profileRange, "6m");
+      });
+    }
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
 test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong entity and stale range leaks", () => {
   const artist1w = makeProfile({
     kind: "artist",
@@ -672,9 +742,15 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   assert.deepEqual(mode4Artist.props.initialProfile, { kind: "artist", key: "4Z8W4fKeB5YxbusRsdQVPb" });
   assert.equal(mode4Artist.props.initialProfileRange, null);
 
-  // Non-4 mode ignores track/artist/prange
+  const mode4Album = await mod.exports.default({
+    searchParams: Promise.resolve({ mode: "4", album: "radiohead::in rainbows", prange: "1y" }),
+  });
+  assert.deepEqual(mode4Album.props.initialProfile, { kind: "album", key: "radiohead::in rainbows" });
+  assert.equal(mode4Album.props.initialProfileRange, "1y");
+
+  // Non-4 mode ignores profile params
   const mode0 = await mod.exports.default({
-    searchParams: Promise.resolve({ mode: "0", track: "t1", prange: "all" }),
+    searchParams: Promise.resolve({ mode: "0", album: "k", prange: "all" }),
   });
   assert.equal(mode0.props.initialMode, 0);
   assert.equal(mode0.props.initialProfile, null);

@@ -3,6 +3,7 @@
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
 import { compactDate } from "@/lib/format-utils";
+import type { ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
@@ -19,9 +20,9 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
-  returnsToArtist?: boolean;
+  returnsTo?: "artist" | "album" | null;
   onProfileBack?: () => void;
-  profileKind?: "track" | "artist" | null;
+  profileKind?: ProfileKind | null;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
@@ -57,7 +58,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   syncError,
   profileKind,
   onProfileBack,
-  returnsToArtist,
+  returnsTo,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -126,6 +127,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       case 4:
         if (profileKind === "track") return "TRACK PROFILE";
         if (profileKind === "artist") return "ARTIST PROFILE";
+        if (profileKind === "album") return "ALBUM PROFILE";
         return "SEARCH";
     }
   };
@@ -269,7 +271,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onClick={onProfileBack}
             className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
           >
-            {returnsToArtist ? "← BACK TO ARTIST" : "← BACK TO SEARCH"}
+            {`← BACK TO ${(returnsTo ?? "search").toUpperCase()}`}
           </button>
         ) : getScopeLabel()}
         {syncError && mode !== 2 && (
