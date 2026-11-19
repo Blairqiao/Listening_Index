@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { CATALOG } from '../src/lib/mock/catalog';
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from '../src/lib/mock/stream-log';
 import { getMockSearch, getMockProfile } from '../src/lib/mock/search-profile';
+import {
+  SEARCH_TRACK_ROWS,
+  SEARCH_SIDE_ROWS,
+  PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
+} from '../src/lib/search-types';
 
 test('getMockSearch matches query against tracks and artists with ranking and limits', () => {
   const res = getMockSearch('radio');
@@ -152,9 +157,14 @@ test('empty search pages through the catalog with global sort order', () => {
 
   for (const sort of ['recent', 'oldest'] as const) {
     const data = getMockSearch('', sort);
-    for (const kind of ['track', 'artist'] as const) {
-      const keys = kind === 'track' ? data.tracks.map(row => row.id) : data.artists.map(row => row.key);
-      const dates = keys.map(key => Date.parse(getMockProfile({ kind, key }, 'all', 'UTC')!.lastPlayedAt!));
+    for (const kind of ['track', 'artist', 'album'] as const) {
+      const keys =
+        kind === 'track'
+          ? data.tracks.map((row) => row.id)
+          : kind === 'artist'
+            ? data.artists.map((row) => row.key)
+            : data.albums.map((row) => row.key);
+      const dates = keys.map((key) => Date.parse(getMockProfile({ kind, key }, 'all', 'UTC')!.lastPlayedAt!));
       assert.ok(dates.length > 1);
       assert.ok(dates.every((date, index) => index === 0 ||
         (sort === 'recent' ? date <= dates[index - 1] : date >= dates[index - 1])));
@@ -220,4 +230,115 @@ test("Artist hours are zero when the range has no Plays", () => {
     .find((profile) => profile?.plays === 0);
   assert.ok(artist);
   assert.deepEqual(artist.hourOfDay, Array(24).fill(0));
+});
+
+test('getMockSearch matches query against album name only and returns albums array', () => {
+  const rainbowsRes = getMockSearch('In Rainbows');
+  assert.ok(rainbowsRes.albums.length > 0);
+  assert.equal(rainbowsRes.albums[0].name, 'In Rainbows');
+  assert.equal(rainbowsRes.albums[0].artist, 'Radiohead');
+  assert.equal(rainbowsRes.albums[0].key, CATALOG.radiohead_weird_fishes.albumId);
+  assert.ok(rainbowsRes.albums[0].plays > 0);
+  assert.ok(rainbowsRes.albums[0].imageUrl);
+
+  const radioRes = getMockSearch('Radiohead');
+  assert.ok(radioRes.artists.some((artist) => artist.name === 'Radiohead'));
+  assert.deepEqual(radioRes.albums, []);
+});
+
+test('getMockSearch limits tracks to SEARCH_TRACK_ROWS and side column to SEARCH_SIDE_ROWS', () => {
+  const res = getMockSearch('', 'most-plays', 1);
+  assert.ok(res.tracks.length > 0 && res.tracks.length <= SEARCH_TRACK_ROWS);
+  assert.ok(res.artists.length > 0);
+  assert.ok(res.albums.length > 0);
+  assert.ok(res.artists.length + res.albums.length <= SEARCH_SIDE_ROWS);
+});
+
+test('getMockSearch album paging without duplicates and sort orders', () => {
+  const albumKeys = new Set<string>();
+  let hasMore = true;
+  for (let page = 1; page <= 40 && hasMore; page++) {
+    const result = getMockSearch('', 'most-plays', page);
+    for (const album of result.albums) {
+      assert.ok(!albumKeys.has(album.key), `Duplicate Album key ${album.key}`);
+      albumKeys.add(album.key);
+    }
+    hasMore = result.hasMore;
+  }
+  assert.equal(hasMore, false);
+  assert.ok(albumKeys.size > SEARCH_SIDE_ROWS);
+  const firstAlbumKey = [...albumKeys][0];
+  const firstAlbum = getMockProfile({ kind: 'album', key: firstAlbumKey }, 'all', 'UTC');
+  assert.equal(albumKeys.size, firstAlbum?.rankedTotal);
+
+  for (const sort of ['most-plays', 'least-plays'] as const) {
+    const res = getMockSearch('', sort, 1);
+    for (let i = 1; i < res.albums.length; i++) {
+      if (sort === 'most-plays') {
+        assert.ok(res.albums[i - 1].plays >= res.albums[i].plays);
+      } else {
+        assert.ok(res.albums[i - 1].plays <= res.albums[i].plays);
+      }
+    }
+  }
+});
+
+test('getMockProfile for album round-trip from search, totals and topTracks sum', () => {
+  const searchRes = getMockSearch('', 'most-plays', 1);
+  assert.ok(searchRes.albums.length > 0);
+
+  for (const albumItem of searchRes.albums) {
+    const profile = getMockProfile({ kind: 'album', key: albumItem.key }, 'all', 'UTC');
+    assert.ok(profile, `Profile should exist for album key ${albumItem.key}`);
+    assert.equal(profile.kind, 'album');
+    assert.equal(profile.key, albumItem.key);
+    assert.equal(profile.name, albumItem.name);
+    assert.equal(profile.artistName, albumItem.artist);
+    assert.equal(profile.albumName, null);
+    assert.deepEqual(profile.topAlbums, []);
+    assert.ok(profile.plays > 0);
+    assert.equal(profile.plays, albumItem.plays);
+    assert.ok(profile.rankedTotal > 0);
+    assert.ok(profile.rank !== null && profile.rank >= 1);
+    assert.ok(profile.firstPlayedAt);
+    assert.ok(profile.lastPlayedAt);
+    assert.ok(profile.artistKey);
+
+    // topTracks capped at PROFILE_ALBUM_PROFILE_TRACKS_LIMIT
+    assert.ok(profile.topTracks.length > 0 && profile.topTracks.length <= PROFILE_ALBUM_PROFILE_TRACKS_LIMIT);
+    // topTracks plays sum to profile.plays
+    const topTracksPlaySum = profile.topTracks.reduce((sum, t) => sum + t.plays, 0);
+    assert.equal(topTracksPlaySum, profile.plays, `topTracks sum should equal plays for ${profile.name}`);
+
+    // hours of day sum to profile.plays
+    assert.ok(profile.hourOfDay);
+    assert.equal(profile.hourOfDay.length, 24);
+    assert.equal(profile.hourOfDay.reduce((sum, c) => sum + c, 0), profile.plays);
+
+    // activity cadence sums to profile.plays
+    assert.equal(profile.activityCadence.reduce((sum, b) => sum + b.count, 0), profile.plays);
+  }
+});
+
+test('Track profile gains albumKey and Artist topAlbums gain key preserving id', () => {
+  const weirdFishesId = CATALOG.radiohead_weird_fishes.id;
+  const trackProfile = getMockProfile({ kind: 'track', key: weirdFishesId }, 'all', 'UTC');
+  assert.ok(trackProfile);
+  assert.equal(trackProfile.albumKey, CATALOG.radiohead_weird_fishes.albumId);
+
+  const artistId = CATALOG.radiohead_weird_fishes.artistId;
+  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, 'all', 'UTC');
+  assert.ok(artistProfile);
+  assert.ok(artistProfile.topAlbums.length > 0);
+  for (const topAlbum of artistProfile.topAlbums) {
+    assert.ok(topAlbum.key, 'topAlbum must have key');
+    assert.ok(topAlbum.id, 'topAlbum must preserve id');
+  }
+});
+
+test('getMockProfile returns null for unknown album target', () => {
+  assert.equal(
+    getMockProfile({ kind: 'album', key: 'nonexistent_album_key' }, 'all', 'UTC'),
+    null
+  );
 });
