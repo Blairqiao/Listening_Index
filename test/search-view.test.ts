@@ -121,7 +121,7 @@ async function primeSearch(query: string, response: SearchResponse) {
   }
 }
 
-test("SearchView SSR: renders named input, placeholder, maxLength, and desktop scroll area", () => {
+test("SearchView SSR: renders named input, placeholder, maxLength, and page scrolling", () => {
   const html = renderToStaticMarkup(
     React.createElement(SearchView, {
       query: "",
@@ -134,7 +134,7 @@ test("SearchView SSR: renders named input, placeholder, maxLength, and desktop s
   assert.ok(html.includes('type="search"'), 'Must render type="search"');
   assert.ok(html.includes('name="search"'), 'Must render name="search"');
   assert.ok(
-    html.includes('placeholder="SEARCH TRACKS OR ARTISTS"'),
+    html.includes('placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"'),
     "Must render correct placeholder"
   );
   assert.ok(
@@ -142,23 +142,11 @@ test("SearchView SSR: renders named input, placeholder, maxLength, and desktop s
     "Must render maxLength 200 (SEARCH_MAX_CHARS * 2)"
   );
   assert.ok(
-    html.includes('aria-label="Search tracks or artists"'),
+    html.includes('aria-label="Search tracks, artists or albums"'),
     "Must render aria-label for accessibility"
   );
 
-  // Scroll container and desktop styling
-  assert.ok(
-    html.includes("scrollbar-hidden"),
-    "Must include scrollbar-hidden class"
-  );
-  assert.ok(
-    html.includes("overflow-y-auto"),
-    "Must include overflow-y-auto class for vertical scrolling"
-  );
-  assert.ok(
-    html.includes("md:h-[560px]") || html.includes("md:h-"),
-    "Must include desktop bounded height styling"
-  );
+  assert.doesNotMatch(html, /overflow-y-auto|scrollbar-hidden|md:h-\[560px\]/);
 });
 
 test("SearchView browses on empty input and accepts a single character", async () => {
@@ -166,6 +154,7 @@ test("SearchView browses on empty input and accepts a single character", async (
     query: "",
     hasMore: true,
     artists: [{ key: "artist-1", name: "Default Artist", plays: 10, imageUrl: null }],
+    albums: [],
     tracks: [],
   });
   const render = (query: string) => renderToStaticMarkup(
@@ -177,6 +166,7 @@ test("SearchView browses on empty input and accepts a single character", async (
   );
   const browseHtml = render("");
   assert.match(browseHtml, /Default Artist/);
+  assert.doesNotMatch(browseHtml, /\[ ALBUMS \]/);
   assert.doesNotMatch(browseHtml, /<select\b/);
   assert.match(browseHtml, /aria-haspopup="listbox"/);
   assert.match(browseHtml, /aria-label="Sort by"/);
@@ -219,6 +209,7 @@ test("SearchView browses on empty input and accepts a single character", async (
     query: "noresults",
     hasMore: false,
     artists: [],
+    albums: [],
     tracks: [],
   });
   const noMatchesHtml = renderToStaticMarkup(
@@ -234,6 +225,14 @@ test("SearchView browses on empty input and accepts a single character", async (
   );
 });
 
+const albumResult = {
+  key: "radiohead::amnesiac",
+  name: "Amnesiac",
+  artist: "Radiohead",
+  plays: 124,
+  imageUrl: "https://example.com/amnesiac.jpg",
+};
+
 test("SearchView results rendering: columns, row style, artwork, and buttons without wrapper role", async () => {
   const mockResponse: SearchResponse = {
     query: "radio",
@@ -246,6 +245,7 @@ test("SearchView results rendering: columns, row style, artwork, and buttons wit
         imageUrl: "https://example.com/radiohead.jpg",
       },
     ],
+    albums: [albumResult],
     tracks: [
       {
         id: "4clD00s1c0rVqP9Ld0vV48",
@@ -271,6 +271,8 @@ test("SearchView results rendering: columns, row style, artwork, and buttons wit
   // Column headers
   assert.ok(html.includes("[ ARTISTS ]"), "Must render [ ARTISTS ] header");
   assert.ok(html.includes("[ TRACKS ]"), "Must render [ TRACKS ] header");
+  assert.match(html, /\[ TRACKS \].*\[ ARTISTS \].*\[ ALBUMS \]/);
+  assert.match(html, /md:h-\[55px\][^>]*><span[^>]*>\[ ALBUMS \]/);
 
   // Verify role="list" was removed from column containers
   assert.ok(
@@ -294,9 +296,40 @@ test("SearchView results rendering: columns, row style, artwork, and buttons wit
   assert.ok(html.includes("In Rainbows"), "Must render track album");
   assert.ok(html.includes("320"), "Must render track plays");
 
+  const albumButton = html.match(/<button\b[^>]*>.*?<\/button>/g)
+    ?.find((button) => button.includes(">Amnesiac</span>"));
+  assert.ok(albumButton, "Must render the Album as a button");
+  assert.match(albumButton, /type="button"/);
+  assert.match(albumButton, /src="https:\/\/example.com\/amnesiac.jpg"/);
+  assert.match(albumButton, />Radiohead<\/div>/);
+  assert.match(albumButton, />124<\/span>/);
+
   // Status line is clean when results exist
   assert.ok(!html.includes("[ NO MATCHES ]"), "Should not show no matches");
   assert.ok(!html.includes("SEARCHING…"), "Should not show searching when cached");
+});
+
+test("SearchView shows album-only results with a standard heading", async () => {
+  await primeSearch("amnesiac", {
+    query: "amnesiac",
+    hasMore: false,
+    artists: [],
+    albums: [albumResult],
+    tracks: [],
+  });
+
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "amnesiac",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(html, /\[ NO TRACKS \]/);
+  assert.match(html, /\[ ALBUMS \].*>Amnesiac</);
+  assert.doesNotMatch(html, /\[ ARTISTS \]|\[ NO ARTISTS \]|\[ NO MATCHES \]/);
+  assert.doesNotMatch(html, /md:h-\[55px\][^>]*><span[^>]*>\[ ALBUMS \]/);
 });
 
 test("useSearch hook behavior: debounce, abort, stale response, error-whitespace regression, and cache hit", async () => {
@@ -335,6 +368,7 @@ test("useSearch hook behavior: debounce, abort, stale response, error-whitespace
       json: async () => ({
         query: q,
         artists: [{ key: `a-${q}`, name: `Artist ${q}`, plays: 100, imageUrl: null }],
+        albums: [],
         tracks: [{ id: `t-${q}`, name: `Track ${q}`, artist: `Artist ${q}`, album: "Alb", plays: 50, albumImageUrl: null }],
       }),
     } as unknown as Response);
@@ -406,6 +440,7 @@ test("useSearch hook behavior: debounce, abort, stale response, error-whitespace
         json: async () => ({
           query: "slow-q",
           artists: [{ key: "slow", name: "Slow", plays: 1, imageUrl: null }],
+          albums: [],
           tracks: [],
         }),
       } as unknown as Response);
@@ -469,6 +504,7 @@ test("useSearch production cache FIFO eviction at 50 entries", async () => {
       json: async () => ({
         query: q,
         artists: [{ key: `k-${q}`, name: `Artist ${q}`, plays: 1, imageUrl: null }],
+        albums: [],
         tracks: [],
       }),
     } as unknown as Response);
