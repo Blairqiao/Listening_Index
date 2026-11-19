@@ -91,7 +91,7 @@ export async function getProfile(
 
     const [
       rankAndPlaysRows, rankedTotalRows, cadenceRows, recentPlayRows,
-      hourRows, monthRows, streakRows, artistPlayRows, albumRows,
+      hourRows, streakRows, artistPlayRows, albumRows,
     ] =
       await Promise.all([
         sql`
@@ -136,11 +136,6 @@ export async function getProfile(
           GROUP BY 1;
         `,
         sql`
-          SELECT to_char(p.played_at AT TIME ZONE ${safeTz}, 'YYYY-MM') AS month, COUNT(*)::int AS plays
-          FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
-          GROUP BY 1 ORDER BY plays DESC, month DESC LIMIT 1;
-        `,
-        sql`
           WITH distinct_days AS (
             SELECT DISTINCT (p.played_at AT TIME ZONE ${safeTz})::date AS day
             FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
@@ -183,7 +178,7 @@ export async function getProfile(
     for (const row of hourRows) {
       hourOfDay[Number(row.hour)] = Number(row.plays);
     }
-    const bestMonth = monthRows[0];
+    const artistPlays = Number(artistPlayRows[0]?.plays ?? 0);
     const albumTracks: ProfileAlbumTrack[] = albumRows.map((row) => ({
       id: String(row.id),
       name: String(row.name),
@@ -207,8 +202,8 @@ export async function getProfile(
       ...cadence,
       artistKey: (activeArtistKey ?? artistId ?? artistGroupKey ?? undefined) as string | undefined,
       trackStats: {
-        artistShare: artistShare(plays, Number(artistPlayRows[0]?.plays ?? 0)),
-        bestMonth: bestMonth ? { month: String(bestMonth.month), plays: Number(bestMonth.plays) } : null,
+        artistShare: artistShare(plays, artistPlays),
+        artistPlays,
         longestStreakDays: Number(streakRows[0]?.streak ?? 0),
       },
       hourOfDay,

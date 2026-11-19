@@ -184,8 +184,7 @@ test("Track stats and album siblings follow the profile range and timezone", () 
   assert.ok(utc.trackStats.longestStreakDays >= 1);
   const sampledDays = new Set(utc.recentPlays.map((play) => play.playedAt.slice(0, 10)));
   assert.ok(utc.trackStats.longestStreakDays <= sampledDays.size + utc.plays - utc.recentPlays.length);
-  assert.ok(utc.trackStats.bestMonth);
-  assert.ok(utc.trackStats.bestMonth.plays <= utc.plays);
+  assert.ok(utc.trackStats.artistPlays >= utc.plays);
   assert.ok(utc.trackStats.artistShare && utc.trackStats.artistShare <= 1);
   assert.ok(utc.albumTracks);
   assert.ok(utc.albumTracks.some((row) => row.id === track.id && row.isCurrent));

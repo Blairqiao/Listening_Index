@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import type { ProfileData, ProfileTarget } from "@/lib/search-types";
 import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
-import { formatMonthLabel, formatShare } from "@/lib/profile-stats";
+import { formatShare } from "@/lib/profile-stats";
 import { HourHistogram } from "./HourHistogram";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
@@ -137,7 +137,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const artistKey = data.artistKey;
   const isTrack = data.kind === "track";
-  const bestMonth = data.trackStats?.bestMonth;
   const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
   const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
@@ -206,12 +205,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div>
               <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">SHARE OF ARTIST</dt>
               <dd className="mt-1 text-sm tabular-nums">{formatShare(data.trackStats?.artistShare ?? null)}</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">BEST MONTH</dt>
-              <dd className="mt-1 text-sm tabular-nums">
-                {bestMonth ? `${formatMonthLabel(bestMonth.month)} · ${bestMonth.plays.toLocaleString()}` : "—"}
-              </dd>
             </div>
             <div>
               <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">LONGEST STREAK</dt>

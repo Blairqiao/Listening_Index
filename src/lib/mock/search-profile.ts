@@ -17,7 +17,7 @@ import {
   type SearchResponse,
   type SearchTrackResult,
 } from "@/lib/search-types";
-import { artistShare, hourHistogram, longestStreak, pickBestMonth } from "@/lib/profile-stats";
+import { artistShare, hourHistogram, longestStreak } from "@/lib/profile-stats";
 import { normalizeForSearch } from "@/lib/search-utils";
 import { CATALOG } from "./catalog";
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from "./stream-log";
@@ -451,7 +451,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       artistKey: artistId || undefined,
       trackStats: {
         artistShare: artistShare(inRangePlayCount, artistPlays),
-        bestMonth: pickBestMonth(days.map((day) => day.slice(0, 7))),
+        artistPlays,
         longestStreakDays: longestStreak(days),
       },
       hourOfDay: hourHistogram(hours),
