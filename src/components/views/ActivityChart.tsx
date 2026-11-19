@@ -12,6 +12,7 @@ export interface ActivityChartProps {
   isLoading?: boolean;
   label?: string;
   headerAside?: React.ReactNode;
+  showRange?: boolean;
   visitorTimezone?: string;
 }
 
@@ -31,6 +32,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   isLoading = false,
   label = "ACTIVITY",
   headerAside,
+  showRange = true,
   visitorTimezone: propTimezone,
 }) => {
   let contextTimezone = "UTC";
@@ -73,7 +75,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       : "";
 
   const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
-  const heading = `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]`;
+  const heading = showRange ? `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]` : `[ ${label} ]`;
 
   return (
     <div>
