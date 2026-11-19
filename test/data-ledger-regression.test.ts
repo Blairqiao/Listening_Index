@@ -1,17 +1,17 @@
-import test from 'node:test';
+import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
-import dotenv from 'dotenv';
 import { getDb } from '../src/lib/db';
 import { bulkInsertPlays, bulkUpsertTracks } from '../src/lib/db/queries/ingestion';
 import { bulkApplyEnrichment } from '../src/lib/db/queries/enrichment';
 import { parseHistoryRecords } from '../src/lib/history-parser';
-dotenv.config({path:'.env.local',quiet:true});
-const id = 'V1datafixture0000000001';
-const sql = getDb();
+import { dbTest, hasTestDb, useTestDatabase } from './helpers/test-db';
+const id = 'V1datafixture000000001';
+let sql: ReturnType<typeof getDb>;
+before(async () => { if (hasTestDb) { await useTestDatabase(); sql = getDb(); } });
 async function fixture() { await bulkUpsertTracks([{id,name:'Fixture',artistName:'Fixture',albumName:'Fixture',durationMs:30000}]); }
 async function clean() {await sql`DELETE FROM plays WHERE track_id = ${id}`; await sql`DELETE FROM tracks WHERE id = ${id}`;}
 const entry = (playedAt:string,msPlayed=30000) => ({trackId:id,playedAt,msPlayed});
-test('realistic export reimport, chronological chunks, exact overlap and maximum duration', async()=>{
+test('realistic export reimport, chronological chunks, exact overlap and maximum duration', dbTest, async()=>{
   try {
     await fixture();
     const records = ['2020-01-01T00:00:00Z','2020-01-01T00:05:00Z'].map(ts=>({ts,ms_played:30000,master_metadata_track_name:'Fixture',master_metadata_album_artist_name:'Fixture',master_metadata_album_album_name:'Fixture',spotify_track_uri:`spotify:track:${id}`}));
@@ -26,7 +26,7 @@ test('realistic export reimport, chronological chunks, exact overlap and maximum
     assert.deepEqual(rows.map(r=>r.ms_played),[30000,60000]);
   } finally { await clean(); }
 });
-test('purge rollback retains both Plays and Track if Track delete fails',async()=>{
+test('purge rollback retains both Plays and Track if Track delete fails', dbTest, async()=>{
   try {
     await fixture(); await bulkInsertPlays([entry('2020-01-01T00:00:00Z')]);
     await sql`CREATE TABLE IF NOT EXISTS v1_remediation_purge_guard (track_id text PRIMARY KEY REFERENCES tracks(id))`;
@@ -36,7 +36,7 @@ test('purge rollback retains both Plays and Track if Track delete fails',async()
     assert.equal(rows[0].count,1);
   } finally {await sql`DROP TABLE IF EXISTS v1_remediation_purge_guard`;await clean();}
 });
-test('recent Spotify metadata resolves a pending Track with authoritative duration',async()=>{
+test('recent Spotify metadata resolves a pending Track with authoritative duration', dbTest, async()=>{
   try {
     await fixture();
     await bulkUpsertTracks([{id,name:'Official',artistName:'Official Artist',albumName:'Official Album',durationMs:20000,enrichmentStatus:'enriched'}]);
@@ -48,7 +48,7 @@ test('recent Spotify metadata resolves a pending Track with authoritative durati
     assert.equal(rows[0].duration_ms,20000); assert.equal(rows[0].name,'Official');
   } finally {await clean();}
 });
-test('purge waits for a concurrent import foreign-key lock and removes its committed Play',async()=>{
+test('purge waits for a concurrent import foreign-key lock and removes its committed Play', dbTest, async()=>{
   try {
     await fixture(); await bulkInsertPlays([entry('2020-01-01T00:00:00Z')]);
     const importing=sql.transaction([
@@ -70,7 +70,7 @@ test('purge waits for a concurrent import foreign-key lock and removes its commi
     assert.deepEqual(rows[0],{plays:0,tracks:0});
   } finally {await clean();}
 });
-test('forward-only recent playback response overlap stays idempotent before exact export overlap',async()=>{
+test('forward-only recent playback response overlap stays idempotent before exact export overlap', dbTest, async()=>{
   try {
     await fixture();
     const recent=(times:string[])=>times.map(played_at=>({played_at,track:{id,duration_ms:180000,name:'Fixture',artists:[{id:'artist',name:'Fixture'}],album:{id:'album',name:'Fixture',images:[]}}}));

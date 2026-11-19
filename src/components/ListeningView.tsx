@@ -43,6 +43,7 @@ import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import {
   computeLivePlayerMetrics,
+  findSelectedSession,
   resolveActiveEntity,
   sanitizeActiveMode,
   EMPTY_OVERVIEW,
@@ -187,12 +188,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     setLastSyncedAt,
   });
 
-  const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) {
-      return Math.min(25, initialStreamLog?.entries?.length || 25);
-    }
-    return null;
-  });
+  // Starts null to match the server render; StreamLogView reports the real count after mount.
+  const [visibleStreamLogCount, setVisibleStreamLogCount] = useState<number | null>(null);
 
   // Active Track resolved from the live player, falling back to the latest Play
   const activeEntity = resolveActiveEntity(currentTrack, streamLogState?.entries?.[0]);
@@ -245,7 +242,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const sessionData: SessionData = sessionState || { sessions: [] };
   const activeSession = React.useMemo(() => {
-    const session = sessionData.sessions.find(session => session.id === selectedSessionId) || sessionData.sessions[0];
+    const session = findSelectedSession(sessionData.sessions, selectedSessionId);
     return session ? presentSession(session, visitorTimezone) : null;
   }, [sessionData.sessions, selectedSessionId, visitorTimezone]);
   const totalSessions = sessionData.sessions.length || 1;
@@ -342,8 +339,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const sessionTagTime =
     activeSession?.tagTime || "--";
+  // Footer status: whether the newest Session is still open, whichever Session is selected
   const isSystemLive = sessionData.sessions[0]?.isOpen || false;
-
 
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
@@ -375,7 +372,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             range={activeRange}
             onSelectRange={handleSelectRange}
             logStartDate={currentOverview.logStartDate}
-            isSessionOpen={isSystemLive}
+            isSessionOpen={activeSession?.isOpen || false}
             sessionTagTime={sessionTagTime}
             isSyncing={isSyncing}
             isAuthenticated={isAuthenticated}

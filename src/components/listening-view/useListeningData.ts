@@ -12,7 +12,14 @@ import {
   patchSessionWithEnrichment,
   type EnrichmentPatchData,
 } from "@/lib/enrichment-patch";
-import { getCachedStreamLogDepth, setCachedStreamLogDepth } from "./listening-helpers";
+import {
+  appendStreamLogPage,
+  getCachedStreamLogDepth,
+  isStreamLogCursorCurrent,
+  mergeStreamLogHead,
+  setCachedStreamLogDepth,
+  streamLogHeadOverlaps,
+} from "./listening-helpers";
 
 export interface UseListeningDataParams {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
@@ -78,6 +85,16 @@ export function useListeningData({
   const [sessionState, setSessionState] = useState<SessionData | null>(() => {
     return initialSession || null;
   });
+
+  // Latest committed state, readable from fetch callbacks without re-creating them
+  const streamLogStateRef = useRef(streamLogState);
+  useEffect(() => {
+    streamLogStateRef.current = streamLogState;
+  }, [streamLogState]);
+  const sessionStateRef = useRef(sessionState);
+  useEffect(() => {
+    sessionStateRef.current = sessionState;
+  }, [sessionState]);
 
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(() => {
     const syncTime =
@@ -189,29 +206,17 @@ export function useListeningData({
         const data = (await res.json()) as StreamLogData;
         if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
         if (data && data.entries) {
+          // A head refresh that does not reach the loaded rows replaces them, like an explicit depth
+          const replaces = Boolean(countToFetch) || !streamLogHeadOverlaps(streamLogStateRef.current, data);
           setStreamLogState((prev) => {
             if (aggregatesOnly && prev) return { ...prev, rawMetrics: data.rawMetrics, metrics: data.metrics };
-            let next: StreamLogData;
-            if (!prev || countToFetch) {
-              next = data;
-            } else {
-              // Merge head slice entries with existing entries by ID
-              const existingIds = new Set(data.entries.map((e) => e.id));
-              const retained = prev.entries.filter((e) => !existingIds.has(e.id));
-              next = {
-                ...data,
-                entries: [...data.entries, ...retained],
-                hasMore: prev.hasMore,
-                nextCursor: prev.nextCursor,
-                nextCursorId: prev.nextCursorId,
-              };
-            }
+            const next = countToFetch ? data : mergeStreamLogHead(prev, data);
             if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
               return patchStreamLogWithEnrichment(next, enrichmentOverlayRef.current, delistedSetRef.current);
             }
             return next;
           });
-          if (!aggregatesOnly) setLoadedPlaysCount((prev) => (countToFetch ? data.entries.length : Math.max(prev, data.entries.length)));
+          if (!aggregatesOnly) setLoadedPlaysCount((prev) => (replaces ? data.entries.length : Math.max(prev, data.entries.length)));
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
             setLastSyncedAt((prev) => (!prev || syncDate > prev ? syncDate : prev));
@@ -271,16 +276,11 @@ export function useListeningData({
         const data = (await res.json()) as StreamLogData;
         if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return;
         if (data && data.entries) {
+          // The list may have been replaced (depth restore, refresh) while this page was in flight
+          if (!isStreamLogCursorCurrent(streamLogStateRef.current, cursor, cursorId)) return;
           setStreamLogState((prev) => {
-            if (!prev) return data;
-            const next: StreamLogData = {
-              ...prev,
-              entries: [...prev.entries, ...data.entries],
-              nextCursor: data.nextCursor,
-              nextCursorId: data.nextCursorId,
-              hasMore: data.hasMore,
-              lastSyncedAt: data.lastSyncedAt || prev.lastSyncedAt,
-            };
+            const next = appendStreamLogPage(prev, data, cursor, cursorId);
+            if (!next || next === prev) return prev;
             if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
               return patchStreamLogWithEnrichment(next, enrichmentOverlayRef.current, delistedSetRef.current);
             }
@@ -333,16 +333,26 @@ export function useListeningData({
     }
   }, []);
 
-  // A timezone change invalidates every cached range
+  // A timezone change invalidates every cached range and drops every request in flight,
+  // including the initial ones, so anything not loaded yet is fetched in full here.
+  const refetchAfterTimezoneChange = useCallback(() => {
+    requestGenerationRef.current++;
+    setOverviewCache({});
+    void fetchOverview(activeRangeRef.current);
+    if (streamLogStateRef.current) {
+      void fetchStreamLog(undefined, true);
+    } else {
+      void fetchStreamLog();
+    }
+    if (!sessionStateRef.current) void fetchSession();
+  }, [fetchOverview, fetchStreamLog, fetchSession]);
+
   useEffect(() => {
     if (tzRef.current !== visitorTimezone) {
       tzRef.current = visitorTimezone;
-      requestGenerationRef.current++;
-      setOverviewCache({});
-      void fetchOverview(activeRangeRef.current);
-      void fetchStreamLog(undefined, true);
+      refetchAfterTimezoneChange();
     }
-  }, [visitorTimezone, fetchOverview, fetchStreamLog]);
+  }, [visitorTimezone, refetchAfterTimezoneChange]);
 
   // Initial load: fetch whatever the server did not provide
   useEffect(() => {

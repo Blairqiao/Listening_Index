@@ -9,6 +9,7 @@ import {
   THIS_BROWSER,
   contextSelectionForUri,
   fetchPlayerAccessToken,
+  readTokenResponse,
   resolveActiveDevice,
   toPlaybackTrack,
   type ActiveDevice,
@@ -20,6 +21,7 @@ export type PlayerStatus = "checking" | "unlinked" | "connecting" | "ready" | "e
 const SDK_TIMEOUT_MESSAGE =
   "Spotify SDK connection timed out. A Spotify Premium account is required for in-browser playback.";
 const ADMIN_EXPIRED_MESSAGE = "Admin session expired. Click the navigation bar lock icon to log in.";
+const TOKEN_UNREACHABLE_MESSAGE = "Could not reach the server to refresh the Spotify token.";
 
 export interface UsePlayerConnectionParams {
   isAuthenticated: boolean;
@@ -35,8 +37,10 @@ export interface UsePlayerConnectionParams {
  * Owns the Web Playback SDK player: linking, connecting, reconnecting with a fresh
  * token, probing the active device, and tearing everything down on unlink or logout.
  *
- * Each connection attempt gets a number; callbacks from an older attempt are ignored,
- * so a teardown during a slow connect cannot leave the player half-connected.
+ * Each connection attempt gets a number; an attempt that is still awaiting when a newer
+ * one or a teardown starts gives up, so a slow connect cannot leave the player
+ * half-connected. SDK events are matched to the player in `playerRef` instead, because
+ * one player outlives many attempts.
  */
 export function usePlayerConnection({
   isAuthenticated,
@@ -128,15 +132,12 @@ export function usePlayerConnection({
       startConnectionTimeout();
       try {
         playerRef.current.disconnect();
+        // The old device id is dead after disconnect; the `ready` listener sets the new one.
+        deviceIdRef.current = null;
+        setDeviceId(null);
         const ok = await playerRef.current.connect();
         if (currentAttempt !== connectionAttemptRef.current) return;
-        if (ok) {
-          if (deviceIdRef.current) {
-            clearConnectionTimeout();
-            setPlayerStatus("ready");
-            void probeActivePlayback(deviceIdRef.current);
-          }
-        } else {
+        if (!ok) {
           clearConnectionTimeout();
           setPlayerStatus("error");
           setErrorMessage("Failed to reconnect player with new Spotify token.");
@@ -171,6 +172,13 @@ export function usePlayerConnection({
       connectionTimeoutRef.current = null;
     }
 
+    let player: SpotifyPlayer | null = null;
+    const releasePlayer = () => {
+      if (!player) return;
+      player.disconnect();
+      if (playerRef.current === player) playerRef.current = null;
+    };
+
     try {
       await loadSpotifySdk();
       if (currentAttempt !== connectionAttemptRef.current) return;
@@ -178,43 +186,37 @@ export function usePlayerConnection({
         throw new Error("Spotify SDK did not initialize");
       }
 
-      const player = new window.Spotify.Player({
+      const created = new window.Spotify.Player({
         name: DEVICE_NAME,
         volume: sliderToVolume(volumeRef.current),
         getOAuthToken: (cb) => {
           fetch("/api/player/token")
-            .then((r) => {
-              if (r.status === 401) {
+            .then(readTokenResponse)
+            .then((result) => {
+              if (result.kind === "linked") {
+                if (result.accessToken) cb(result.accessToken);
+              } else if (result.kind === "unlinked") {
+                setIsLinked(false);
+                setPlayerStatus("unlinked");
+              } else {
+                // Still linked as far as we know, so offer Retry instead of "not linked".
                 setPlayerStatus("error");
-                setErrorMessage(ADMIN_EXPIRED_MESSAGE);
-                return null;
-              }
-              return r.json();
-            })
-            .then((d) => {
-              if (!d) return;
-              if (d?.accessToken) {
-                cb(d.accessToken);
-              } else if (d?.linked === false) {
-                setIsLinked(false);
-                setPlayerStatus("unlinked");
-              } else if (d?.error) {
-                setIsLinked(false);
-                setPlayerStatus("unlinked");
-                setErrorMessage(d.error);
+                setErrorMessage(result.kind === "admin-expired" ? ADMIN_EXPIRED_MESSAGE : result.message);
               }
             })
             .catch((e) => {
               console.error("[PLAYER] Failed to refresh token:", e);
-              setIsLinked(false);
-              setPlayerStatus("unlinked");
-              setErrorMessage("Failed to refresh token from server.");
+              setPlayerStatus("error");
+              setErrorMessage(TOKEN_UNREACHABLE_MESSAGE);
             });
         },
       });
+      player = created;
 
+      // `ready` and `not_ready` fire on every reconnect of this player, so they are
+      // matched by player identity, not by the attempt that created it.
       player.addListener("ready", ({ device_id }) => {
-        if (currentAttempt !== connectionAttemptRef.current || playerRef.current !== player) return;
+        if (playerRef.current !== created) return;
         clearConnectionTimeout();
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
@@ -223,7 +225,7 @@ export function usePlayerConnection({
       });
 
       player.addListener("not_ready", () => {
-        if (currentAttempt !== connectionAttemptRef.current || playerRef.current !== player) return;
+        if (playerRef.current !== created) return;
         deviceIdRef.current = null;
         setDeviceId(null);
         setPlayerStatus("connecting");
@@ -269,20 +271,22 @@ export function usePlayerConnection({
         setErrorMessage(e.message);
       });
 
+      // Registered before connect() so a `ready` that fires during it is not dropped.
+      playerRef.current = player;
       const ok = await player.connect();
       if (currentAttempt !== connectionAttemptRef.current) {
-        player.disconnect();
+        releasePlayer();
         return;
       }
       if (ok) {
-        playerRef.current = player;
-        startConnectionTimeout();
+        if (!deviceIdRef.current) startConnectionTimeout();
       } else {
-        player.disconnect();
+        releasePlayer();
         setPlayerStatus("error");
         setErrorMessage("The player could not connect to Spotify.");
       }
     } catch (e) {
+      releasePlayer();
       if (currentAttempt !== connectionAttemptRef.current) return;
       clearConnectionTimeout();
       setPlayerStatus("error");
@@ -329,27 +333,28 @@ export function usePlayerConnection({
         setPlayerStatus("checking");
         setErrorMessage(null);
         try {
-          const res = await fetch("/api/player/token");
-          if (res.status === 401) {
-            teardownPlayer();
-            setPlayerStatus("error");
-            setErrorMessage(ADMIN_EXPIRED_MESSAGE);
-            return;
-          }
-
-          const data = await res.json().catch(() => ({}));
-          if (data?.linked) {
+          const result = await readTokenResponse(await fetch("/api/player/token"));
+          if (result.kind === "linked") {
             setIsLinked(true);
             void probeActivePlayback(deviceIdRef.current);
             void loadInitialContext();
             void loadPlaylists();
             await connectPlayer(forceReconnect);
-          } else {
+          } else if (result.kind === "unlinked") {
             teardownPlayer();
+          } else if (result.kind === "admin-expired") {
+            teardownPlayer();
+            setPlayerStatus("error");
+            setErrorMessage(ADMIN_EXPIRED_MESSAGE);
+          } else {
+            // The credential may still be stored: keep the player and offer Retry.
+            setPlayerStatus("error");
+            setErrorMessage(result.message);
           }
         } catch (err) {
-          teardownPlayer();
           console.warn("[PLAYER] Failed to check token status:", err);
+          setPlayerStatus("error");
+          setErrorMessage(TOKEN_UNREACHABLE_MESSAGE);
         }
       });
     },

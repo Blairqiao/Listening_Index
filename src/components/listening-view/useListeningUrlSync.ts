@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { Mode, RangeKey } from "@/lib/types";
 
 export interface UseListeningUrlSyncParams {
@@ -28,32 +28,40 @@ export function useListeningUrlSync({
   setSelectedSessionId,
   sanitizeActiveMode,
 }: UseListeningUrlSyncParams) {
+  const appliedRef = useRef(false);
+  // ?mode=3 (admin-only Live Player) requested before the visitor was authenticated
+  const pendingLivePlayerRef = useRef(false);
+
+  // Apply the URL once. Login and lock must not replay it over what the visitor chose since.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const m = params.get("mode");
-      if (m === "0" || m === "1" || m === "2" || m === "3") {
-        setActiveMode(sanitizeActiveMode(parseInt(m, 10) as Mode, isAuthenticated));
+    if (appliedRef.current || typeof window === "undefined") return;
+    appliedRef.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    if (m === "0" || m === "1" || m === "2" || m === "3") {
+      const requested = parseInt(m, 10) as Mode;
+      pendingLivePlayerRef.current = requested === 3 && !isAuthenticated;
+      setActiveMode(sanitizeActiveMode(requested, isAuthenticated));
+    }
+    const r = params.get("range");
+    if (r && rangeKeys.includes(r as RangeKey)) {
+      const rangeKey = r as RangeKey;
+      setActiveRange(rangeKey);
+      activeRangeRef.current = rangeKey;
+      if (overviewCacheRef.current[rangeKey]) {
+        setDisplayedRange(rangeKey);
+      } else {
+        fetchOverview(rangeKey);
       }
-      const r = params.get("range");
-      if (r && rangeKeys.includes(r as RangeKey)) {
-        const rangeKey = r as RangeKey;
-        setActiveRange(rangeKey);
-        activeRangeRef.current = rangeKey;
-        if (overviewCacheRef.current[rangeKey]) {
-          setDisplayedRange(rangeKey);
-        } else {
-          fetchOverview(rangeKey);
-        }
-      }
-      const sess = params.get("session");
-      if (sess) {
-        if (setSelectedSessionId) setSelectedSessionId(sess);
-      }
-      const configParam = params.get("config");
-      if (configParam === "true" || configParam === "1") {
-        openModal();
-      }
+    }
+    const sess = params.get("session");
+    if (sess) {
+      if (setSelectedSessionId) setSelectedSessionId(sess);
+    }
+    const configParam = params.get("config");
+    if (configParam === "true" || configParam === "1") {
+      openModal();
     }
   }, [
     openModal,
@@ -66,6 +74,13 @@ export function useListeningUrlSync({
     overviewCacheRef,
     setDisplayedRange,
     setSelectedSessionId,
-      sanitizeActiveMode,
+    sanitizeActiveMode,
   ]);
+
+  useEffect(() => {
+    if (isAuthenticated && pendingLivePlayerRef.current) {
+      pendingLivePlayerRef.current = false;
+      setActiveMode(3);
+    }
+  }, [isAuthenticated, setActiveMode]);
 }

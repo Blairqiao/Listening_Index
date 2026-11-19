@@ -11,6 +11,14 @@ export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
   return mode === 3 && !isAuthenticated ? 0 : mode;
 }
 
+/** The Session picked in the Sessions view, defaulting to the newest one. */
+export function findSelectedSession<T extends { id: string }>(
+  sessions: readonly T[],
+  selectedSessionId?: string
+): T | undefined {
+  return sessions.find((session) => session.id === selectedSessionId) || sessions[0];
+}
+
 export function getTrackStatsCacheKey(params: {
   trackId?: string | null;
   title?: string | null;
@@ -86,6 +94,60 @@ export function computeSyncedAgo(date: Date | null, now = Date.now()): string {
   if (diffHours === 1) return "1H AGO";
   if (diffHours < 24) return `${diffHours}H AGO`;
   return `${Math.floor(diffHours / 24)}D AGO`;
+}
+
+/** Rows in one Stream Log page; also the depth of a head refresh. */
+export const STREAM_LOG_PAGE_SIZE = 50;
+
+/** True when a refreshed head page shares at least one Play with the rows already loaded. */
+export function streamLogHeadOverlaps(prev: StreamLogData | null, fresh: StreamLogData): boolean {
+  if (!prev || prev.entries.length === 0) return false;
+  const freshIds = new Set(fresh.entries.map((entry) => entry.id));
+  return prev.entries.some((entry) => freshIds.has(entry.id));
+}
+
+/**
+ * Apply a refreshed head page to the loaded Stream Log. With an overlap the older rows stay
+ * and pagination continues from their cursor. Without one, Plays between the two sets were
+ * never fetched, so the fresh page and its cursor replace everything.
+ */
+export function mergeStreamLogHead(prev: StreamLogData | null, fresh: StreamLogData): StreamLogData {
+  if (!prev || !streamLogHeadOverlaps(prev, fresh)) return fresh;
+  const freshIds = new Set(fresh.entries.map((entry) => entry.id));
+  return {
+    ...fresh,
+    entries: [...fresh.entries, ...prev.entries.filter((entry) => !freshIds.has(entry.id))],
+    hasMore: prev.hasMore,
+    nextCursor: prev.nextCursor,
+    nextCursorId: prev.nextCursorId,
+  };
+}
+
+/** True when the loaded Stream Log still ends at the cursor a "load more" request was made from. */
+export function isStreamLogCursorCurrent(
+  current: StreamLogData | null,
+  cursor: string,
+  cursorId: string
+): boolean {
+  return Boolean(current) && current!.nextCursor === cursor && (current!.nextCursorId || "") === cursorId;
+}
+
+/** Append a "load more" page, or return the state unchanged if the list was replaced meanwhile. */
+export function appendStreamLogPage(
+  prev: StreamLogData | null,
+  page: StreamLogData,
+  cursor: string,
+  cursorId: string
+): StreamLogData | null {
+  if (!prev || !isStreamLogCursorCurrent(prev, cursor, cursorId)) return prev;
+  return {
+    ...prev,
+    entries: [...prev.entries, ...page.entries],
+    nextCursor: page.nextCursor,
+    nextCursorId: page.nextCursorId,
+    hasMore: page.hasMore,
+    lastSyncedAt: page.lastSyncedAt || prev.lastSyncedAt,
+  };
 }
 
 const STREAM_LOG_DEPTH_KEY = "stream_log_depth";

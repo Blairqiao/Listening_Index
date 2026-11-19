@@ -62,6 +62,31 @@ export function getNextRepeatState(current: number): "off" | "context" | "track"
   return "off";
 }
 
+export type TokenResponse =
+  | { kind: "linked"; accessToken: string | null }
+  | { kind: "unlinked" }
+  | { kind: "admin-expired" }
+  | { kind: "failed"; message: string };
+
+/**
+ * Classifies a /api/player/token response. Only an OK `linked: false` means the
+ * credential is gone, and only the ADMIN_AUTH_REQUIRED code means the admin session
+ * expired; any other failure may be transient.
+ */
+export async function readTokenResponse(res: Response): Promise<TokenResponse> {
+  const body = await res.json().catch(() => null);
+  if (body?.code === "ADMIN_AUTH_REQUIRED") return { kind: "admin-expired" };
+  if (res.ok && body?.linked === true) {
+    return { kind: "linked", accessToken: typeof body.accessToken === "string" ? body.accessToken : null };
+  }
+  if (res.ok && body?.linked === false) return { kind: "unlinked" };
+  const message =
+    typeof body?.error === "string" && body.error
+      ? body.error
+      : `Spotify token request failed (HTTP ${res.status}).`;
+  return { kind: "failed", message };
+}
+
 /** Fetch active player access token from server endpoint. */
 export async function fetchPlayerAccessToken(): Promise<string | null> {
   try {

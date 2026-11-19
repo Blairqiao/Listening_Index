@@ -45,10 +45,13 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to refresh Spotify token";
-    const status = err instanceof SpotifyApiError && err.status ? err.status : 502;
+    const upstream = err instanceof SpotifyApiError && err.status ? err.status : 502;
+    // A 401 from this route means the admin session expired. Spotify's own 401 is an
+    // upstream failure, so it goes out as 502 like any other refresh that cannot succeed.
+    const forwardable = upstream >= 400 && upstream < 500 && upstream !== 401;
     return NextResponse.json(
-      { error: message },
-      { status: status >= 400 && status < 500 ? status : 502 }
+      { error: message, code: "SPOTIFY_TOKEN_REFRESH_FAILED" },
+      { status: forwardable ? upstream : 502 }
     );
   }
 }

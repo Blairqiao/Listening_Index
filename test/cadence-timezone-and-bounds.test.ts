@@ -222,3 +222,53 @@ test('N019: 1d SQL query uses DATE_TRUNC with AT TIME ZONE UTC', async () => {
     "1d query must truncate using AT TIME ZONE 'UTC'"
   );
 });
+
+// ---------------------------------------------------------------------------
+// Day labels match their bucket keys in zones far from the server's
+// ---------------------------------------------------------------------------
+function withServerTimezone<T>(serverTz: string, run: () => T): T {
+  const previous = process.env.TZ;
+  process.env.TZ = serverTz;
+  try {
+    return run();
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+}
+
+// Bucket startTime is UTC midnight of the visitor's calendar day key.
+function expectedDayLabel(startTime: string): string {
+  const month = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short' }).format(new Date(startTime)).toUpperCase();
+  return `${startTime.slice(8, 10)} ${month}`;
+}
+
+for (const { tz, serverTz } of [
+  { tz: 'Pacific/Auckland', serverTz: 'UTC' },
+  { tz: 'Pacific/Pago_Pago', serverTz: 'Asia/Tokyo' },
+]) {
+  test(`cadence day labels match their bucket keys for ${tz} on a ${serverTz} server`, () => {
+    withServerTimezone(serverTz, () => {
+      const now = new Date('2026-07-20T12:00:00Z');
+
+      const month = buildActivityCadence({ range: '1m', tz, now, cadenceRows: [{ day: '2026-07-15', count: 4 }] }).activityCadence;
+      const july15 = month.find((b) => b.count === 4);
+      assert.ok(july15, 'the 15 July bucket must exist');
+      assert.equal(july15.date, '15 JUL');
+      for (const bucket of month) assert.equal(bucket.date, expectedDayLabel(bucket.startTime));
+
+      const week = buildActivityCadence({ range: '1w', tz, now, cadenceRows: [{ day: '2026-07-15', block: 0, count: 2 }] }).activityCadence;
+      const weekJuly15 = week.find((b) => b.count === 2);
+      assert.ok(weekJuly15, 'the 15 July block must exist');
+      assert.equal(weekJuly15.date, '15 JUL 00:00–06:00');
+      assert.equal(weekJuly15.markerLabel, '15');
+      for (const bucket of week) assert.ok(bucket.date.startsWith(expectedDayLabel(bucket.startTime)), bucket.date);
+
+      // Week buckets starting on the 1st must carry that month's marker, not the neighbour's.
+      const sixMonths = buildActivityCadence({ range: '6m', tz, now: new Date('2026-07-07T12:00:00Z'), cadenceRows: [] }).activityCadence;
+      for (const bucket of sixMonths.filter((b) => b.isMarker)) {
+        assert.equal(bucket.markerLabel, expectedDayLabel(bucket.startTime).slice(3), bucket.startTime);
+      }
+    });
+  });
+}

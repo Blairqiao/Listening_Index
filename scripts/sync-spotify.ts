@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
-dotenv.config();
+// dotenv keeps the first value it sees, so .env.local goes first to win, as in Next.js.
 dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 import { syncSpotify } from "../src/lib/spotify-sync";
 

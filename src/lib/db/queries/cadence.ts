@@ -102,6 +102,13 @@ function offsetCalendarDay(base: { year: number; month: number; day: number }, d
   return { year, month, day, dayKey };
 }
 
+// A day key is already the visitor's local calendar date, so labels are formatted in UTC.
+// Parsing the key in the server's zone and formatting in the visitor's can shift it a day.
+function calendarDayNoonUtc(dayKey: string): Date {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
 export function buildActivityCadence(params: {
   range: RangeKey;
   tz: string;
@@ -163,7 +170,7 @@ export function buildActivityCadence(params: {
 
     for (let daysAgo = numDaysAgo; daysAgo >= 0; daysAgo--) {
       const { year, month, day, dayKey } = offsetCalendarDay(baseDate, daysAgo);
-      const dayLabel = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
+      const dayLabel = formatDayGroupTz(calendarDayNoonUtc(dayKey), "UTC");
       const dayNumber = dayLabel.split(" ")[0];
 
       for (let b = 0; b < 4; b++) {
@@ -193,7 +200,7 @@ export function buildActivityCadence(params: {
 
     for (let daysAgo = numDaysAgo; daysAgo >= 0; daysAgo--) {
       const { year, month, day, dayKey } = offsetCalendarDay(baseDate, daysAgo);
-      const label = formatDayGroupTz(new Date(dayKey + "T12:00:00"), tz);
+      const label = formatDayGroupTz(calendarDayNoonUtc(dayKey), "UTC");
       const idx = numDaysAgo - daysAgo;
       const isMarker = idx === 0 || idx === 7 || idx === 14 || idx === 21 || idx === numDaysAgo;
       const startTime = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
@@ -229,9 +236,9 @@ export function buildActivityCadence(params: {
       if (!weekEndKey) weekEndKey = weekStartKey;
 
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
-        timeZone: tz,
+        timeZone: "UTC",
         month: "short",
-      }).format(new Date(weekStartKey + "T12:00:00")).toUpperCase();
+      }).format(calendarDayNoonUtc(weekStartKey)).toUpperCase();
 
       const isNewMonth = monthAbbr !== lastMonth;
       if (isNewMonth) lastMonth = monthAbbr;

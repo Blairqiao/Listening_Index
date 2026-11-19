@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
-dotenv.config({ quiet: true });
+// dotenv keeps the first value it sees, so .env.local goes first to win, as in Next.js.
 dotenv.config({ path: ".env.local", quiet: true });
+dotenv.config({ quiet: true });
 
 import { isDbConfigured } from "../src/lib/db";
 import { migrateSchema, shouldRunMigrations } from "../src/lib/db/queries/schema";

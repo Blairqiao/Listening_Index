@@ -8,10 +8,10 @@ const root = path.resolve(__dirname, "..");
 
 test("AC-1: package.json has test script and removes auth:spotify; scripts/get-spotify-token.ts is removed", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf-8"));
-  assert.equal(
-    pkg.scripts?.test,
-    "tsx --test test/*.test.ts",
-    "package.json must contain test script: tsx --test test/*.test.ts"
+  assert.match(
+    pkg.scripts?.test ?? "",
+    /^tsx .*--test test\/\*\.test\.ts$/,
+    "package.json must contain a tsx --test test/*.test.ts script"
   );
   assert.equal(
     pkg.scripts?.["auth:spotify"],

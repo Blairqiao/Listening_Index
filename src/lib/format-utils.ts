@@ -207,10 +207,9 @@ export function formatDurationMs(ms: number): string {
 
 export function compactDate(dateStr: string): string {
   const date = new Date(dateStr);
-  const year = date.getFullYear();
-  const month = date.toLocaleString("default", { month: "numeric" });
-  const day = date.getDate();
-  return `${month}/${day}/${year}`;
+  // The empty-ledger placeholder ("--") is not a date
+  if (isNaN(date.getTime())) return "--";
+  return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
 }
 
 export function formatDayGroup(date: Date, tz = "UTC"): string {

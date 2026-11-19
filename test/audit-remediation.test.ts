@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { NextRequest } from "next/server";
 import { readModuleSource } from "./helpers/module-source";
+import { hasTestDb, useTestDatabase } from "./helpers/test-db";
 
 const root = path.resolve(__dirname, "..");
 
@@ -122,20 +123,15 @@ test("TASK-3: Streak query uses recursive index-probed CTE without 120-day cutof
     "stream-log.ts must not use ::date AT TIME ZONE without explicit ::timestamp cast"
   );
 
-  // If local .env.local exists, run deep behavioral verification against live Postgres
-  const envPath = path.join(root, ".env.local");
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, "utf-8");
-    const match = envContent.match(/DATABASE_URL=([^\r\n]+)/);
-    if (match && match[1]) {
-      process.env.DATABASE_URL = match[1].trim();
-      const { getStreamLog } = await import("../src/lib/db/queries/stream-log");
-      const result = await getStreamLog(10, "America/New_York");
-      assert.ok(typeof result.rawMetrics.streakDays === "number", "streakDays must be a number");
-      assert.ok(result.rawMetrics.streakDays >= 0, "streakDays must be non-negative");
-      assert.ok(Array.isArray(result.entries), "entries must be an array");
-      assert.ok(result.metrics.length === 4, "metrics must have 4 entries");
-    }
+  // Deep behavioral verification runs only against the opt-in test database.
+  if (hasTestDb) {
+    await useTestDatabase();
+    const { getStreamLog } = await import("../src/lib/db/queries/stream-log");
+    const result = await getStreamLog(10, "America/New_York");
+    assert.ok(typeof result.rawMetrics.streakDays === "number", "streakDays must be a number");
+    assert.ok(result.rawMetrics.streakDays >= 0, "streakDays must be non-negative");
+    assert.ok(Array.isArray(result.entries), "entries must be an array");
+    assert.ok(result.metrics.length === 4, "metrics must have 4 entries");
   }
 });
 
@@ -157,8 +153,9 @@ test("TASK-3: Ribbon artist queries align with isCatalogFullyEnriched() (F5)", a
     "track-stats.ts must check isCatalogFullyEnriched and count distinct t.artist_id"
   );
 
-  // If local database is configured, verify runtime execution of overview query
-  if (process.env.DATABASE_URL) {
+  // Verify runtime execution of the overview query against the opt-in test database.
+  if (hasTestDb) {
+    await useTestDatabase();
     const { getOverviewData } = await import("../src/lib/db/queries/overview");
     const overviewData = await getOverviewData("1d");
     assert.ok(overviewData.metrics, "overviewData must return metrics");

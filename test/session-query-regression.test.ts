@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import dotenv from 'dotenv';
 import { getDb } from '../src/lib/db';
 import { bulkUpsertTracks } from '../src/lib/db/queries/ingestion';
 import { getCurrentSession } from '../src/lib/db/queries/session';
 import { getStreamLog } from '../src/lib/db/queries/stream-log';
-dotenv.config({path:'.env.local',quiet:true});
-test('complete Session context survives the old 600-row cutoff and Stream Log pagination',async()=>{
+import { dbTest, useTestDatabase } from './helpers/test-db';
+test('complete Session context survives the old 600-row cutoff and Stream Log pagination', dbTest, async()=>{
+  await useTestDatabase();
   const sql=getDb(); const trackId='V1sessionfixture0000001'; const base=Date.parse('2099-01-01T00:00:00Z');
   try {
     await bulkUpsertTracks([{id:trackId,name:'Fixture',artistName:'Fixture',albumName:'Fixture',durationMs:30000}]);

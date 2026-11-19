@@ -26,14 +26,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const onSelect = onSelectSession;
   const selectedSessionId = externalSelectedSessionId || presentedSessions[0]?.id;
   const selectedSessionIdValue = selectedSessionId;
-  const isOpen = presentedSessions[0]?.isOpen || false;
-
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
+  // Starts false to match the server render; the resize effect below sets the real value.
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   const [isTracksExpanded, setIsTracksExpanded] = useState(false);
   const [isSessionsExpanded, setIsSessionsExpanded] = useState(false);
 
@@ -77,6 +71,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
   const activeSession = useMemo(() => {
     return presentedSessions.find((s) => s.id === selectedSessionId) || presentedSessions[0];
   }, [presentedSessions, selectedSessionId]);
+  // The header describes the Session shown, not the newest one
+  const isOpen = activeSession?.isOpen || false;
 
   // Tracks for active session
   const activeTracks: PresentedSessionItem[] = useMemo(() => {

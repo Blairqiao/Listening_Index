@@ -14,13 +14,15 @@ const DEFAULT_TIMEZONE = "UTC";
 
 /**
  * Validates and sanitizes a timezone string.
- * Gracefully falls back to DEFAULT_TIMEZONE if tz is undefined, empty, or not a recognized IANA timezone identifier.
+ * Gracefully falls back to DEFAULT_TIMEZONE if tz is undefined, empty, a bare UTC offset, or not a recognized IANA timezone identifier.
  * Prevents PostgreSQL 'time zone not recognized' runtime query crashes from untrusted query params or headers.
  */
 export function sanitizeTimezone(tz?: string | null): string {
   if (!tz || typeof tz !== "string") return DEFAULT_TIMEZONE;
   const trimmed = tz.trim();
   if (!trimmed) return DEFAULT_TIMEZONE;
+  // Intl accepts "+08:00", but Postgres AT TIME ZONE reads a bare offset with the opposite sign.
+  if (/^[+-]\d/.test(trimmed)) return DEFAULT_TIMEZONE;
   try {
     Intl.DateTimeFormat(undefined, { timeZone: trimmed });
     return trimmed;

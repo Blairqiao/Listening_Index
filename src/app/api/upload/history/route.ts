@@ -6,7 +6,7 @@ import {
   bulkInsertPlays,
   TrackUpsertItem,
 } from "@/lib/db/queries";
-import { CompactPlayEvent } from "@/lib/history-parser";
+import { CompactPlayEvent, isSpotifyTrackId } from "@/lib/history-parser";
 import { clearServerCache } from "@/lib/db/server-cache";
 
 export const dynamic = "force-dynamic";
@@ -58,8 +58,7 @@ export async function POST(request: NextRequest) {
         !p ||
         typeof p.playedAt !== "string" ||
         isNaN(Date.parse(p.playedAt)) ||
-        typeof p.trackId !== "string" ||
-        p.trackId.trim() === "" ||
+        !isSpotifyTrackId(p.trackId) ||
         typeof p.trackName !== "string" ||
         typeof p.artistName !== "string" ||
         typeof p.albumName !== "string" ||

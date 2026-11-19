@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { RangeKey } from "@/lib/types";
-import { computeSyncedAgo, overviewRefreshOrder } from "./listening-helpers";
+import { computeSyncedAgo, overviewRefreshOrder, STREAM_LOG_PAGE_SIZE } from "./listening-helpers";
 
 export interface UseListeningSyncParams {
   isAuthenticated: boolean;
   activeRangeRef: React.MutableRefObject<RangeKey>;
   requestGenerationRef: React.MutableRefObject<number>;
   fetchOverview: (range: RangeKey) => Promise<unknown>;
-  fetchStreamLog: () => Promise<void>;
+  fetchStreamLog: (countToFetch?: number) => Promise<void>;
   fetchSession: () => Promise<void>;
   lastSyncedAt: Date | null;
   setLastSyncedAt: (date: Date) => void;
@@ -93,13 +93,14 @@ export function useListeningSync({
     }
   }, [activeRangeRef, fetchOverview, fetchStreamLog, fetchSession]);
 
-  // When an upload batch completes, refetch every range so all of them include the imported plays
+  // When an upload batch completes, refetch every range so all of them include the imported Plays.
+  // An import can add older Plays inside the loaded Stream Log window, so that list is replaced, not merged.
   const handleUploadComplete = useCallback(async () => {
     requestGenerationRef.current++;
     try {
       await Promise.all([
         ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
-        fetchStreamLog(),
+        fetchStreamLog(STREAM_LOG_PAGE_SIZE),
         fetchSession(),
       ]);
     } catch (err) {
