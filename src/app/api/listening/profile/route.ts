@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const target = parseProfileTarget(searchParams);
     if (!target) {
-      return jsonNoCache({ error: "Missing track or artist." }, 400);
+      return jsonNoCache({ error: "Missing track, artist, or album." }, 400);
     }
 
     const rawRange = searchParams.get("prange");
