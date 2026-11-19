@@ -16,7 +16,7 @@ export interface ProfileViewProps {
   onOpenProfile: (target: ProfileTarget) => void;
 }
 
-function ProfileRankedList({ label, heading, children }: { label: string; heading?: string; children: React.ReactNode }) {
+function ProfileRankedList({ label, heading, uncapped = false, children }: { label: string; heading?: string; uncapped?: boolean; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const count = React.Children.count(children);
 
@@ -26,7 +26,7 @@ function ProfileRankedList({ label, heading, children }: { label: string; headin
         <span>{heading ?? <>[ TOP {label} ]</>}</span>
         <span>PLAYS</span>
       </div>
-      <div className={`md:max-h-[165px] md:overflow-y-auto scrollbar-hidden ${expanded ? "" : "max-md:[&>*:nth-child(n+4)]:hidden"}`}>
+      <div className={`${uncapped ? "" : "md:max-h-[165px] md:overflow-y-auto scrollbar-hidden"} ${expanded ? "" : "max-md:[&>*:nth-child(n+4)]:hidden"}`}>
         {children}
       </div>
       {count > 3 && (
@@ -70,7 +70,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       const dayGroup = day === previousDay ? undefined : day;
       previousDay = day;
       const timeStr = formatHHmmTz(d, visitorTimezone);
-      return { ...play, dayGroup, timeStr };
+      return { ...play, day, dayGroup, timeStr };
     });
   }, [data?.recentPlays, visitorTimezone]);
 
@@ -152,6 +152,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const isTrack = data.kind === "track";
   const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
+  const hasAlbumList = isTrack && albumTracks.length >= 2;
+  // Without an album list the Track's recent plays take the full width, split into two columns.
+  const recentSpansFull = data.plays === 0 || (isTrack && !hasAlbumList);
+  const half = Math.ceil(recentPlaysWithPresentation.length / 2);
+  const trackColumns = isTrack && !hasAlbumList && recentPlaysWithPresentation.length > 1
+    ? [recentPlaysWithPresentation.slice(0, half), recentPlaysWithPresentation.slice(half)]
+    : [recentPlaysWithPresentation];
   const hours = data.plays > 0 ? data.hourOfDay : undefined;
   const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
     ? `https://open.spotify.com/track/${data.key}`
@@ -237,42 +244,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      {isTrack && data.plays > 0 && (
-        <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-4">
-          {albumTracks.length >= 2 && (
-            <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
-              {albumTracks.map((track, idx) => {
-                const rowClass = "group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left border-b border-[#191917]";
-                const row = (
-                  <>
-                    <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
-                      {String(idx + 1).padStart(2, "0")}
-                    </span>
-                    <Artwork src={data.imageUrl} alt={track.name} size={38} />
-                    <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
-                      {track.name}
-                    </span>
-                    <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
-                      {track.plays.toLocaleString()}
-                    </span>
-                  </>
-                );
+      {hasAlbumList && data.plays > 0 && (
+      <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-4">
+          <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]" uncapped>
+            {albumTracks.map((track, idx) => {
+              const rowClass = "group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left border-b border-[#191917]";
+              const row = (
+                <>
+                  <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <Artwork src={data.imageUrl} alt={track.name} size={38} />
+                  <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
+                    {track.name}
+                  </span>
+                  <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                    {track.plays.toLocaleString()}
+                  </span>
+                </>
+              );
 
-                return track.isCurrent ? (
-                  <div key={track.id} aria-current="true" className={rowClass}>{row}</div>
-                ) : (
-                  <button
-                    key={track.id}
-                    type="button"
-                    onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                    className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
-                  >
-                    {row}
-                  </button>
-                );
-              })}
-            </ProfileRankedList>
-          )}
+              return track.isCurrent ? (
+                <div key={track.id} aria-current="true" className={rowClass}>{row}</div>
+              ) : (
+                <button
+                  key={track.id}
+                  type="button"
+                  onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+                  className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
+                >
+                  {row}
+                </button>
+              );
+            })}
+          </ProfileRankedList>
         </div>
       )}
 
@@ -339,7 +344,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${data.plays > 0 ? "md:col-start-1 md:row-start-4" : "md:col-span-full"}`}>
+      <div className={`min-w-0 ${isTrack ? "" : "md:max-h-[420px] md:overflow-y-auto scrollbar-hidden "}${recentSpansFull ? "md:col-span-full" : "md:col-start-1 md:row-start-4"}`}>
         {data.plays === 0 ? (
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] py-4 select-none">
             [ NO PLAYS IN THIS RANGE ]
@@ -351,17 +356,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 [ RECENT PLAYS ]
               </span>
             </div>
+            {isTrack ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-[26px]">
+                {trackColumns.map((column, columnIndex) => (
+                  <div key={columnIndex} className={`flex flex-col${trackColumns.length === 1 ? " md:col-span-2" : ""}`}>
+                    {column.map((play, rowIndex) => (
+                      <div key={play.id} className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[11.5px]">
+                        <span className="text-[#5A5A55] tracking-[0.08em]">
+                          {play.dayGroup ?? (columnIndex > 0 && rowIndex === 0 ? <span className="hidden md:inline">{play.day}</span> : null)}
+                        </span>
+                        <span className="text-[#8A8A83] tabular-nums">{play.timeStr}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="flex flex-col">
               {recentPlaysWithPresentation.map((play) => {
-                if (isTrack) {
-                  return (
-                    <div key={play.id} className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[11.5px]">
-                      <span className="text-[#5A5A55] tracking-[0.08em]">{play.dayGroup}</span>
-                      <span className="text-[#8A8A83] tabular-nums">{play.timeStr}</span>
-                    </div>
-                  );
-                }
-
                 const segmentId = segmentIdForTrack(play.trackId, segments);
                 const isActive = segmentId !== null && segmentId === activeSegmentId;
                 const row = (
@@ -410,6 +422,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
         )}
       </div>

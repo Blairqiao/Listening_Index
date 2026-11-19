@@ -307,3 +307,39 @@ test("ProfileView hides the Track story sections at zero plays", () => {
   assert.match(markup, /Weird Fishes/);
   assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|BY HOUR|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
+
+test("ProfileView lets the Track album list and recent plays run their full height on desktop", () => {
+  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
+    data: mockTrackProfile,
+    status: "ready",
+    visitorTimezone: "UTC",
+    onOpenProfile: () => {},
+  }));
+  const album = markup.slice(markup.indexOf("FROM THIS ALBUM"), markup.indexOf("House of Cards"));
+  assert.doesNotMatch(album, /md:max-h-/);
+  assert.match(album, /max-md:\[&amp;&gt;\*:nth-child\(n\+4\)\]:hidden/);
+  const recentStart = markup.lastIndexOf("<div", markup.indexOf("[ RECENT PLAYS ]") - 200);
+  assert.doesNotMatch(markup.slice(recentStart, markup.indexOf("[ RECENT PLAYS ]")), /md:max-h-/);
+});
+
+test("ProfileView spreads Track recent plays over two columns when there is no album list", () => {
+  const recentPlays = Array.from({ length: 6 }, (_, i) => ({
+    ...mockTrackProfile.recentPlays[0],
+    id: `play-${i}`,
+    playedAt: new Date(Date.UTC(2024, 10, 18, 20 - i)).toISOString(),
+  }));
+  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
+    data: { ...mockTrackProfile, albumTracks: [], recentPlays },
+    status: "ready",
+    visitorTimezone: "UTC",
+    onOpenProfile: () => {},
+  }));
+  assert.doesNotMatch(markup, /FROM THIS ALBUM/);
+  assert.match(markup, /md:col-span-full"><div><div[^>]*><span[^>]*>\[ RECENT PLAYS \]/);
+  assert.match(markup, /md:grid-cols-2/);
+  const columns = markup.slice(markup.indexOf("md:grid-cols-2"));
+  // One date label for the day, plus a desktop-only repeat at the top of the second column.
+  assert.equal(columns.match(/>18 NOV</g)?.length, 2);
+  assert.match(columns, /hidden md:inline[^>]*>18 NOV</);
+  assert.equal(columns.match(/h-8/g)?.length, 6);
+});
