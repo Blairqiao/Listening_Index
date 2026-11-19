@@ -35,6 +35,12 @@ function mapRecentPlays(rows: Record<string, unknown>[]): ProfilePlay[] {
   }));
 }
 
+function toHourOfDay(rows: Record<string, unknown>[]): number[] {
+  const counts = Array<number>(24).fill(0);
+  for (const { hour, plays } of rows) counts[Number(hour)] = Number(plays);
+  return counts;
+}
+
 export async function getProfile(
   target: ProfileTarget,
   range: RangeKey,
@@ -174,10 +180,6 @@ export async function getProfile(
       minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
     });
 
-    const hourOfDay = Array<number>(24).fill(0);
-    for (const row of hourRows) {
-      hourOfDay[Number(row.hour)] = Number(row.plays);
-    }
     const artistPlays = Number(artistPlayRows[0]?.plays ?? 0);
     const albumTracks: ProfileAlbumTrack[] = albumRows.map((row) => ({
       id: String(row.id),
@@ -206,7 +208,7 @@ export async function getProfile(
         artistPlays,
         longestStreakDays: Number(streakRows[0]?.streak ?? 0),
       },
-      hourOfDay,
+      hourOfDay: toHourOfDay(hourRows),
       albumTracks,
       topTracks: [],
       topAlbums: [],
@@ -273,6 +275,7 @@ export async function getProfile(
     topTrackRows,
     topAlbumRows,
     recentPlayRows,
+    hourRows,
   ] = await Promise.all([
     sql`
       SELECT plays::int, rank::int FROM (
@@ -353,6 +356,12 @@ export async function getProfile(
       ORDER BY p.played_at DESC, p.id DESC
       LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
     `,
+    sql`
+      SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${artistFilter}
+      GROUP BY 1;
+    `,
   ]);
 
   const plays = Number(rankAndPlaysRows[0]?.plays ?? 0);
@@ -397,6 +406,7 @@ export async function getProfile(
     rank,
     rankedTotal,
     ...cadence,
+    hourOfDay: toHourOfDay(hourRows),
     topTracks,
     topAlbums,
     recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),

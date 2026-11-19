@@ -346,6 +346,43 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
     }
   });
 
+  await t.test("Artist hours match a recount by range and local time", async () => {
+    for (const range of ["all", "1m"] as const) {
+      for (const tz of ["UTC", "America/Chicago"]) {
+        const { profile, rawPlays, track } = await captureStableComparison(
+          sql, `artist-hours-${range}-${tz}`, async () => {
+            const overview = await getOverviewData(range, tz);
+            const key = overview.topArtists.find((artist) => artist.id)?.id;
+            assert.ok(key);
+            const profile = await getProfile({ kind: "artist", key }, range, tz);
+            assert.ok(profile?.topTracks[0]);
+            const enriched = await isCatalogFullyEnriched();
+            const artistFilter = enriched
+              ? sql`t.artist_id = ${profile.key}`
+              : sql`t.artist_group_key = ${profile.key}`;
+            const timeFilter = range === "all" ? sql`TRUE` :
+              sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+            const [rawPlays, track] = await Promise.all([
+              sql`SELECT p.played_at FROM plays p JOIN tracks t ON t.id = p.track_id
+                  WHERE ${artistFilter} AND ${timeFilter}`,
+              getProfile({ kind: "track", key: profile.topTracks[0].id }, range, tz),
+            ]);
+            return { profile, rawPlays, track };
+          },
+        );
+        const formatter = new Intl.DateTimeFormat("en-GB", {
+          timeZone: tz, hour: "2-digit", hourCycle: "h23",
+        });
+        assert.ok(profile.hourOfDay);
+        assert.deepEqual(profile.hourOfDay, hourHistogram(rawPlays.map(({ played_at }) =>
+          Number(formatter.format(new Date(played_at)))
+        )));
+        assert.equal(profile.hourOfDay.reduce((sum, count) => sum + count, 0), profile.plays);
+        assert.equal(track?.trackStats?.artistPlays, profile.plays);
+      }
+    }
+  });
+
   await t.test("Track stats are empty when the range has no plays", async () => {
     const profile = await captureStableComparison(sql, "track-story-empty-range", async () => {
       const [track] = await sql`
