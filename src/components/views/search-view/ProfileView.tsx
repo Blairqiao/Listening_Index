@@ -3,8 +3,9 @@
 import React, { useMemo, useState } from "react";
 import type { ProfileData, ProfileTarget } from "@/lib/search-types";
 import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
-import { formatShare } from "@/lib/profile-stats";
-import { HourHistogram } from "./HourHistogram";
+import { artistShare, buildShareSegments, formatShare, segmentIdForTrack } from "@/lib/profile-stats";
+import { HourStrip } from "./HourStrip";
+import { ProportionShareBar, SegmentedShareBar } from "./ShareBar";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
 
@@ -48,6 +49,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   visitorTimezone,
   onOpenProfile,
 }) => {
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const profileIdentity = data ? JSON.stringify([data.kind, data.key, data.range]) : null;
+  const [previousProfileIdentity, setPreviousProfileIdentity] = useState(profileIdentity);
+  if (profileIdentity !== previousProfileIdentity) {
+    setPreviousProfileIdentity(profileIdentity);
+    setActiveSegmentId(null);
+  }
+
+  const artistTracks = data?.kind === "artist" ? data.topTracks : undefined;
+  const plays = data?.plays ?? 0;
+  const segments = useMemo(() => buildShareSegments(artistTracks ?? [], plays), [artistTracks, plays]);
+
   const recentPlaysWithPresentation = useMemo(() => {
     if (!data?.recentPlays) return [];
     let previousDay: string | undefined;
@@ -139,6 +152,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const isTrack = data.kind === "track";
   const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
+  const hours = data.plays > 0 ? data.hourOfDay : undefined;
+  const lowerRow = hours ? "md:row-start-4" : "md:row-start-3";
   const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
     ? `https://open.spotify.com/track/${data.key}`
     : null;
@@ -157,7 +172,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         />
         <div className="min-w-0 flex-1">
           <div className={`font-sans ${isTrack ? "text-[20px] md:text-[24px]" : "text-[15px]"} font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none`}>
-            {data.name}
+            {spotifyUrl ? (
+              <a
+                href={spotifyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex max-w-full items-baseline hover:text-music-accent focus-visible:outline-music-accent"
+              >
+                <span className="truncate">{data.name}</span>
+                <span aria-hidden="true" className="ml-2 font-mono text-[12px] text-[#6A6A64] group-hover:text-music-accent">↗</span>
+                <span className="sr-only">(opens in Spotify)</span>
+              </a>
+            ) : data.name}
           </div>
           {isTrack && data.artistName && (
             <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
@@ -176,16 +202,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           )}
         </div>
-        {spotifyUrl && (
-          <a
-            href={spotifyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-none self-start text-right font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] hover:text-music-accent focus-visible:outline-music-accent"
-          >
-            SPOTIFY ↗
-          </a>
-        )}
       </div>
 
       <div className="min-w-0 md:col-span-full">
@@ -196,73 +212,78 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           monthlyCadence={data.monthlyCadence}
           isLoading={status === "loading"}
           visitorTimezone={visitorTimezone}
+          headerAside={isTrack && data.plays > 0 && streak > 0 ? (
+            <span className="text-right font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] tabular-nums">
+              LONGEST STREAK · {streak.toLocaleString()} {streak === 1 ? "DAY" : "DAYS"}
+            </span>
+          ) : undefined}
         />
       </div>
 
+      {hours && <div className="min-w-0 md:col-span-full"><HourStrip counts={hours} /></div>}
+
       {isTrack && data.plays > 0 && (
-        <>
-          <dl className="flex flex-wrap gap-x-8 gap-y-3 self-start border-y border-[#191917] py-3 font-mono md:col-start-1 md:row-start-3">
-            <div>
-              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">SHARE OF ARTIST</dt>
-              <dd className="mt-1 text-sm tabular-nums">{formatShare(data.trackStats?.artistShare ?? null)}</dd>
-            </div>
-            <div>
-              <dt className="text-[11px] tracking-[0.14em] text-[#8A8A83]">LONGEST STREAK</dt>
-              <dd className="mt-1 text-sm tabular-nums">
-                {streak === 0 ? "—" : `${streak.toLocaleString()} ${streak === 1 ? "DAY" : "DAYS"}`}
-              </dd>
-            </div>
-          </dl>
+        <div className={`flex min-w-0 flex-col gap-6 md:col-start-2 ${lowerRow}`}>
+          <ProportionShareBar
+            heading={`[ SHARE OF ${data.artistName?.toUpperCase() || "ARTIST"} ]`}
+            part={data.plays}
+            total={data.trackStats?.artistPlays ?? 0}
+          />
+          {albumTracks.length >= 2 && (
+            <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
+              {albumTracks.map((track, idx) => {
+                const rowClass = "group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left border-b border-[#191917]";
+                const row = (
+                  <>
+                    <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <Artwork src={data.imageUrl} alt={track.name} size={38} />
+                    <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
+                      {track.name}
+                    </span>
+                    <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                      {track.plays.toLocaleString()}
+                    </span>
+                  </>
+                );
 
-          <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-3 md:row-span-2">
-            {data.hourOfDay && <HourHistogram counts={data.hourOfDay} />}
-            {albumTracks.length >= 2 && (
-              <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
-                {albumTracks.map((track, idx) => {
-                  const rowClass = "group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left border-b border-[#191917]";
-                  const row = (
-                    <>
-                      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                      <Artwork src={data.imageUrl} alt={track.name} size={38} />
-                      <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
-                        {track.name}
-                      </span>
-                      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
-                        {track.plays.toLocaleString()}
-                      </span>
-                    </>
-                  );
-
-                  return track.isCurrent ? (
-                    <div key={track.id} aria-current="true" className={rowClass}>{row}</div>
-                  ) : (
-                    <button
-                      key={track.id}
-                      type="button"
-                      onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
-                    >
-                      {row}
-                    </button>
-                  );
-                })}
-              </ProfileRankedList>
-            )}
-          </div>
-        </>
+                return track.isCurrent ? (
+                  <div key={track.id} aria-current="true" className={rowClass}>{row}</div>
+                ) : (
+                  <button
+                    key={track.id}
+                    type="button"
+                    onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+                    className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
+                  >
+                    {row}
+                  </button>
+                );
+              })}
+            </ProfileRankedList>
+          )}
+        </div>
       )}
 
       {data.kind === "artist" && data.plays > 0 && (
-        <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-3">
+        <div className={`flex min-w-0 flex-col gap-6 md:col-start-2 ${lowerRow}`}>
+          <SegmentedShareBar
+            heading="[ SHARE OF PLAYS ]"
+            segments={segments}
+            total={data.plays}
+            activeId={activeSegmentId}
+            onActiveChange={setActiveSegmentId}
+          />
           <ProfileRankedList key={`${data.key}-tracks`} label="TRACKS">
             {data.topTracks.map((track, idx) => (
               <button
                 key={track.id}
                 type="button"
                 onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                className="group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917]"
+                onMouseEnter={() => setActiveSegmentId(track.id)}
+                onMouseLeave={() => setActiveSegmentId(null)}
+                className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
               >
                 <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                   {String(idx + 1).padStart(2, "0")}
@@ -272,8 +293,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   alt={track.name}
                   size={38}
                 />
-                <span className="font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent transition-none leading-snug">
+                <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent transition-none leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                   {track.name}
+                </span>
+                <span className="font-mono text-[11px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
+                  {formatShare(artistShare(track.plays, data.plays))}
                 </span>
                 <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
                   {track.plays.toLocaleString()}
@@ -312,7 +336,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${isTrack ? (data.plays > 0 ? "md:col-start-1 md:row-start-4" : "md:col-span-full") : "md:col-start-1 md:row-start-3"}`}>
+      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${data.plays > 0 ? `md:col-start-1 ${lowerRow}` : "md:col-span-full"}`}>
         {data.plays === 0 ? (
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] py-4 select-none">
             [ NO PLAYS IN THIS RANGE ]
@@ -326,6 +350,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
             <div className="flex flex-col">
               {recentPlaysWithPresentation.map((play) => {
+                if (isTrack) {
+                  return (
+                    <div key={play.id} className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[11.5px]">
+                      <span className="text-[#5A5A55] tracking-[0.08em]">{play.dayGroup}</span>
+                      <span className="text-[#8A8A83] tabular-nums">{play.timeStr}</span>
+                    </div>
+                  );
+                }
+
+                const segmentId = segmentIdForTrack(play.trackId, segments);
+                const isActive = segmentId !== null && segmentId === activeSegmentId;
                 const row = (
                   <>
                     <span className="font-mono text-[11px] text-[#5A5A55] tabular-nums select-none flex-none w-[44px]">
@@ -337,10 +372,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       size={38}
                     />
                     <div className="min-w-0 flex-1 pl-1">
-                      <span className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate leading-snug select-none">
+                      <span className={`block font-sans text-[14px] tracking-[-0.01em] truncate leading-snug select-none ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                         {play.title}
                       </span>
-                      {data.kind === "artist" && play.album && (
+                      {play.album && (
                         <span className="block font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
                           {play.album}
                         </span>
@@ -358,20 +393,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         </span>
                       </div>
                     )}
-                    {data.kind === "artist" ? (
-                      <button
-                        type="button"
-                        aria-label={`Open Track profile for ${play.title}`}
-                        onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
-                        className="flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent"
-                      >
-                        {row}
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-3 px-1 h-[54px] md:h-[55px] border-b border-[#191917]">
-                        {row}
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={`Open Track profile for ${play.title}`}
+                      onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
+                      onMouseEnter={() => setActiveSegmentId(segmentId)}
+                      onMouseLeave={() => setActiveSegmentId(null)}
+                      className={`flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent ${isActive ? "bg-[#111110]" : ""}`}
+                    >
+                      {row}
+                    </button>
                   </React.Fragment>
                 );
               })}

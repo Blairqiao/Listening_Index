@@ -16,7 +16,8 @@ const mockArtistProfile: ProfileData = {
   range: "1m",
   firstPlayedAt: "2024-01-15T12:00:00.000Z",
   lastPlayedAt: "2024-11-18T18:30:00.000Z",
-  plays: 42,
+  plays: 50,
+  hourOfDay: Array.from({ length: 24 }, (_, hour) => hour === 18 ? 50 : 0),
   rank: 1,
   rankedTotal: 50,
   activityCadence: [
@@ -76,7 +77,7 @@ const mockTrackProfile: ProfileData = {
   kind: "track",
   key: "4clD00s1c0rVqP9Ld0vV48",
   artistKey: "radiohead-key",
-  trackStats: { artistShare: 0.236, artistPlays: 59, longestStreakDays: 5 },
+  trackStats: { artistShare: 0.5, artistPlays: 50, longestStreakDays: 5 },
   hourOfDay: Array.from({ length: 24 }, (_, hour) => hour === 22 ? 12 : 0),
   albumTracks: [
     { id: "4clD00s1c0rVqP9Ld0vV48", name: "Weird Fishes / Arpeggi", plays: 20, isCurrent: true },
@@ -139,6 +140,12 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.ok(markup.includes("Weird Fishes / Arpeggi"), "Must render recent play title");
   assert.ok(markup.includes("In Rainbows"), "Must render album name for artist profile");
   assert.ok(markup.includes("18:30"), "Must render formatted play time in UTC");
+  assert.match(markup, /\[ SHARE OF PLAYS \]/);
+  assert.match(markup, /\[ WHEN IT PLAYS \]/);
+  assert.match(markup, /title="Other Tracks"/);
+  assert.match(markup, /w-\[34px\][^>]*>50%<\/span>/);
+  assert.match(markup, /w-\[34px\][^>]*>34%<\/span>/);
+  assert.ok(markup.indexOf("SHARE OF PLAYS") < markup.indexOf("RECENT PLAYS"));
   assert.ok(markup.includes("[ TOP TRACKS ]"), "Artist profile must render [ TOP TRACKS ]");
   assert.ok(markup.includes("Reckoner"), "Must render top Track Reckoner");
   assert.match(markup, /<button type="button" (?!role="listitem")[^>]*>.*?Reckoner.*?<\/button>/);
@@ -159,10 +166,13 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.ok(markup.includes("Weird Fishes / Arpeggi"), "Must include track title");
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
   assert.ok(markup.includes("In Rainbows"), "Must include album name");
-  assert.match(markup, /open.spotify.com\/track\/4clD00s1c0rVqP9Ld0vV48/);
-  assert.match(markup, /SHARE OF ARTIST/);
-  assert.match(markup, />24%<\/dd>/);
-  assert.match(markup, /5 DAYS/);
+  assert.match(markup, /<a href="https:\/\/open\.spotify\.com\/track\/4clD00s1c0rVqP9Ld0vV48" target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>Weird Fishes \/ Arpeggi<\/span>/);
+  assert.doesNotMatch(markup, /SPOTIFY ↗|BEST MONTH|<dt/);
+  assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
+  assert.match(markup, /50% · 25 PLAYS/);
+  assert.match(markup, /OF 50/);
+  assert.match(markup, /\[ PLAYS \/ 1M \].*?LONGEST STREAK · 5 DAYS/);
+  assert.match(markup, /PEAK 22:00/);
   assert.match(markup, /role="img" aria-label="Plays by hour of day, peak 22:00"/);
   assert.match(markup, /FROM THIS ALBUM/);
   assert.equal(markup.match(/aria-current="true"/g)?.length, 1);
@@ -172,7 +182,9 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /<button[^>]*>Radiohead<\/button>/);
   assert.doesNotMatch(markup, /FIRST PLAYED|LAST PLAYED|LIFETIME/);
   assert.match(markup, /md:col-span-full/);
-  assert.ok(markup.includes("12:30"), "Must format recent play time in America/Chicago");
+  const recent = markup.slice(markup.indexOf("RECENT PLAYS"));
+  assert.doesNotMatch(recent, /<img|Weird Fishes/);
+  assert.ok(recent.includes("12:30"), "Must format recent play time in America/Chicago");
 });
 
 test("ProfileView: SSR zero plays state renders empty message and retains chart", () => {
@@ -287,5 +299,5 @@ test("ProfileView hides the Track story sections at zero plays", () => {
   }));
   assert.match(markup, /NO PLAYS IN THIS RANGE/);
   assert.match(markup, /Weird Fishes/);
-  assert.doesNotMatch(markup, /SHARE OF ARTIST|BEST MONTH|LONGEST STREAK|WHEN IT PLAYS|FROM THIS ALBUM|RECENT PLAYS/);
+  assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
