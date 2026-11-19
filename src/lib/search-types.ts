@@ -1,6 +1,8 @@
 import type { ActivityBucket, RangeKey } from "@/lib/types";
 
 export const SEARCH_RESULT_LIMIT = 8;
+export const SEARCH_TRACK_ROWS = SEARCH_RESULT_LIMIT;
+export const SEARCH_SIDE_ROWS = SEARCH_TRACK_ROWS - 1; // The Albums heading takes one row.
 export const SEARCH_SORT_OPTIONS = [
   { value: "most-plays", label: "Most plays" },
   { value: "least-plays", label: "Least plays" },
@@ -14,6 +16,7 @@ export const SEARCH_MAX_CHARS = 100;
 export const DEFAULT_PROFILE_RANGE: RangeKey = "1y";
 export const PROFILE_RECENT_PLAYS_LIMIT = 20;
 export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
+export const PROFILE_ALBUM_PROFILE_TRACKS_LIMIT = 50;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
 export const PROFILE_TOP_ALBUMS_LIMIT = 5;
 
@@ -22,6 +25,14 @@ export interface SearchArtistResult {
   name: string;
   plays: number;           // lifetime plays
   imageUrl: string | null; // image of the artist's most-played album, if any
+}
+
+export interface SearchAlbumResult {
+  key: string;             // album_id when the catalog is fully enriched, otherwise album_group_key
+  name: string;
+  artist: string;
+  plays: number;           // lifetime Plays
+  imageUrl: string | null;
 }
 
 export interface SearchTrackResult {
@@ -36,15 +47,22 @@ export interface SearchTrackResult {
 export interface SearchResponse {
   query: string;           // the trimmed query that was searched
   artists: SearchArtistResult[];
+  albums: SearchAlbumResult[];
   tracks: SearchTrackResult[];
   hasMore: boolean;
 }
 
-export type ProfileKind = "track" | "artist";
+export type ProfileKind = "track" | "artist" | "album";
 export interface ProfileTarget { kind: ProfileKind; key: string; }
 
 export interface ProfileTopTrack { id: string; name: string; plays: number; albumImageUrl: string | null; }
-export interface ProfileTopAlbum { id?: string; name: string; plays: number; imageUrl: string | null; }
+export interface ProfileTopAlbum {
+  id?: string;
+  key?: string; // The Album ID when fully enriched, otherwise its Group Key. Omitted when unavailable.
+  name: string;
+  plays: number;
+  imageUrl: string | null;
+}
 export interface ProfilePlay {
   id: string; trackId: string; playedAt: string; // ISO
   title: string; artist: string; album: string; durationMs: number; albumImageUrl: string | null;
@@ -65,24 +83,25 @@ export interface ProfileTrackStats {
 
 export interface ProfileData {
   kind: ProfileKind;
-  key: string;                 // canonical: track id, or artist key in the active identity form
-  name: string;                // track title or artist name
-  artistName: string | null;   // track profiles: the track's artist. Artist profiles: null
-  albumName: string | null;    // track profiles only
+  key: string;                 // Track ID, or Artist or Album key in the active identity form
+  name: string;                // Track title, Artist name, or Album name
+  artistName: string | null;   // The Artist on a Track or Album profile. Null for Artist profiles.
+  albumName: string | null;    // Track profiles only
   imageUrl: string | null;
   range: RangeKey;
   firstPlayedAt: string | null; // lifetime, ISO
   lastPlayedAt: string | null;  // lifetime, ISO
   plays: number;               // in range
   rank: number | null;         // in range. null when plays = 0
-  rankedTotal: number;         // tracks (or artists) with ≥ 1 play in range
+  rankedTotal: number;         // Tracks, Artists, or Albums with at least one Play in range
   activityCadence: ActivityBucket[];
   monthlyCadence?: ActivityBucket[];
   artistKey?: string;
+  albumKey?: string;           // The Track's Album key in the active identity form
   trackStats?: ProfileTrackStats; // track profiles only
   hourOfDay?: number[]; // 24 counts indexed by local hour
   albumTracks?: ProfileAlbumTrack[]; // track profiles only, ranked in range
-  topTracks: ProfileTopTrack[]; // artist profiles only (≤ 10, in range). [] for tracks
-  topAlbums: ProfileTopAlbum[]; // artist profiles only (≤ 5, in range). [] for tracks
+  topTracks: ProfileTopTrack[]; // Ranked in range. Up to 10 for Artist profiles and 50 for Album profiles.
+  topAlbums: ProfileTopAlbum[]; // Artist profiles only, up to 5 in range.
   recentPlays: ProfilePlay[];   // in range, newest first, ≤ 20
 }

@@ -123,3 +123,39 @@ test('parseProfileTarget handles URLSearchParams and records with track/artist p
   assert.equal(parseProfileTarget({ track: [] }), null);
   assert.equal(parseProfileTarget({ track: ['', 'second_track'] }), null);
 });
+
+test('parseProfileTarget accepts Album keys and trims record values', () => {
+  assert.deepEqual(
+    parseProfileTarget(new URLSearchParams('album=x')),
+    { kind: 'album', key: 'x' },
+  );
+  assert.deepEqual(
+    parseProfileTarget({ album: ['  artist::album  ', 'other'] }),
+    { kind: 'album', key: 'artist::album' },
+  );
+});
+
+test('parseProfileTarget prefers valid Track and Artist targets over Album', () => {
+  assert.deepEqual(
+    parseProfileTarget(new URLSearchParams('track=t&artist=a&album=x')),
+    { kind: 'track', key: 't' },
+  );
+  assert.deepEqual(
+    parseProfileTarget(new URLSearchParams('track=t&album=x')),
+    { kind: 'track', key: 't' },
+  );
+  assert.deepEqual(
+    parseProfileTarget({ track: '', artist: 'a', album: 'x' }),
+    { kind: 'artist', key: 'a' },
+  );
+  assert.deepEqual(
+    parseProfileTarget({ track: 'bad\u0000id', artist: ' ', album: 'x' }),
+    { kind: 'album', key: 'x' },
+  );
+});
+
+test('parseProfileTarget rejects blank, oversized, and control-character Album keys', () => {
+  for (const album of ['', '  ', 'a'.repeat(201), 'bad\u0000key', 'bad\u007fkey']) {
+    assert.equal(parseProfileTarget(new URLSearchParams({ album })), null);
+  }
+});
