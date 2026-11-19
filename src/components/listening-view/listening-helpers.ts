@@ -209,25 +209,23 @@ export function buildListeningUrlSearch(
 ): string {
   const raw = currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch;
   const params = new URLSearchParams(raw);
+  const target = state.activeMode === 4 ? state.profileTarget : null;
+
+  for (const kind of ["track", "artist", "album"]) {
+    if (kind !== target?.kind) params.delete(kind);
+  }
 
   if (state.activeMode === 4) {
     params.set("mode", "4");
-    if (state.profileTarget) {
-      params.set(state.profileTarget.kind, state.profileTarget.key);
-      params.delete(state.profileTarget.kind === "track" ? "artist" : "track");
-      params.set("prange", state.profileRange);
-    } else {
-      params.delete("track");
-      params.delete("artist");
-      params.delete("prange");
-    }
+  } else if (params.get("mode") === "4") {
+    params.delete("mode");
+  }
+
+  if (target) {
+    params.set(target.kind, target.key);
+    params.set("prange", state.profileRange);
   } else {
-    params.delete("track");
-    params.delete("artist");
     params.delete("prange");
-    if (params.get("mode") === "4") {
-      params.delete("mode");
-    }
   }
 
   const qs = params.toString();

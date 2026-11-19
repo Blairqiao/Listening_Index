@@ -57,9 +57,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setActiveSegmentId(null);
   }
 
-  const artistTracks = data?.kind === "artist" ? data.topTracks : undefined;
+  const isAlbum = data?.kind === "album";
+  const isArtist = data?.kind === "artist";
+  const rankedTracks = isArtist || isAlbum ? data.topTracks : undefined;
   const plays = data?.plays ?? 0;
-  const segments = useMemo(() => buildShareSegments(artistTracks ?? [], plays), [artistTracks, plays]);
+  const segments = useMemo(() => buildShareSegments(rankedTracks ?? [], plays), [rankedTracks, plays]);
 
   const recentPlaysWithPresentation = useMemo(() => {
     if (!data?.recentPlays) return [];
@@ -148,8 +150,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (!data) return null;
 
-  const artistKey = data.artistKey;
+  const { artistKey, albumKey } = data;
   const isTrack = data.kind === "track";
+  const hasLargeHeader = isTrack || isAlbum;
   const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
   const hasAlbumList = isTrack && albumTracks.length >= 2;
@@ -160,9 +163,38 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     ? [recentPlaysWithPresentation.slice(0, half), recentPlaysWithPresentation.slice(half)]
     : [recentPlaysWithPresentation];
   const hours = data.plays > 0 ? data.hourOfDay : undefined;
-  const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
-    ? `https://open.spotify.com/track/${data.key}`
+  const spotifyUrl = hasLargeHeader && /^[a-zA-Z0-9]{22}$/.test(data.key)
+    ? `https://open.spotify.com/${data.kind}/${data.key}`
     : null;
+
+  const renderTopTrack = (track: ProfileData["topTracks"][number], idx: number) => (
+    <button
+      key={track.id}
+      type="button"
+      onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+      onMouseEnter={() => setActiveSegmentId(track.id)}
+      onMouseLeave={() => setActiveSegmentId(null)}
+      className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
+    >
+      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+        {String(idx + 1).padStart(2, "0")}
+      </span>
+      <Artwork
+        src={track.albumImageUrl}
+        alt={track.name}
+        size={38}
+      />
+      <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent transition-none leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
+        {track.name}
+      </span>
+      <span className="font-mono text-[11px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
+        {formatShare(artistShare(track.plays, plays))}
+      </span>
+      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+        {track.plays.toLocaleString()}
+      </span>
+    </button>
+  );
 
   return (
     <div
@@ -170,14 +202,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         status === "loading" ? "opacity-60" : ""
       }`}
     >
-      <div className={`flex items-center gap-3 min-w-0 md:col-span-full${isTrack ? " md:gap-4" : ""}`}>
+      <div className={`flex items-center gap-3 min-w-0 md:col-span-full${hasLargeHeader ? " md:gap-4" : ""}`}>
         <Artwork
           src={data.imageUrl}
           alt={data.name}
-          size={isTrack ? 88 : 38}
+          size={hasLargeHeader ? 88 : 38}
         />
         <div className="min-w-0 flex-1">
-          <div className={`font-sans ${isTrack ? "text-[20px] md:text-[24px]" : "text-[15px]"} font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none`}>
+          <div className={`font-sans ${hasLargeHeader ? "text-[20px] md:text-[24px]" : "text-[15px]"} font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none`}>
             {spotifyUrl ? (
               <a
                 href={spotifyUrl}
@@ -191,9 +223,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </a>
             ) : data.name}
           </div>
-          {isTrack && data.artistName && (
+          {hasLargeHeader && data.artistName && (
             <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
-              {artistKey && data.artistName ? (
+              {artistKey ? (
                 <button
                   type="button"
                   onClick={() => onOpenProfile({ kind: "artist", key: artistKey })}
@@ -204,7 +236,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
           {isTrack && data.albumName && (
             <div className="mt-0.5 truncate font-mono text-[11.5px] leading-tight text-[#6A6A64] select-none">
-              {data.albumName}
+              {albumKey ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenProfile({ kind: "album", key: albumKey })}
+                  className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
+                >{data.albumName}</button>
+              ) : data.albumName}
             </div>
           )}
         </div>
@@ -232,7 +270,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      {data.kind === "artist" && data.plays > 0 && (
+      {(isArtist || isAlbum) && data.plays > 0 && (
         <div className="min-w-0 md:col-span-full">
           <SegmentedShareBar
             heading="[ SHARE OF PLAYS ]"
@@ -281,66 +319,45 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      {data.kind === "artist" && data.plays > 0 && (
+      {(isArtist || isAlbum) && data.plays > 0 && (
         <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-4">
           <ProfileRankedList key={`${data.key}-tracks`} label="TRACKS">
-            {data.topTracks.map((track, idx) => (
-              <button
-                key={track.id}
-                type="button"
-                onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                onMouseEnter={() => setActiveSegmentId(track.id)}
-                onMouseLeave={() => setActiveSegmentId(null)}
-                className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
-              >
-                <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
-                  {String(idx + 1).padStart(2, "0")}
-                </span>
-                <Artwork
-                  src={track.albumImageUrl}
-                  alt={track.name}
-                  size={38}
-                />
-                <span className={`font-sans text-[14px] tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent transition-none leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
-                  {track.name}
-                </span>
-                <span className="font-mono text-[11px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
-                  {formatShare(artistShare(track.plays, data.plays))}
-                </span>
-                <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
-                  {track.plays.toLocaleString()}
-                </span>
-              </button>
-            ))}
+            {data.topTracks.map(renderTopTrack)}
           </ProfileRankedList>
-          <ProfileRankedList key={`${data.key}-albums`} label="ALBUMS">
-            {data.topAlbums.map((album, idx) => {
-              const isLast = idx === data.topAlbums.length - 1;
-              return (
-                <div
-                  key={album.id || album.name}
-                  className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] ${
-                    isLast ? "border-b-0" : "border-b border-[#191917]"
-                  }`}
-                >
-                  <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
-                    {String(idx + 1).padStart(2, "0")}
-                  </span>
-                  <Artwork
-                    src={album.imageUrl}
-                    alt={album.name}
-                    size={38}
-                  />
-                  <span className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate leading-snug">
-                    {album.name}
-                  </span>
-                  <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
-                    {album.plays.toLocaleString()}
-                  </span>
-                </div>
-              );
-            })}
-          </ProfileRankedList>
+          {isArtist && (
+            <ProfileRankedList key={`${data.key}-albums`} label="ALBUMS">
+              {data.topAlbums.map((album, idx) => {
+                const key = album.key;
+                const Row = key ? "button" : "div";
+                const isLast = idx === data.topAlbums.length - 1;
+                return (
+                  <Row
+                    key={key || album.id || album.name}
+                    type={key ? "button" : undefined}
+                    onClick={key ? () => onOpenProfile({ kind: "album", key }) : undefined}
+                    className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] ${
+                      isLast ? "border-b-0" : "border-b border-[#191917]"
+                    }${key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none" : ""}`}
+                  >
+                    <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
+                    <Artwork
+                      src={album.imageUrl}
+                      alt={album.name}
+                      size={38}
+                    />
+                    <span className={`font-sans text-[13px] text-[#EDEDE8] flex-1 truncate leading-snug${key ? " group-hover:text-music-accent transition-none" : ""}`}>
+                      {album.name}
+                    </span>
+                    <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                      {album.plays.toLocaleString()}
+                    </span>
+                  </Row>
+                );
+              })}
+            </ProfileRankedList>
+          )}
         </div>
       )}
 
@@ -390,7 +407,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       <span className={`block font-sans text-[14px] tracking-[-0.01em] truncate leading-snug select-none ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                         {play.title}
                       </span>
-                      {play.album && (
+                      {!isAlbum && play.album && (
                         <span className="block font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
                           {play.album}
                         </span>

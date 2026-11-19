@@ -228,7 +228,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     handleOpenProfile,
     handleOpenRelatedProfile,
     handleProfileBack,
-    returnsToArtist,
+    returnsTo,
     handleSelectProfileRange,
   } = useSearchProfile({
     activeMode,
@@ -389,7 +389,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     profileTarget,
     profileRange,
     visitorTimezone,
-    profileTarget?.kind === "artist" ? artistRankFormat : trackRankFormat,
+    profileTarget?.kind === "track" ? trackRankFormat : artistRankFormat,
   );
 
   const metricByMode: Record<Mode, [string, string, string, string]> = {
@@ -450,7 +450,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 handleProfileBack();
                 window.scrollTo(0, 0);
               }}
-              returnsToArtist={returnsToArtist}
+              returnsTo={returnsTo}
               profileKind={activeMode === 4 ? profileTarget?.kind ?? null : null}
               layout={config.livePlayerLayout}
               onToggleLayout={handleToggleLayout}
@@ -471,7 +471,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               onToggleTrackRank={handleToggleTrackRank}
               onToggleArtistRank={handleToggleArtistRank}
               onToggleProfileRank={activeMode === 4 && profileMetrics[1] !== "--"
-                ? profileTarget?.kind === "artist" ? handleToggleArtistRank : handleToggleTrackRank
+                ? profileTarget?.kind === "track" ? handleToggleTrackRank : handleToggleArtistRank
                 : undefined}
             />
           )}

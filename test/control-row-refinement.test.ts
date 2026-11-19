@@ -2,6 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ControlRow } from "../src/components/listening-view/ControlRow";
 import { formatStreamLogDateSpan } from "../src/lib/format-utils";
 
 test("formatStreamLogDateSpan formats date ranges correctly", () => {
@@ -52,6 +55,29 @@ test("ControlRow component supports dynamic scope labels for Stream Log, Session
     content.includes("hidden md:flex"),
     "ControlRow must hide layout controls on mobile viewports"
   );
+});
+
+test("ControlRow shows the Album profile label and the profile back destination", () => {
+  const props = {
+    mode: 4,
+    range: "1y",
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+    profileKind: "album",
+  } as const;
+  assert.match(renderToStaticMarkup(React.createElement(ControlRow, props)), />ALBUM PROFILE</);
+
+  for (const [returnsTo, label] of [["album", "ALBUM"], ["artist", "ARTIST"], [null, "SEARCH"]] as const) {
+    const markup = renderToStaticMarkup(React.createElement(ControlRow, {
+      ...props,
+      profileKind: returnsTo === "album" ? "track" : "album",
+      returnsTo,
+      onProfileBack: () => {},
+    }));
+    assert.match(markup, new RegExp(`<button[^>]*>← BACK TO ${label}</button>`));
+  }
 });
 
 test("LivePlayerView houses context selector inside playback controls without redundant middle device band", () => {

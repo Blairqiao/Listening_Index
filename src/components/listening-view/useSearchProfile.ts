@@ -7,6 +7,11 @@ import {
   type ProfileStatus,
 } from "./listening-helpers";
 
+interface ProfileOrigin {
+  target: ProfileTarget & { kind: "artist" | "album" };
+  range: RangeKey;
+}
+
 export interface UseSearchProfileParams {
   activeMode: Mode;
   visitorTimezone: string;
@@ -29,7 +34,7 @@ export function useSearchProfile({
   const [profileRange, setProfileRange] = useState<RangeKey>(
     () => initialProfileRange ?? DEFAULT_PROFILE_RANGE
   );
-  const [artistOrigin, setArtistOrigin] = useState<{ target: ProfileTarget; range: RangeKey } | null>(null);
+  const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin | null>(null);
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
 
@@ -65,21 +70,24 @@ export function useSearchProfile({
   );
 
   const handleOpenProfile = useCallback((target: ProfileTarget) => {
-    setArtistOrigin(null);
+    setProfileOrigin(null);
     openProfileAt(target, DEFAULT_PROFILE_RANGE);
   }, [openProfileAt]);
 
   const handleOpenRelatedProfile = useCallback((target: ProfileTarget) => {
-    setArtistOrigin(profileTarget?.kind === "artist" && target.kind === "track"
-      ? { target: profileTarget, range: profileRange }
+    const originKind = profileTarget?.kind;
+    const keepsOrigin = (originKind === "artist" && (target.kind === "track" || target.kind === "album"))
+      || (originKind === "album" && target.kind === "track");
+    setProfileOrigin(profileTarget && keepsOrigin
+      ? { target: { kind: originKind, key: profileTarget.key }, range: profileRange }
       : null);
     openProfileAt(target, profileRange);
   }, [openProfileAt, profileRange, profileTarget]);
 
   const handleProfileBack = useCallback(() => {
-    if (artistOrigin) {
-      setArtistOrigin(null);
-      openProfileAt(artistOrigin.target, artistOrigin.range);
+    if (profileOrigin) {
+      setProfileOrigin(null);
+      openProfileAt(profileOrigin.target, profileOrigin.range);
       return;
     }
 
@@ -87,7 +95,7 @@ export function useSearchProfile({
     setProfileTarget(null);
     setRawProfileData(null);
     setProfileStatus("loading");
-  }, [artistOrigin, openProfileAt]);
+  }, [profileOrigin, openProfileAt]);
 
   const handleSelectProfileRange = useCallback(
     (range: RangeKey) => {
@@ -248,7 +256,7 @@ export function useSearchProfile({
     handleOpenProfile,
     handleOpenRelatedProfile,
     handleProfileBack,
-    returnsToArtist: artistOrigin !== null,
+    returnsTo: profileOrigin?.target.kind ?? null,
     handleSelectProfileRange,
   };
 }
