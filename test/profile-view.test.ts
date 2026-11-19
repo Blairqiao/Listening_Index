@@ -141,7 +141,11 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.ok(markup.includes("In Rainbows"), "Must render album name for artist profile");
   assert.ok(markup.includes("18:30"), "Must render formatted play time in UTC");
   assert.match(markup, /\[ SHARE OF PLAYS \]/);
-  assert.match(markup, /\[ WHEN IT PLAYS \]/);
+  assert.doesNotMatch(markup, /WHEN IT PLAYS/);
+  assert.match(markup, /<button type="button" aria-pressed="true"[^>]*>OVER TIME<\/button>/);
+  assert.match(markup, /<button type="button" aria-pressed="false"[^>]*>BY HOUR<\/button>/);
+  assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF PLAYS \]/);
+  assert.ok(markup.indexOf("SHARE OF PLAYS") < markup.indexOf("TOP TRACKS"));
   assert.match(markup, /title="Other Tracks"/);
   assert.match(markup, /w-\[34px\][^>]*>50%<\/span>/);
   assert.match(markup, /w-\[34px\][^>]*>34%<\/span>/);
@@ -171,9 +175,11 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
   assert.match(markup, /50% · 25 PLAYS/);
   assert.match(markup, /OF 50/);
-  assert.match(markup, /\[ PLAYS \/ 1M \].*?LONGEST STREAK · 5 DAYS/);
-  assert.match(markup, /PEAK 22:00/);
-  assert.match(markup, /role="img" aria-label="Plays by hour of day, peak 22:00"/);
+  assert.match(markup, /\[ PLAYS \/ 1M \].*?OVER TIME.*?BY HOUR/);
+  assert.match(markup, /Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
+  assert.doesNotMatch(markup, /WHEN IT PLAYS|PEAK 22:00/);
+  assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF RADIOHEAD \]/);
+  assert.ok(markup.indexOf("SHARE OF RADIOHEAD") < markup.indexOf("FROM THIS ALBUM"));
   assert.match(markup, /FROM THIS ALBUM/);
   assert.equal(markup.match(/aria-current="true"/g)?.length, 1);
   assert.match(markup, /<div[^>]*aria-current="true"[^>]*>.*?text-music-accent[^>]*>Weird Fishes \/ Arpeggi/);
@@ -287,7 +293,7 @@ test("ProfileView hides the album section for a single ranked Track", () => {
     onOpenProfile: () => {},
   }));
   assert.doesNotMatch(markup, /FROM THIS ALBUM/);
-  assert.match(markup, /WHEN IT PLAYS/);
+  assert.match(markup, /BY HOUR/);
 });
 
 test("ProfileView hides the Track story sections at zero plays", () => {
@@ -299,5 +305,5 @@ test("ProfileView hides the Track story sections at zero plays", () => {
   }));
   assert.match(markup, /NO PLAYS IN THIS RANGE/);
   assert.match(markup, /Weird Fishes/);
-  assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
+  assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|BY HOUR|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
