@@ -4,23 +4,28 @@ import type { RangeKey, ActivityBucket } from "@/lib/types";
 
 export type CadenceScope =
   | { kind: "track"; trackId: string }
-  | { kind: "artist"; column: "artist_id" | "artist_group_key"; value: string };
+  | { kind: "artist"; column: "artist_id" | "artist_group_key"; value: string }
+  | { kind: "album"; column: "album_id" | "album_group_key"; value: string };
 
 export function buildCadenceQuery(range: RangeKey, tz: string, scope?: CadenceScope) {
   const sql = getDb();
 
-  const scopeJoin = scope?.kind === "artist"
+  const scopeJoin = scope?.kind === "artist" || scope?.kind === "album"
     ? sql`
       JOIN tracks t ON t.id = p.track_id`
     : sql``;
 
-  const scopeFilter = scope?.kind === "track"
-    ? sql`p.track_id = ${scope.trackId}`
-    : scope?.column === "artist_id"
-      ? sql`t.artist_id = ${scope.value}`
-      : scope
-        ? sql`t.artist_group_key = ${scope.value}`
-        : sql``;
+  const scopeFilter = !scope
+    ? sql``
+    : scope.kind === "track"
+      ? sql`p.track_id = ${scope.trackId}`
+      : scope.kind === "artist"
+        ? scope.column === "artist_id"
+          ? sql`t.artist_id = ${scope.value}`
+          : sql`t.artist_group_key = ${scope.value}`
+        : scope.column === "album_id"
+          ? sql`t.album_id = ${scope.value}`
+          : sql`t.album_group_key = ${scope.value}`;
 
   const scopeAnd = scope ? sql` AND ${scopeFilter}` : sql``;
   const scopeWhere = scope
