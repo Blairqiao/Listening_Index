@@ -83,5 +83,10 @@ export function parseProfileTarget(
     return { kind: "artist", key: artist };
   }
 
+  const album = sanitizeTargetValue(extractTargetParam(params, "album"));
+  if (album !== null) {
+    return { kind: "album", key: album };
+  }
+
   return null;
 }
