@@ -76,7 +76,7 @@ const mockTrackProfile: ProfileData = {
   kind: "track",
   key: "4clD00s1c0rVqP9Ld0vV48",
   artistKey: "radiohead-key",
-  trackStats: { artistShare: 0.236, bestMonth: { month: "2024-03", plays: 14 }, longestStreakDays: 5 },
+  trackStats: { artistShare: 0.236, artistPlays: 59, longestStreakDays: 5 },
   hourOfDay: Array.from({ length: 24 }, (_, hour) => hour === 22 ? 12 : 0),
   albumTracks: [
     { id: "4clD00s1c0rVqP9Ld0vV48", name: "Weird Fishes / Arpeggi", plays: 20, isCurrent: true },
@@ -162,7 +162,6 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /open.spotify.com\/track\/4clD00s1c0rVqP9Ld0vV48/);
   assert.match(markup, /SHARE OF ARTIST/);
   assert.match(markup, />24%<\/dd>/);
-  assert.match(markup, /MAR 2024 · 14/);
   assert.match(markup, /5 DAYS/);
   assert.match(markup, /role="img" aria-label="Plays by hour of day, peak 22:00"/);
   assert.match(markup, /FROM THIS ALBUM/);

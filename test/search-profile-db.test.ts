@@ -6,7 +6,7 @@ import { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "../src/lib/db/queries
 import { migrateSchema } from "../src/lib/db/queries/schema";
 import { searchCatalog } from "../src/lib/db/queries/search";
 import { isCatalogFullyEnriched } from "../src/lib/db/queries/enrichment";
-import { hourHistogram, longestStreak, pickBestMonth } from "../src/lib/profile-stats";
+import { hourHistogram, longestStreak } from "../src/lib/profile-stats";
 import { getProfile } from "../src/lib/db/queries/profile";
 import {
   PROFILE_ALBUM_TRACKS_LIMIT,
@@ -337,8 +337,8 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
       assert.equal(profile.plays, rawPlays.length);
       assert.deepEqual(profile.hourOfDay, hourHistogram(local.map(({ hour }) => hour)));
       assert.equal(profile.hourOfDay.reduce((sum, count) => sum + count, 0), profile.plays);
-      assert.deepEqual(profile.trackStats.bestMonth, pickBestMonth(local.map(({ day }) => day.slice(0, 7))));
       assert.equal(profile.trackStats.longestStreakDays, longestStreak(local.map(({ day }) => day)));
+      assert.equal(profile.trackStats.artistPlays, artist?.plays ?? 0);
       assert.equal(profile.trackStats.artistShare, profile.plays && artist?.plays ? profile.plays / artist.plays : null);
       assert.deepEqual(profile.albumTracks, siblings.map((row) => ({
         id: row.id, name: row.name, plays: row.plays, isCurrent: row.id === id,
@@ -358,7 +358,9 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
 
     assert.ok(profile);
     assert.equal(profile.plays, 0);
-    assert.deepEqual(profile.trackStats, { artistShare: null, bestMonth: null, longestStreakDays: 0 });
+    assert.ok(profile.trackStats);
+    assert.equal(profile.trackStats.artistShare, null);
+    assert.equal(profile.trackStats.longestStreakDays, 0);
     assert.deepEqual(profile.hourOfDay, Array(24).fill(0));
   });
 

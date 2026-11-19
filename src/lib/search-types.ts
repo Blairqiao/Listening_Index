@@ -59,7 +59,7 @@ export interface ProfileAlbumTrack {
 
 export interface ProfileTrackStats {
   artistShare: number | null;
-  bestMonth: { month: string; plays: number } | null;
+  artistPlays: number;
   longestStreakDays: number;
 }
 
@@ -80,7 +80,7 @@ export interface ProfileData {
   monthlyCadence?: ActivityBucket[];
   artistKey?: string;
   trackStats?: ProfileTrackStats; // track profiles only
-  hourOfDay?: number[]; // track profiles only, indexed by local hour
+  hourOfDay?: number[]; // 24 counts indexed by local hour
   albumTracks?: ProfileAlbumTrack[]; // track profiles only, ranked in range
   topTracks: ProfileTopTrack[]; // artist profiles only (≤ 10, in range). [] for tracks
   topAlbums: ProfileTopAlbum[]; // artist profiles only (≤ 5, in range). [] for tracks
