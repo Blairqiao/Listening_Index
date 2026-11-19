@@ -3,19 +3,24 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ActivityChart } from "../src/components/views/ActivityChart";
-import { HourStrip } from "../src/components/views/search-view/HourStrip";
+import { HourChart } from "../src/components/views/search-view/HourChart";
 import { ProportionShareBar, SegmentedShareBar } from "../src/components/views/search-view/ShareBar";
 import { buildShareSegments, hourHistogram, OTHER_SEGMENT_ID } from "../src/lib/profile-stats";
 
-test("HourStrip announces the peak and labels individual hours", () => {
-  const markup = renderToStaticMarkup(React.createElement(HourStrip, { counts: hourHistogram([2, 22, 22]) }));
-  assert.match(markup, /PEAK 22:00/);
+test("HourChart draws 24 hour bars under the range heading", () => {
+  const aside = React.createElement("span", null, "ASIDE");
+  const markup = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([2, 22, 22]), range: "1m", headerAside: aside }));
+  assert.match(markup, /\[ WHEN IT PLAYS \/ 1M \]/);
+  assert.match(markup, /ASIDE/);
   assert.match(markup, /aria-label="Plays by hour of day, peak 22:00"/);
   assert.match(markup, /title="22:00 · 2 plays"/);
+  assert.equal(markup.match(/title="\d\d:00 · /g)?.length, 24);
+  assert.match(markup, /h-\[80px\]/);
+  assert.match(markup, />00<.*>06<.*>12<.*>18<.*>23</);
 
-  const empty = renderToStaticMarkup(React.createElement(HourStrip, { counts: hourHistogram([]) }));
+  const empty = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([]), range: "all" }));
+  assert.match(empty, /\[ WHEN IT PLAYS \/ ALL \]/);
   assert.match(empty, /aria-label="No plays by hour"/);
-  assert.doesNotMatch(empty, /PEAK/);
 });
 
 test("ProportionShareBar presents the share and omits an empty bar", () => {

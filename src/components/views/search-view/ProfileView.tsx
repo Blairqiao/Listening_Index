@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import type { ProfileData, ProfileTarget } from "@/lib/search-types";
 import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
 import { artistShare, buildShareSegments, formatShare, segmentIdForTrack } from "@/lib/profile-stats";
-import { HourStrip } from "./HourStrip";
+import { ProfileChart } from "./ProfileChart";
 import { ProportionShareBar, SegmentedShareBar } from "./ShareBar";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
@@ -153,7 +153,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
   const hours = data.plays > 0 ? data.hourOfDay : undefined;
-  const lowerRow = hours ? "md:row-start-4" : "md:row-start-3";
   const spotifyUrl = data.kind === "track" && /^[a-zA-Z0-9]{22}$/.test(data.key)
     ? `https://open.spotify.com/track/${data.key}`
     : null;
@@ -205,30 +204,41 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       <div className="min-w-0 md:col-span-full">
-        <ActivityChart
-          label="PLAYS"
+        <ProfileChart
           range={data.range}
           activityCadence={data.activityCadence}
           monthlyCadence={data.monthlyCadence}
           isLoading={status === "loading"}
           visitorTimezone={visitorTimezone}
-          headerAside={isTrack && data.plays > 0 && streak > 0 ? (
-            <span className="text-right font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] tabular-nums">
-              LONGEST STREAK · {streak.toLocaleString()} {streak === 1 ? "DAY" : "DAYS"}
-            </span>
-          ) : undefined}
+          hourOfDay={hours}
+          streakDays={isTrack ? streak : 0}
         />
       </div>
 
-      {hours && <div className="min-w-0 md:col-span-full"><HourStrip counts={hours} /></div>}
-
       {isTrack && data.plays > 0 && (
-        <div className={`flex min-w-0 flex-col gap-6 md:col-start-2 ${lowerRow}`}>
+        <div className="min-w-0 md:col-span-full">
           <ProportionShareBar
             heading={`[ SHARE OF ${data.artistName?.toUpperCase() || "ARTIST"} ]`}
             part={data.plays}
             total={data.trackStats?.artistPlays ?? 0}
           />
+        </div>
+      )}
+
+      {data.kind === "artist" && data.plays > 0 && (
+        <div className="min-w-0 md:col-span-full">
+          <SegmentedShareBar
+            heading="[ SHARE OF PLAYS ]"
+            segments={segments}
+            total={data.plays}
+            activeId={activeSegmentId}
+            onActiveChange={setActiveSegmentId}
+          />
+        </div>
+      )}
+
+      {isTrack && data.plays > 0 && (
+        <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-4">
           {albumTracks.length >= 2 && (
             <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
               {albumTracks.map((track, idx) => {
@@ -267,14 +277,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       )}
 
       {data.kind === "artist" && data.plays > 0 && (
-        <div className={`flex min-w-0 flex-col gap-6 md:col-start-2 ${lowerRow}`}>
-          <SegmentedShareBar
-            heading="[ SHARE OF PLAYS ]"
-            segments={segments}
-            total={data.plays}
-            activeId={activeSegmentId}
-            onActiveChange={setActiveSegmentId}
-          />
+        <div className="flex min-w-0 flex-col gap-6 md:col-start-2 md:row-start-4">
           <ProfileRankedList key={`${data.key}-tracks`} label="TRACKS">
             {data.topTracks.map((track, idx) => (
               <button
@@ -336,7 +339,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
-      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${data.plays > 0 ? `md:col-start-1 ${lowerRow}` : "md:col-span-full"}`}>
+      <div className={`min-w-0 md:max-h-[420px] md:overflow-y-auto scrollbar-hidden ${data.plays > 0 ? "md:col-start-1 md:row-start-4" : "md:col-span-full"}`}>
         {data.plays === 0 ? (
           <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] py-4 select-none">
             [ NO PLAYS IN THIS RANGE ]
