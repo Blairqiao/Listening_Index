@@ -11,6 +11,7 @@ export interface ActivityChartProps {
   monthlyCadence?: ActivityBucket[];
   isLoading?: boolean;
   label?: string;
+  headerAside?: React.ReactNode;
   visitorTimezone?: string;
 }
 
@@ -29,6 +30,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   monthlyCadence,
   isLoading = false,
   label = "ACTIVITY",
+  headerAside,
   visitorTimezone: propTimezone,
 }) => {
   let contextTimezone = "UTC";
@@ -70,11 +72,19 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       ? activityCadence[activityCadence.length - 1].date
       : "";
 
+  const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
+  const heading = `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]`;
+
   return (
     <div>
-      <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none">
-        [ {label} / {range === "all" ? "ALL" : range.toUpperCase()} ]
-      </div>
+      {headerAside == null ? (
+        <div className={headingClass}>{heading}</div>
+      ) : (
+        <div className="flex justify-between items-baseline gap-2">
+          <span className={headingClass}>{heading}</span>
+          {headerAside}
+        </div>
+      )}
 
       <div>
         <div
