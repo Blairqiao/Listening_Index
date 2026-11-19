@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useRef } from "react";
-import { ChevronDown, X } from "lucide-react";
-import { DEFAULT_SEARCH_SORT, SEARCH_MAX_CHARS, SEARCH_SORT_OPTIONS, type ProfileTarget, type SearchSort } from "@/lib/search-types";
-import { parseSearchSort } from "@/lib/search-utils";
+import { X } from "lucide-react";
+import { DEFAULT_SEARCH_SORT, SEARCH_MAX_CHARS, type ProfileTarget, type SearchSort } from "@/lib/search-types";
+import { searchChipClass, SortMenu } from "./SortMenu";
 import { useSearch } from "./useSearch";
 import { Artwork, getFallbackSwatchColor } from "../../Artwork";
+
+const pageButtonClass = `${searchChipClass} disabled:cursor-default disabled:opacity-40 disabled:hover:text-[#6A6A64] disabled:hover:border-[#26261F]`;
 
 export interface SearchViewProps {
   query: string;
@@ -78,42 +80,30 @@ export const SearchView: React.FC<SearchViewProps> = ({
           )}
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-          <label className="flex items-center gap-2">
-            <span className="uppercase">Sort</span>
-            <span className="relative">
-              <select
-                aria-label="Sort by"
-                value={sort}
-                onChange={(event) => onSortChange?.(parseSearchSort(event.target.value))}
-                className="min-h-8 appearance-none cursor-pointer rounded-none border border-[#26261F] bg-transparent pl-2.5 pr-7 uppercase text-[#8A8A83] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent [color-scheme:dark]"
-              >
-                {SEARCH_SORT_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
-            </span>
-          </label>
+          <SortMenu value={sort} onChange={(nextSort) => onSortChange?.(nextSort)} />
           {(page > 1 || data?.hasMore) && (
-            <nav aria-label="Search results pages" className="flex items-center gap-2">
+            <nav aria-label="Search results pages" className="flex items-center gap-1.5">
               <button
                 type="button"
                 aria-label="Previous page"
                 disabled={page <= 1 || status === "loading"}
                 onClick={() => onPageChange?.(page - 1)}
-                className="size-8 cursor-pointer rounded-none border border-[#26261F] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent disabled:cursor-default disabled:opacity-40"
+                className={pageButtonClass}
               >
-                ←
+                ← PREV
               </button>
-              <span className="tabular-nums text-[#8A8A83]">{String(page).padStart(2, "0")}</span>
+              <span className="tabular-nums whitespace-nowrap text-[#8A8A83]">
+                <span className="text-[#5A5A55] tracking-[0.14em]">PAGE</span>{" "}
+                {String(page).padStart(2, "0")}
+              </span>
               <button
                 type="button"
                 aria-label="Next page"
                 disabled={status !== "ready" || !data?.hasMore}
                 onClick={() => onPageChange?.(page + 1)}
-                className="size-8 cursor-pointer rounded-none border border-[#26261F] hover:border-[#3A3A32] hover:text-[#EDEDE8] focus-visible:outline-music-accent disabled:cursor-default disabled:opacity-40"
+                className={pageButtonClass}
               >
-                →
+                NEXT →
               </button>
             </nav>
           )}

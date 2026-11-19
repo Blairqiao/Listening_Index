@@ -175,9 +175,15 @@ test("SearchView browses on empty input and accepts a single character", async (
       onOpenProfile: () => {},
     })
   );
-  assert.match(render(""), /Default Artist/);
-  assert.match(render(""), /aria-label="Next page"/);
-  assert.match(render(""), /Most plays.*Least plays.*Most recent.*Least recent/);
+  const browseHtml = render("");
+  assert.match(browseHtml, /Default Artist/);
+  assert.doesNotMatch(browseHtml, /<select\b/);
+  assert.match(browseHtml, /aria-haspopup="listbox"/);
+  assert.match(browseHtml, /aria-label="Sort by"/);
+  assert.match(browseHtml, />MOST PLAYS</);
+  assert.match(browseHtml, /aria-label="Previous page"[^>]*>← PREV</);
+  assert.match(browseHtml, /aria-label="Next page"[^>]*>NEXT →</);
+  assert.match(browseHtml, />PAGE<\/span> 01</);
   const shortHtml = render("r");
   assert.match(shortHtml, /SEARCHING/);
   assert.doesNotMatch(shortHtml, /TYPE 2/);
