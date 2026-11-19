@@ -1,9 +1,11 @@
 import type { RangeKey } from "@/lib/types";
 import {
   DEFAULT_SEARCH_SORT,
-  SEARCH_RESULT_LIMIT,
+  SEARCH_SIDE_ROWS,
+  SEARCH_TRACK_ROWS,
   type SearchSort,
   PROFILE_ALBUM_TRACKS_LIMIT,
+  PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
@@ -13,12 +15,14 @@ import {
   type ProfileTarget,
   type ProfileTopAlbum,
   type ProfileTopTrack,
+  type SearchAlbumResult,
   type SearchArtistResult,
   type SearchResponse,
   type SearchTrackResult,
 } from "@/lib/search-types";
 import { artistShare, hourHistogram, longestStreak } from "@/lib/profile-stats";
 import { normalizeForSearch } from "@/lib/search-utils";
+import { planSideColumn } from "@/lib/search-layout";
 import { CATALOG } from "./catalog";
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from "./stream-log";
 import { buildProfileCadence } from "@/lib/db/queries/cadence";
@@ -56,6 +60,21 @@ interface DerivedMockArtist {
   imageUrl: string | null;
   firstPlayedAt: string;
   lastPlayedAt: string;
+}
+
+interface DerivedMockAlbum {
+  key: string;
+  name: string;
+  artist: string;
+  artistId: string;
+  lifetimePlays: number;
+  imageUrl: string | null;
+  firstPlayedAt: string;
+  lastPlayedAt: string;
+}
+
+function getMockAlbumKey(play: { artist: string; album: string; albumId?: string }): string {
+  return play.albumId || `${play.artist.toLowerCase().trim()}::${play.album.toLowerCase().trim()}`;
 }
 
 const CATALOG_ENTRIES = Object.values(CATALOG);
@@ -162,7 +181,7 @@ function deriveUniqueArtists(plays: NormalizedMockPlay[]): Map<string, DerivedMo
       artistEntry.lastPlayedAt = play.playedAt;
     }
 
-    const albumKey = play.albumId ?? play.album;
+    const albumKey = getMockAlbumKey(play);
     const albumRecord = artistEntry.albumCounts.get(albumKey) ?? {
       name: play.album,
       count: 0,
@@ -196,8 +215,44 @@ function deriveUniqueArtists(plays: NormalizedMockPlay[]): Map<string, DerivedMo
   return result;
 }
 
+function deriveUniqueAlbums(plays: NormalizedMockPlay[]): Map<string, DerivedMockAlbum> {
+  const albums = new Map<string, DerivedMockAlbum>();
+
+  for (const play of plays) {
+    const key = getMockAlbumKey(play);
+    let albumEntry = albums.get(key);
+    if (!albumEntry) {
+      albumEntry = {
+        key,
+        name: play.album,
+        artist: play.artist,
+        artistId: play.artistId,
+        lifetimePlays: 0,
+        imageUrl: play.albumImageUrl ?? null,
+        firstPlayedAt: play.playedAt,
+        lastPlayedAt: play.playedAt,
+      };
+      albums.set(key, albumEntry);
+    }
+
+    albumEntry.lifetimePlays += 1;
+    if (new Date(play.playedAt).getTime() < new Date(albumEntry.firstPlayedAt).getTime()) {
+      albumEntry.firstPlayedAt = play.playedAt;
+    }
+    if (new Date(play.playedAt).getTime() > new Date(albumEntry.lastPlayedAt).getTime()) {
+      albumEntry.lastPlayedAt = play.playedAt;
+    }
+    if (!albumEntry.imageUrl && play.albumImageUrl) {
+      albumEntry.imageUrl = play.albumImageUrl;
+    }
+  }
+
+  return albums;
+}
+
 const UNIQUE_TRACKS: Map<string, DerivedMockTrack> = deriveUniqueTracks(NORMALIZED_PLAYS);
 const UNIQUE_ARTISTS: Map<string, DerivedMockArtist> = deriveUniqueArtists(NORMALIZED_PLAYS);
+const UNIQUE_ALBUMS: Map<string, DerivedMockAlbum> = deriveUniqueAlbums(NORMALIZED_PLAYS);
 
 export function getMockSearch(
   query: string,
@@ -206,11 +261,13 @@ export function getMockSearch(
 ): SearchResponse {
   const trimmed = query.trim();
   const normalizedQuery = normalizeForSearch(trimmed);
-  const offset = (page - 1) * SEARCH_RESULT_LIMIT;
-  const end = offset + SEARCH_RESULT_LIMIT;
+  const trackOffset = (page - 1) * SEARCH_TRACK_ROWS;
   const matches = (value: string) => normalizeForSearch(value).includes(normalizedQuery);
 
-  function compare(a: DerivedMockTrack | DerivedMockArtist, b: DerivedMockTrack | DerivedMockArtist) {
+  function compare(
+    a: DerivedMockTrack | DerivedMockArtist | DerivedMockAlbum,
+    b: DerivedMockTrack | DerivedMockArtist | DerivedMockAlbum,
+  ) {
     const recency = Date.parse(b.lastPlayedAt) - Date.parse(a.lastPlayedAt);
     const order = {
       "most-plays": b.lifetimePlays - a.lifetimePlays,
@@ -226,30 +283,60 @@ export function getMockSearch(
   const matchedArtists = [...UNIQUE_ARTISTS.values()]
     .filter((artist) => matches(artist.name))
     .sort(compare);
+  const matchedAlbums = [...UNIQUE_ALBUMS.values()]
+    .filter((album) => matches(album.name))
+    .sort(compare);
   const matchedTracks = [...UNIQUE_TRACKS.values()]
     .filter((track) => matches(track.name) || matches(track.artist))
     .sort(compare);
 
-  const artists: SearchArtistResult[] = matchedArtists.slice(offset, end).map((artist) => ({
-    key: artist.key,
-    name: artist.name,
-    plays: artist.lifetimePlays,
-    imageUrl: artist.imageUrl,
-  }));
-  const tracks: SearchTrackResult[] = matchedTracks.slice(offset, end).map((track) => ({
-    id: track.id,
-    name: track.name,
-    artist: track.artist,
-    album: track.album,
-    plays: track.lifetimePlays,
-    albumImageUrl: track.albumImageUrl,
-  }));
+  const artistTotal = matchedArtists.length;
+  const albumTotal = matchedAlbums.length;
+
+  const { artistOffset, artistLimit, albumOffset, albumLimit } = planSideColumn({
+    artistTotal,
+    albumTotal,
+    sideRows: SEARCH_SIDE_ROWS,
+    page,
+  });
+
+  const artists: SearchArtistResult[] = matchedArtists
+    .slice(artistOffset, artistOffset + artistLimit)
+    .map((artist) => ({
+      key: artist.key,
+      name: artist.name,
+      plays: artist.lifetimePlays,
+      imageUrl: artist.imageUrl,
+    }));
+  const albums: SearchAlbumResult[] = matchedAlbums
+    .slice(albumOffset, albumOffset + albumLimit)
+    .map((album) => ({
+      key: album.key,
+      name: album.name,
+      artist: album.artist,
+      plays: album.lifetimePlays,
+      imageUrl: album.imageUrl,
+    }));
+  const tracks: SearchTrackResult[] = matchedTracks
+    .slice(trackOffset, trackOffset + SEARCH_TRACK_ROWS)
+    .map((track) => ({
+      id: track.id,
+      name: track.name,
+      artist: track.artist,
+      album: track.album,
+      plays: track.lifetimePlays,
+      albumImageUrl: track.albumImageUrl,
+    }));
 
   return {
     query: trimmed,
     artists,
+    albums,
     tracks,
-    hasMore: matchedArtists.length > end || matchedTracks.length > end,
+    hasMore:
+      trackOffset + SEARCH_TRACK_ROWS < matchedTracks.length ||
+      artistOffset + artistLimit < artistTotal ||
+      albumOffset + albumLimit < albumTotal,
   };
 }
 
@@ -353,7 +440,7 @@ function getLocalPlayTimes(plays: NormalizedMockPlay[], timeZone: string) {
 }
 
 export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: string): ProfileData | null {
-  if (!target || (target.kind !== "track" && target.kind !== "artist")) {
+  if (!target || (target.kind !== "track" && target.kind !== "artist" && target.kind !== "album")) {
     return null;
   }
 
@@ -450,6 +537,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       rankedTotal,
       ...cadence,
       artistKey: artistId || undefined,
+      albumKey: getMockAlbumKey(targetLifetimePlays[0]),
       trackStats: {
         artistShare: artistShare(inRangePlayCount, artistPlays),
         artistPlays,
@@ -463,7 +551,114 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     };
   }
 
-  // target.kind === "artist"
+  if (target.kind === "album") {
+    const album = UNIQUE_ALBUMS.get(target.key);
+    if (!album) return null;
+
+    const albumLifetimePlays = NORMALIZED_PLAYS.filter((p) => getMockAlbumKey(p) === target.key);
+
+    const albumInRangePlays = filterPlaysInRange(albumLifetimePlays, cutoffMs);
+    const albumInRangePlayCount = albumInRangePlays.length;
+
+    // Album ranking uses row order (plays DESC, name ASC, key ASC) over in-range plays
+    const albumCounts = new Map<string, { key: string; name: string; count: number }>();
+    for (const p of allInRangePlays) {
+      const key = getMockAlbumKey(p);
+      const existing = albumCounts.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        albumCounts.set(key, { key, name: p.album, count: 1 });
+      }
+    }
+    const albumRankedTotal = albumCounts.size;
+
+    let albumRank: number | null = null;
+    if (albumInRangePlayCount > 0) {
+      const sortedAlbums = [...albumCounts.values()].sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.name.localeCompare(b.name) || a.key.localeCompare(b.key);
+      });
+      const albumIndex = sortedAlbums.findIndex((a) => a.key === target.key);
+      albumRank = albumIndex >= 0 ? albumIndex + 1 : null;
+    }
+
+    const albumCadenceRows = computeCadenceRows(albumLifetimePlays, range, effectiveTz, now);
+    const albumCadence = buildProfileCadence({
+      range,
+      tz: effectiveTz,
+      now,
+      cadenceRows: albumCadenceRows,
+      minDateRow: { log_start_date: album.firstPlayedAt },
+    });
+
+    const albumRecentPlays: ProfilePlay[] = albumInRangePlays
+      .slice()
+      .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime())
+      .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
+      .map((p) => ({
+        id: p.id,
+        trackId: p.trackId,
+        playedAt: p.playedAt,
+        title: p.title,
+        artist: p.artist,
+        album: p.album,
+        durationMs: p.durationMs,
+        albumImageUrl: p.albumImageUrl,
+      }));
+
+    const albumTrackAggregates = new Map<
+      string,
+      { id: string; name: string; plays: number; albumImageUrl: string | null }
+    >();
+    for (const p of albumInRangePlays) {
+      const existing = albumTrackAggregates.get(p.trackId);
+      if (existing) {
+        existing.plays += 1;
+        if (!existing.albumImageUrl && p.albumImageUrl) {
+          existing.albumImageUrl = p.albumImageUrl;
+        }
+      } else {
+        albumTrackAggregates.set(p.trackId, {
+          id: p.trackId,
+          name: p.title,
+          plays: 1,
+          albumImageUrl: p.albumImageUrl,
+        });
+      }
+    }
+
+    const albumTopTracks: ProfileTopTrack[] = [...albumTrackAggregates.values()]
+      .sort((a, b) => {
+        if (b.plays !== a.plays) return b.plays - a.plays;
+        return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+      })
+      .slice(0, PROFILE_ALBUM_PROFILE_TRACKS_LIMIT);
+
+    const albumLocalTimes = getLocalPlayTimes(albumInRangePlays, effectiveTz);
+
+    return {
+      kind: "album",
+      key: album.key,
+      name: album.name,
+      artistName: album.artist,
+      albumName: null,
+      imageUrl: album.imageUrl,
+      range,
+      firstPlayedAt: album.firstPlayedAt,
+      lastPlayedAt: album.lastPlayedAt,
+      plays: albumInRangePlayCount,
+      rank: albumRank,
+      rankedTotal: albumRankedTotal,
+      ...albumCadence,
+      artistKey: album.artistId || undefined,
+      hourOfDay: hourHistogram(albumLocalTimes.map(({ hour }) => hour)),
+      topTracks: albumTopTracks,
+      topAlbums: [],
+      recentPlays: albumRecentPlays,
+    };
+  }
+
   const artist = UNIQUE_ARTISTS.get(target.key);
   if (!artist) return null;
 
@@ -542,9 +737,12 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     })
     .slice(0, PROFILE_TOP_TRACKS_LIMIT);
 
-  const albumAggregates = new Map<string, { id?: string; name: string; plays: number; imageUrl: string | null }>();
+  const albumAggregates = new Map<
+    string,
+    { id?: string; key: string; name: string; plays: number; imageUrl: string | null }
+  >();
   for (const p of targetInRangePlays) {
-    const albumKey = p.albumId ?? p.album;
+    const albumKey = getMockAlbumKey(p);
     const existing = albumAggregates.get(albumKey);
     if (existing) {
       existing.plays += 1;
@@ -554,6 +752,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     } else {
       albumAggregates.set(albumKey, {
         id: p.albumId,
+        key: albumKey,
         name: p.album,
         plays: 1,
         imageUrl: p.albumImageUrl,
@@ -564,9 +763,16 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
   const topAlbums: ProfileTopAlbum[] = [...albumAggregates.values()]
     .sort((a, b) => {
       if (b.plays !== a.plays) return b.plays - a.plays;
-      return a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name) || a.key.localeCompare(b.key);
     })
-    .slice(0, PROFILE_TOP_ALBUMS_LIMIT);
+    .slice(0, PROFILE_TOP_ALBUMS_LIMIT)
+    .map((a) => ({
+      id: a.id,
+      key: a.key,
+      name: a.name,
+      plays: a.plays,
+      imageUrl: a.imageUrl,
+    }));
 
   return {
     kind: "artist",
