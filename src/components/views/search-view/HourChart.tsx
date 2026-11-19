@@ -16,16 +16,37 @@ function hourLabel(hour: number): string {
 const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
 
 // Same frame and bar styling as ActivityChart, so switching views doesn't move the page.
-export function HourChart({ counts, headerAside }: { counts: number[]; headerAside?: React.ReactNode }) {
+export function HourChart({
+  counts,
+  headerAside,
+  heading,
+}: {
+  counts: number[];
+  headerAside?: React.ReactNode;
+  heading?: React.ReactNode;
+}) {
   const peak = peakHour(counts);
   const max = peak === null ? 0 : counts[peak];
 
   return (
     <div>
-      <div className="flex justify-between items-baseline gap-2">
-        <span className={headingClass}>[ WHEN IT PLAYS ]</span>
-        {headerAside}
-      </div>
+      {heading !== undefined ? (
+        headerAside == null ? (
+          heading
+        ) : (
+          <div className="flex justify-between items-baseline gap-2">
+            {heading}
+            {headerAside}
+          </div>
+        )
+      ) : headerAside == null ? (
+        <div className={headingClass}>[ WHEN IT PLAYS ]</div>
+      ) : (
+        <div className="flex justify-between items-baseline gap-2">
+          <span className={headingClass}>[ WHEN IT PLAYS ]</span>
+          {headerAside}
+        </div>
+      )}
       <div role="img" aria-label={peak === null ? "No plays by hour" : `Plays by hour of day, peak ${hourLabel(peak)}`}>
         <div className="flex gap-[2px] items-end h-[80px] w-full">
           {counts.map((count, hour) => {

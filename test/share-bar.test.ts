@@ -79,4 +79,13 @@ test("ActivityChart retains the default heading and supports an aside", () => {
   assert.match(aside, /LONGEST STREAK/);
   const bare = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, label: "PLAYS", showRange: false }));
   assert.match(bare, />\[ PLAYS \]</);
+  const customHeading = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, heading: React.createElement("button", null, "[ OVER TIME ]") }));
+  assert.match(customHeading, /<button>\[ OVER TIME \]/);
+  assert.doesNotMatch(customHeading, /\[ ACTIVITY/);
+});
+
+test("HourChart supports a custom heading", () => {
+  const customHeading = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([2]), heading: React.createElement("button", null, "[ BY HOUR ]") }));
+  assert.match(customHeading, /<button>\[ BY HOUR \]/);
+  assert.doesNotMatch(customHeading, /WHEN IT PLAYS/);
 });

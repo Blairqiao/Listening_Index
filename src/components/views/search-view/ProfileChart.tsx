@@ -8,8 +8,10 @@ import { HourChart } from "./HourChart";
 
 type ChartView = "time" | "hour";
 
-// Same look as the live player's [ SYNTHETIC ] source toggle: one bracketed label naming the current view.
-const toggleClass = "font-mono text-[10px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors";
+// Combined label + toggle button on the left: bracketed view label in the style of the live player's [ SYNTHETIC ] toggle.
+const toggleHeadingClass =
+  "font-mono text-[11px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
+const staticHeadingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {
   range: RangeKey;
@@ -34,22 +36,24 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
   const [view, setView] = useState<ChartView>("time");
   const showHours = hourOfDay !== undefined && view === "hour";
 
-  const toggle = hourOfDay ? (
+  const heading = hourOfDay ? (
     <button
       type="button"
       onClick={() => setView(view === "time" ? "hour" : "time")}
       title="Click to switch between plays over time and plays by hour of day"
-      className={toggleClass}
+      className={toggleHeadingClass}
     >
       {view === "time" ? "[ OVER TIME ]" : "[ BY HOUR ]"}
       <span className="sr-only">{view === "time" ? ", switch to plays by hour" : ", switch to plays over time"}</span>
     </button>
-  ) : undefined;
+  ) : (
+    <div className={staticHeadingClass}>[ PLAYS ]</div>
+  );
 
   return (
     <div>
       {showHours ? (
-        <HourChart counts={hourOfDay} headerAside={toggle} />
+        <HourChart counts={hourOfDay} heading={heading} />
       ) : (
         <ActivityChart
           label="PLAYS"
@@ -58,7 +62,7 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
           monthlyCadence={monthlyCadence}
           isLoading={isLoading}
           visitorTimezone={visitorTimezone}
-          headerAside={toggle}
+          heading={heading}
           showRange={false}
         />
       )}
