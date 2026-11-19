@@ -6,6 +6,7 @@ import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cad
 import { artistShare } from "@/lib/profile-stats";
 import type { RangeKey } from "@/lib/types";
 import {
+  PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
@@ -86,6 +87,7 @@ export async function getProfile(
     const { artist_id: artistId, artist_group_key: artistGroupKey,
       album_id: albumId, album_group_key: albumGroupKey } = trackRow;
     const activeArtistKey = isEnriched ? artistId : artistGroupKey;
+    const activeAlbumKey = isEnriched ? albumId : albumGroupKey;
     const artistFilter = isEnriched
       ? sql`t.artist_id = ${activeArtistKey}`
       : sql`t.artist_group_key = ${activeArtistKey}`;
@@ -203,6 +205,7 @@ export async function getProfile(
       rankedTotal,
       ...cadence,
       artistKey: (activeArtistKey ?? artistId ?? artistGroupKey ?? undefined) as string | undefined,
+      albumKey: (activeAlbumKey ?? albumId ?? albumGroupKey ?? undefined) as string | undefined,
       trackStats: {
         artistShare: artistShare(plays, artistPlays),
         artistPlays,
@@ -214,6 +217,10 @@ export async function getProfile(
       topAlbums: [],
       recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
     };
+  }
+
+  if (target.kind === "album") {
+    return getAlbumProfile(target, range, safeTz, timeFilter);
   }
 
   // Artist profile: resolve either key form with active identity form taking precedence.
@@ -327,6 +334,7 @@ export async function getProfile(
     sql`
       SELECT
         ${isEnriched ? sql`t.album_id` : sql`MAX(t.album_id)`} AS id,
+        ${albumGroupCol} AS key,
         COALESCE(MAX(al.name), MAX(t.album_name), '') AS name,
         COUNT(p.id)::int AS plays,
         MAX(al.image_url) AS image_url
@@ -387,6 +395,7 @@ export async function getProfile(
 
   const topAlbums: ProfileTopAlbum[] = topAlbumRows.map((row) => ({
     id: row.id ? String(row.id) : undefined,
+    key: row.key ? String(row.key) : undefined,
     name: String(row.name),
     plays: Number(row.plays),
     imageUrl: (row.image_url as string | null) ?? null,
@@ -409,6 +418,182 @@ export async function getProfile(
     hourOfDay: toHourOfDay(hourRows),
     topTracks,
     topAlbums,
+    recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
+  };
+}
+
+async function getAlbumProfile(
+  target: ProfileTarget,
+  range: RangeKey,
+  safeTz: string,
+  timeFilter: ReturnType<ReturnType<typeof getDb>>
+): Promise<ProfileData | null> {
+  const sql = getDb();
+  const isEnriched = await isCatalogFullyEnriched();
+  const resolveRows = isEnriched
+    ? await sql`
+        SELECT COALESCE(
+          (SELECT id FROM albums WHERE id = ${target.key} LIMIT 1),
+          (SELECT MAX(t.album_id) FROM tracks t WHERE t.album_group_key = ${target.key} AND t.album_id IS NOT NULL)
+        ) AS resolved_key;
+      `
+    : await sql`
+        SELECT COALESCE(
+          (SELECT t.album_group_key FROM tracks t WHERE t.album_group_key = ${target.key} LIMIT 1),
+          (SELECT MAX(t.album_group_key) FROM tracks t WHERE t.album_id = ${target.key} AND t.album_group_key IS NOT NULL)
+        ) AS resolved_key;
+      `;
+
+  const resolvedKey = resolveRows[0]?.resolved_key ? String(resolveRows[0].resolved_key) : null;
+  if (!resolvedKey) {
+    return null;
+  }
+
+  const albumFilter = isEnriched
+    ? sql`t.album_id = ${resolvedKey}`
+    : sql`t.album_group_key = ${resolvedKey}`;
+  const albumGroupCol = isEnriched ? sql`t.album_id` : sql`t.album_group_key`;
+  const albumFilterForRank = isEnriched
+    ? sql`t.album_id IS NOT NULL`
+    : sql`t.album_group_key IS NOT NULL`;
+  const artistKeyCol = isEnriched ? sql`t.artist_id` : sql`t.artist_group_key`;
+
+  const lifetimeRows = await sql`
+    SELECT
+      COALESCE(MAX(al.name), MAX(t.album_name), '') AS name,
+      COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist_name,
+      MAX(${artistKeyCol}) AS artist_key,
+      MAX(al.image_url) AS image_url,
+      MIN(p.played_at) AS first_played_at,
+      MAX(p.played_at) AS last_played_at,
+      COUNT(p.id)::int AS lifetime_plays
+    FROM plays p
+    JOIN tracks t ON p.track_id = t.id
+    LEFT JOIN albums al ON t.album_id = al.id
+    LEFT JOIN artists ar ON t.artist_id = ar.id
+    WHERE ${albumFilter};
+  `;
+  const lifetimeRow = lifetimeRows[0];
+  if (!lifetimeRow || Number(lifetimeRow.lifetime_plays) === 0) {
+    return null;
+  }
+
+  const scope: CadenceScope = {
+    kind: "album",
+    column: isEnriched ? "album_id" : "album_group_key",
+    value: resolvedKey,
+  };
+
+  const [
+    rankAndPlaysRows,
+    rankedTotalRows,
+    cadenceRows,
+    topTrackRows,
+    recentPlayRows,
+    hourRows,
+  ] = await Promise.all([
+    sql`
+      SELECT plays::int, rank::int FROM (
+        SELECT
+          ${albumGroupCol} AS album_key,
+          COUNT(p.id) AS plays,
+          ROW_NUMBER() OVER (
+            ORDER BY COUNT(p.id) DESC, COALESCE(MAX(al.name), MAX(t.album_name), '') ASC, ${albumGroupCol} ASC
+          ) AS rank
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        LEFT JOIN albums al ON t.album_id = al.id
+        WHERE ${timeFilter} AND ${albumFilterForRank}
+        GROUP BY ${albumGroupCol}
+      ) r
+      WHERE r.album_key = ${resolvedKey};
+    `,
+    sql`
+      SELECT ${isEnriched ? sql`COUNT(DISTINCT t.album_id)::int` : sql`COUNT(DISTINCT t.album_group_key)::int`} AS total
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${albumFilterForRank};
+    `,
+    buildCadenceQuery(range, safeTz, scope),
+    sql`
+      SELECT
+        t.id,
+        t.name,
+        COUNT(p.id)::int AS plays,
+        al.image_url AS album_image_url
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      WHERE ${timeFilter} AND ${albumFilter}
+      GROUP BY t.id, t.name, al.image_url
+      ORDER BY plays DESC, t.name ASC, t.id ASC
+      LIMIT ${PROFILE_ALBUM_PROFILE_TRACKS_LIMIT};
+    `,
+    sql`
+      SELECT
+        p.id::text,
+        p.played_at,
+        p.track_id,
+        al.image_url AS album_image_url,
+        t.name AS title,
+        COALESCE(ar.name, t.artist_name, '') AS artist,
+        COALESCE(al.name, t.album_name, '') AS album,
+        t.duration_ms
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      LEFT JOIN artists ar ON t.artist_id = ar.id
+      WHERE ${timeFilter} AND ${albumFilter}
+      ORDER BY p.played_at DESC, p.id DESC
+      LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
+    `,
+    sql`
+      SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${albumFilter}
+      GROUP BY 1;
+    `,
+  ]);
+
+  const plays = Number(rankAndPlaysRows[0]?.plays ?? 0);
+  const rank =
+    plays > 0 && rankAndPlaysRows[0]?.rank != null
+      ? Number(rankAndPlaysRows[0].rank)
+      : null;
+  const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
+
+  const cadence = buildProfileCadence({
+    range,
+    tz: safeTz,
+    cadenceRows: cadenceRows as Record<string, unknown>[],
+    minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
+  });
+
+  const topTracks: ProfileTopTrack[] = topTrackRows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    plays: Number(row.plays),
+    albumImageUrl: (row.album_image_url as string | null) ?? null,
+  }));
+
+  return {
+    kind: "album",
+    key: resolvedKey,
+    name: String(lifetimeRow.name),
+    artistName: (lifetimeRow.artist_name as string | null) ?? null,
+    albumName: null,
+    imageUrl: (lifetimeRow.image_url as string | null) ?? null,
+    range,
+    firstPlayedAt: lifetimeRow.first_played_at ? toIso(lifetimeRow.first_played_at) : null,
+    lastPlayedAt: lifetimeRow.last_played_at ? toIso(lifetimeRow.last_played_at) : null,
+    plays,
+    rank,
+    rankedTotal,
+    ...cadence,
+    artistKey: lifetimeRow.artist_key ? String(lifetimeRow.artist_key) : undefined,
+    hourOfDay: toHourOfDay(hourRows),
+    topTracks,
+    topAlbums: [],
     recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
   };
 }
