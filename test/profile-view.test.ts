@@ -129,7 +129,8 @@ test("ProfileView: SSR ready state for artist profile", () => {
   );
 
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
-  assert.ok(markup.includes("[ PLAYS / 1M ]"), "Chart must use PLAYS label with range");
+  assert.ok(markup.includes("[ PLAYS ]"), "Chart must use PLAYS label");
+  assert.doesNotMatch(markup, /PLAYS \/ 1M/);
   assert.ok(markup.includes('role="img"'), "Chart must retain role=img accessibility attribute");
   assert.ok(
     markup.includes('aria-label="Activity cadence histogram"'),
@@ -142,8 +143,8 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.ok(markup.includes("18:30"), "Must render formatted play time in UTC");
   assert.match(markup, /\[ SHARE OF PLAYS \]/);
   assert.doesNotMatch(markup, /WHEN IT PLAYS/);
-  assert.match(markup, /<button type="button" aria-pressed="true"[^>]*>OVER TIME<\/button>/);
-  assert.match(markup, /<button type="button" aria-pressed="false"[^>]*>BY HOUR<\/button>/);
+  assert.match(markup, /<button type="button"[^>]*class="[^"]*text-music-accent[^"]*"[^>]*>\[ OVER TIME \]<span class="sr-only">, switch to plays by hour<\/span><\/button>/);
+  assert.doesNotMatch(markup, /BY HOUR|aria-pressed/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF PLAYS \]/);
   assert.ok(markup.indexOf("SHARE OF PLAYS") < markup.indexOf("TOP TRACKS"));
   assert.match(markup, /title="Other Tracks"/);
@@ -175,7 +176,7 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
   assert.match(markup, /50% · 25 PLAYS/);
   assert.match(markup, /OF 50/);
-  assert.match(markup, /\[ PLAYS \/ 1M \].*?OVER TIME.*?BY HOUR/);
+  assert.match(markup, /\[ PLAYS \].*?\[ OVER TIME \]/);
   assert.match(markup, /Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
   assert.doesNotMatch(markup, /WHEN IT PLAYS|PEAK 22:00/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF RADIOHEAD \]/);
@@ -221,7 +222,7 @@ test("ProfileView: SSR zero plays state renders empty message and retains chart"
   );
 
   assert.ok(markup.includes("Radiohead"), "Must keep header artist name");
-  assert.ok(markup.includes("[ PLAYS / 1M ]"), "Must keep chart header");
+  assert.ok(markup.includes("[ PLAYS ]"), "Must keep chart header");
   assert.ok(markup.includes('role="img"'), "Must retain chart img role");
   assert.equal(markup.split("[ NO PLAYS IN THIS RANGE ]").length - 1, 1);
   assert.ok(
@@ -293,7 +294,7 @@ test("ProfileView hides the album section for a single ranked Track", () => {
     onOpenProfile: () => {},
   }));
   assert.doesNotMatch(markup, /FROM THIS ALBUM/);
-  assert.match(markup, /BY HOUR/);
+  assert.match(markup, /\[ OVER TIME \]/);
 });
 
 test("ProfileView hides the Track story sections at zero plays", () => {
@@ -305,7 +306,7 @@ test("ProfileView hides the Track story sections at zero plays", () => {
   }));
   assert.match(markup, /NO PLAYS IN THIS RANGE/);
   assert.match(markup, /Weird Fishes/);
-  assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|BY HOUR|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
+  assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|OVER TIME|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
 
 test("ProfileView lets the Track album list and recent plays run their full height on desktop", () => {

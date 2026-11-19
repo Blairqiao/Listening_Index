@@ -8,14 +8,8 @@ import { HourChart } from "./HourChart";
 
 type ChartView = "time" | "hour";
 
-const chipClass = "font-mono text-[11px] tracking-[0.08em] uppercase whitespace-nowrap px-2 py-[1px] rounded-none border bg-transparent cursor-pointer transition-none focus:outline-none focus-visible:border-music-accent focus-visible:text-music-accent";
-const activeChip = "border-music-accent text-music-accent";
-const idleChip = "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32]";
-
-const VIEWS: { id: ChartView; label: string }[] = [
-  { id: "time", label: "OVER TIME" },
-  { id: "hour", label: "BY HOUR" },
-];
+// Same look as the live player's [ SYNTHETIC ] source toggle: one bracketed label naming the current view.
+const toggleClass = "font-mono text-[10px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors";
 
 export interface ProfileChartProps {
   range: RangeKey;
@@ -41,23 +35,21 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
   const showHours = hourOfDay !== undefined && view === "hour";
 
   const toggle = hourOfDay ? (
-    <div className="flex gap-1.5 shrink-0">
-      {VIEWS.map(({ id, label }) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={view === id}
-          onClick={() => setView(id)}
-          className={`${chipClass} ${view === id ? activeChip : idleChip}`}
-        >{label}</button>
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={() => setView(view === "time" ? "hour" : "time")}
+      title="Click to switch between plays over time and plays by hour of day"
+      className={toggleClass}
+    >
+      {view === "time" ? "[ OVER TIME ]" : "[ BY HOUR ]"}
+      <span className="sr-only">{view === "time" ? ", switch to plays by hour" : ", switch to plays over time"}</span>
+    </button>
   ) : undefined;
 
   return (
     <div>
       {showHours ? (
-        <HourChart counts={hourOfDay} range={range} headerAside={toggle} />
+        <HourChart counts={hourOfDay} headerAside={toggle} />
       ) : (
         <ActivityChart
           label="PLAYS"
@@ -67,6 +59,7 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
           isLoading={isLoading}
           visitorTimezone={visitorTimezone}
           headerAside={toggle}
+          showRange={false}
         />
       )}
       {hourOfDay && <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 tracking-[0.08em] text-[#8A8A83] tabular-nums">{readout(showHours, hourOfDay, streakDays)}</div>}

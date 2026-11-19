@@ -9,8 +9,8 @@ import { buildShareSegments, hourHistogram, OTHER_SEGMENT_ID } from "../src/lib/
 
 test("HourChart draws 24 hour bars under the range heading", () => {
   const aside = React.createElement("span", null, "ASIDE");
-  const markup = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([2, 22, 22]), range: "1m", headerAside: aside }));
-  assert.match(markup, /\[ WHEN IT PLAYS \/ 1M \]/);
+  const markup = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([2, 22, 22]), headerAside: aside }));
+  assert.match(markup, /\[ WHEN IT PLAYS \]/);
   assert.match(markup, /ASIDE/);
   assert.match(markup, /aria-label="Plays by hour of day, peak 22:00"/);
   assert.match(markup, /title="22:00 · 2 plays"/);
@@ -18,8 +18,7 @@ test("HourChart draws 24 hour bars under the range heading", () => {
   assert.match(markup, /h-\[80px\]/);
   assert.match(markup, />00<.*>06<.*>12<.*>18<.*>23</);
 
-  const empty = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([]), range: "all" }));
-  assert.match(empty, /\[ WHEN IT PLAYS \/ ALL \]/);
+  const empty = renderToStaticMarkup(React.createElement(HourChart, { counts: hourHistogram([]) }));
   assert.match(empty, /aria-label="No plays by hour"/);
 });
 
@@ -78,4 +77,6 @@ test("ActivityChart retains the default heading and supports an aside", () => {
   assert.match(markup, /<div class="font-mono text-\[11px\] tracking-\[0.14em\] text-\[#5A5A55\] mb-2 select-none">\[ ACTIVITY \/ 1D \]<\/div>/);
   const aside = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, headerAside: "LONGEST STREAK" }));
   assert.match(aside, /LONGEST STREAK/);
+  const bare = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, label: "PLAYS", showRange: false }));
+  assert.match(bare, />\[ PLAYS \]</);
 });
