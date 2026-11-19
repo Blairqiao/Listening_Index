@@ -336,6 +336,22 @@ function computeCadenceRows(
   return [...counts.entries()].map(([ym, count]) => ({ ym, count }));
 }
 
+function getLocalPlayTimes(plays: NormalizedMockPlay[], timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+  return plays.map(({ playedAt }) => {
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(playedAt))
+      .map(({ type, value }) => [type, value]));
+    return { day: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+  });
+}
+
 export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: string): ProfileData | null {
   if (!target || (target.kind !== "track" && target.kind !== "artist")) {
     return null;
@@ -393,22 +409,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       }));
 
     const { artistId, albumId, album } = targetLifetimePlays[0];
-    const localTime = new Intl.DateTimeFormat("en-CA", {
-      timeZone: effectiveTz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      hourCycle: "h23",
-    });
-    const days: string[] = [];
-    const hours: number[] = [];
-    for (const play of targetInRangePlays) {
-      const parts = Object.fromEntries(localTime.formatToParts(new Date(play.playedAt))
-        .map(({ type, value }) => [type, value]));
-      days.push(`${parts.year}-${parts.month}-${parts.day}`);
-      hours.push(Number(parts.hour) % 24);
-    }
+    const localTimes = getLocalPlayTimes(targetInRangePlays, effectiveTz);
 
     let artistPlays = 0;
     const albumCounts = new Map<string, ProfileAlbumTrack>();
@@ -452,9 +453,9 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       trackStats: {
         artistShare: artistShare(inRangePlayCount, artistPlays),
         artistPlays,
-        longestStreakDays: longestStreak(days),
+        longestStreakDays: longestStreak(localTimes.map(({ day }) => day)),
       },
-      hourOfDay: hourHistogram(hours),
+      hourOfDay: hourHistogram(localTimes.map(({ hour }) => hour)),
       albumTracks,
       topTracks: [],
       topAlbums: [],
@@ -581,6 +582,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     rank,
     rankedTotal,
     ...cadence,
+    hourOfDay: hourHistogram(getLocalPlayTimes(targetInRangePlays, effectiveTz).map(({ hour }) => hour)),
     topTracks,
     topAlbums,
     recentPlays,

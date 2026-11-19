@@ -196,3 +196,28 @@ test("Track stats and album siblings follow the profile range and timezone", () 
   assert.ok(day.plays < utc.plays);
   assert.equal(day.hourOfDay?.reduce((sum, count) => sum + count, 0), day.plays);
 });
+
+test("Artist hours follow the timezone and match the Track share denominator", () => {
+  const key = getMockSearch("").artists[0].key;
+  const target = { kind: "artist", key } as const;
+  const utc = getMockProfile(target, "all", "UTC")!;
+  const tokyo = getMockProfile(target, "all", "Asia/Tokyo")!;
+  assert.ok(utc.plays > 0);
+  assert.ok(utc.hourOfDay && tokyo.hourOfDay);
+  for (const counts of [utc.hourOfDay, tokyo.hourOfDay]) {
+    assert.equal(counts.length, 24);
+    assert.equal(counts.reduce((sum, count) => sum + count, 0), utc.plays);
+  }
+  assert.notDeepEqual(utc.hourOfDay, tokyo.hourOfDay);
+
+  const track = getMockProfile({ kind: "track", key: utc.topTracks[0].id }, "all", "UTC");
+  assert.equal(track?.trackStats?.artistPlays, utc.plays);
+});
+
+test("Artist hours are zero when the range has no Plays", () => {
+  const artist = Object.values(CATALOG)
+    .map(({ artistId: key }) => getMockProfile({ kind: "artist", key }, "1d", "UTC"))
+    .find((profile) => profile?.plays === 0);
+  assert.ok(artist);
+  assert.deepEqual(artist.hourOfDay, Array(24).fill(0));
+});
