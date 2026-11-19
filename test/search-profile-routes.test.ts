@@ -19,12 +19,12 @@ function loadSearchRoute(stubs: SearchRouteStubs = {}) {
 
   const defaultSearchCatalog = async (query: string): Promise<SearchResponse> => {
     searchCatalogCalls.push(query);
-    return { query, artists: [], tracks: [], hasMore: false };
+    return { query, artists: [], albums: [], tracks: [], hasMore: false };
   };
 
   const defaultMockSearch = (query: string): SearchResponse => {
     mockSearchCalls.push(query);
-    return { query, artists: [], tracks: [], hasMore: false };
+    return { query, artists: [], albums: [], tracks: [], hasMore: false };
   };
 
   const mergedStubs = {
@@ -54,7 +54,7 @@ function createDummyProfile(target: ProfileTarget, range: RangeKey): ProfileData
     kind: target.kind,
     key: target.key,
     name: 'Sample Name',
-    artistName: target.kind === 'track' ? 'Sample Artist' : null,
+    artistName: target.kind === 'track' || target.kind === 'album' ? 'Sample Artist' : null,
     albumName: target.kind === 'track' ? 'Sample Album' : null,
     imageUrl: null,
     range,
@@ -113,7 +113,7 @@ test('search route accepts an empty query and passes sort and page through', asy
   const { route } = loadSearchRoute({
     searchCatalog: async (query, sort, page) => {
       calls.push([query, sort, page]);
-      return { query, artists: [], tracks: [], hasMore: false };
+      return { query, artists: [], albums: [], tracks: [], hasMore: false };
     },
   });
 
@@ -147,6 +147,7 @@ test('search route with configured database trims query and returns database res
     query: 'radio',
     hasMore: false,
     artists: [{ key: 'art_1', name: 'Radiohead', plays: 100, imageUrl: null }],
+    albums: [],
     tracks: [{ id: 'tr_1', name: 'Reckoner', artist: 'Radiohead', album: 'In Rainbows', plays: 50, albumImageUrl: null }],
   };
 
@@ -171,6 +172,7 @@ test('search route falls back to mock when database is unconfigured', async () =
     query: 'radio',
     hasMore: false,
     artists: [{ key: 'art_mock', name: 'Radiohead', plays: 10, imageUrl: null }],
+    albums: [],
     tracks: [],
   };
 
@@ -197,6 +199,7 @@ test('search route forces mock when FORCE_MOCK_DATA is true despite configured d
       query: 'bjork',
       hasMore: false,
       artists: [],
+      albums: [],
       tracks: [],
     };
 
@@ -243,6 +246,8 @@ test('profile route rejects missing or empty target with 400', async () => {
     'http://127.0.0.1:8888/api/listening/profile',
     'http://127.0.0.1:8888/api/listening/profile?track=',
     'http://127.0.0.1:8888/api/listening/profile?artist=%20%20',
+    'http://127.0.0.1:8888/api/listening/profile?album=',
+    'http://127.0.0.1:8888/api/listening/profile?album=%20%20',
     'http://127.0.0.1:8888/api/listening/profile?track=%00',
   ];
 
@@ -250,7 +255,7 @@ test('profile route rejects missing or empty target with 400', async () => {
     const res = await route.GET(new NextRequest(url));
     assert.equal(res.status, 400, `Expected 400 for ${url}`);
     assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    assert.deepEqual(await res.json(), { error: 'Missing track or artist.' });
+    assert.deepEqual(await res.json(), { error: 'Missing track, artist, or album.' });
   }
 
   assert.equal(getProfileCalls.length, 0);
@@ -370,6 +375,45 @@ test('profile route handles unexpected runtime errors with 500', async () => {
   const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/profile?track=track_1'));
   assert.equal(res.status, 500);
   assert.deepEqual(await res.json(), { error: 'Internal Server Error' });
+});
+
+test('profile route passes album target through to database query and returns profile shape', async () => {
+  const { route, getProfileCalls } = loadProfileRoute({ isDbConfigured: () => true });
+
+  const url = 'http://127.0.0.1:8888/api/listening/profile?album=alb_in_rainbows&prange=6m&tz=America/Chicago';
+  const res = await route.GET(new NextRequest(url));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+  const expectedProfile = createDummyProfile({ kind: 'album', key: 'alb_in_rainbows' }, '6m');
+  assert.deepEqual(await res.json(), expectedProfile);
+
+  assert.equal(getProfileCalls.length, 1);
+  assert.deepEqual(getProfileCalls[0], {
+    target: { kind: 'album', key: 'alb_in_rainbows' },
+    range: '6m',
+    tz: 'America/Chicago',
+  });
+});
+
+test('profile route passes album target through to mock profile when database is unconfigured', async () => {
+  const { route, getProfileCalls, mockProfileCalls } = loadProfileRoute({ isDbConfigured: () => false });
+
+  const url = 'http://127.0.0.1:8888/api/listening/profile?album=alb_mock&prange=1m&tz=UTC';
+  const res = await route.GET(new NextRequest(url));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+  const expectedProfile = createDummyProfile({ kind: 'album', key: 'alb_mock' }, '1m');
+  assert.deepEqual(await res.json(), expectedProfile);
+
+  assert.equal(getProfileCalls.length, 0);
+  assert.equal(mockProfileCalls.length, 1);
+  assert.deepEqual(mockProfileCalls[0], {
+    target: { kind: 'album', key: 'alb_mock' },
+    range: '1m',
+    tz: 'UTC',
+  });
 });
 
 test('queries barrel exports searchCatalog and getProfile', async () => {
