@@ -118,6 +118,70 @@ const mockTrackProfile: ProfileData = {
   ],
 };
 
+const mockAlbumProfile: ProfileData = {
+  ...mockArtistProfile,
+  kind: "album",
+  key: "5vkqYmiPBYLaalcmjujWxK",
+  name: "In Rainbows",
+  artistName: "Radiohead",
+  artistKey: mockArtistProfile.key,
+  imageUrl: mockArtistProfile.topAlbums[0].imageUrl,
+  topAlbums: [],
+};
+
+test("ProfileView: Album header, Track shares and Recent Plays", () => {
+  const props = { status: "ready", visitorTimezone: "UTC", onOpenProfile: () => {} } as const;
+  const markup = renderToStaticMarkup(React.createElement(ProfileView, { ...props, data: mockAlbumProfile }));
+
+  assert.match(markup, /<a href="https:\/\/open\.spotify\.com\/album\/5vkqYmiPBYLaalcmjujWxK" target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>In Rainbows<\/span>/);
+  assert.match(markup, /w-\[88px\]|width="88"/);
+  assert.match(markup, /<button[^>]*>Radiohead<\/button>/);
+  assert.match(markup, /\[ OVER TIME \]/);
+  assert.match(markup, /\[ SHARE OF PLAYS \]/);
+  assert.match(markup, /\[ TOP TRACKS \]/);
+  assert.match(markup, /w-\[34px\][^>]*>50%<\/span>/);
+  assert.match(markup, /\[ RECENT PLAYS \]/);
+  const recentPlays = markup.slice(markup.indexOf("[ RECENT PLAYS ]"));
+  assert.match(recentPlays, /aria-label="Open Track profile for Weird Fishes \/ Arpeggi"/);
+  assert.doesNotMatch(recentPlays, />In Rainbows</);
+  assert.doesNotMatch(markup, /\[ TOP ALBUMS \]|\[ SHARE OF RADIOHEAD \]|LONGEST STREAK/);
+
+  const groupKeyMarkup = renderToStaticMarkup(React.createElement(ProfileView, {
+    ...props,
+    data: { ...mockAlbumProfile, key: "radiohead::in rainbows", artistKey: undefined },
+  }));
+  assert.match(groupKeyMarkup, />In Rainbows</);
+  assert.match(groupKeyMarkup, />Radiohead</);
+  assert.doesNotMatch(groupKeyMarkup, /open\.spotify\.com|<button[^>]*>Radiohead<\/button>/);
+});
+
+test("ProfileView links Artist and Track Album names only when keyed", () => {
+  const props = { status: "ready", visitorTimezone: "UTC", onOpenProfile: () => {} } as const;
+  const keyedArtist = renderToStaticMarkup(React.createElement(ProfileView, {
+    ...props,
+    data: {
+      ...mockArtistProfile,
+      topAlbums: [
+        { ...mockArtistProfile.topAlbums[0], key: "radiohead::in rainbows" },
+        { name: "Unkeyed Album", plays: 8, imageUrl: null },
+      ],
+    },
+  }));
+  const albumRows = keyedArtist.slice(keyedArtist.indexOf("[ TOP ALBUMS ]"), keyedArtist.indexOf("[ RECENT PLAYS ]"));
+  assert.match(albumRows, /<button[^>]*>(?:(?!<\/button>).)*>In Rainbows<\/span>.*?<\/button>/);
+  assert.match(albumRows, />Unkeyed Album<\/span>/);
+  assert.doesNotMatch(albumRows, /<button[^>]*>(?:(?!<\/button>).)*>Unkeyed Album<\/span>/);
+
+  const keyedTrack = renderToStaticMarkup(React.createElement(ProfileView, {
+    ...props,
+    data: { ...mockTrackProfile, albumKey: "radiohead::in rainbows" },
+  }));
+  const unkeyedTrack = renderToStaticMarkup(React.createElement(ProfileView, { ...props, data: mockTrackProfile }));
+  assert.match(keyedTrack, /<button[^>]*>In Rainbows<\/button>/);
+  assert.match(unkeyedTrack, />In Rainbows<\/div>/);
+  assert.doesNotMatch(unkeyedTrack, /<button[^>]*>In Rainbows<\/button>/);
+});
+
 test("ProfileView: SSR ready state for artist profile", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
