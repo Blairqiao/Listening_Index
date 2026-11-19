@@ -129,8 +129,8 @@ test("ProfileView: SSR ready state for artist profile", () => {
   );
 
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
-  assert.ok(markup.includes("[ PLAYS ]"), "Chart must use PLAYS label");
-  assert.doesNotMatch(markup, /PLAYS \/ 1M/);
+  assert.ok(markup.includes("[ OVER TIME ]"), "Chart must use [ OVER TIME ] toggle heading");
+  assert.doesNotMatch(markup, /\[ PLAYS \]|WHEN IT PLAYS|PLAYS \/ 1M/);
   assert.ok(markup.includes('role="img"'), "Chart must retain role=img accessibility attribute");
   assert.ok(
     markup.includes('aria-label="Activity cadence histogram"'),
@@ -142,7 +142,6 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.ok(markup.includes("In Rainbows"), "Must render album name for artist profile");
   assert.ok(markup.includes("18:30"), "Must render formatted play time in UTC");
   assert.match(markup, /\[ SHARE OF PLAYS \]/);
-  assert.doesNotMatch(markup, /WHEN IT PLAYS/);
   assert.match(markup, /<button type="button"[^>]*class="[^"]*text-music-accent[^"]*"[^>]*>\[ OVER TIME \]<span class="sr-only">, switch to plays by hour<\/span><\/button>/);
   assert.doesNotMatch(markup, /BY HOUR|aria-pressed/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF PLAYS \]/);
@@ -176,9 +175,8 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
   assert.match(markup, /50% · 25 PLAYS/);
   assert.match(markup, /OF 50/);
-  assert.match(markup, /\[ PLAYS \].*?\[ OVER TIME \]/);
-  assert.match(markup, /Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
-  assert.doesNotMatch(markup, /WHEN IT PLAYS|PEAK 22:00/);
+  assert.match(markup, /\[ OVER TIME \].*?Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
+  assert.doesNotMatch(markup, /\[ PLAYS \]|WHEN IT PLAYS|PEAK 22:00/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF RADIOHEAD \]/);
   assert.ok(markup.indexOf("SHARE OF RADIOHEAD") < markup.indexOf("FROM THIS ALBUM"));
   assert.match(markup, /FROM THIS ALBUM/);

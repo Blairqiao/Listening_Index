@@ -14,6 +14,7 @@ export interface ActivityChartProps {
   headerAside?: React.ReactNode;
   showRange?: boolean;
   visitorTimezone?: string;
+  heading?: React.ReactNode;
 }
 
 const EMPTY_CADENCE_BAR_COUNTS: Record<RangeKey, number> = {
@@ -34,6 +35,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   headerAside,
   showRange = true,
   visitorTimezone: propTimezone,
+  heading: headingProp,
 }) => {
   let contextTimezone = "UTC";
   try {
@@ -75,15 +77,24 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       : "";
 
   const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
-  const heading = showRange ? `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]` : `[ ${label} ]`;
+  const defaultHeadingText = showRange ? `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]` : `[ ${label} ]`;
 
   return (
     <div>
-      {headerAside == null ? (
-        <div className={headingClass}>{heading}</div>
+      {headingProp !== undefined ? (
+        headerAside == null ? (
+          headingProp
+        ) : (
+          <div className="flex justify-between items-baseline gap-2">
+            {headingProp}
+            {headerAside}
+          </div>
+        )
+      ) : headerAside == null ? (
+        <div className={headingClass}>{defaultHeadingText}</div>
       ) : (
         <div className="flex justify-between items-baseline gap-2">
-          <span className={headingClass}>{heading}</span>
+          <span className={headingClass}>{defaultHeadingText}</span>
           {headerAside}
         </div>
       )}
