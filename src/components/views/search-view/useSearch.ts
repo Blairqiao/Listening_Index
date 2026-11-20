@@ -1,11 +1,23 @@
 import { useState, useEffect } from "react";
-import { DEFAULT_SEARCH_SORT, type SearchResponse, type SearchSort } from "@/lib/search-types";
+import {
+  DEFAULT_SEARCH_FILTER,
+  DEFAULT_SEARCH_SORT,
+  type SearchFilter,
+  type SearchResponse,
+  type SearchSort,
+} from "@/lib/search-types";
 import { checkSearchQuery, type SearchQueryCheck } from "@/lib/search-utils";
 
 export type SearchStatus = "idle" | "loading" | "ready" | "error";
 
 const SEARCH_CACHE_MAX = 50;
 const searchCache = new Map<string, SearchResponse>();
+let cacheGeneration = 0;
+
+export function clearSearchCache(): void {
+  searchCache.clear();
+  cacheGeneration++;
+}
 
 function setInCache(key: string, value: SearchResponse): void {
   if (searchCache.has(key)) {
@@ -19,25 +31,37 @@ function setInCache(key: string, value: SearchResponse): void {
   searchCache.set(key, value);
 }
 
-export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT, page = 1): {
+export function useSearch(
+  query: string,
+  sort: SearchSort = DEFAULT_SEARCH_SORT,
+  page = 1,
+  filter: SearchFilter = DEFAULT_SEARCH_FILTER,
+): {
   status: SearchStatus;
   data: SearchResponse | null;
   check: SearchQueryCheck;
 } {
   const check = checkSearchQuery(query);
   const requestUrl = check.ok
-    ? "/api/listening/search?" + new URLSearchParams({ q: check.query, sort, page: String(page) })
+    ? "/api/listening/search?" +
+      new URLSearchParams({
+        q: check.query,
+        sort,
+        page: String(page),
+        type: filter,
+      })
     : null;
 
   const [lastReadyData, setLastReadyData] = useState<SearchResponse | null>(null);
   const [errorUrl, setErrorUrl] = useState<string | null>(null);
+  const [errorGeneration, setErrorGeneration] = useState<number>(cacheGeneration);
   const [previousRequestUrl, setPreviousRequestUrl] = useState<string | null>(requestUrl);
 
   // Transition adjustment during render when effective query or invalid state changes
   if (requestUrl !== previousRequestUrl) {
     setPreviousRequestUrl(requestUrl);
     setErrorUrl(null);
-    if (requestUrl === null || (check.ok && check.query === "")) {
+    if (requestUrl === null) {
       setLastReadyData(null);
     }
   }
@@ -49,6 +73,7 @@ export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT,
   }
 
   const delay = check.ok && check.query === "" ? 0 : 250;
+  const currentGeneration = cacheGeneration;
 
   useEffect(() => {
     if (!requestUrl) {
@@ -71,14 +96,15 @@ export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT,
         );
 
         if (!res.ok) {
-          if (!controller.signal.aborted) {
+          if (!controller.signal.aborted && currentGeneration === cacheGeneration) {
             setErrorUrl(requestUrl);
+            setErrorGeneration(currentGeneration);
           }
           return;
         }
 
         const json: SearchResponse = await res.json();
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || currentGeneration !== cacheGeneration) {
           return;
         }
 
@@ -86,10 +112,11 @@ export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT,
         setLastReadyData(json);
         setErrorUrl(null);
       } catch (err: unknown) {
-        if ((err as Error)?.name === "AbortError" || controller.signal.aborted) {
+        if ((err as Error)?.name === "AbortError" || controller.signal.aborted || currentGeneration !== cacheGeneration) {
           return;
         }
         setErrorUrl(requestUrl);
+        setErrorGeneration(currentGeneration);
       }
     }, delay);
 
@@ -97,7 +124,7 @@ export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT,
       clearTimeout(timer);
       controller.abort();
     };
-  }, [requestUrl, delay]);
+  }, [requestUrl, delay, currentGeneration]);
 
   if (!check.ok) {
     return {
@@ -115,7 +142,7 @@ export function useSearch(query: string, sort: SearchSort = DEFAULT_SEARCH_SORT,
     };
   }
 
-  if (errorUrl === requestUrl) {
+  if (errorUrl === requestUrl && errorGeneration === cacheGeneration) {
     return {
       status: "error",
       data: null,
