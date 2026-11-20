@@ -106,6 +106,22 @@ test("MetricRibbon: Mode 4 labels and rendering", () => {
   assert.ok(ribbonMarkup.includes("RANK"), "Ribbon must render RANK");
   assert.ok(ribbonMarkup.includes("FIRST PLAYED"), "Ribbon must render FIRST PLAYED");
   assert.ok(ribbonMarkup.includes("LAST PLAYED"), "Ribbon must render LAST PLAYED");
+  assert.ok(
+    !ribbonMarkup.includes("opacity-60 transition-opacity duration-150"),
+    "MetricRibbon values must not be dimmed when isLoading is omitted or false"
+  );
+
+  const loadingMarkup = renderToStaticMarkup(
+    React.createElement(MetricRibbon, {
+      mode: 4,
+      metrics: ["1,234", "#12", "JAN 2024", "TODAY"],
+      isLoading: true,
+    })
+  );
+  assert.ok(
+    loadingMarkup.includes("opacity-60 transition-opacity duration-150"),
+    "MetricRibbon values must have dimmed opacity classes when isLoading is true"
+  );
 });
 
 test("ControlRow: Mode 4 scope label and profile range controls", () => {

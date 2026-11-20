@@ -6,6 +6,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
 import { formatStreamLogDateSpan } from "../src/lib/format-utils";
+import type { ProfileHistoryEntry } from "../src/lib/search-types";
 
 test("formatStreamLogDateSpan formats date ranges correctly", () => {
   // 1. Multi-day span
@@ -95,4 +96,124 @@ test("LivePlayerView houses context selector inside playback controls without re
     content.includes("selectContext"),
     "LivePlayerView must preserve selectContext"
   );
+});
+
+test("ControlRow renders breadcrumb trail for multi-hop profile history with truncation and jump handlers", () => {
+  const history: ProfileHistoryEntry[] = [
+    { target: { kind: "artist", key: "radiohead" }, range: "1y", name: "Radiohead" },
+    { target: { kind: "album", key: "in-rainbows" }, range: "1y", name: "In Rainbows" },
+  ];
+
+  let jumpedIndex: number | null = null;
+  let returnedToSearch = false;
+
+  const props = {
+    mode: 4 as const,
+    range: "1y" as const,
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+    profileKind: "track" as const,
+    profileHistory: history,
+    onJumpToHistory: (index: number) => { jumpedIndex = index; },
+    onReturnToSearch: () => { returnedToSearch = true; },
+  };
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+
+  // Breadcrumbs navigation wrapper
+  assert.ok(markup.includes('<nav aria-label="Profile navigation"'), "Must render nav with aria-label");
+  assert.ok(markup.includes("flex items-center gap-1.5 min-w-0 overflow-hidden"), "Nav must have overflow/gap discipline");
+
+  // Desktop search button and ancestors
+  assert.ok(markup.includes("← SEARCH"), "Must render ← SEARCH on desktop");
+  assert.ok(markup.includes("Radiohead"), "Must render ancestor name Radiohead");
+  assert.ok(markup.includes("In Rainbows"), "Must render direct parent name In Rainbows");
+  assert.ok(markup.includes("max-w-[140px] truncate"), "Must truncate ancestor button text cleanly");
+  assert.ok(markup.includes("text-[#A0A099] hover:text-[#EDEDE8]"), "Direct parent must be styled brighter");
+
+  // Mobile layout
+  assert.ok(markup.includes("← In Rainbows"), "Mobile view must show ← <DIRECT PARENT NAME>");
+  assert.ok(markup.includes(">SEARCH</button>"), "Mobile view must show subtle SEARCH escape link");
+
+  // Range controls should not shrink
+  assert.ok(markup.includes("shrink-0"), "ControlRow range container must have shrink-0");
+
+  // Verify click handlers through element tree
+  interface VNode {
+    type?: unknown;
+    props?: {
+      children?: unknown;
+      onClick?: () => void;
+    };
+  }
+
+  function findButtons(node: unknown): VNode[] {
+    if (!node || typeof node !== "object") return [];
+    if (Array.isArray(node)) return node.flatMap(findButtons);
+    const elem = node as VNode;
+    if (elem.type === "button") return [elem];
+    const children = Array.isArray(elem.props?.children)
+      ? elem.props?.children
+      : elem.props?.children
+      ? [elem.props.children]
+      : [];
+    return children.flatMap(findButtons);
+  }
+
+  const buttons = findButtons(ControlRow(props));
+  const searchBtn = buttons.find((b) => b.props?.children === "← SEARCH");
+  assert.ok(searchBtn, "Must find desktop ← SEARCH button");
+  searchBtn.props?.onClick?.();
+  assert.equal(returnedToSearch, true, "Clicking ← SEARCH must call onReturnToSearch");
+
+  const radioheadBtn = buttons.find((b) => b.props?.children === "Radiohead");
+  assert.ok(radioheadBtn, "Must find Radiohead ancestor button");
+  radioheadBtn.props?.onClick?.();
+  assert.equal(jumpedIndex, 0, "Clicking Radiohead must jump to index 0");
+
+  const inRainbowsBtn = buttons.find((b) => b.props?.children === "In Rainbows");
+  assert.ok(inRainbowsBtn, "Must find In Rainbows ancestor button");
+  inRainbowsBtn.props?.onClick?.();
+  assert.equal(jumpedIndex, 1, "Clicking In Rainbows must jump to index 1");
+
+  // Fallback to onJumpToHistory(-1) when onReturnToSearch is omitted
+  let fallbackJumpedIndex: number | null = null;
+  const fallbackTree = ControlRow({
+    ...props,
+    onReturnToSearch: undefined,
+    onJumpToHistory: (idx: number) => { fallbackJumpedIndex = idx; },
+  });
+  const fallbackSearchBtn = findButtons(fallbackTree).find((b) => b.props?.children === "← SEARCH");
+  fallbackSearchBtn?.props?.onClick?.();
+  assert.equal(fallbackJumpedIndex, -1, "Clicking ← SEARCH without onReturnToSearch must call onJumpToHistory(-1)");
+});
+
+test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () => {
+  const history: ProfileHistoryEntry[] = [
+    { target: { kind: "artist", key: "artist-1" }, range: "1y", name: "First Artist" },
+    { target: { kind: "album", key: "album-1" }, range: "1y", name: "Middle Album" },
+    { target: { kind: "track", key: "track-1" }, range: "1y", name: "Parent Track" },
+  ];
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, {
+    mode: 4,
+    range: "1y",
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+    profileKind: "artist",
+    profileHistory: history,
+    onJumpToHistory: () => {},
+    onReturnToSearch: () => {},
+  }));
+
+  // Ellipsis should be present
+  assert.ok(markup.includes("…"), "Must render ellipsis when history exceeds 2 ancestors");
+  // First ancestor should not be in visible trail, but last 2 must be
+  assert.ok(!markup.includes("First Artist"), "First ancestor beyond last 2 should be collapsed");
+  assert.ok(markup.includes("Middle Album"), "Second ancestor should be visible");
+  assert.ok(markup.includes("Parent Track"), "Direct parent should be visible");
 });
