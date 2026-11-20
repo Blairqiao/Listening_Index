@@ -2,9 +2,9 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { useSearch } from "../src/components/views/search-view/useSearch";
+import { useSearch, clearSearchCache } from "../src/components/views/search-view/useSearch";
 import { SearchView } from "../src/components/views/search-view/SearchView";
-import type { SearchResponse, SearchSort } from "../src/lib/search-types";
+import type { SearchFilter, SearchResponse, SearchSort } from "../src/lib/search-types";
 
 function createHookHarness() {
   const stateValues: unknown[] = [];
@@ -48,7 +48,7 @@ function createHookHarness() {
     },
   };
 
-  const runTurn = (q: string, sort?: SearchSort, page?: number) => {
+  const runTurn = (q: string, sort?: SearchSort, page?: number, filter?: SearchFilter) => {
     let result: ReturnType<typeof useSearch> | undefined;
     let passes = 0;
     do {
@@ -57,7 +57,7 @@ function createHookHarness() {
       effectCursor = 0;
       isRendering = true;
       try {
-        result = useSearch(q, sort, page);
+        result = useSearch(q, sort, page, filter);
       } finally {
         isRendering = false;
       }
@@ -90,7 +90,13 @@ async function flushMicrotasks(): Promise<void> {
   }
 }
 
-async function primeSearch(query: string, response: SearchResponse) {
+async function primeSearch(
+  query: string,
+  response: SearchResponse,
+  sort?: SearchSort,
+  page?: number,
+  filter?: SearchFilter,
+) {
   mock.timers.enable({ apis: ["setTimeout"] });
   const origFetch = globalThis.fetch;
   const origUseState = React.useState;
@@ -108,10 +114,10 @@ async function primeSearch(query: string, response: SearchResponse) {
   }) as typeof fetch;
 
   try {
-    harness.runTurn(query);
+    harness.runTurn(query, sort, page, filter);
     mock.timers.tick(250);
     await flushMicrotasks();
-    harness.runTurn(query);
+    harness.runTurn(query, sort, page, filter);
   } finally {
     harness.cleanup();
     (React as unknown as { useState: unknown }).useState = origUseState;
@@ -147,6 +153,7 @@ test("SearchView SSR: renders named input, placeholder, maxLength, and page scro
   );
 
   assert.doesNotMatch(html, /overflow-y-auto|scrollbar-hidden|md:h-\[560px\]/);
+  assert.doesNotMatch(html, /mt-4 md:mt-6/, "Root must not add duplicate top margin");
 });
 
 test("SearchView browses on empty input and accepts a single character", async () => {
@@ -452,10 +459,10 @@ test("useSearch hook behavior: debounce, abort, stale response, error-whitespace
     assert.equal(res.status, "ready");
     assert.equal(res.data?.artists[0]?.name, "Artist fast-q", "Stale response must not overwrite current ready data");
 
-    // Clearing the search returns to the catalog instead of keeping the previous matches.
+    // Clearing the search keeps the previous matches (dimmed) instead of flashing null.
     res = harness.runTurn("", "oldest", 2);
     assert.equal(res.status, "loading");
-    assert.equal(res.data, null);
+    assert.equal(res.data?.artists[0]?.name, "Artist fast-q", "Prior results must be retained during clearing to browse");
     mock.timers.tick(250);
     await flushMicrotasks();
     const browseUrl = new URL(fetchCalls.at(-1)!.url, "http://localhost");
@@ -551,4 +558,399 @@ test("useSearch production cache FIFO eviction at 50 entries", async () => {
     globalThis.fetch = origFetch;
     mock.timers.reset();
   }
+});
+
+test("useSearch hook: filter-specific cache keys, clearSearchCache invalidation, stale pre-clear discard, and retention", async () => {
+  clearSearchCache();
+  mock.timers.enable({ apis: ["setTimeout"] });
+  const origFetch = globalThis.fetch;
+  const origUseState = React.useState;
+  const origUseEffect = React.useEffect;
+
+  const harness = createHookHarness();
+  (React as unknown as { useState: unknown }).useState = harness.mockReact.useState;
+  (React as unknown as { useEffect: unknown }).useEffect = harness.mockReact.useEffect;
+
+  const fetchUrls: string[] = [];
+  let pendingResolve: ((res: Response) => void) | null = null;
+
+  globalThis.fetch = ((url: string, _opts?: RequestInit) => {
+    fetchUrls.push(url);
+    const u = new URL(url, "http://localhost");
+    const q = u.searchParams.get("q") ?? "";
+    const filterType = u.searchParams.get("type") ?? "all";
+
+    if (q === "hang-pre-clear") {
+      return new Promise<Response>((resolve) => {
+        pendingResolve = resolve;
+      });
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({
+        query: q,
+        artists: [{ key: `art-${q}-${filterType}`, name: `Artist ${q} ${filterType}`, plays: 10, imageUrl: null }],
+        albums: [],
+        tracks: [],
+      }),
+    } as unknown as Response);
+  }) as typeof fetch;
+
+  try {
+    // 1. Filter-specific cache key: initial fetch with tracks
+    let res = harness.runTurn("radiohead", "most-plays", 1, "tracks");
+    assert.equal(res.status, "loading");
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    assert.equal(fetchUrls.length, 1);
+    assert.ok(fetchUrls[0].includes("type=tracks"), "URL must include type=tracks");
+
+    res = harness.runTurn("radiohead", "most-plays", 1, "tracks");
+    assert.equal(res.status, "ready");
+    assert.equal(res.data?.artists[0]?.name, "Artist radiohead tracks");
+
+    // 2. Switching filter to 'artists' for same query is a cache miss
+    res = harness.runTurn("radiohead", "most-plays", 1, "artists");
+    assert.equal(res.status, "loading");
+    assert.equal(res.data?.artists[0]?.name, "Artist radiohead tracks", "Retains prior ready results while loading");
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    assert.equal(fetchUrls.length, 2);
+    assert.ok(fetchUrls[1].includes("type=artists"), "URL must include type=artists");
+
+    res = harness.runTurn("radiohead", "most-plays", 1, "artists");
+    assert.equal(res.status, "ready");
+    assert.equal(res.data?.artists[0]?.name, "Artist radiohead artists");
+
+    // 3. clearSearchCache invalidates cache and triggers refetch on same query
+    clearSearchCache();
+    res = harness.runTurn("radiohead", "most-plays", 1, "artists");
+    assert.equal(res.status, "loading", "After clearSearchCache, entry must not hit cache");
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    assert.equal(fetchUrls.length, 3, "Refetch must occur after clearSearchCache");
+
+    res = harness.runTurn("radiohead", "most-plays", 1, "artists");
+    assert.equal(res.status, "ready");
+
+    // 4. Stale pre-clear in-flight response must be discarded after clearSearchCache
+    res = harness.runTurn("hang-pre-clear", "most-plays", 1, "all");
+    assert.equal(res.status, "loading");
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    assert.ok(pendingResolve, "hang-pre-clear fetch must be initiated");
+
+    // Clear cache while request is in-flight
+    clearSearchCache();
+
+    // Now resolve the hung request
+    const resolve = pendingResolve as ((r: Response) => void) | null;
+    if (resolve) {
+      resolve({
+        ok: true,
+        json: async () => ({
+          query: "hang-pre-clear",
+          artists: [{ key: "stale", name: "Stale Artist", plays: 1, imageUrl: null }],
+          albums: [],
+          tracks: [],
+        }),
+      } as unknown as Response);
+    }
+    await flushMicrotasks();
+
+    // Rerender after resolve - must NOT be ready with stale data
+    res = harness.runTurn("hang-pre-clear", "most-plays", 1, "all");
+    assert.notEqual(res.data?.artists[0]?.name, "Stale Artist", "Stale pre-clear response must be discarded");
+
+    // 5. Clear-to-browse retention: transitioning query to "" retains prior results while loading
+    res = harness.runTurn("cleartest", "most-plays", 1, "all");
+    mock.timers.tick(250);
+    await flushMicrotasks();
+    res = harness.runTurn("cleartest", "most-plays", 1, "all");
+    assert.equal(res.status, "ready");
+
+    res = harness.runTurn("", "most-plays", 1, "all");
+    assert.equal(res.status, "loading");
+    assert.ok(res.data !== null, "Prior data must be retained during clearing to browse");
+    assert.equal(res.data?.artists[0]?.name, "Artist cleartest all");
+  } finally {
+    clearSearchCache();
+    harness.cleanup();
+    (React as unknown as { useState: unknown }).useState = origUseState;
+    (React as unknown as { useEffect: unknown }).useEffect = origUseEffect;
+    globalThis.fetch = origFetch;
+    mock.timers.reset();
+  }
+});
+
+test("SearchView top control strip: filter pills with totals, bracket sort trigger, and optional random button", async () => {
+  clearSearchCache();
+  await primeSearch("radio", {
+    query: "radio",
+    hasMore: false,
+    artists: [{ key: "a1", name: "Radiohead", plays: 100, imageUrl: null }],
+    albums: [],
+    tracks: [],
+    totals: { tracks: 42, artists: 12, albums: 5 },
+  }, "most-plays", 1, "tracks");
+
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "radio",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "tracks",
+      sort: "most-plays",
+      onRandomProfile: () => {},
+    })
+  );
+
+  // Filter group & accessibility
+  assert.match(html, /role="group"/);
+  assert.match(html, /aria-label="Filter by type"/);
+  assert.match(html, /aria-pressed="true"[^>]*>[^<]*<span>TRACKS<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ALL<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ARTISTS<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ALBUMS<\/span>/);
+  assert.match(html, />ALL<\/span>/);
+  assert.match(html, />TRACKS<\/span>/);
+  assert.match(html, />ARTISTS<\/span>/);
+  assert.match(html, />ALBUMS<\/span>/);
+
+  // Pill totals counts with hidden sm:inline markup
+  assert.match(
+    html,
+    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">42<\/span>/
+  );
+  assert.match(
+    html,
+    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">12<\/span>/
+  );
+  assert.match(
+    html,
+    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">5<\/span>/
+  );
+
+  // Filter pill styling: ControlRow padding and visible focus-visible outline
+  assert.match(html, /px-1 sm:px-2\.5/);
+  assert.match(html, /focus-visible:outline-music-accent/);
+
+  // Active filter styling: tracks is active -> border-music-accent text-music-accent
+  assert.match(html, /border-music-accent text-music-accent[^>]*>[^<]*<span>TRACKS<\/span>/);
+
+  // Bracket sort trigger: [ SORT: MOST PLAYS ⌄ ]
+  assert.match(html, /\[ SORT:.*MOST PLAYS.*⌄ \]/);
+  assert.match(html, /aria-label="Sort by"/);
+
+  // Random button
+  assert.match(html, /\[ RANDOM \]/);
+  assert.match(html, /aria-label="Open random profile"/);
+
+  // When onRandomProfile is omitted, [ RANDOM ] is not rendered
+  const noRandomHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "radio",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+    })
+  );
+  assert.doesNotMatch(noRandomHtml, /\[ RANDOM \]/);
+});
+
+test("SearchView single-filter layout: balanced 2-column grid, recency headers, and lastPlayedAt formatting", async () => {
+  clearSearchCache();
+  const sampleTracks = Array.from({ length: 16 }, (_, i) => ({
+    id: `track-${i + 1}`,
+    name: `Track Number ${String(i + 1).padStart(2, "0")}`,
+    artist: "Sample Artist",
+    album: "Sample Album",
+    plays: 100 - i * 5,
+    albumImageUrl: null,
+    lastPlayedAt: "2026-11-20T01:30:00Z",
+  }));
+
+  await primeSearch("sample", {
+    query: "sample",
+    hasMore: false,
+    artists: [],
+    albums: [],
+    tracks: sampleTracks,
+  }, "recent", 1, "tracks");
+
+  const recentHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "sample",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "tracks",
+      sort: "recent",
+      visitorTimezone: "America/New_York",
+    })
+  );
+
+  // Heading for single filter
+  assert.match(recentHtml, /\[ TRACKS \]/);
+  assert.doesNotMatch(recentHtml, /\[ ARTISTS \]/);
+  assert.doesNotMatch(recentHtml, /\[ ALBUMS \]/);
+
+  // Recency header on recent sort
+  assert.match(recentHtml, /LAST PLAYED · PLAYS/);
+
+  // Balanced 2-column grid
+  assert.match(recentHtml, /md:grid-cols-2/);
+  assert.match(recentHtml, /md:gap-x-\[26px\]/);
+
+  // Last played date formatting: 2026-11-20T01:30:00Z in America/New_York formatted as "19 NOV 26"
+  assert.match(recentHtml, /19 NOV 26/);
+
+  // Column wrappers must not have role="list"
+  assert.ok(!recentHtml.includes('role="list"'));
+
+  // Split verification: first 8 tracks in left column, next 8 in right column
+  const columns = recentHtml.split('<div class="min-w-0 flex flex-col">').slice(1);
+  assert.deepEqual(columns.map((column) => [...column.matchAll(/Track Number \d+/g)].length), [8, 8]);
+  const track1Index = recentHtml.indexOf("Track Number 01");
+  const track8Index = recentHtml.indexOf("Track Number 08");
+  const track9Index = recentHtml.indexOf("Track Number 09");
+  const track16Index = recentHtml.indexOf("Track Number 16");
+  assert.ok(track1Index !== -1 && track8Index !== -1 && track9Index !== -1 && track16Index !== -1);
+  assert.ok(track1Index < track8Index, "Track 01 appears before Track 08");
+  assert.ok(track8Index < track9Index, "Left column items appear before right column items");
+  assert.ok(track9Index < track16Index, "Track 09 appears before Track 16");
+
+  // Cover both recency sorts: oldest sort also displays recency header and formatted timestamp
+  await primeSearch("sample", {
+    query: "sample",
+    hasMore: false,
+    artists: [],
+    albums: [],
+    tracks: sampleTracks,
+  }, "oldest", 1, "tracks");
+
+  const oldestHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "sample",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "tracks",
+      sort: "oldest",
+      visitorTimezone: "America/New_York",
+    })
+  );
+  assert.match(oldestHtml, /LAST PLAYED · PLAYS/);
+  assert.match(oldestHtml, /19 NOV 26/);
+});
+
+test("SearchView Tracks-only mixed layout when filter is 'all'", async () => {
+  clearSearchCache();
+  const sampleTracks = Array.from({ length: 4 }, (_, i) => ({
+    id: `t-${i + 1}`,
+    name: `Mixed Track ${i + 1}`,
+    artist: "Solo Artist",
+    album: "Solo Album",
+    plays: 20,
+    albumImageUrl: null,
+  }));
+
+  await primeSearch("tracks-only", {
+    query: "tracks-only",
+    hasMore: false,
+    artists: [],
+    albums: [],
+    tracks: sampleTracks,
+  });
+
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "tracks-only",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "all",
+    })
+  );
+
+  assert.match(html, /\[ TRACKS \]/);
+  assert.doesNotMatch(html, /\[ ARTISTS \]/);
+  assert.doesNotMatch(html, /\[ ALBUMS \]/);
+  // Full width split into 2 columns
+  assert.match(html, /md:grid-cols-2/);
+});
+
+test("SearchView bottom hairline pagination: totalPages, divider, and DOM order", async () => {
+  clearSearchCache();
+  await primeSearch("pagetest", {
+    query: "pagetest",
+    hasMore: true,
+    totalPages: 12,
+    artists: [{ key: "a1", name: "Page Artist", plays: 5, imageUrl: null }],
+    albums: [],
+    tracks: [],
+  });
+
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "pagetest",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      page: 1,
+    })
+  );
+
+  // Bottom hairline pagination with hairlines
+  assert.match(html, /flex-1 h-\[1px\] bg-\[#1C1C1A\]/);
+  assert.match(html, /aria-label="Search results pages"/);
+  assert.match(html, /PAGE<\/span> 01 \/ 12/);
+
+  // Position: pagination must appear after results
+  const artistIndex = html.indexOf("Page Artist");
+  const paginationIndex = html.indexOf('aria-label="Search results pages"');
+  assert.ok(artistIndex < paginationIndex, "Pagination must be rendered below search results");
+});
+
+test("SearchView input: filter-specific placeholder and aria-label", () => {
+  // Filter-specific placeholders
+  const tracksHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "tracks",
+    })
+  );
+  assert.match(tracksHtml, /placeholder="SEARCH TRACKS"/);
+  assert.match(tracksHtml, /aria-label="Search tracks"/);
+
+  const artistsHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "artists",
+    })
+  );
+  assert.match(artistsHtml, /placeholder="SEARCH ARTISTS"/);
+  assert.match(artistsHtml, /aria-label="Search artists"/);
+
+  const albumsHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "albums",
+    })
+  );
+  assert.match(albumsHtml, /placeholder="SEARCH ALBUMS"/);
+  assert.match(albumsHtml, /aria-label="Search albums"/);
+
+  const allHtml = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      filter: "all",
+    })
+  );
+  assert.match(allHtml, /placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"/);
+  assert.match(allHtml, /aria-label="Search tracks, artists or albums"/);
 });

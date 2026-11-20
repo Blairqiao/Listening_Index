@@ -1,14 +1,21 @@
 "use client";
 
 import React, { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from "react";
-import { ChevronDown } from "lucide-react";
 import { SEARCH_SORT_OPTIONS, type SearchSort } from "@/lib/search-types";
 
 const chipBaseClass = "font-mono text-[11px] tracking-[0.08em] uppercase whitespace-nowrap px-2.5 py-[3px] rounded-none border bg-transparent cursor-pointer transition-none focus:outline-none focus-visible:border-music-accent focus-visible:text-music-accent";
 const idleChipColors = "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32]";
 export const searchChipClass = `${chipBaseClass} ${idleChipColors}`;
 
-export function SortMenu({ value, onChange }: { value: SearchSort; onChange: (sort: SearchSort) => void }): JSX.Element {
+export function SortMenu({
+  value,
+  onChange,
+  onOpenChange,
+}: {
+  value: SearchSort;
+  onChange: (sort: SearchSort) => void;
+  onOpenChange?: (open: boolean) => void;
+}): JSX.Element {
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
   const open = highlightedIndex !== null;
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -16,6 +23,10 @@ export function SortMenu({ value, onChange }: { value: SearchSort; onChange: (so
   const listboxRef = useRef<HTMLUListElement>(null);
   const listboxId = useId();
   const selectedIndex = Math.max(0, SEARCH_SORT_OPTIONS.findIndex((option) => option.value === value));
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -92,11 +103,11 @@ export function SortMenu({ value, onChange }: { value: SearchSort; onChange: (so
         aria-label="Sort by"
         onClick={() => setHighlightedIndex(open ? null : selectedIndex)}
         onKeyDown={handleTriggerKeyDown}
-        className={`${open ? `${chipBaseClass} text-music-accent border-music-accent` : searchChipClass} flex items-center gap-1.5`}
+        className={`font-mono text-[11px] tracking-[0.1em] uppercase bg-transparent border-0 cursor-pointer p-0 transition-none focus:outline-none focus-visible:text-music-accent whitespace-nowrap ${
+          open ? "text-music-accent" : "text-[#6A6A64] hover:text-[#EDEDE8]"
+        }`}
       >
-        <span className="text-[#5A5A55] tracking-[0.14em]">SORT ·</span>
-        <span>{SEARCH_SORT_OPTIONS[selectedIndex].label.toUpperCase()}</span>
-        <ChevronDown size={12} aria-hidden="true" />
+        [ SORT: <span>{SEARCH_SORT_OPTIONS[selectedIndex].label.toUpperCase()}</span> ⌄ ]
       </button>
       {open && (
         <ul
@@ -107,7 +118,7 @@ export function SortMenu({ value, onChange }: { value: SearchSort; onChange: (so
           aria-activedescendant={`${listboxId}-${highlightedIndex}`}
           tabIndex={-1}
           onKeyDown={handleListboxKeyDown}
-          className="absolute left-0 top-full z-20 mt-1 min-w-full border border-[#26261F] bg-[#080808] py-1 focus:outline-none"
+          className="absolute right-0 top-full z-20 mt-1 min-w-full border border-[#26261F] bg-[#080808] py-1 focus:outline-none"
         >
           {SEARCH_SORT_OPTIONS.map(({ value: optionValue, label }, index) => {
             const selected = optionValue === value;
