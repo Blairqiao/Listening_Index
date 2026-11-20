@@ -3,10 +3,13 @@
 import React, { useState } from "react";
 import type { ActivityBucket, RangeKey } from "@/lib/types";
 import { ActivityChart } from "../ActivityChart";
-import { peakHour } from "@/lib/profile-stats";
+import { peakDayOfWeek, peakHour } from "@/lib/profile-stats";
 import { HourChart } from "./HourChart";
+import { DayOfWeekChart } from "./DayOfWeekChart";
 
-type ChartView = "time" | "hour";
+const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+
+type ChartView = "time" | "hour" | "day";
 
 // Combined label + toggle button on the left: bracketed view label in the style of the live player's [ SYNTHETIC ] toggle.
 const toggleHeadingClass =
@@ -20,31 +23,89 @@ export interface ProfileChartProps {
   isLoading: boolean;
   visitorTimezone: string;
   hourOfDay?: number[];
+  dayOfWeek?: number[];
   streakDays?: number;
 }
 
-function readout(showHours: boolean, hourOfDay: number[], streakDays: number): string | null {
-  if (showHours) {
+function readout(
+  view: ChartView,
+  hourOfDay: number[] | undefined,
+  dayOfWeek: number[] | undefined,
+  streakDays: number,
+): string | null {
+  if (view === "hour" && hourOfDay) {
     const peak = peakHour(hourOfDay);
     return peak === null ? null : `PEAK ${String(peak).padStart(2, "0")}:00`;
+  }
+  if (view === "day" && dayOfWeek) {
+    const peak = peakDayOfWeek(dayOfWeek);
+    return peak === null ? null : `PEAK ${DAY_LABELS[peak]}`;
   }
   if (streakDays <= 0) return null;
   return `LONGEST STREAK · ${streakDays.toLocaleString()} ${streakDays === 1 ? "DAY" : "DAYS"}`;
 }
 
-export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading, visitorTimezone, hourOfDay, streakDays = 0 }: ProfileChartProps) {
+export function ProfileChart({
+  range,
+  activityCadence,
+  monthlyCadence,
+  isLoading,
+  visitorTimezone,
+  hourOfDay,
+  dayOfWeek,
+  streakDays = 0,
+}: ProfileChartProps) {
   const [view, setView] = useState<ChartView>("time");
-  const showHours = hourOfDay !== undefined && view === "hour";
 
-  const heading = hourOfDay ? (
+  const hasHour = hourOfDay !== undefined;
+  const hasDay = dayOfWeek !== undefined;
+  const canToggle = hasHour || hasDay;
+
+  // Cycle available modes: "time" -> "hour" (if present) -> "day" (if present) -> "time"
+  const cycleView = () => {
+    setView(() => {
+      const current = currentView;
+      if (current === "time") {
+        if (hasHour) return "hour";
+        if (hasDay) return "day";
+        return "time";
+      }
+      if (current === "hour") {
+        if (hasDay) return "day";
+        return "time";
+      }
+      return "time";
+    });
+  };
+
+  const currentView: ChartView =
+    view === "hour" && !hasHour
+      ? hasDay
+        ? "day"
+        : "time"
+      : view === "day" && !hasDay
+        ? "time"
+        : view;
+
+  let viewTitle = "[ OVER TIME ]";
+  let switchSrText = hasHour ? ", switch to plays by hour" : ", switch to plays by day of week";
+  if (currentView === "hour") {
+    viewTitle = "[ BY HOUR ]";
+    switchSrText = hasDay ? ", switch to plays by day of week" : ", switch to plays over time";
+  } else if (currentView === "day") {
+    viewTitle = "[ BY DAY ]";
+    switchSrText = ", switch to plays over time";
+  }
+
+  const heading = canToggle ? (
     <button
       type="button"
-      onClick={() => setView(view === "time" ? "hour" : "time")}
-      title="Click to switch between plays over time and plays by hour of day"
+      onClick={cycleView}
+      title="Click to switch chart view"
       className={toggleHeadingClass}
     >
-      {view === "time" ? "[ OVER TIME ]" : "[ BY HOUR ]"}
-      <span className="sr-only">{view === "time" ? ", switch to plays by hour" : ", switch to plays over time"}</span>
+      {viewTitle}
+      <span className="sr-only">{switchSrText}</span>
     </button>
   ) : (
     <div className={staticHeadingClass}>[ PLAYS ]</div>
@@ -52,8 +113,10 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
 
   return (
     <div>
-      {showHours ? (
+      {currentView === "hour" && hourOfDay ? (
         <HourChart counts={hourOfDay} heading={heading} />
+      ) : currentView === "day" && dayOfWeek ? (
+        <DayOfWeekChart counts={dayOfWeek} heading={heading} />
       ) : (
         <ActivityChart
           label="PLAYS"
@@ -66,7 +129,11 @@ export function ProfileChart({ range, activityCadence, monthlyCadence, isLoading
           showRange={false}
         />
       )}
-      {hourOfDay && <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 tracking-[0.08em] text-[#8A8A83] tabular-nums">{readout(showHours, hourOfDay, streakDays)}</div>}
+      {(hasHour || hasDay) && (
+        <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 tracking-[0.08em] text-[#8A8A83] tabular-nums">
+          {readout(currentView, hourOfDay, dayOfWeek, streakDays)}
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@ const headingClass = "mb-2 font-mono text-[11px] tracking-[0.14em] text-[#5A5A55
 const legendClass = "mt-2 flex justify-between gap-2 font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] tabular-nums";
 
 function playCountLabel(plays: number): string {
-  return `${plays} ${plays === 1 ? "PLAY" : "PLAYS"}`;
+  return `${plays.toLocaleString()} ${plays === 1 ? "PLAY" : "PLAYS"}`;
 }
 
 export function ProportionShareBar({ heading, part, total }: { heading: string; part: number; total: number }) {
@@ -20,7 +20,7 @@ export function ProportionShareBar({ heading, part, total }: { heading: string; 
       </div>
       <div className={legendClass}>
         <span className="text-music-accent">{formatShare(artistShare(part, total))} · {playCountLabel(part)}</span>
-        <span className="shrink-0">OF {total}</span>
+        <span className="shrink-0">OF {total.toLocaleString()}</span>
       </div>
     </div>
   );
@@ -51,10 +51,15 @@ export function SegmentedShareBar({ heading, segments, total, activeId, onActive
             <div
               key={id}
               title={label}
-              className={color}
+              className={`${color} cursor-pointer`}
               style={{ flexGrow: plays }}
-              onMouseEnter={() => onActiveChange(id)}
-              onMouseLeave={() => onActiveChange(null)}
+              onClick={() => onActiveChange(activeId === id ? null : id)}
+              onPointerEnter={(e) => {
+                if (e.pointerType === "mouse") onActiveChange(id);
+              }}
+              onPointerLeave={(e) => {
+                if (e.pointerType === "mouse") onActiveChange(null);
+              }}
             />
           );
         })}
@@ -70,10 +75,10 @@ export function SegmentedShareBar({ heading, segments, total, activeId, onActive
             <span className="truncate text-music-accent">
               {active.label.toUpperCase()} · {formatShare(artistShare(active.plays, total))}
             </span>
-            <span className="shrink-0">{active.plays} OF {total}</span>
+            <span className="shrink-0">{active.plays.toLocaleString()} OF {total.toLocaleString()}</span>
           </>
         ) : (
-          <span>{total} PLAYS</span>
+          <span>{total.toLocaleString()} PLAYS</span>
         )}
       </div>
     </div>
