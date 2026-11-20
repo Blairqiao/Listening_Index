@@ -3,7 +3,7 @@
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
 import { compactDate } from "@/lib/format-utils";
-import type { ProfileKind } from "@/lib/search-types";
+import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
@@ -23,6 +23,9 @@ interface ControlRowProps {
   returnsTo?: ProfileKind | null;
   onProfileBack?: () => void;
   profileKind?: ProfileKind | null;
+  profileHistory?: ProfileHistoryEntry[];
+  onJumpToHistory?: (index: number) => void;
+  onReturnToSearch?: () => void;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
@@ -59,6 +62,9 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   profileKind,
   onProfileBack,
   returnsTo,
+  profileHistory,
+  onJumpToHistory,
+  onReturnToSearch,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -134,7 +140,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
 
   const renderRangeButtons = () => (
     <div
-      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5"
+      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
       role="group"
       aria-label="Time range filters"
     >
@@ -150,7 +156,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               e.currentTarget.blur();
               if (!isSyncing) onSelectRange(r.key);
             }}
-            className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center ${
+            className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
               isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
             } ${
               isActive
@@ -254,6 +260,95 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   };
 
   const showsRanges = mode === 0 || (mode === 4 && !!profileKind);
+  const showsProfileNav = mode === 4 && profileKind && (onProfileBack || onJumpToHistory);
+
+  const Scope = showsProfileNav ? "div" : "span";
+  const renderProfileNav = () => {
+    if (!profileHistory?.length || !onJumpToHistory) {
+      return (
+        <button
+          type="button"
+          onClick={onProfileBack ?? onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+          className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
+        >
+          {`← BACK TO ${(returnsTo ?? "search").toUpperCase()}`}
+        </button>
+      );
+    }
+
+    const directParent = profileHistory[profileHistory.length - 1];
+    const directParentName = directParent.name || directParent.target.kind.toUpperCase();
+    const hasOverflow = profileHistory.length > 2;
+    const startIdx = Math.max(0, profileHistory.length - 2);
+    const visibleAncestors = profileHistory.slice(startIdx).map((entry, offset) => {
+      const index = startIdx + offset;
+      const isDirectParent = index === profileHistory.length - 1;
+      return { entry, index, isDirectParent };
+    });
+
+    return (
+      <>
+        {/* Mobile (< sm): direct parent + subtle search escape link */}
+        <div className="flex sm:hidden items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={onProfileBack ?? (() => onJumpToHistory?.(profileHistory.length - 1))}
+            className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] max-w-[170px] truncate focus-visible:outline-music-accent"
+            title={`Back to ${directParentName}`}
+          >
+            {`← ${directParentName}`}
+          </button>
+          <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+          <button
+            type="button"
+            onClick={onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+            className="min-h-7 cursor-pointer text-[#6A6A64] hover:text-[#EDEDE8] shrink-0 focus-visible:outline-music-accent"
+            title="Return to search"
+          >
+            SEARCH
+          </button>
+        </div>
+
+        {/* Desktop (>= sm): full breadcrumb trail */}
+        <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+            className="min-h-7 cursor-pointer text-[#6A6A64] hover:text-[#EDEDE8] shrink-0 focus-visible:outline-music-accent"
+            title="Return to search"
+          >
+            ← SEARCH
+          </button>
+          {hasOverflow && (
+            <>
+              <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+              <span className="text-[#5A5A55] select-none" aria-hidden="true">…</span>
+            </>
+          )}
+          {visibleAncestors.map(({ entry, index, isDirectParent }) => {
+            const name = entry.name || entry.target.kind.toUpperCase();
+            return (
+              <React.Fragment key={`${entry.target.kind}-${entry.target.key}-${index}`}>
+                <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+                <button
+                  type="button"
+                  onClick={() => onJumpToHistory?.(index)}
+                  className={`min-h-7 cursor-pointer max-w-[140px] truncate focus-visible:outline-music-accent ${
+                    isDirectParent
+                      ? "text-[#A0A099] hover:text-[#EDEDE8]"
+                      : "text-[#6A6A64] hover:text-[#EDEDE8]"
+                  }`}
+                  title={name}
+                >
+                  {name}
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
 
   return (
     <div
@@ -263,25 +358,23 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           : "flex justify-between items-center h-[28px]"
       }`}
     >
-      {/* Left Slot: Scope Label */}
-      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4">
-        {mode === 4 && profileKind && onProfileBack ? (
-          <button
-            type="button"
-            onClick={onProfileBack}
-            className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
-          >
-            {`← BACK TO ${(returnsTo ?? "search").toUpperCase()}`}
-          </button>
-        ) : getScopeLabel()}
+      {/* Left Slot: Scope Label or Profile Navigation */}
+      <Scope className={`font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4 ${showsProfileNav ? "min-w-0 flex items-center" : ""}`}>
+        {showsProfileNav ? (
+          <nav aria-label="Profile navigation" className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            {renderProfileNav()}
+          </nav>
+        ) : (
+          getScopeLabel()
+        )}
         {syncError && mode !== 2 && (
           <span className="ml-2 text-[#FF6B6B] tracking-[0.08em]">
             [ {syncError.toUpperCase()} ]
           </span>
         )}
-      </span>
+      </Scope>
 
-      <div className={`flex items-center ${showsRanges ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"}`}>
+      <div className={`flex items-center ${showsRanges ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"} ${showsProfileNav ? "shrink-0" : ""}`}>
         {renderControls()}
       </div>
     </div>

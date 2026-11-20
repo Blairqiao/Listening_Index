@@ -13,6 +13,7 @@ interface MetricRibbonProps {
   onToggleTrackRank?: () => void;
   onToggleArtistRank?: () => void;
   onToggleProfileRank?: () => void;
+  isLoading?: boolean;
 }
 
 export const getRibbonLabels = (
@@ -52,6 +53,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   onToggleTrackRank,
   onToggleArtistRank,
   onToggleProfileRank,
+  isLoading = false,
 }) => {
   const labels = getRibbonLabels(mode, overviewTimeUnit);
 
@@ -115,7 +117,11 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
             <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] flex items-center justify-between">
               <span>{label}</span>
             </div>
-            <div className="font-mono text-[19px] sm:text-[20px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all">
+            <div
+              className={`font-mono text-[19px] sm:text-[20px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all ${
+                isLoading ? "opacity-60 transition-opacity duration-150" : ""
+              }`}
+            >
               {metrics[i]}
             </div>
           </div>
