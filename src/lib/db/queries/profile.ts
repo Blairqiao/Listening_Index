@@ -3,17 +3,20 @@ import { isCatalogFullyEnriched } from "./enrichment";
 import { sanitizeTimezone } from "./helpers";
 import { OVERVIEW_INTERVAL_CONFIG } from "./overview";
 import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cadence";
-import { artistShare } from "@/lib/profile-stats";
+import { artistShare, computePeakDay, longestStreak } from "@/lib/profile-stats";
 import type { RangeKey } from "@/lib/types";
 import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_ALBUM_TRACKS_LIMIT,
+  PROFILE_MORE_ALBUMS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
+  PROFILE_RELATED_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
   type ProfileAlbumTrack,
   type ProfileData,
   type ProfilePlay,
+  type ProfileRelatedTrack,
   type ProfileTarget,
   type ProfileTopAlbum,
   type ProfileTopTrack,
@@ -33,6 +36,7 @@ function mapRecentPlays(rows: Record<string, unknown>[]): ProfilePlay[] {
     album: String(row.album),
     durationMs: Number(row.duration_ms) || 0,
     albumImageUrl: (row.album_image_url as string | null) ?? null,
+    msPlayed: Number(row.ms_played) || 0,
   }));
 }
 
@@ -40,6 +44,27 @@ function toHourOfDay(rows: Record<string, unknown>[]): number[] {
   const counts = Array<number>(24).fill(0);
   for (const { hour, plays } of rows) counts[Number(hour)] = Number(plays);
   return counts;
+}
+
+function toDayOfWeek(rows: Record<string, unknown>[]): number[] {
+  const counts = Array<number>(7).fill(0);
+  for (const { iso_dow, plays } of rows) {
+    const idx = Number(iso_dow) - 1;
+    if (idx >= 0 && idx < 7) counts[idx] = Number(plays);
+  }
+  return counts;
+}
+
+function summarizeDailyCounts(rows: Record<string, unknown>[]) {
+  const days = rows.map((row) => ({
+    date: String(row.day),
+    plays: Number(row.plays),
+  }));
+  return {
+    activeDays: days.filter((d) => d.plays > 0).length,
+    longestStreakDays: longestStreak(days.map((d) => d.date)),
+    peakDay: computePeakDay(days),
+  };
 }
 
 export async function getProfile(
@@ -91,15 +116,18 @@ export async function getProfile(
     const artistFilter = isEnriched
       ? sql`t.artist_id = ${activeArtistKey}`
       : sql`t.artist_group_key = ${activeArtistKey}`;
-    const albumFilter = albumId != null
-      ? sql`t.album_id = ${albumId}`
-      : albumGroupKey != null && artistGroupKey != null
-        ? sql`t.album_id IS NULL AND t.album_group_key = ${albumGroupKey} AND t.artist_group_key = ${artistGroupKey}`
+    const albumFilter = isEnriched
+      ? albumId != null
+        ? sql`t.album_id = ${albumId}`
+        : null
+      : albumGroupKey != null
+        ? sql`t.album_group_key = ${albumGroupKey}`
         : null;
 
     const [
       rankAndPlaysRows, rankedTotalRows, cadenceRows, recentPlayRows,
-      hourRows, streakRows, artistPlayRows, albumRows,
+      hourRows, dayOfWeekRows, dailyCountRows, aggRows,
+      artistPlayRows, albumPlayRows, albumRows, relatedTrackRows,
     ] =
       await Promise.all([
         sql`
@@ -125,6 +153,7 @@ export async function getProfile(
             p.id::text,
             p.played_at,
             p.track_id,
+            p.ms_played,
             al.image_url AS album_image_url,
             t.name AS title,
             COALESCE(ar.name, t.artist_name, '') AS artist,
@@ -144,19 +173,33 @@ export async function getProfile(
           GROUP BY 1;
         `,
         sql`
-          WITH distinct_days AS (
-            SELECT DISTINCT (p.played_at AT TIME ZONE ${safeTz})::date AS day
-            FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
-          ), streak_groups AS (
-            SELECT day - (ROW_NUMBER() OVER (ORDER BY day))::int AS streak_start FROM distinct_days
-          )
-          SELECT COALESCE(MAX(days), 0)::int AS streak
-          FROM (SELECT COUNT(*) AS days FROM streak_groups GROUP BY streak_start) streaks;
+          SELECT EXTRACT(ISODOW FROM p.played_at AT TIME ZONE ${safeTz})::int AS iso_dow, COUNT(*)::int AS plays
+          FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
+          GROUP BY 1;
+        `,
+        sql`
+          SELECT (p.played_at AT TIME ZONE ${safeTz})::date::text AS day, COUNT(*)::int AS plays
+          FROM plays p WHERE p.track_id = ${trackId} AND ${timeFilter}
+          GROUP BY 1;
+        `,
+        sql`
+          SELECT
+            COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
+            AVG(LEAST(p.ms_played::float / NULLIF(t.duration_ms, 0), 1.0))
+              FILTER (WHERE t.duration_ms > 0) AS completion_rate
+          FROM plays p
+          JOIN tracks t ON t.id = p.track_id
+          WHERE p.track_id = ${trackId} AND ${timeFilter};
         `,
         activeArtistKey == null ? [] : sql`
           SELECT COUNT(*)::int AS plays
           FROM plays p JOIN tracks t ON t.id = p.track_id
           WHERE ${artistFilter} AND ${timeFilter};
+        `,
+        albumFilter === null ? [] : sql`
+          SELECT COUNT(*)::int AS plays
+          FROM plays p JOIN tracks t ON t.id = p.track_id
+          WHERE ${albumFilter} AND ${timeFilter};
         `,
         albumFilter === null ? [] : sql`
           SELECT t.id, t.name, COUNT(p.id)::int AS plays
@@ -165,6 +208,48 @@ export async function getProfile(
           GROUP BY t.id, t.name
           ORDER BY plays DESC, t.name ASC, t.id ASC
           LIMIT ${PROFILE_ALBUM_TRACKS_LIMIT};
+        `,
+        sql`
+          WITH ordered AS (
+            SELECT
+              p.track_id,
+              p.played_at,
+              p.id,
+              LAG(p.track_id) OVER (ORDER BY p.played_at ASC, p.id ASC) AS prev_track_id,
+              LAG(p.played_at) OVER (ORDER BY p.played_at ASC, p.id ASC) AS prev_played_at,
+              LEAD(p.track_id) OVER (ORDER BY p.played_at ASC, p.id ASC) AS next_track_id,
+              LEAD(p.played_at) OVER (ORDER BY p.played_at ASC, p.id ASC) AS next_played_at
+            FROM plays p
+            WHERE ${timeFilter}
+          ),
+          neighbors AS (
+            SELECT prev_track_id AS other_id
+            FROM ordered
+            WHERE track_id = ${trackId}
+              AND prev_track_id IS NOT NULL
+              AND prev_track_id <> ${trackId}
+              AND played_at - prev_played_at <= INTERVAL '30 minutes'
+            UNION ALL
+            SELECT next_track_id AS other_id
+            FROM ordered
+            WHERE track_id = ${trackId}
+              AND next_track_id IS NOT NULL
+              AND next_track_id <> ${trackId}
+              AND next_played_at - played_at <= INTERVAL '30 minutes'
+          )
+          SELECT
+            t.id,
+            t.name,
+            COALESCE(ar.name, t.artist_name, '') AS artist,
+            al.image_url AS album_image_url,
+            COUNT(*)::int AS co_plays
+          FROM neighbors n
+          JOIN tracks t ON t.id = n.other_id
+          LEFT JOIN artists ar ON t.artist_id = ar.id
+          LEFT JOIN albums al ON t.album_id = al.id
+          GROUP BY t.id, t.name, ar.name, t.artist_name, al.image_url
+          ORDER BY co_plays DESC, t.name ASC, t.id ASC
+          LIMIT ${PROFILE_RELATED_TRACKS_LIMIT};
         `,
       ]);
 
@@ -182,12 +267,26 @@ export async function getProfile(
       minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
     });
 
+    const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+      dailyCountRows as Record<string, unknown>[],
+    );
+    const totalMs = Number(aggRows[0]?.total_ms ?? 0);
+    const completionRate =
+      aggRows[0]?.completion_rate != null ? Number(aggRows[0].completion_rate) : null;
     const artistPlays = Number(artistPlayRows[0]?.plays ?? 0);
+    const albumPlays = Number(albumPlayRows[0]?.plays ?? 0);
     const albumTracks: ProfileAlbumTrack[] = albumRows.map((row) => ({
       id: String(row.id),
       name: String(row.name),
       plays: Number(row.plays),
       isCurrent: row.id === trackId,
+    }));
+    const relatedTracks: ProfileRelatedTrack[] = relatedTrackRows.map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      artist: String(row.artist),
+      albumImageUrl: (row.album_image_url as string | null) ?? null,
+      coPlays: Number(row.co_plays),
     }));
 
     return {
@@ -209,9 +308,22 @@ export async function getProfile(
       trackStats: {
         artistShare: artistShare(plays, artistPlays),
         artistPlays,
-        longestStreakDays: Number(streakRows[0]?.streak ?? 0),
+        longestStreakDays,
       },
       hourOfDay: toHourOfDay(hourRows),
+      dayOfWeek: toDayOfWeek(dayOfWeekRows),
+      stats: {
+        totalMs,
+        activeDays,
+        longestStreakDays,
+        peakDay,
+        completionRate,
+        artistPlays,
+        artistShare: artistShare(plays, artistPlays),
+        albumPlays,
+        albumShare: artistShare(plays, albumPlays),
+      },
+      relatedTracks,
       albumTracks,
       topTracks: [],
       topAlbums: [],
@@ -283,6 +395,9 @@ export async function getProfile(
     topAlbumRows,
     recentPlayRows,
     hourRows,
+    dayOfWeekRows,
+    dailyCountRows,
+    aggRows,
   ] = await Promise.all([
     sql`
       SELECT plays::int, rank::int FROM (
@@ -351,6 +466,7 @@ export async function getProfile(
         p.id::text,
         p.played_at,
         p.track_id,
+        p.ms_played,
         al.image_url AS album_image_url,
         t.name AS title,
         COALESCE(ar.name, t.artist_name, '') AS artist,
@@ -370,6 +486,23 @@ export async function getProfile(
       WHERE ${timeFilter} AND ${artistFilter}
       GROUP BY 1;
     `,
+    sql`
+      SELECT EXTRACT(ISODOW FROM p.played_at AT TIME ZONE ${safeTz})::int AS iso_dow, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${artistFilter}
+      GROUP BY 1;
+    `,
+    sql`
+      SELECT (p.played_at AT TIME ZONE ${safeTz})::date::text AS day, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${artistFilter}
+      GROUP BY 1;
+    `,
+    sql`
+      SELECT COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${artistFilter};
+    `,
   ]);
 
   const plays = Number(rankAndPlaysRows[0]?.plays ?? 0);
@@ -385,6 +518,11 @@ export async function getProfile(
     cadenceRows: cadenceRows as Record<string, unknown>[],
     minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
   });
+
+  const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+    dailyCountRows as Record<string, unknown>[],
+  );
+  const totalMs = Number(aggRows[0]?.total_ms ?? 0);
 
   const topTracks: ProfileTopTrack[] = topTrackRows.map((row) => ({
     id: String(row.id),
@@ -416,6 +554,13 @@ export async function getProfile(
     rankedTotal,
     ...cadence,
     hourOfDay: toHourOfDay(hourRows),
+    dayOfWeek: toDayOfWeek(dayOfWeekRows),
+    stats: {
+      totalMs,
+      activeDays,
+      longestStreakDays,
+      peakDay,
+    },
     topTracks,
     topAlbums,
     recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
@@ -466,7 +611,8 @@ async function getAlbumProfile(
       MAX(al.image_url) AS image_url,
       MIN(p.played_at) AS first_played_at,
       MAX(p.played_at) AS last_played_at,
-      COUNT(p.id)::int AS lifetime_plays
+      COUNT(p.id)::int AS lifetime_plays,
+      COUNT(DISTINCT p.track_id)::int AS tracks_heard_lifetime
     FROM plays p
     JOIN tracks t ON p.track_id = t.id
     LEFT JOIN albums al ON t.album_id = al.id
@@ -477,6 +623,13 @@ async function getAlbumProfile(
   if (!lifetimeRow || Number(lifetimeRow.lifetime_plays) === 0) {
     return null;
   }
+
+  const artistKey = lifetimeRow.artist_key ? String(lifetimeRow.artist_key) : undefined;
+  const artistFilter = artistKey
+    ? isEnriched
+      ? sql`t.artist_id = ${artistKey}`
+      : sql`t.artist_group_key = ${artistKey}`
+    : null;
 
   const scope: CadenceScope = {
     kind: "album",
@@ -491,6 +644,12 @@ async function getAlbumProfile(
     topTrackRows,
     recentPlayRows,
     hourRows,
+    dayOfWeekRows,
+    dailyCountRows,
+    aggRows,
+    artistPlayRows,
+    fullAlbumSessionRows,
+    moreAlbumRows,
   ] = await Promise.all([
     sql`
       SELECT plays::int, rank::int FROM (
@@ -534,6 +693,7 @@ async function getAlbumProfile(
         p.id::text,
         p.played_at,
         p.track_id,
+        p.ms_played,
         al.image_url AS album_image_url,
         t.name AS title,
         COALESCE(ar.name, t.artist_name, '') AS artist,
@@ -553,6 +713,79 @@ async function getAlbumProfile(
       WHERE ${timeFilter} AND ${albumFilter}
       GROUP BY 1;
     `,
+    sql`
+      SELECT EXTRACT(ISODOW FROM p.played_at AT TIME ZONE ${safeTz})::int AS iso_dow, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${albumFilter}
+      GROUP BY 1;
+    `,
+    sql`
+      SELECT (p.played_at AT TIME ZONE ${safeTz})::date::text AS day, COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${albumFilter}
+      GROUP BY 1;
+    `,
+    sql`
+      SELECT
+        COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
+        COUNT(DISTINCT p.track_id)::int AS tracks_heard_in_range,
+        ${artistFilter === null ? sql`0::int` : sql`COUNT(*) FILTER (WHERE ${artistFilter})::int`} AS album_artist_plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${albumFilter};
+    `,
+    artistFilter === null ? [] : sql`
+      SELECT COUNT(*)::int AS plays
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${timeFilter} AND ${artistFilter};
+    `,
+    sql`
+      WITH ordered AS (
+        SELECT
+          p.track_id,
+          p.played_at,
+          p.id,
+          CASE
+            WHEN LAG(p.played_at) OVER (ORDER BY p.played_at ASC, p.id ASC) IS NULL
+              OR p.played_at - LAG(p.played_at) OVER (ORDER BY p.played_at ASC, p.id ASC) > INTERVAL '30 minutes'
+            THEN 1
+            ELSE 0
+          END AS is_new
+        FROM plays p
+        JOIN tracks t ON p.track_id = t.id
+        WHERE ${timeFilter} AND ${albumFilter}
+      ),
+      sessions AS (
+        SELECT
+          track_id,
+          SUM(is_new) OVER (ORDER BY played_at ASC, id ASC) AS session_id
+        FROM ordered
+      )
+      SELECT COUNT(*)::int AS full_sessions
+      FROM (
+        SELECT session_id
+        FROM sessions
+        GROUP BY session_id
+        HAVING COUNT(DISTINCT track_id) >= 3
+      ) s;
+    `,
+    artistFilter === null ? [] : sql`
+      SELECT
+        ${isEnriched ? sql`t.album_id` : sql`MAX(t.album_id)`} AS id,
+        ${albumGroupCol} AS key,
+        COALESCE(MAX(al.name), MAX(t.album_name), '') AS name,
+        COUNT(p.id)::int AS plays,
+        MAX(al.image_url) AS image_url
+      FROM plays p
+      JOIN tracks t ON p.track_id = t.id
+      LEFT JOIN albums al ON t.album_id = al.id
+      WHERE ${timeFilter}
+        AND ${artistFilter}
+        AND ${albumFilterForRank}
+        AND ${albumGroupCol} <> ${resolvedKey}
+      GROUP BY ${albumGroupCol}
+      ORDER BY plays DESC, name ASC, ${albumGroupCol} ASC
+      LIMIT ${PROFILE_MORE_ALBUMS_LIMIT};
+    `,
   ]);
 
   const plays = Number(rankAndPlaysRows[0]?.plays ?? 0);
@@ -569,11 +802,29 @@ async function getAlbumProfile(
     minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
   });
 
+  const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+    dailyCountRows as Record<string, unknown>[],
+  );
+  const totalMs = Number(aggRows[0]?.total_ms ?? 0);
+  const tracksHeardInRange = Number(aggRows[0]?.tracks_heard_in_range ?? 0);
+  const albumArtistPlays = Number(aggRows[0]?.album_artist_plays ?? 0);
+  const tracksHeardLifetime = Number(lifetimeRow.tracks_heard_lifetime ?? 0);
+  const artistPlays = Number(artistPlayRows[0]?.plays ?? 0);
+  const fullAlbumSessions = Number(fullAlbumSessionRows[0]?.full_sessions ?? 0);
+
   const topTracks: ProfileTopTrack[] = topTrackRows.map((row) => ({
     id: String(row.id),
     name: String(row.name),
     plays: Number(row.plays),
     albumImageUrl: (row.album_image_url as string | null) ?? null,
+  }));
+
+  const moreAlbums: ProfileTopAlbum[] = moreAlbumRows.map((row) => ({
+    id: row.id ? String(row.id) : undefined,
+    key: row.key ? String(row.key) : undefined,
+    name: String(row.name),
+    plays: Number(row.plays),
+    imageUrl: (row.image_url as string | null) ?? null,
   }));
 
   return {
@@ -590,8 +841,21 @@ async function getAlbumProfile(
     rank,
     rankedTotal,
     ...cadence,
-    artistKey: lifetimeRow.artist_key ? String(lifetimeRow.artist_key) : undefined,
+    artistKey,
     hourOfDay: toHourOfDay(hourRows),
+    dayOfWeek: toDayOfWeek(dayOfWeekRows),
+    stats: {
+      totalMs,
+      activeDays,
+      longestStreakDays,
+      peakDay,
+      artistPlays,
+      artistShare: artistShare(albumArtistPlays, artistPlays),
+      tracksHeardInRange,
+      tracksHeardLifetime,
+      fullAlbumSessions,
+    },
+    moreAlbums,
     topTracks,
     topAlbums: [],
     recentPlays: mapRecentPlays(recentPlayRows as Record<string, unknown>[]),
