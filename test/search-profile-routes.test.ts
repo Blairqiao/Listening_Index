@@ -9,8 +9,8 @@ import type { RangeKey } from '../src/lib/types';
 
 interface SearchRouteStubs {
   isDbConfigured?: () => boolean;
-  searchCatalog?: (query: string, sort?: string, page?: number) => Promise<SearchResponse>;
-  getMockSearch?: (query: string) => SearchResponse;
+  searchCatalog?: (query: string, sort?: string, page?: number, filter?: string) => Promise<SearchResponse>;
+  getMockSearch?: (query: string, sort?: string, page?: number, filter?: string) => SearchResponse;
 }
 
 function loadSearchRoute(stubs: SearchRouteStubs = {}) {
@@ -41,6 +41,42 @@ function loadSearchRoute(stubs: SearchRouteStubs = {}) {
 
   const route = loadTs('src/app/api/listening/search/route.ts', mergedStubs);
   return { route, searchCatalogCalls, mockSearchCalls };
+}
+
+interface RandomRouteStubs {
+  isDbConfigured?: () => boolean;
+  getRandomProfileTarget?: (filter: string) => Promise<ProfileTarget | null>;
+  getMockRandomProfileTarget?: (filter: string) => ProfileTarget | null;
+}
+
+function loadRandomRoute(stubs: RandomRouteStubs = {}) {
+  const getRandomProfileTargetCalls: string[] = [];
+  const mockRandomCalls: string[] = [];
+
+  const defaultGetRandomProfileTarget = async (filter: string): Promise<ProfileTarget | null> => {
+    getRandomProfileTargetCalls.push(filter);
+    return { kind: 'track', key: 'track_123' };
+  };
+
+  const defaultGetMockRandomProfileTarget = (filter: string): ProfileTarget | null => {
+    mockRandomCalls.push(filter);
+    return { kind: 'artist', key: 'art_mock' };
+  };
+
+  const mergedStubs = {
+    '@/lib/db': { isDbConfigured: stubs.isDbConfigured ?? (() => true) },
+    '@/lib/db/queries': {
+      getRandomProfileTarget: stubs.getRandomProfileTarget ?? defaultGetRandomProfileTarget,
+    },
+    '@/lib/mock/search-profile': {
+      getMockRandomProfileTarget: stubs.getMockRandomProfileTarget ?? defaultGetMockRandomProfileTarget,
+    },
+    '@/lib/route-utils': routeUtils,
+    '@/lib/search-utils': searchUtils,
+  };
+
+  const route = loadTs('src/app/api/listening/random/route.ts', mergedStubs);
+  return { route, getRandomProfileTargetCalls, mockRandomCalls };
 }
 
 interface ProfileRouteStubs {
@@ -111,15 +147,43 @@ function loadProfileRoute(stubs: ProfileRouteStubs = {}) {
 test('search route accepts an empty query and passes sort and page through', async () => {
   const calls: unknown[][] = [];
   const { route } = loadSearchRoute({
-    searchCatalog: async (query, sort, page) => {
-      calls.push([query, sort, page]);
+    searchCatalog: async (query, sort, page, filter) => {
+      calls.push([query, sort, page, filter]);
       return { query, artists: [], albums: [], tracks: [], hasMore: false };
     },
   });
 
   const response = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/search?sort=oldest&page=2'));
   assert.equal(response.status, 200);
-  assert.deepEqual(calls, [['', 'oldest', 2]]);
+  assert.deepEqual(calls, [['', 'oldest', 2, 'all']]);
+});
+
+test('search route forwards type parameter to database query and mock search', async () => {
+  const dbCalls: unknown[][] = [];
+  const { route: dbRoute } = loadSearchRoute({
+    isDbConfigured: () => true,
+    searchCatalog: async (query, sort, page, filter) => {
+      dbCalls.push([query, sort, page, filter]);
+      return { query, artists: [], albums: [], tracks: [], hasMore: false };
+    },
+  });
+
+  const dbRes = await dbRoute.GET(new NextRequest('http://127.0.0.1:8888/api/listening/search?q=test&type=albums&sort=recent&page=3'));
+  assert.equal(dbRes.status, 200);
+  assert.deepEqual(dbCalls, [['test', 'recent', 3, 'albums']]);
+
+  const mockCalls: unknown[][] = [];
+  const { route: mockRoute } = loadSearchRoute({
+    isDbConfigured: () => false,
+    getMockSearch: (query, sort, page, filter) => {
+      mockCalls.push([query, sort, page, filter]);
+      return { query, artists: [], albums: [], tracks: [], hasMore: false };
+    },
+  });
+
+  const mockRes = await mockRoute.GET(new NextRequest('http://127.0.0.1:8888/api/listening/search?q=test&type=tracks&sort=most-plays&page=1'));
+  assert.equal(mockRes.status, 200);
+  assert.deepEqual(mockCalls, [['test', 'most-plays', 1, 'tracks']]);
 });
 
 test('search route rejects overlong queries with 400 and exact error', async () => {
@@ -420,4 +484,102 @@ test('queries barrel exports searchCatalog and getProfile', async () => {
   const queries = await import('../src/lib/db/queries/index');
   assert.equal(typeof (queries as Record<string, unknown>).searchCatalog, 'function');
   assert.equal(typeof (queries as Record<string, unknown>).getProfile, 'function');
+  assert.equal(typeof (queries as Record<string, unknown>).getRandomProfileTarget, 'function');
+});
+
+test('random route returns profile target from database when db configured', async () => {
+  const { route, getRandomProfileTargetCalls } = loadRandomRoute({
+    isDbConfigured: () => true,
+    getRandomProfileTarget: async (filter) => {
+      getRandomProfileTargetCalls.push(filter);
+      return { kind: 'album', key: 'alb_ok_computer' };
+    },
+  });
+
+  assert.equal(route.dynamic, 'force-dynamic');
+  const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random?type=albums'));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  assert.deepEqual(await res.json(), { kind: 'album', key: 'alb_ok_computer' });
+  assert.deepEqual(getRandomProfileTargetCalls, ['albums']);
+});
+
+test('random route defaults absent or invalid type to all', async () => {
+  const { route, getRandomProfileTargetCalls } = loadRandomRoute({
+    isDbConfigured: () => true,
+  });
+
+  const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random?type=invalid_type'));
+  assert.equal(res.status, 200);
+  const withoutType = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random'));
+  assert.equal(withoutType.status, 200);
+  assert.deepEqual(getRandomProfileTargetCalls, ['all', 'all']);
+});
+
+test('random route falls back to mock when database is unconfigured', async () => {
+  const { route, mockRandomCalls, getRandomProfileTargetCalls } = loadRandomRoute({
+    isDbConfigured: () => false,
+    getMockRandomProfileTarget: (filter) => {
+      mockRandomCalls.push(filter);
+      return { kind: 'artist', key: 'art_radiohead' };
+    },
+  });
+
+  const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random?type=artists'));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  assert.deepEqual(await res.json(), { kind: 'artist', key: 'art_radiohead' });
+  assert.equal(getRandomProfileTargetCalls.length, 0);
+  assert.deepEqual(mockRandomCalls, ['artists']);
+});
+
+test('random route forces mock when FORCE_MOCK_DATA is true despite configured database', async () => {
+  const prevEnv = process.env.FORCE_MOCK_DATA;
+  process.env.FORCE_MOCK_DATA = 'true';
+  try {
+    const { route, mockRandomCalls, getRandomProfileTargetCalls } = loadRandomRoute({
+      isDbConfigured: () => true,
+      getMockRandomProfileTarget: (filter) => {
+        mockRandomCalls.push(filter);
+        return { kind: 'track', key: 'track_creep' };
+      },
+    });
+
+    const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random?type=tracks'));
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { kind: 'track', key: 'track_creep' });
+    assert.equal(getRandomProfileTargetCalls.length, 0);
+    assert.deepEqual(mockRandomCalls, ['tracks']);
+  } finally {
+    if (prevEnv === undefined) {
+      delete process.env.FORCE_MOCK_DATA;
+    } else {
+      process.env.FORCE_MOCK_DATA = prevEnv;
+    }
+  }
+});
+
+test('random route returns 404 when archive is empty', async () => {
+  const { route } = loadRandomRoute({
+    isDbConfigured: () => true,
+    getRandomProfileTarget: async () => null,
+  });
+
+  const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random'));
+  assert.equal(res.status, 404);
+  assert.equal(res.headers.get('cache-control'), 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  assert.deepEqual(await res.json(), { error: 'Archive is empty.' });
+});
+
+test('random route handles unexpected runtime errors with 500', async () => {
+  const { route } = loadRandomRoute({
+    isDbConfigured: () => true,
+    getRandomProfileTarget: async () => {
+      throw new Error('Database connection failed');
+    },
+  });
+
+  const res = await route.GET(new NextRequest('http://127.0.0.1:8888/api/listening/random'));
+  assert.equal(res.status, 500);
+  assert.deepEqual(await res.json(), { error: 'Internal Server Error' });
 });
