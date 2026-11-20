@@ -8,7 +8,14 @@ import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
-import { parseProfileTarget, parseRangeKey } from "@/lib/search-utils";
+import {
+  checkSearchQuery,
+  parseProfileTarget,
+  parseRangeKey,
+  parseSearchFilter,
+  parseSearchPage,
+  parseSearchSort,
+} from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +35,17 @@ interface PageProps {
     config?: string;
     track?: string | string[];
     artist?: string | string[];
+    album?: string | string[];
     prange?: string | string[];
+    q?: string | string[];
+    type?: string | string[];
+    sort?: string | string[];
+    page?: string | string[];
   }>;
+}
+
+function firstParam(val: string | string[] | undefined): string | undefined {
+  return Array.isArray(val) ? val[0] : val;
 }
 
 export default async function Page({ searchParams }: PageProps) {
@@ -56,11 +72,26 @@ export default async function Page({ searchParams }: PageProps) {
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;
-  const rawPrange = Array.isArray(resolvedParams?.prange)
-    ? resolvedParams.prange[0]
-    : resolvedParams?.prange;
+  const rawPrange = firstParam(resolvedParams?.prange);
   const initialProfileRange =
     initialMode === 4 ? parseRangeKey(rawPrange) : null;
+
+  const isInitialSearch = initialMode === 4 && !initialProfile;
+  const checkedQuery = checkSearchQuery(firstParam(resolvedParams?.q) ?? "");
+  const initialSearchQuery = isInitialSearch
+    ? checkedQuery.ok
+      ? checkedQuery.query
+      : ""
+    : undefined;
+  const initialSearchFilter = isInitialSearch
+    ? parseSearchFilter(firstParam(resolvedParams?.type))
+    : undefined;
+  const initialSearchSort = isInitialSearch
+    ? parseSearchSort(firstParam(resolvedParams?.sort))
+    : undefined;
+  const initialSearchPage = isInitialSearch
+    ? parseSearchPage(firstParam(resolvedParams?.page))
+    : undefined;
 
   const activeConfig = isForceMock ? DEFAULT_SITE_CONFIG : await getActiveSiteConfig();
   const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
@@ -82,6 +113,10 @@ export default async function Page({ searchParams }: PageProps) {
       initialRange={initialRange}
       initialProfile={initialProfile}
       initialProfileRange={initialProfileRange}
+      initialSearchQuery={initialSearchQuery}
+      initialSearchFilter={initialSearchFilter}
+      initialSearchSort={initialSearchSort}
+      initialSearchPage={initialSearchPage}
     />
   );
 }

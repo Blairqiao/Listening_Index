@@ -932,6 +932,44 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   assert.equal(mode3.props.initialMode, 0);
   assert.equal(mode3.props.initialProfile, null);
   assert.equal(mode3.props.initialProfileRange, null);
+
+  // Mode 4 browse (no profile target) passes parsed search params
+  const mode4Search = await mod.exports.default({
+    searchParams: Promise.resolve({
+      mode: "4",
+      q: "  radiohead  ",
+      type: "albums",
+      sort: "recent",
+      page: "3",
+    }),
+  });
+  assert.equal(mode4Search.props.initialMode, 4);
+  assert.equal(mode4Search.props.initialProfile, null);
+  assert.equal(mode4Search.props.initialSearchQuery, "radiohead");
+  assert.equal(mode4Search.props.initialSearchFilter, "albums");
+  assert.equal(mode4Search.props.initialSearchSort, "recent");
+  assert.equal(mode4Search.props.initialSearchPage, 3);
+
+  // Mode 4 browse with invalid/too-long query falls back to defaults
+  const mode4InvalidSearch = await mod.exports.default({
+    searchParams: Promise.resolve({
+      mode: "4",
+      q: "a".repeat(200),
+      type: "invalid",
+      sort: "bogus",
+      page: "0",
+    }),
+  });
+  assert.equal(mode4InvalidSearch.props.initialSearchQuery, "");
+  assert.equal(mode4InvalidSearch.props.initialSearchFilter, "all");
+  assert.equal(mode4InvalidSearch.props.initialSearchSort, "most-plays");
+  assert.equal(mode4InvalidSearch.props.initialSearchPage, 1);
+
+  // Mode 4 with a profile target does not pass browse search params
+  assert.equal(mode4Track.props.initialSearchQuery, undefined);
+  assert.equal(mode4Track.props.initialSearchFilter, undefined);
+  assert.equal(mode4Track.props.initialSearchSort, undefined);
+  assert.equal(mode4Track.props.initialSearchPage, undefined);
 });
 
 test("useSearchProfile: clearProfileCache invalidates in-flight requests and refreshes mounted profile while retaining same-target data", async () => {
