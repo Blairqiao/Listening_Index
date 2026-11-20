@@ -1,8 +1,17 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import { X } from "lucide-react";
-import { DEFAULT_SEARCH_SORT, SEARCH_MAX_CHARS, type ProfileTarget, type SearchSort } from "@/lib/search-types";
+import {
+  DEFAULT_SEARCH_FILTER,
+  DEFAULT_SEARCH_SORT,
+  SEARCH_FILTER_OPTIONS,
+  SEARCH_MAX_CHARS,
+  type ProfileTarget,
+  type SearchFilter,
+  type SearchSort,
+} from "@/lib/search-types";
+import { formatCompactPlayDate } from "@/lib/profile-stats";
 import { searchChipClass, SortMenu } from "./SortMenu";
 import { useSearch } from "./useSearch";
 import { Artwork, getFallbackSwatchColor } from "../../Artwork";
@@ -11,9 +20,14 @@ const pageButtonClass = `${searchChipClass} disabled:cursor-default disabled:opa
 
 const headingLabelClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]";
 
-function ResultHeading({ label, afterArtists = false }: {
+function ResultHeading({
+  label,
+  afterArtists = false,
+  rightHeader = "PLAYS",
+}: {
   label: "TRACKS" | "ARTISTS" | "ALBUMS";
   afterArtists?: boolean;
+  rightHeader?: string;
 }) {
   const spacing = afterArtists
     ? "mt-6 mb-2 md:mt-0 md:mb-0 md:h-[55px] md:items-end md:pb-2"
@@ -22,17 +36,26 @@ function ResultHeading({ label, afterArtists = false }: {
   return (
     <div className={`flex justify-between items-baseline ${spacing}`}>
       <span className={headingLabelClass}>[ {label} ]</span>
-      <span className={headingLabelClass}>PLAYS</span>
+      <span className={headingLabelClass}>{rightHeader}</span>
     </div>
   );
 }
 
-function ResultRow({ name, imageUrl, swatchName = name, plays, subtitle, onClick }: {
+function ResultRow({
+  name,
+  imageUrl,
+  swatchName = name,
+  plays,
+  subtitle,
+  lastPlayedText,
+  onClick,
+}: {
   name: string;
   imageUrl: string | null;
   swatchName?: string;
   plays: number;
   subtitle?: React.ReactNode;
+  lastPlayedText?: string;
   onClick: () => void;
 }) {
   return (
@@ -52,9 +75,16 @@ function ResultRow({ name, imageUrl, swatchName = name, plays, subtitle, onClick
           </div>
         )}
       </div>
-      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums text-right">
-        {plays.toLocaleString()}
-      </span>
+      <div className="flex-none flex items-center gap-2 text-right">
+        {lastPlayedText && (
+          <span className="font-mono text-[10.5px] text-[#5A5A55] tabular-nums">
+            {lastPlayedText}
+          </span>
+        )}
+        <span className="font-mono text-[11px] text-[#8A8A83] tabular-nums">
+          {plays.toLocaleString()}
+        </span>
+      </div>
     </button>
   );
 }
@@ -65,8 +95,13 @@ export interface SearchViewProps {
   onOpenProfile: (target: ProfileTarget) => void;
   sort?: SearchSort;
   page?: number;
+  filter?: SearchFilter;
+  visitorTimezone?: string;
   onSortChange?: (sort: SearchSort) => void;
   onPageChange?: (page: number) => void;
+  onFilterChange?: (filter: SearchFilter) => void;
+  onRandomProfile?: () => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export const SearchView: React.FC<SearchViewProps> = ({
@@ -75,15 +110,38 @@ export const SearchView: React.FC<SearchViewProps> = ({
   onOpenProfile,
   sort = DEFAULT_SEARCH_SORT,
   page = 1,
+  filter = DEFAULT_SEARCH_FILTER,
+  visitorTimezone = "UTC",
   onSortChange,
   onPageChange,
+  onFilterChange,
+  onRandomProfile,
+  inputRef,
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { status, data } = useSearch(query, sort, page);
+  const internalInputRef = useRef<HTMLInputElement | null>(null);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const { status, data } = useSearch(query, sort, page, filter);
+
+  const setMergedRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      internalInputRef.current = element;
+      if (inputRef) {
+        inputRef.current = element;
+      }
+    },
+    [inputRef]
+  );
 
   const albums = data?.albums ?? [];
   const hasArtists = !!data?.artists.length;
-  const hasResults = hasArtists || albums.length > 0 || !!data?.tracks.length;
+  const hasResults =
+    filter === "all"
+      ? hasArtists || albums.length > 0 || !!data?.tracks.length
+      : filter === "tracks"
+        ? !!data?.tracks.length
+        : filter === "artists"
+          ? hasArtists
+          : albums.length > 0;
 
   let statusText: string | null = null;
   if (status === "loading") {
@@ -96,19 +154,274 @@ export const SearchView: React.FC<SearchViewProps> = ({
     statusText = query.trim() ? "[ NO MATCHES ]" : "[ NO PLAYS IN ARCHIVE ]";
   }
 
+  let placeholder = "SEARCH TRACKS, ARTISTS OR ALBUMS";
+  let inputAriaLabel = "Search tracks, artists or albums";
+  if (filter === "tracks") {
+    placeholder = "SEARCH TRACKS";
+    inputAriaLabel = "Search tracks";
+  } else if (filter === "artists") {
+    placeholder = "SEARCH ARTISTS";
+    inputAriaLabel = "Search artists";
+  } else if (filter === "albums") {
+    placeholder = "SEARCH ALBUMS";
+    inputAriaLabel = "Search albums";
+  }
+
+  const isRecencySort = sort === "recent" || sort === "oldest";
+  const rightHeader = isRecencySort ? "LAST PLAYED · PLAYS" : "PLAYS";
+
+  const formatLastPlayed = (iso?: string | null): string | undefined => {
+    if (!isRecencySort || !iso) return undefined;
+    const formatted = formatCompactPlayDate(iso, visitorTimezone);
+    return formatted !== "--" ? formatted : undefined;
+  };
+
+  const getFilterCount = (filterValue: SearchFilter): number | undefined => {
+    if (!data?.totals) return undefined;
+    if (filterValue === "tracks") return data.totals.tracks;
+    if (filterValue === "artists") return data.totals.artists;
+    if (filterValue === "albums") return data.totals.albums;
+    return undefined;
+  };
+
+  const showPagination = page > 1 || !!data?.hasMore || (data?.totalPages ?? 1) > 1;
+  const canPrev = page > 1 && status !== "loading";
+  const canNext =
+    status === "ready" &&
+    !!data?.hasMore &&
+    (data?.totalPages === undefined || page < data.totalPages);
+
+  useEffect(() => {
+    if (!onPageChange) return;
+    const pageChange = onPageChange;
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (isSortMenuOpen) return;
+
+      const active = typeof document !== "undefined" ? document.activeElement : null;
+      if (
+        active instanceof HTMLElement &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.tagName === "SELECT" ||
+          active.isContentEditable ||
+          active.closest('[role="listbox"], [aria-haspopup="listbox"][aria-expanded="true"]'))
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        if (canPrev) {
+          event.preventDefault();
+          pageChange(page - 1);
+        }
+      } else if (event.key === "ArrowRight") {
+        if (canNext) {
+          event.preventDefault();
+          pageChange(page + 1);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSortMenuOpen, canPrev, canNext, onPageChange, page]);
+
+  const renderTrackRow = (track: NonNullable<typeof data>["tracks"][number]): JSX.Element => (
+    <ResultRow
+      key={track.id}
+      name={track.name}
+      imageUrl={track.albumImageUrl}
+      swatchName={track.album || track.name}
+      plays={track.plays}
+      lastPlayedText={formatLastPlayed(track.lastPlayedAt)}
+      subtitle={
+        <>
+          <span>{track.artist}</span>
+          {" · "}
+          <span>{track.album}</span>
+        </>
+      }
+      onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+    />
+  );
+
+  const renderArtistRow = (artist: NonNullable<typeof data>["artists"][number]): JSX.Element => (
+    <ResultRow
+      key={artist.key}
+      name={artist.name}
+      imageUrl={artist.imageUrl}
+      plays={artist.plays}
+      lastPlayedText={formatLastPlayed(artist.lastPlayedAt)}
+      onClick={() => onOpenProfile({ kind: "artist", key: artist.key })}
+    />
+  );
+
+  const renderAlbumRow = (album: NonNullable<typeof data>["albums"][number]): JSX.Element => (
+    <ResultRow
+      key={album.key}
+      name={album.name}
+      imageUrl={album.imageUrl}
+      plays={album.plays}
+      lastPlayedText={formatLastPlayed(album.lastPlayedAt)}
+      subtitle={album.artist}
+      onClick={() => onOpenProfile({ kind: "album", key: album.key })}
+    />
+  );
+
+  const renderBalancedGrid = (
+    label: "TRACKS" | "ARTISTS" | "ALBUMS",
+    items: JSX.Element[]
+  ): JSX.Element => {
+    const mid = Math.ceil(items.length / 2);
+    return (
+      <div className="min-w-0">
+        <ResultHeading label={label} rightHeader={rightHeader} />
+        <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-[26px]">
+          <div className="min-w-0 flex flex-col">{items.slice(0, mid)}</div>
+          <div className="min-w-0 flex flex-col">{items.slice(mid)}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderResults = () => {
+    if (!hasResults || !data) return null;
+
+    if (filter === "all") {
+      const tracksOnlyMixed = !hasArtists && albums.length === 0 && data.tracks.length > 0;
+
+      if (tracksOnlyMixed) {
+        return renderBalancedGrid("TRACKS", data.tracks.map(renderTrackRow));
+      }
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-[26px]">
+          <div className="min-w-0">
+            <ResultHeading label="TRACKS" rightHeader={rightHeader} />
+            <div className="flex flex-col">
+              {data.tracks.length === 0 ? (
+                <div className="font-mono text-[11px] text-[#4A4A46] py-3 px-1 select-none">
+                  [ NO TRACKS ]
+                </div>
+              ) : (
+                data.tracks.map(renderTrackRow)
+              )}
+            </div>
+          </div>
+
+          {(hasArtists || albums.length > 0) && (
+            <div className="min-w-0">
+              {hasArtists && (
+                <div>
+                  <ResultHeading label="ARTISTS" rightHeader={rightHeader} />
+                  <div className="flex flex-col">
+                    {data.artists.map(renderArtistRow)}
+                  </div>
+                </div>
+              )}
+              {albums.length > 0 && (
+                <div>
+                  <ResultHeading label="ALBUMS" afterArtists={hasArtists} rightHeader={rightHeader} />
+                  <div className="flex flex-col">
+                    {albums.map(renderAlbumRow)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (filter === "tracks") {
+      return renderBalancedGrid("TRACKS", data.tracks.map(renderTrackRow));
+    }
+    if (filter === "artists") {
+      return renderBalancedGrid("ARTISTS", data.artists.map(renderArtistRow));
+    }
+    if (filter === "albums") {
+      return renderBalancedGrid("ALBUMS", albums.map(renderAlbumRow));
+    }
+    return null;
+  };
+
   return (
-    <div className="w-full mt-4 md:mt-6 flex flex-col select-none">
+    <div className="w-full flex flex-col select-none">
+      {/* Top control strip */}
+      <div className="my-3.5 sm:my-4 md:my-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          role="group"
+          aria-label="Filter by type"
+          className="grid grid-cols-4 gap-1.5 w-full sm:flex sm:w-auto"
+        >
+          {SEARCH_FILTER_OPTIONS.map((opt) => {
+            const isActive = filter === opt.value;
+            const count = getFilterCount(opt.value);
+
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => onFilterChange?.(opt.value)}
+                className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
+                  isActive
+                    ? "border-music-accent text-music-accent bg-transparent"
+                    : "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent"
+                }`}
+              >
+                <span>{opt.label.toUpperCase()}</span>
+                {count !== undefined && (
+                  <span className="hidden sm:inline ml-1 font-mono text-[10px] text-[#5A5A55] tabular-nums">
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <SortMenu
+            value={sort}
+            onChange={(nextSort) => onSortChange?.(nextSort)}
+            onOpenChange={setIsSortMenuOpen}
+          />
+          {onRandomProfile && (
+            <button
+              type="button"
+              onClick={onRandomProfile}
+              aria-label="Open random profile"
+              className="font-mono text-[11px] tracking-[0.1em] uppercase bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
+            >
+              [ RANDOM ]
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Search Input */}
       <div className="flex-none mb-3">
         <div className="relative">
           <input
-            ref={inputRef}
+            ref={setMergedRef}
             type="search"
             name="search"
             maxLength={SEARCH_MAX_CHARS * 2}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"
-            aria-label="Search tracks, artists or albums"
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+              if (e.key === "Escape" && query) {
+                e.preventDefault();
+                onQueryChange("");
+              }
+            }}
+            placeholder={placeholder}
+            aria-label={inputAriaLabel}
             className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 pl-1 pr-10 outline-none transition-none rounded-none [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
@@ -117,7 +430,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               aria-label="Clear search"
               onClick={() => {
                 onQueryChange("");
-                inputRef.current?.focus();
+                internalInputRef.current?.focus();
               }}
               className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
             >
@@ -125,115 +438,53 @@ export const SearchView: React.FC<SearchViewProps> = ({
             </button>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-          <SortMenu value={sort} onChange={(nextSort) => onSortChange?.(nextSort)} />
-          {(page > 1 || data?.hasMore) && (
-            <nav aria-label="Search results pages" className="flex items-center gap-1.5">
-              <button
-                type="button"
-                aria-label="Previous page"
-                disabled={page <= 1 || status === "loading"}
-                onClick={() => onPageChange?.(page - 1)}
-                className={pageButtonClass}
-              >
-                ← PREV
-              </button>
-              <span className="tabular-nums whitespace-nowrap text-[#8A8A83]">
-                <span className="text-[#5A5A55] tracking-[0.14em]">PAGE</span>{" "}
-                {String(page).padStart(2, "0")}
-              </span>
-              <button
-                type="button"
-                aria-label="Next page"
-                disabled={status !== "ready" || !data?.hasMore}
-                onClick={() => onPageChange?.(page + 1)}
-                className={pageButtonClass}
-              >
-                NEXT →
-              </button>
-            </nav>
-          )}
-        </div>
-        <div className="px-1 font-mono text-[11px] text-[#8A8A83] empty:hidden" role="status">
+        <div className="px-1 font-mono text-[11px] text-[#8A8A83] empty:hidden mt-2" role="status">
           {statusText}
         </div>
       </div>
 
+      {/* Results */}
       <div
         key={page}
         className={`transition-opacity duration-150 ${status === "loading" ? "opacity-60" : "opacity-100"}`}
       >
-        {hasResults && data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-[26px]">
-            <div className="min-w-0">
-              <ResultHeading label="TRACKS" />
-              <div className="flex flex-col">
-                {data.tracks.length === 0 ? (
-                  <div className="font-mono text-[11px] text-[#4A4A46] py-3 px-1 select-none">
-                    [ NO TRACKS ]
-                  </div>
-                ) : (
-                  data.tracks.map((track) => (
-                    <ResultRow
-                      key={track.id}
-                      name={track.name}
-                      imageUrl={track.albumImageUrl}
-                      swatchName={track.album || track.name}
-                      plays={track.plays}
-                      subtitle={
-                        <>
-                          <span>{track.artist}</span>
-                          {" · "}
-                          <span>{track.album}</span>
-                        </>
-                      }
-                      onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-
-            {(hasArtists || albums.length > 0) && (
-              <div className="min-w-0">
-                {hasArtists && (
-                  <div>
-                    <ResultHeading label="ARTISTS" />
-                    <div className="flex flex-col">
-                      {data.artists.map((artist) => (
-                        <ResultRow
-                          key={artist.key}
-                          name={artist.name}
-                          imageUrl={artist.imageUrl}
-                          plays={artist.plays}
-                          onClick={() => onOpenProfile({ kind: "artist", key: artist.key })}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {albums.length > 0 && (
-                  <div>
-                    <ResultHeading label="ALBUMS" afterArtists={hasArtists} />
-                    <div className="flex flex-col">
-                      {albums.map((album) => (
-                        <ResultRow
-                          key={album.key}
-                          name={album.name}
-                          imageUrl={album.imageUrl}
-                          plays={album.plays}
-                          subtitle={album.artist}
-                          onClick={() => onOpenProfile({ kind: "album", key: album.key })}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        {renderResults()}
       </div>
+
+      {/* Bottom Hairline Pagination */}
+      {showPagination && (
+        <div className="w-full py-5 px-1 select-none font-mono text-[11px] flex items-center gap-3">
+          <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
+          <nav aria-label="Search results pages" className="inline-flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={!canPrev}
+              onClick={() => onPageChange?.(page - 1)}
+              className={pageButtonClass}
+            >
+              ← PREV
+            </button>
+            <span className="tabular-nums whitespace-nowrap text-[#8A8A83]">
+              <span className="text-[#5A5A55] tracking-[0.14em]">PAGE</span>{" "}
+              {String(page).padStart(2, "0")}
+              {data?.totalPages !== undefined && (
+                <> / {String(data.totalPages).padStart(2, "0")}</>
+              )}
+            </span>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={!canNext}
+              onClick={() => onPageChange?.(page + 1)}
+              className={pageButtonClass}
+            >
+              NEXT →
+            </button>
+          </nav>
+          <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
+        </div>
+      )}
     </div>
   );
 };
