@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planSideColumn } from "../src/lib/search-layout";
+import { planSideColumn, computeSearchTotalPages } from "../src/lib/search-layout";
+import { SEARCH_TRACK_ROWS, SEARCH_SIDE_ROWS } from "../src/lib/search-types";
 
 test("planSideColumn splits seven rows four to three and advances both offsets", () => {
   const input = { artistTotal: 10, albumTotal: 10, sideRows: 7 };
@@ -98,6 +99,98 @@ test("planSideColumn fills every page that has results after it, so the columns 
           `artistTotal=${artistTotal}, albumTotal=${albumTotal}, sideRows=${sideRows}, page=${page}`,
         );
       }
+    }
+  }
+});
+
+test("computeSearchTotalPages returns at least 1 for empty totals across all filters", () => {
+  for (const filter of ["all", "tracks", "artists", "albums"] as const) {
+    assert.equal(
+      computeSearchTotalPages({ filter, trackTotal: 0, artistTotal: 0, albumTotal: 0 }),
+      1,
+      `Filter ${filter} should return 1 for empty totals`,
+    );
+  }
+});
+
+test("computeSearchTotalPages calculates total pages for single-type filters using SEARCH_SINGLE_TYPE_ROWS", () => {
+  // tracks filter
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 0, artistTotal: 100, albumTotal: 100 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 1, artistTotal: 0, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 16, artistTotal: 0, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 17, artistTotal: 0, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 32, artistTotal: 0, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "tracks", trackTotal: 33, artistTotal: 0, albumTotal: 0 }), 3);
+
+  // artists filter
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 100, artistTotal: 0, albumTotal: 100 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 0, artistTotal: 1, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 0, artistTotal: 16, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 0, artistTotal: 17, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 0, artistTotal: 32, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "artists", trackTotal: 0, artistTotal: 48, albumTotal: 0 }), 3);
+
+  // albums filter
+  assert.equal(computeSearchTotalPages({ filter: "albums", trackTotal: 100, artistTotal: 100, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "albums", trackTotal: 0, artistTotal: 0, albumTotal: 1 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "albums", trackTotal: 0, artistTotal: 0, albumTotal: 16 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "albums", trackTotal: 0, artistTotal: 0, albumTotal: 17 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "albums", trackTotal: 0, artistTotal: 0, albumTotal: 32 }), 2);
+});
+
+test("computeSearchTotalPages for 'all' filter matches exact final non-empty page of planSideColumn and track pagination", () => {
+  // Test multiples of 8 for trackTotal when side column is empty
+  assert.equal(computeSearchTotalPages({ filter: "all", trackTotal: 0, artistTotal: 0, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "all", trackTotal: 8, artistTotal: 0, albumTotal: 0 }), 1);
+  assert.equal(computeSearchTotalPages({ filter: "all", trackTotal: 9, artistTotal: 0, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "all", trackTotal: 16, artistTotal: 0, albumTotal: 0 }), 2);
+  assert.equal(computeSearchTotalPages({ filter: "all", trackTotal: 24, artistTotal: 0, albumTotal: 0 }), 3);
+
+  const testCases = [
+    [0, 0],
+    [0, 20],
+    [20, 0],
+    [3, 20],
+    [20, 3],
+    [10, 10],
+    [1, 20],
+    [20, 1],
+    [12, 12],
+    [0, 30],
+    [30, 0],
+    [7, 7],
+    [8, 8],
+    [14, 14],
+  ];
+
+  for (const [artistTotal, albumTotal] of testCases) {
+    // Find final non-empty page by walking planSideColumn
+    let expectedSidePages = 0;
+    for (let page = 1; page <= artistTotal + albumTotal + 2; page += 1) {
+      const slice = planSideColumn({ artistTotal, albumTotal, sideRows: SEARCH_SIDE_ROWS, page });
+      if (slice.artistLimit > 0 || slice.albumLimit > 0) {
+        expectedSidePages = page;
+      } else {
+        break;
+      }
+    }
+
+    for (const trackTotal of [0, 1, 8, 9, 16, 24, 35, 100]) {
+      const expectedTrackPages = Math.ceil(trackTotal / SEARCH_TRACK_ROWS);
+      const expectedTotalPages = Math.max(1, expectedTrackPages, expectedSidePages);
+
+      const actual = computeSearchTotalPages({
+        filter: "all",
+        trackTotal,
+        artistTotal,
+        albumTotal,
+      });
+
+      assert.equal(
+        actual,
+        expectedTotalPages,
+        `Mismatch for artistTotal=${artistTotal}, albumTotal=${albumTotal}, trackTotal=${trackTotal}: expected ${expectedTotalPages}, got ${actual}`,
+      );
     }
   }
 });
