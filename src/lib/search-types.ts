@@ -3,6 +3,17 @@ import type { ActivityBucket, RangeKey } from "@/lib/types";
 export const SEARCH_RESULT_LIMIT = 8;
 export const SEARCH_TRACK_ROWS = SEARCH_RESULT_LIMIT;
 export const SEARCH_SIDE_ROWS = SEARCH_TRACK_ROWS - 1; // The Albums heading takes one row.
+export const SEARCH_SINGLE_TYPE_ROWS = 16;
+
+export const SEARCH_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "tracks", label: "Tracks" },
+  { value: "artists", label: "Artists" },
+  { value: "albums", label: "Albums" },
+] as const;
+export type SearchFilter = (typeof SEARCH_FILTER_OPTIONS)[number]["value"];
+export const DEFAULT_SEARCH_FILTER: SearchFilter = "all";
+
 export const SEARCH_SORT_OPTIONS = [
   { value: "most-plays", label: "Most plays" },
   { value: "least-plays", label: "Least plays" },
@@ -19,12 +30,21 @@ export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
 export const PROFILE_ALBUM_PROFILE_TRACKS_LIMIT = 50;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
 export const PROFILE_TOP_ALBUMS_LIMIT = 5;
+export const PROFILE_RELATED_TRACKS_LIMIT = 4;
+export const PROFILE_MORE_ALBUMS_LIMIT = 4;
+
+export interface SearchTotals {
+  tracks: number;
+  artists: number;
+  albums: number;
+}
 
 export interface SearchArtistResult {
   key: string;             // artist_id when the catalog is fully enriched, else artist_group_key
   name: string;
   plays: number;           // lifetime plays
   imageUrl: string | null; // image of the artist's most-played album, if any
+  lastPlayedAt?: string | null;
 }
 
 export interface SearchAlbumResult {
@@ -33,6 +53,7 @@ export interface SearchAlbumResult {
   artist: string;
   plays: number;           // lifetime Plays
   imageUrl: string | null;
+  lastPlayedAt?: string | null;
 }
 
 export interface SearchTrackResult {
@@ -42,6 +63,7 @@ export interface SearchTrackResult {
   album: string;
   plays: number;           // lifetime plays
   albumImageUrl: string | null;
+  lastPlayedAt?: string | null;
 }
 
 export interface SearchResponse {
@@ -50,10 +72,46 @@ export interface SearchResponse {
   albums: SearchAlbumResult[];
   tracks: SearchTrackResult[];
   hasMore: boolean;
+  totals?: SearchTotals;
+  totalPages?: number;
 }
 
 export type ProfileKind = "track" | "artist" | "album";
 export interface ProfileTarget { kind: ProfileKind; key: string; }
+
+export interface ProfilePeakDay {
+  date: string;  // Local YYYY-MM-DD
+  plays: number;
+}
+
+export interface ProfileRelatedTrack {
+  id: string;
+  name: string;
+  artist: string;
+  albumImageUrl: string | null;
+  coPlays: number;
+}
+
+export interface ProfileSummaryStats {
+  totalMs: number;
+  activeDays: number;
+  longestStreakDays: number;
+  peakDay: ProfilePeakDay | null;
+  completionRate?: number | null;
+  artistPlays?: number;
+  artistShare?: number | null;
+  albumPlays?: number;
+  albumShare?: number | null;
+  tracksHeardInRange?: number;
+  tracksHeardLifetime?: number;
+  fullAlbumSessions?: number;
+}
+
+export interface ProfileHistoryEntry {
+  target: ProfileTarget;
+  range: RangeKey;
+  name?: string;
+}
 
 export interface ProfileTopTrack { id: string; name: string; plays: number; albumImageUrl: string | null; }
 export interface ProfileTopAlbum {
@@ -66,6 +124,7 @@ export interface ProfileTopAlbum {
 export interface ProfilePlay {
   id: string; trackId: string; playedAt: string; // ISO
   title: string; artist: string; album: string; durationMs: number; albumImageUrl: string | null;
+  msPlayed?: number;
 }
 
 export interface ProfileAlbumTrack {
@@ -100,6 +159,10 @@ export interface ProfileData {
   albumKey?: string;           // The Track's Album key in the active identity form
   trackStats?: ProfileTrackStats; // track profiles only
   hourOfDay?: number[]; // 24 counts indexed by local hour
+  dayOfWeek?: number[];
+  stats?: ProfileSummaryStats;
+  relatedTracks?: ProfileRelatedTrack[];
+  moreAlbums?: ProfileTopAlbum[];
   albumTracks?: ProfileAlbumTrack[]; // track profiles only, ranked in range
   topTracks: ProfileTopTrack[]; // Ranked in range. Up to 10 for Artist profiles and 50 for Album profiles.
   topAlbums: ProfileTopAlbum[]; // Artist profiles only, up to 5 in range.
