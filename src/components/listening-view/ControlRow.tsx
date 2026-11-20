@@ -20,7 +20,7 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
-  returnsTo?: "artist" | "album" | null;
+  returnsTo?: ProfileKind | null;
   onProfileBack?: () => void;
   profileKind?: ProfileKind | null;
   // Mode 3: Live Player page-level controls

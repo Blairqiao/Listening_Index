@@ -1,6 +1,13 @@
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
-import type { ProfileData, ProfileTarget } from "@/lib/search-types";
+import {
+  DEFAULT_SEARCH_FILTER,
+  DEFAULT_SEARCH_SORT,
+  type ProfileData,
+  type ProfileTarget,
+  type SearchFilter,
+  type SearchSort,
+} from "@/lib/search-types";
 import { formatLogStartDate } from "@/lib/db/queries/helpers";
 import { formatRankDisplay, formatPlaysDisplay } from "@/lib/format-utils";
 
@@ -173,17 +180,17 @@ export function formatProfileRibbonMetrics(
   rankFormat: "rank" | "percentile" = "rank",
 ): [string, string, string, string] {
   if (
-    status !== "ready" ||
+    (status !== "ready" && status !== "loading") ||
     !data ||
     !target ||
     data.kind !== target.kind ||
     data.key !== target.key ||
-    data.range !== range
+    (status === "ready" && data.range !== range)
   ) {
     return ["--", "--", "--", "--"];
   }
 
-  const plays = String(data.plays);
+  const plays = data.plays.toLocaleString();
   const rank =
     data.rank !== null && data.rank > 0
       ? formatRankDisplay(data.rank, data.rankedTotal, rankFormat)
@@ -205,6 +212,12 @@ export function buildListeningUrlSearch(
     activeMode: Mode;
     profileTarget: ProfileTarget | null;
     profileRange: RangeKey;
+    search?: {
+      query: string;
+      filter: SearchFilter;
+      sort: SearchSort;
+      page: number;
+    };
   }
 ): string {
   const raw = currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch;
@@ -226,6 +239,35 @@ export function buildListeningUrlSearch(
     params.set("prange", state.profileRange);
   } else {
     params.delete("prange");
+  }
+
+  if (state.activeMode === 4 && !target && state.search) {
+    const trimmedQuery = state.search.query.trim();
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    } else {
+      params.delete("q");
+    }
+    if (state.search.filter !== DEFAULT_SEARCH_FILTER) {
+      params.set("type", state.search.filter);
+    } else {
+      params.delete("type");
+    }
+    if (state.search.sort !== DEFAULT_SEARCH_SORT) {
+      params.set("sort", state.search.sort);
+    } else {
+      params.delete("sort");
+    }
+    if (state.search.page > 1) {
+      params.set("page", String(state.search.page));
+    } else {
+      params.delete("page");
+    }
+  } else {
+    params.delete("q");
+    params.delete("type");
+    params.delete("sort");
+    params.delete("page");
   }
 
   const qs = params.toString();

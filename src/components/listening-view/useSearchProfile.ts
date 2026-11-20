@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_PROFILE_RANGE, type ProfileData, type ProfileTarget } from "@/lib/search-types";
+import {
+  DEFAULT_PROFILE_RANGE,
+  type ProfileData,
+  type ProfileHistoryEntry,
+  type ProfileTarget,
+} from "@/lib/search-types";
 import type { Mode, RangeKey } from "@/lib/types";
 import {
   getProfileCacheKey,
@@ -7,16 +12,14 @@ import {
   type ProfileStatus,
 } from "./listening-helpers";
 
-interface ProfileOrigin {
-  target: ProfileTarget & { kind: "artist" | "album" };
-  range: RangeKey;
-}
+const MAX_PROFILE_HISTORY = 20;
 
 export interface UseSearchProfileParams {
   activeMode: Mode;
   visitorTimezone: string;
   initialProfile?: ProfileTarget | null;
   initialProfileRange?: RangeKey | null;
+  initialSearchQuery?: string;
   isSyncing?: boolean;
 }
 
@@ -25,21 +28,25 @@ export function useSearchProfile({
   visitorTimezone,
   initialProfile,
   initialProfileRange,
+  initialSearchQuery,
   isSyncing = false,
 }: UseSearchProfileParams) {
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>(() => initialSearchQuery ?? "");
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(
     () => initialProfile ?? null
   );
   const [profileRange, setProfileRange] = useState<RangeKey>(
     () => initialProfileRange ?? DEFAULT_PROFILE_RANGE
   );
-  const [profileOrigin, setProfileOrigin] = useState<ProfileOrigin | null>(null);
+  const [profileHistory, setProfileHistory] = useState<ProfileHistoryEntry[]>([]);
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
+  const [cacheVersion, setCacheVersion] = useState(0);
 
   const profileCacheRef = useRef<Map<string, ProfileData>>(new Map());
   const requestGenerationRef = useRef(0);
+
+  const profileData = resolveDisplayedProfileData(rawProfileData, profileTarget);
 
   const openProfileAt = useCallback(
     (target: ProfileTarget, nextRange: RangeKey) => {
@@ -69,33 +76,111 @@ export function useSearchProfile({
     [visitorTimezone]
   );
 
-  const handleOpenProfile = useCallback((target: ProfileTarget) => {
-    setProfileOrigin(null);
-    openProfileAt(target, DEFAULT_PROFILE_RANGE);
-  }, [openProfileAt]);
-
-  const handleOpenRelatedProfile = useCallback((target: ProfileTarget) => {
-    const originKind = profileTarget?.kind;
-    const keepsOrigin = (originKind === "artist" && (target.kind === "track" || target.kind === "album"))
-      || (originKind === "album" && target.kind === "track");
-    setProfileOrigin(profileTarget && keepsOrigin
-      ? { target: { kind: originKind, key: profileTarget.key }, range: profileRange }
-      : null);
-    openProfileAt(target, profileRange);
-  }, [openProfileAt, profileRange, profileTarget]);
-
-  const handleProfileBack = useCallback(() => {
-    if (profileOrigin) {
-      setProfileOrigin(null);
-      openProfileAt(profileOrigin.target, profileOrigin.range);
-      return;
-    }
-
+  const handleReturnToSearch = useCallback(() => {
     requestGenerationRef.current++;
+    setProfileHistory([]);
     setProfileTarget(null);
     setRawProfileData(null);
     setProfileStatus("loading");
-  }, [profileOrigin, openProfileAt]);
+  }, []);
+
+  const handleOpenProfile = useCallback(
+    (target: ProfileTarget) => {
+      setProfileHistory([]);
+      openProfileAt(target, DEFAULT_PROFILE_RANGE);
+    },
+    [openProfileAt]
+  );
+
+  const handleOpenRelatedProfile = useCallback(
+    (target: ProfileTarget) => {
+      if (
+        profileTarget &&
+        (target.kind !== profileTarget.kind || target.key !== profileTarget.key)
+      ) {
+        setProfileHistory((prev) => {
+          const top = prev.at(-1);
+          if (top && top.target.kind === target.kind && top.target.key === target.key) {
+            return prev.slice(0, -1);
+          }
+          const next = [
+            ...prev,
+            {
+              target: profileTarget,
+              range: profileRange,
+              name: profileData?.name,
+            },
+          ];
+          return next.length > MAX_PROFILE_HISTORY
+            ? next.slice(next.length - MAX_PROFILE_HISTORY)
+            : next;
+        });
+      }
+      openProfileAt(target, profileRange);
+    },
+    [openProfileAt, profileData?.name, profileRange, profileTarget]
+  );
+
+  const handleProfileBack = useCallback(() => {
+    if (profileHistory.length > 0) {
+      const previous = profileHistory[profileHistory.length - 1];
+      setProfileHistory((prev) => prev.slice(0, -1));
+      openProfileAt(previous.target, previous.range);
+      return;
+    }
+
+    handleReturnToSearch();
+  }, [profileHistory, openProfileAt, handleReturnToSearch]);
+
+  const handleJumpToHistory = useCallback(
+    (index: number) => {
+      if (index < 0) {
+        handleReturnToSearch();
+        return;
+      }
+      if (index >= profileHistory.length) return;
+      const entry = profileHistory[index];
+      setProfileHistory((prev) => prev.slice(0, index));
+      openProfileAt(entry.target, entry.range);
+    },
+    [profileHistory, openProfileAt, handleReturnToSearch]
+  );
+
+  const syncFromLocation = useCallback(
+    (
+      target: ProfileTarget | null,
+      range: RangeKey | null,
+      history?: ProfileHistoryEntry[]
+    ) => {
+      if (!target) {
+        handleReturnToSearch();
+        return;
+      }
+      if (history !== undefined) {
+        const bounded =
+          history.length > MAX_PROFILE_HISTORY
+            ? history.slice(history.length - MAX_PROFILE_HISTORY)
+            : history.slice();
+        setProfileHistory(bounded);
+      } else {
+        setProfileHistory((prev) => {
+          const top = prev.at(-1);
+          if (top && top.target.kind === target.kind && top.target.key === target.key) {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+      }
+      openProfileAt(target, range ?? DEFAULT_PROFILE_RANGE);
+    },
+    [openProfileAt, handleReturnToSearch]
+  );
+
+  const clearProfileCache = useCallback(() => {
+    profileCacheRef.current.clear();
+    requestGenerationRef.current++;
+    setCacheVersion((v) => v + 1);
+  }, []);
 
   const handleSelectProfileRange = useCallback(
     (range: RangeKey) => {
@@ -242,9 +327,7 @@ export function useSearchProfile({
       cancelled = true;
       controller.abort();
     };
-  }, [activeMode, profileTarget, profileRange, visitorTimezone]);
-
-  const profileData = resolveDisplayedProfileData(rawProfileData, profileTarget);
+  }, [activeMode, profileTarget, profileRange, visitorTimezone, cacheVersion]);
 
   return {
     searchQuery,
@@ -253,10 +336,15 @@ export function useSearchProfile({
     profileRange,
     profileData,
     profileStatus,
+    profileHistory,
     handleOpenProfile,
     handleOpenRelatedProfile,
     handleProfileBack,
-    returnsTo: profileOrigin?.target.kind ?? null,
+    handleJumpToHistory,
+    handleReturnToSearch,
+    syncFromLocation,
+    clearProfileCache,
+    returnsTo: profileHistory.at(-1)?.target.kind ?? null,
     handleSelectProfileRange,
   };
 }
