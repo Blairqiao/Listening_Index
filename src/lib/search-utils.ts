@@ -1,10 +1,14 @@
 import type { RangeKey } from "@/lib/types";
 import {
+  DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
+  SEARCH_FILTER_OPTIONS,
   SEARCH_MAX_CHARS,
-  SEARCH_RESULT_LIMIT,
+  SEARCH_SINGLE_TYPE_ROWS,
   SEARCH_SORT_OPTIONS,
   type ProfileTarget,
+  type SearchFilter,
+  type SearchSort,
 } from "@/lib/search-types";
 
 export const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
@@ -25,14 +29,18 @@ export function checkSearchQuery(raw: string): SearchQueryCheck {
   return { ok: true, query };
 }
 
-export function parseSearchSort(raw: string | null) {
+export function parseSearchFilter(raw: string | null | undefined): SearchFilter {
+  return SEARCH_FILTER_OPTIONS.find(({ value }) => value === raw)?.value ?? DEFAULT_SEARCH_FILTER;
+}
+
+export function parseSearchSort(raw: string | null | undefined): SearchSort {
   return SEARCH_SORT_OPTIONS.find(({ value }) => value === raw)?.value ?? DEFAULT_SEARCH_SORT;
 }
 
-export function parseSearchPage(raw: string | null): number {
+export function parseSearchPage(raw: string | null | undefined): number {
   if (!raw || !/^[1-9][0-9]*$/.test(raw)) return 1;
   const page = Number(raw);
-  return Number.isSafeInteger(page * SEARCH_RESULT_LIMIT) ? page : 1;
+  return Number.isSafeInteger(page * SEARCH_SINGLE_TYPE_ROWS) ? page : 1;
 }
 
 export function normalizeForSearch(s: string): string {
