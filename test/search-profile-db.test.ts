@@ -6,16 +6,24 @@ import { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "../src/lib/db/queries
 import { migrateSchema } from "../src/lib/db/queries/schema";
 import { searchCatalog } from "../src/lib/db/queries/search";
 import { isCatalogFullyEnriched } from "../src/lib/db/queries/enrichment";
-import { hourHistogram, longestStreak } from "../src/lib/profile-stats";
+import {
+  computeCompletionRate,
+  computePeakDay,
+  dayOfWeekHistogram,
+  hourHistogram,
+  longestStreak,
+} from "../src/lib/profile-stats";
 import { getProfile } from "../src/lib/db/queries/profile";
 import {
   PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_RECENT_PLAYS_LIMIT,
+  PROFILE_RELATED_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
   SEARCH_RESULT_LIMIT,
 } from "../src/lib/search-types";
 import { checkSearchQuery, normalizeForSearch } from "../src/lib/search-utils";
+import { loadTs } from "./helpers/load-ts";
 
 dotenv.config({ path: ".env.local", quiet: true });
 
@@ -295,51 +303,174 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
       `;
       const enriched = await isCatalogFullyEnriched();
 
-      return Promise.all((["all", "1m"] as const).flatMap((range) =>
-        ["UTC", "America/Chicago"].map(async (tz) => {
-          const timeFilter = range === "all" ? sql`TRUE` :
-            sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+      return Promise.all((["all", "1m"] as const).map(async (range) => {
+        const timeFilter = range === "all" ? sql`TRUE` :
+          sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+        const orderedPlays = await sql`
+          SELECT p.id::text, p.track_id, p.played_at
+          FROM plays p
+          WHERE ${timeFilter}
+          ORDER BY p.played_at ASC, p.id ASC;
+        `;
+        const coPlayCounts = new Map<string, number>();
+        for (let i = 0; i < orderedPlays.length; i++) {
+          if (String(orderedPlays[i].track_id) !== id) continue;
+          const currMs = Date.parse(String(orderedPlays[i].played_at));
+          if (i > 0) {
+            const prevId = String(orderedPlays[i - 1].track_id);
+            const prevMs = Date.parse(String(orderedPlays[i - 1].played_at));
+            if (prevId !== id && currMs - prevMs <= 30 * 60 * 1000) {
+              coPlayCounts.set(prevId, (coPlayCounts.get(prevId) ?? 0) + 1);
+            }
+          }
+          if (i + 1 < orderedPlays.length) {
+            const nextId = String(orderedPlays[i + 1].track_id);
+            const nextMs = Date.parse(String(orderedPlays[i + 1].played_at));
+            if (nextId !== id && nextMs - currMs <= 30 * 60 * 1000) {
+              coPlayCounts.set(nextId, (coPlayCounts.get(nextId) ?? 0) + 1);
+            }
+          }
+        }
+        const neighborIds = [...coPlayCounts.keys()];
+        const neighborMeta = neighborIds.length > 0
+          ? await sql`
+              SELECT t.id, t.name, COALESCE(ar.name, t.artist_name, '') AS artist, al.image_url AS album_image_url
+              FROM tracks t
+              LEFT JOIN artists ar ON t.artist_id = ar.id
+              LEFT JOIN albums al ON t.album_id = al.id
+              WHERE t.id = ANY(${neighborIds});
+            `
+          : [];
+        const expectedRelated = neighborMeta
+          .map((row) => ({
+            id: String(row.id),
+            name: String(row.name),
+            artist: String(row.artist),
+            albumImageUrl: (row.album_image_url as string | null) ?? null,
+            coPlays: coPlayCounts.get(String(row.id)) ?? 0,
+          }))
+          .sort((a, b) =>
+            b.coPlays - a.coPlays ||
+            (a.name < b.name ? -1 : a.name > b.name ? 1 : 0) ||
+            (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+          )
+          .slice(0, PROFILE_RELATED_TRACKS_LIMIT);
+
+        return Promise.all(["UTC", "America/Chicago"].map(async (tz) => {
           const [profile, rawPlays, [identity]] = await Promise.all([
             getProfile({ kind: "track", key: id }, range, tz),
-            sql`SELECT p.played_at FROM plays p WHERE p.track_id = ${id} AND ${timeFilter}`,
+            sql`
+              SELECT p.id::text, p.played_at, p.ms_played, t.duration_ms
+              FROM plays p JOIN tracks t ON t.id = p.track_id
+              WHERE p.track_id = ${id} AND ${timeFilter}
+            `,
             sql`SELECT artist_id, artist_group_key, album_id, album_group_key FROM tracks WHERE id = ${id}`,
           ]);
           const artistKey = enriched ? identity.artist_id : identity.artist_group_key;
           const artist = artistKey == null ? null : await getProfile({ kind: "artist", key: artistKey }, range, tz);
-          const siblings = await sql`
-            SELECT t.id, t.name, COUNT(*)::int AS plays
-            FROM tracks t JOIN plays p ON p.track_id = t.id
-            WHERE ${timeFilter} AND CASE WHEN ${identity.album_id}::text IS NOT NULL
-              THEN t.album_id = ${identity.album_id}
-              ELSE t.album_id IS NULL AND t.album_group_key = ${identity.album_group_key}
-                AND t.artist_group_key = ${identity.artist_group_key}
-            END
-            GROUP BY t.id, t.name ORDER BY plays DESC, t.name ASC, t.id ASC
-            LIMIT ${PROFILE_ALBUM_TRACKS_LIMIT};
-          `;
-          return { id, tz, profile, rawPlays, artist, siblings };
-        })
-      ));
+          const albumFilter = enriched
+            ? identity.album_id != null
+              ? sql`t.album_id = ${identity.album_id}`
+              : null
+            : identity.album_group_key != null
+              ? sql`t.album_group_key = ${identity.album_group_key}`
+              : null;
+          const [siblings, albumPlayRows] = albumFilter
+            ? await Promise.all([
+                sql`
+                  SELECT t.id, t.name, COUNT(*)::int AS plays
+                  FROM tracks t JOIN plays p ON p.track_id = t.id
+                  WHERE ${timeFilter} AND ${albumFilter}
+                  GROUP BY t.id, t.name ORDER BY plays DESC, t.name ASC, t.id ASC
+                  LIMIT ${PROFILE_ALBUM_TRACKS_LIMIT};
+                `,
+                sql`
+                  SELECT COUNT(*)::int AS plays
+                  FROM tracks t JOIN plays p ON p.track_id = t.id
+                  WHERE ${timeFilter} AND ${albumFilter};
+                `,
+              ])
+            : [[], []];
+          return {
+            id,
+            range,
+            tz,
+            profile,
+            rawPlays,
+            artist,
+            siblings,
+            albumPlays: Number(albumPlayRows[0]?.plays ?? 0),
+            expectedRelated,
+          };
+        }));
+      })).then((groups) => groups.flat());
     });
 
-    for (const { id, tz, profile, rawPlays, artist, siblings } of comparisons) {
+    const weekdayToIso: Record<string, number> = {
+      Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7,
+    };
+
+    for (const { id, range, tz, profile, rawPlays, artist, siblings, albumPlays, expectedRelated } of comparisons) {
       assert.ok(profile?.trackStats);
       assert.ok(profile.hourOfDay);
+      assert.ok(profile.dayOfWeek);
+      assert.ok(profile.stats);
+      assert.ok(Array.isArray(profile.relatedTracks));
       const formatter = new Intl.DateTimeFormat("en-CA", {
         timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", hourCycle: "h23",
+        hour: "2-digit", hourCycle: "h23", weekday: "short",
       });
       const local = rawPlays.map(({ played_at }) => {
         const parts = Object.fromEntries(formatter.formatToParts(new Date(played_at))
           .map(({ type, value }) => [type, value]));
-        return { day: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+        return {
+          day: `${parts.year}-${parts.month}-${parts.day}`,
+          hour: Number(parts.hour),
+          isoDow: weekdayToIso[parts.weekday],
+        };
       });
+      const dayCounts = new Map<string, number>();
+      for (const { day } of local) dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
+      const dayList = [...dayCounts.entries()].map(([date, plays]) => ({ date, plays }));
+      const expectedTotalMs = rawPlays.reduce((sum, r) => sum + Number(r.ms_played ?? 0), 0);
+      const expectedCompletion = computeCompletionRate(
+        rawPlays.map((r) => ({ msPlayed: Number(r.ms_played ?? 0), durationMs: Number(r.duration_ms ?? 0) })),
+      );
+
       assert.equal(profile.plays, rawPlays.length);
       assert.deepEqual(profile.hourOfDay, hourHistogram(local.map(({ hour }) => hour)));
       assert.equal(profile.hourOfDay.reduce((sum, count) => sum + count, 0), profile.plays);
+      assert.equal(profile.dayOfWeek.length, 7);
+      assert.deepEqual(profile.dayOfWeek, dayOfWeekHistogram(local.map(({ isoDow }) => isoDow)));
+      assert.equal(profile.dayOfWeek.reduce((sum, count) => sum + count, 0), profile.plays);
       assert.equal(profile.trackStats.longestStreakDays, longestStreak(local.map(({ day }) => day)));
       assert.equal(profile.trackStats.artistPlays, artist?.plays ?? 0);
       assert.equal(profile.trackStats.artistShare, profile.plays && artist?.plays ? profile.plays / artist.plays : null);
+      assert.equal(profile.stats.totalMs, expectedTotalMs);
+      assert.equal(profile.stats.activeDays, dayList.length);
+      assert.equal(profile.stats.longestStreakDays, profile.trackStats.longestStreakDays);
+      assert.deepEqual(profile.stats.peakDay, computePeakDay(dayList));
+      if (expectedCompletion === null) {
+        assert.equal(profile.stats.completionRate, null);
+      } else {
+        assert.ok(
+          profile.stats.completionRate != null &&
+            Math.abs(profile.stats.completionRate - expectedCompletion) < 1e-9,
+          `expected completionRate ${profile.stats.completionRate} ≈ ${expectedCompletion}`
+        );
+      }
+      assert.equal(profile.stats.artistPlays, artist?.plays ?? 0);
+      assert.equal(profile.stats.artistShare, profile.trackStats.artistShare);
+      assert.equal(profile.stats.albumPlays, albumPlays);
+      assert.equal(profile.stats.albumShare, profile.plays && albumPlays ? profile.plays / albumPlays : null);
+      if (range === "all") {
+        assert.ok(expectedRelated.length > 0, "expected nonempty relatedTracks on configured archive");
+      }
+      assert.deepEqual(profile.relatedTracks, expectedRelated);
+      const rawMsById = new Map(rawPlays.map((r) => [String(r.id), Number(r.ms_played ?? 0)]));
+      for (const play of profile.recentPlays) {
+        assert.equal(play.msPlayed, rawMsById.get(play.id));
+      }
       assert.deepEqual(profile.albumTracks, siblings.map((row) => ({
         id: row.id, name: row.name, plays: row.plays, isCurrent: row.id === id,
       })));
@@ -363,7 +494,7 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
             const timeFilter = range === "all" ? sql`TRUE` :
               sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
             const [rawPlays, track] = await Promise.all([
-              sql`SELECT p.played_at FROM plays p JOIN tracks t ON t.id = p.track_id
+              sql`SELECT p.id::text, p.played_at, p.ms_played FROM plays p JOIN tracks t ON t.id = p.track_id
                   WHERE ${artistFilter} AND ${timeFilter}`,
               getProfile({ kind: "track", key: profile.topTracks[0].id }, range, tz),
             ]);
@@ -374,10 +505,23 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
           timeZone: tz, hour: "2-digit", hourCycle: "h23",
         });
         assert.ok(profile.hourOfDay);
+        assert.ok(profile.dayOfWeek);
+        assert.ok(profile.stats);
         assert.deepEqual(profile.hourOfDay, hourHistogram(rawPlays.map(({ played_at }) =>
           Number(formatter.format(new Date(played_at)))
         )));
         assert.equal(profile.hourOfDay.reduce((sum, count) => sum + count, 0), profile.plays);
+        assert.equal(profile.dayOfWeek.length, 7);
+        assert.equal(profile.dayOfWeek.reduce((sum, count) => sum + count, 0), profile.plays);
+        const expectedTotalMs = rawPlays.reduce((sum, r) => sum + Number(r.ms_played ?? 0), 0);
+        assert.equal(profile.stats.totalMs, expectedTotalMs);
+        assert.ok(profile.stats.activeDays > 0);
+        assert.ok(profile.stats.longestStreakDays > 0);
+        assert.ok(profile.stats.peakDay && profile.stats.peakDay.plays > 0);
+        const rawMsById = new Map(rawPlays.map((r) => [String(r.id), Number(r.ms_played ?? 0)]));
+        for (const play of profile.recentPlays) {
+          assert.equal(play.msPlayed, rawMsById.get(play.id));
+        }
         assert.equal(track?.trackStats?.artistPlays, profile.plays);
       }
     }
@@ -399,6 +543,46 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
     assert.equal(profile.trackStats.artistShare, null);
     assert.equal(profile.trackStats.longestStreakDays, 0);
     assert.deepEqual(profile.hourOfDay, Array(24).fill(0));
+    assert.deepEqual(profile.dayOfWeek, Array(7).fill(0));
+    assert.ok(profile.stats);
+    assert.equal(profile.stats.totalMs, 0);
+    assert.equal(profile.stats.activeDays, 0);
+    assert.equal(profile.stats.longestStreakDays, 0);
+    assert.equal(profile.stats.peakDay, null);
+    assert.equal(profile.stats.completionRate, null);
+    assert.deepEqual(profile.relatedTracks, []);
+  });
+
+  await t.test("Track albumFilter uses album_group_key in group-key mode", async () => {
+    const { getProfile: getGroupKeyProfile } = loadTs("src/lib/db/queries/profile.ts", {
+      "../index": { getDb },
+      "./enrichment": { isCatalogFullyEnriched: async () => false },
+    }) as { getProfile: typeof getProfile };
+
+    const { profile, albumPlays } = await captureStableComparison(sql, "track-dual-phase-album-filter", async () => {
+      const [row] = await sql`
+        SELECT t.id, t.album_group_key
+        FROM tracks t JOIN plays p ON p.track_id = t.id
+        WHERE t.album_group_key IS NOT NULL
+        GROUP BY t.id, t.album_group_key
+        ORDER BY COUNT(p.id) DESC, t.id ASC
+        LIMIT 1;
+      `;
+      assert.ok(row, "expected a track with album_group_key");
+      const [profile, [countRow]] = await Promise.all([
+        getGroupKeyProfile({ kind: "track", key: String(row.id) }, "all", "UTC"),
+        sql`
+          SELECT COUNT(*)::int AS plays
+          FROM plays p JOIN tracks t ON t.id = p.track_id
+          WHERE t.album_group_key = ${row.album_group_key};
+        `,
+      ]);
+      return { profile, albumPlays: Number(countRow.plays) };
+    });
+
+    assert.ok(profile?.stats);
+    assert.equal(profile.stats.albumPlays, albumPlays);
+    assert.equal(profile.stats.albumShare, profile.plays > 0 && albumPlays > 0 ? profile.plays / albumPlays : null);
   });
 
   await t.test("searchCatalog handles case, substrings, accents, and escaped wildcards", async () => {
