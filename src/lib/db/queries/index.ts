@@ -75,5 +75,5 @@ export { getInitialMusicData } from "./initial-data";
 export { getTrackTelemetryStats, type TrackTelemetryStats } from "./track-stats";
 
 // Search & Profiles
-export { searchCatalog } from "./search";
+export { searchCatalog, getRandomProfileTarget } from "./search";
 export { getProfile } from "./profile";
