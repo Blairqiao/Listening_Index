@@ -6,7 +6,11 @@ import {
   normalizeForSearch,
   parseRangeKey,
   parseProfileTarget,
+  parseSearchFilter,
+  parseSearchSort,
+  parseSearchPage,
 } from '../src/lib/search-utils';
+import { SEARCH_SINGLE_TYPE_ROWS } from '../src/lib/search-types';
 
 test('RANGE_KEYS contains the six canonical overview range keys', () => {
   assert.deepEqual(RANGE_KEYS, ['1d', '1w', '1m', '6m', '1y', 'all']);
@@ -158,4 +162,46 @@ test('parseProfileTarget rejects blank, oversized, and control-character Album k
   for (const album of ['', '  ', 'a'.repeat(201), 'bad\u0000key', 'bad\u007fkey']) {
     assert.equal(parseProfileTarget(new URLSearchParams({ album })), null);
   }
+});
+
+test('parseSearchFilter accepts known filters and defaults to all', () => {
+  assert.equal(parseSearchFilter('all'), 'all');
+  assert.equal(parseSearchFilter('tracks'), 'tracks');
+  assert.equal(parseSearchFilter('artists'), 'artists');
+  assert.equal(parseSearchFilter('albums'), 'albums');
+
+  assert.equal(parseSearchFilter(null), 'all');
+  assert.equal(parseSearchFilter(undefined), 'all');
+  assert.equal(parseSearchFilter(''), 'all');
+  assert.equal(parseSearchFilter('   '), 'all');
+  assert.equal(parseSearchFilter('TRACKS'), 'all');
+  assert.equal(parseSearchFilter('Artists'), 'all');
+  assert.equal(parseSearchFilter('unknown'), 'all');
+});
+
+test('parseSearchSort handles valid, invalid, null, and undefined values', () => {
+  assert.equal(parseSearchSort('most-plays'), 'most-plays');
+  assert.equal(parseSearchSort('least-plays'), 'least-plays');
+  assert.equal(parseSearchSort('recent'), 'recent');
+  assert.equal(parseSearchSort('oldest'), 'oldest');
+
+  assert.equal(parseSearchSort(null), 'most-plays');
+  assert.equal(parseSearchSort(undefined), 'most-plays');
+  assert.equal(parseSearchSort('invalid'), 'most-plays');
+});
+
+test('parseSearchPage defaults invalid pages and enforces the 16-row limit', () => {
+  assert.equal(parseSearchPage(null), 1);
+  assert.equal(parseSearchPage(undefined), 1);
+  assert.equal(parseSearchPage(''), 1);
+  assert.equal(parseSearchPage('0'), 1);
+  assert.equal(parseSearchPage('-5'), 1);
+  assert.equal(parseSearchPage('abc'), 1);
+  assert.equal(parseSearchPage('1'), 1);
+  assert.equal(parseSearchPage('42'), 42);
+
+  const maxSafePage = Math.floor(Number.MAX_SAFE_INTEGER / SEARCH_SINGLE_TYPE_ROWS);
+  assert.equal(parseSearchPage(String(maxSafePage)), maxSafePage);
+  assert.equal(parseSearchPage(String(maxSafePage + 1)), 1);
+  assert.equal(parseSearchPage('999999999999999999999999'), 1);
 });
