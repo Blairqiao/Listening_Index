@@ -8,7 +8,7 @@ import type { ProfileData } from "../src/lib/search-types";
 
 const mockArtistProfile: ProfileData = {
   kind: "artist",
-  key: "radiohead-key",
+  key: "4Z8W4fKeB5YxbusRsdQVPb",
   name: "Radiohead",
   artistName: null,
   albumName: null,
@@ -17,7 +17,8 @@ const mockArtistProfile: ProfileData = {
   firstPlayedAt: "2024-01-15T12:00:00.000Z",
   lastPlayedAt: "2024-11-18T18:30:00.000Z",
   plays: 50,
-  hourOfDay: Array.from({ length: 24 }, (_, hour) => hour === 18 ? 50 : 0),
+  hourOfDay: Array.from({ length: 24 }, (_, hour) => (hour === 18 ? 50 : 0)),
+  dayOfWeek: [5, 8, 10, 7, 12, 4, 4],
   rank: 1,
   rankedTotal: 50,
   activityCadence: [
@@ -76,9 +77,10 @@ const mockArtistProfile: ProfileData = {
 const mockTrackProfile: ProfileData = {
   kind: "track",
   key: "4clD00s1c0rVqP9Ld0vV48",
-  artistKey: "radiohead-key",
+  artistKey: "4Z8W4fKeB5YxbusRsdQVPb",
   trackStats: { artistShare: 0.5, artistPlays: 50, longestStreakDays: 5 },
-  hourOfDay: Array.from({ length: 24 }, (_, hour) => hour === 22 ? 12 : 0),
+  hourOfDay: Array.from({ length: 24 }, (_, hour) => (hour === 22 ? 12 : 0)),
+  dayOfWeek: [2, 3, 4, 5, 6, 3, 2],
   albumTracks: [
     { id: "4clD00s1c0rVqP9Ld0vV48", name: "Weird Fishes / Arpeggi", plays: 20, isCurrent: true },
     { id: "other-track", name: "House of Cards", plays: 8, isCurrent: false },
@@ -129,70 +131,136 @@ const mockAlbumProfile: ProfileData = {
   topAlbums: [],
 };
 
-test("ProfileView: Album header, Track shares and Recent Plays", () => {
+test("ProfileView: Album header, Track shares, no repeated artwork, and Recent Plays", () => {
   const props = { status: "ready", visitorTimezone: "UTC", onOpenProfile: () => {} } as const;
-  const markup = renderToStaticMarkup(React.createElement(ProfileView, { ...props, data: mockAlbumProfile }));
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      ...props,
+      data: {
+        ...mockAlbumProfile,
+        recentPlays: [
+          {
+            ...mockAlbumProfile.recentPlays[0],
+            msPlayed: 318000,
+          },
+        ],
+        stats: {
+          totalMs: 7_200_000,
+          activeDays: 12,
+          longestStreakDays: 4,
+          peakDay: { date: "2024-11-10", plays: 9 },
+          artistPlays: 100,
+          artistShare: 0.5,
+          tracksHeardInRange: 8,
+          tracksHeardLifetime: 10,
+          fullAlbumSessions: 3,
+        },
+        moreAlbums: [
+          {
+            key: "kid-a-key",
+            name: "Kid A",
+            plays: 31,
+            imageUrl: "https://example.com/kid-a.jpg",
+          },
+        ],
+      },
+    })
+  );
 
+  assert.match(markup, /\[ ALBUM \]/);
   assert.match(markup, /<a href="https:\/\/open\.spotify\.com\/album\/5vkqYmiPBYLaalcmjujWxK" target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>In Rainbows<\/span>/);
   assert.match(markup, /w-\[88px\]|width="88"/);
-  assert.match(markup, /<button[^>]*>Radiohead<\/button>/);
+  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead →<\/button>/);
   assert.match(markup, /\[ OVER TIME \]/);
   assert.match(markup, /\[ SHARE OF PLAYS \]/);
   assert.match(markup, /\[ TOP TRACKS \]/);
   assert.match(markup, /w-\[34px\][^>]*>50%<\/span>/);
   assert.match(markup, /\[ RECENT PLAYS \]/);
-  const recentPlays = markup.slice(markup.indexOf("[ RECENT PLAYS ]"));
-  assert.match(recentPlays, /aria-label="Open Track profile for Weird Fishes \/ Arpeggi"/);
-  assert.doesNotMatch(recentPlays, />In Rainbows</);
-  assert.doesNotMatch(markup, /\[ TOP ALBUMS \]|\[ SHARE OF RADIOHEAD \]|LONGEST STREAK/);
+  assert.match(markup, /\[ ALBUM STATS \]/);
+  assert.match(markup, /ARTIST SHARE.*?50%/);
+  assert.match(markup, /TRACKS HEARD.*?8 \/ 10/);
+  assert.match(markup, /FULL-ALBUM SESSIONS.*?3/);
+  assert.match(markup, /\[ MORE BY RADIOHEAD \]/);
+  assert.match(markup, /Kid A/);
 
-  const groupKeyMarkup = renderToStaticMarkup(React.createElement(ProfileView, {
-    ...props,
-    data: { ...mockAlbumProfile, key: "radiohead::in rainbows", artistKey: undefined },
-  }));
+  const recentPlays = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ TOP TRACKS ]"));
+  assert.match(recentPlays, /aria-label="Open Track profile for Weird Fishes \/ Arpeggi"/);
+  assert.match(recentPlays, /5:18/);
+  assert.doesNotMatch(recentPlays, /<img/);
+  assert.doesNotMatch(recentPlays, />In Rainbows</);
+
+  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ ALBUM STATS ]"));
+  assert.doesNotMatch(topTracks, /<img/);
+  assert.match(topTracks, /md:max-h-\[220px\]/);
+  assert.match(topTracks, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
+
+  assert.doesNotMatch(markup, /\[ TOP ALBUMS \]|\[ SHARE OF RADIOHEAD \]/);
+
+  const groupKeyMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      ...props,
+      data: { ...mockAlbumProfile, key: "radiohead::in rainbows", artistKey: undefined },
+    })
+  );
   assert.match(groupKeyMarkup, />In Rainbows</);
-  assert.match(groupKeyMarkup, />Radiohead</);
-  assert.doesNotMatch(groupKeyMarkup, /open\.spotify\.com|<button[^>]*>Radiohead<\/button>/);
+  assert.match(groupKeyMarkup, /ARTIST · <\/span>Radiohead/);
+  assert.doesNotMatch(groupKeyMarkup, /open\.spotify\.com|<button[^>]*>Radiohead/);
 });
 
 test("ProfileView links Artist and Track Album names only when keyed", () => {
   const props = { status: "ready", visitorTimezone: "UTC", onOpenProfile: () => {} } as const;
-  const keyedArtist = renderToStaticMarkup(React.createElement(ProfileView, {
-    ...props,
-    data: {
-      ...mockArtistProfile,
-      topAlbums: [
-        { ...mockArtistProfile.topAlbums[0], key: "radiohead::in rainbows" },
-        { name: "Unkeyed Album", plays: 8, imageUrl: null },
-      ],
-    },
-  }));
-  const albumRows = keyedArtist.slice(keyedArtist.indexOf("[ TOP ALBUMS ]"), keyedArtist.indexOf("[ RECENT PLAYS ]"));
+  const keyedArtist = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      ...props,
+      data: {
+        ...mockArtistProfile,
+        topAlbums: [
+          { ...mockArtistProfile.topAlbums[0], key: "radiohead::in rainbows" },
+          { name: "Unkeyed Album", plays: 8, imageUrl: null },
+        ],
+      },
+    })
+  );
+  const albumRows = keyedArtist.slice(keyedArtist.indexOf("[ TOP ALBUMS ]"));
   assert.match(albumRows, /<button[^>]*>(?:(?!<\/button>).)*>In Rainbows<\/span>.*?<\/button>/);
   assert.match(albumRows, />Unkeyed Album<\/span>/);
   assert.doesNotMatch(albumRows, /<button[^>]*>(?:(?!<\/button>).)*>Unkeyed Album<\/span>/);
 
-  const keyedTrack = renderToStaticMarkup(React.createElement(ProfileView, {
-    ...props,
-    data: { ...mockTrackProfile, albumKey: "radiohead::in rainbows" },
-  }));
-  const unkeyedTrack = renderToStaticMarkup(React.createElement(ProfileView, { ...props, data: mockTrackProfile }));
-  assert.match(keyedTrack, /<button[^>]*>In Rainbows<\/button>/);
-  assert.match(unkeyedTrack, />In Rainbows<\/div>/);
-  assert.doesNotMatch(unkeyedTrack, /<button[^>]*>In Rainbows<\/button>/);
+  const keyedTrack = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      ...props,
+      data: { ...mockTrackProfile, albumKey: "radiohead::in rainbows" },
+    })
+  );
+  const unkeyedTrack = renderToStaticMarkup(
+    React.createElement(ProfileView, { ...props, data: mockTrackProfile })
+  );
+  assert.match(keyedTrack, /ALBUM · <\/span><button[^>]*>In Rainbows →<\/button>/);
+  assert.match(unkeyedTrack, /ALBUM · <\/span>In Rainbows<\/div>/);
+  assert.doesNotMatch(unkeyedTrack, /<button[^>]*>In Rainbows/);
 });
 
-test("ProfileView: SSR ready state for artist profile", () => {
+test("ProfileView: SSR ready state for artist profile with 88px header, Spotify link, and stats", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
-      data: mockArtistProfile,
+      data: {
+        ...mockArtistProfile,
+        stats: {
+          totalMs: 14_400_000,
+          activeDays: 18,
+          longestStreakDays: 6,
+          peakDay: { date: "2024-11-12", plays: 11 },
+        },
+      },
       status: "ready",
       visitorTimezone: "UTC",
       onOpenProfile: () => {},
     })
   );
 
-  assert.ok(markup.includes("Radiohead"), "Must include artist name");
+  assert.match(markup, /\[ ARTIST \]/);
+  assert.match(markup, /w-\[88px\]|width="88"/);
+  assert.match(markup, /<a href="https:\/\/open\.spotify\.com\/artist\/4Z8W4fKeB5YxbusRsdQVPb" target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>Radiohead<\/span>/);
   assert.ok(markup.includes("[ OVER TIME ]"), "Chart must use [ OVER TIME ] toggle heading");
   assert.doesNotMatch(markup, /\[ PLAYS \]|WHEN IT PLAYS|PLAYS \/ 1M/);
   assert.ok(markup.includes('role="img"'), "Chart must retain role=img accessibility attribute");
@@ -219,18 +287,60 @@ test("ProfileView: SSR ready state for artist profile", () => {
   assert.match(markup, /<button type="button" (?!role="listitem")[^>]*>.*?Reckoner.*?<\/button>/);
   assert.doesNotMatch(markup, /<button[^>]*role="listitem"/);
   assert.ok(markup.includes("[ TOP ALBUMS ]"), "Artist profile must render [ TOP ALBUMS ]");
+  assert.match(markup, /\[ ARTIST STATS \]/);
+  assert.match(markup, /LISTENING TIME.*?4H/);
+  assert.match(markup, /ACTIVE DAYS.*?18/);
+  assert.match(markup, /LONGEST STREAK.*?6 DAYS/);
+  assert.match(markup, /PEAK DAY.*?11 · 12 NOV 24/);
+  assert.doesNotMatch(markup, /md:row-start-4/);
 });
 
-test("ProfileView: SSR ready state for track profile without duplicated lifetime dates", () => {
+test("ProfileView: SSR ready state for track profile with stats, duration/partial, and related tracks", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
-      data: mockTrackProfile,
+      data: {
+        ...mockTrackProfile,
+        recentPlays: [
+          {
+            ...mockTrackProfile.recentPlays[0],
+            id: "play-full",
+            msPlayed: 310000,
+          },
+          {
+            ...mockTrackProfile.recentPlays[0],
+            id: "play-partial",
+            playedAt: "2024-11-18T17:30:00.000Z",
+            msPlayed: 120000,
+          },
+        ],
+        stats: {
+          totalMs: 4_500_000,
+          activeDays: 9,
+          longestStreakDays: 5,
+          peakDay: { date: "2024-11-15", plays: 4 },
+          completionRate: 0.92,
+          artistPlays: 50,
+          artistShare: 0.5,
+          albumPlays: 40,
+          albumShare: 0.625,
+        },
+        relatedTracks: [
+          {
+            id: "related-1",
+            name: "Nude",
+            artist: "Radiohead",
+            albumImageUrl: "https://example.com/in-rainbows.jpg",
+            coPlays: 7,
+          },
+        ],
+      },
       status: "ready",
       visitorTimezone: "America/Chicago",
       onOpenProfile: () => {},
     })
   );
 
+  assert.match(markup, /\[ TRACK \]/);
   assert.ok(markup.includes("Weird Fishes / Arpeggi"), "Must include track title");
   assert.ok(markup.includes("Radiohead"), "Must include artist name");
   assert.ok(markup.includes("In Rainbows"), "Must include album name");
@@ -239,8 +349,13 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
   assert.match(markup, /50% · 25 PLAYS/);
   assert.match(markup, /OF 50/);
-  assert.match(markup, /\[ OVER TIME \].*?Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
-  assert.doesNotMatch(markup, /\[ PLAYS \]|WHEN IT PLAYS|PEAK 22:00/);
+  // Streak is in [ TRACK STATS ], not duplicated in the chart footer when stats is present
+  assert.doesNotMatch(markup, /LONGEST STREAK · 5 DAYS/);
+  assert.match(markup, /\[ TRACK STATS \]/);
+  assert.match(markup, /COMPLETION.*?92%/);
+  assert.match(markup, /ALBUM SHARE.*?63%/);
+  assert.match(markup, /\[ OFTEN PLAYED WITH \]/);
+  assert.match(markup, /Nude.*?Radiohead.*?7×/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF RADIOHEAD \]/);
   assert.ok(markup.indexOf("SHARE OF RADIOHEAD") < markup.indexOf("FROM THIS ALBUM"));
   assert.match(markup, /FROM THIS ALBUM/);
@@ -248,12 +363,35 @@ test("ProfileView: SSR ready state for track profile without duplicated lifetime
   assert.match(markup, /<div[^>]*aria-current="true"[^>]*>.*?text-music-accent[^>]*>Weird Fishes \/ Arpeggi/);
   assert.match(markup, /<button[^>]*>(?:(?!<\/button>).)*House of Cards.*?<\/button>/);
   assert.match(markup, /w-\[88px\]|width="88"/);
-  assert.match(markup, /<button[^>]*>Radiohead<\/button>/);
+  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead →<\/button>/);
   assert.doesNotMatch(markup, /FIRST PLAYED|LAST PLAYED|LIFETIME/);
-  assert.match(markup, /md:col-span-full/);
-  const recent = markup.slice(markup.indexOf("RECENT PLAYS"));
+
+  const fromAlbum = markup.slice(markup.indexOf("FROM THIS ALBUM"), markup.indexOf("OFTEN PLAYED WITH"));
+  assert.doesNotMatch(fromAlbum, /<img/);
+  assert.match(fromAlbum, /md:max-h-\[220px\]/);
+  assert.match(fromAlbum, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
+
+  const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("TRACK STATS"));
   assert.doesNotMatch(recent, /<img|Weird Fishes/);
   assert.ok(recent.includes("12:30"), "Must format recent play time in America/Chicago");
+  assert.ok(recent.includes("5:10"), "Must render full play duration");
+  assert.ok(recent.includes("2:00"), "Must render partial play duration");
+  assert.ok(recent.includes("PARTIAL"), "Must tag partial plays");
+});
+
+test("ProfileView: Track without stats falls back to chart streak readout and renders cleanly without msPlayed", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockTrackProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(markup, /\[ OVER TIME \].*?Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
+  const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("FROM THIS ALBUM"));
+  assert.doesNotMatch(recent, /0:00|PARTIAL/);
 });
 
 test("ProfileView: SSR zero plays state renders empty message and retains chart", () => {
@@ -291,6 +429,32 @@ test("ProfileView: SSR zero plays state renders empty message and retains chart"
     !markup.includes("[ RECENT PLAYS ]"),
     "Must NOT render [ RECENT PLAYS ] header when plays === 0"
   );
+});
+
+test("ProfileView: SSR loading skeleton respects pendingKind with 88px header", () => {
+  const trackSkeleton = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: null,
+      status: "loading",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+      pendingKind: "track",
+    })
+  );
+  assert.match(trackSkeleton, /w-\[88px\] h-\[88px\]/);
+  assert.match(trackSkeleton, /\[ TRACK STATS \]/);
+
+  const artistSkeleton = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: null,
+      status: "loading",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+      pendingKind: "artist",
+    })
+  );
+  assert.match(artistSkeleton, /w-\[88px\] h-\[88px\]/);
+  assert.match(artistSkeleton, /\[ TOP TRACKS \]/);
 });
 
 test("ProfileView: SSR error and not_found states", () => {
@@ -347,56 +511,47 @@ test("ActivityChart: default label is ACTIVITY and accessible semantics preserve
   assert.ok(defaultMarkup.includes("NOW"), "1d range must render NOW marker");
 });
 
-
 test("ProfileView hides the album section for a single ranked Track", () => {
-  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
-    data: { ...mockTrackProfile, albumTracks: mockTrackProfile.albumTracks?.slice(0, 1) },
-    status: "ready",
-    visitorTimezone: "UTC",
-    onOpenProfile: () => {},
-  }));
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: { ...mockTrackProfile, albumTracks: mockTrackProfile.albumTracks?.slice(0, 1) },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
   assert.doesNotMatch(markup, /FROM THIS ALBUM/);
   assert.match(markup, /\[ OVER TIME \]/);
 });
 
 test("ProfileView hides the Track story sections at zero plays", () => {
-  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
-    data: { ...mockTrackProfile, plays: 0, rank: null, recentPlays: [] },
-    status: "ready",
-    visitorTimezone: "UTC",
-    onOpenProfile: () => {},
-  }));
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: { ...mockTrackProfile, plays: 0, rank: null, recentPlays: [] },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
   assert.match(markup, /NO PLAYS IN THIS RANGE/);
   assert.match(markup, /Weird Fishes/);
   assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|OVER TIME|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
 
-test("ProfileView lets the Track album list and recent plays run their full height on desktop", () => {
-  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
-    data: mockTrackProfile,
-    status: "ready",
-    visitorTimezone: "UTC",
-    onOpenProfile: () => {},
-  }));
-  const album = markup.slice(markup.indexOf("FROM THIS ALBUM"), markup.indexOf("House of Cards"));
-  assert.doesNotMatch(album, /md:max-h-/);
-  assert.match(album, /max-md:\[&amp;&gt;\*:nth-child\(n\+4\)\]:hidden/);
-  const recentStart = markup.lastIndexOf("<div", markup.indexOf("[ RECENT PLAYS ]") - 200);
-  assert.doesNotMatch(markup.slice(recentStart, markup.indexOf("[ RECENT PLAYS ]")), /md:max-h-/);
-});
-
-test("ProfileView spreads Track recent plays over two columns when there is no album list", () => {
+test("ProfileView spreads Track recent plays over two columns when right column has no content", () => {
   const recentPlays = Array.from({ length: 6 }, (_, i) => ({
     ...mockTrackProfile.recentPlays[0],
     id: `play-${i}`,
     playedAt: new Date(Date.UTC(2024, 10, 18, 20 - i)).toISOString(),
   }));
-  const markup = renderToStaticMarkup(React.createElement(ProfileView, {
-    data: { ...mockTrackProfile, albumTracks: [], recentPlays },
-    status: "ready",
-    visitorTimezone: "UTC",
-    onOpenProfile: () => {},
-  }));
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: { ...mockTrackProfile, albumTracks: [], recentPlays },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
   assert.doesNotMatch(markup, /FROM THIS ALBUM/);
   assert.match(markup, /md:col-span-full"><div><div[^>]*><span[^>]*>\[ RECENT PLAYS \]/);
   assert.match(markup, /md:grid-cols-2/);
