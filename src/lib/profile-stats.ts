@@ -1,3 +1,6 @@
+import type { ProfilePeakDay } from "./search-types";
+import { SESSION_GAP_MS } from "./session-calculation";
+
 const DAY_MS = 86_400_000;
 
 export function longestStreak(days: string[]): number {
@@ -61,4 +64,110 @@ export function segmentIdForTrack(trackId: string, segments: ShareSegment[]): st
 export function peakHour(counts: number[]): number | null {
   const max = Math.max(0, ...counts);
   return max > 0 ? counts.indexOf(max) : null;
+}
+
+export function dayOfWeekHistogram(isoDays: number[]): number[] {
+  const counts = Array<number>(7).fill(0);
+  for (const day of isoDays) {
+    if (Number.isInteger(day) && day >= 1 && day <= 7) {
+      counts[day - 1] += 1;
+    }
+  }
+  return counts;
+}
+
+export function peakDayOfWeek(counts: number[]): number | null {
+  return peakHour(counts.slice(0, 7));
+}
+
+export function computePeakDay(
+  days: Array<{ date: string; plays: number }>,
+): ProfilePeakDay | null {
+  const positive = days.filter((d) => d.plays > 0);
+  if (positive.length === 0) return null;
+
+  const sorted = [...positive].sort(
+    (a, b) => b.plays - a.plays || b.date.localeCompare(a.date),
+  );
+  return { date: sorted[0].date, plays: sorted[0].plays };
+}
+
+export function computeCompletionRate(
+  plays: Array<{ msPlayed: number; durationMs: number }>,
+): number | null {
+  const valid = plays.filter((p) => Number.isFinite(p.durationMs) && p.durationMs > 0);
+  if (valid.length === 0) return null;
+  const sum = valid.reduce((acc, p) => {
+    const ms = Number.isFinite(p.msPlayed) ? p.msPlayed : 0;
+    const ratio = ms / p.durationMs;
+    const clamped = Math.min(1, Math.max(0, ratio));
+    return acc + clamped;
+  }, 0);
+  return sum / valid.length;
+}
+
+export function countFullAlbumSessions(
+  plays: Array<{ trackId: string; playedAt: string }>,
+  minDistinctTracks = 3,
+  sessionGapMs = SESSION_GAP_MS,
+): number {
+  if (plays.length === 0) return 0;
+  const sorted = [...plays].sort((a, b) => Date.parse(a.playedAt) - Date.parse(b.playedAt));
+  const sessions: Array<Array<{ trackId: string; playedAt: string }>> = [];
+  for (const play of sorted) {
+    const currentSession = sessions[sessions.length - 1];
+    if (
+      !currentSession ||
+      Date.parse(play.playedAt) - Date.parse(currentSession[currentSession.length - 1].playedAt) > sessionGapMs
+    ) {
+      sessions.push([play]);
+    } else {
+      currentSession.push(play);
+    }
+  }
+
+  let count = 0;
+  for (const session of sessions) {
+    const distinctTracks = new Set(session.map((p) => p.trackId));
+    if (distinctTracks.size >= minDistinctTracks) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+export function formatListeningDuration(ms: number): string {
+  const clampedMs = Math.max(0, Number.isFinite(ms) ? ms : 0);
+  if (clampedMs === 0) return "0M";
+  if (clampedMs < 60_000) return "<1M";
+  const totalMinutes = Math.round(clampedMs / 60_000);
+  if (totalMinutes < 60) return `${totalMinutes}M`;
+  const hours = Math.floor(totalMinutes / 60);
+  const remMins = totalMinutes % 60;
+  if (hours < 100) {
+    return remMins === 0 ? `${hours}H` : `${hours}H ${remMins}M`;
+  }
+  return `${Math.round(clampedMs / 3_600_000).toLocaleString()}H`;
+}
+
+export function formatCompactPlayDate(iso: string | null | undefined, tz: string): string {
+  if (!iso) return "--";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "--";
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      day: "2-digit",
+      month: "short",
+      year: "2-digit",
+    });
+    const parts = formatter.formatToParts(date);
+    const day = parts.find((p) => p.type === "day")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const year = parts.find((p) => p.type === "year")?.value;
+    if (!day || !month || !year) return "--";
+    return `${day} ${month} ${year}`.toUpperCase();
+  } catch {
+    return "--";
+  }
 }
