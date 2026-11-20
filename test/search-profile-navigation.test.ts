@@ -5,7 +5,7 @@ import React from "react";
 import ts from "typescript";
 import * as timezoneUtils from "../src/lib/timezone-utils";
 import * as searchUtils from "../src/lib/search-utils";
-import type { ProfileData, ProfileTarget } from "../src/lib/search-types";
+import type { ProfileData, ProfileHistoryEntry, ProfileTarget } from "../src/lib/search-types";
 import type { Mode, RangeKey } from "../src/lib/types";
 import {
   buildListeningUrlSearch,
@@ -42,6 +42,7 @@ interface UseSearchProfileArgs {
   visitorTimezone: string;
   initialProfile?: ProfileTarget | null;
   initialProfileRange?: RangeKey | null;
+  initialSearchQuery?: string;
   isSyncing?: boolean;
 }
 
@@ -265,13 +266,60 @@ test("buildListeningUrlSearch keeps only the active profile key, including Album
   }), "");
 });
 
-test("useSearchProfile keeps one back origin for Artist to Album and Album to Track", async () => {
+test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse and clears them on profile or mode change", () => {
+  // Mode 4 browse writes non-default q, type, sort, page
+  assert.equal(
+    buildListeningUrlSearch("?mode=4", {
+      activeMode: 4,
+      profileTarget: null,
+      profileRange: "1y",
+      search: { query: "  radiohead  ", filter: "albums", sort: "recent", page: 2 },
+    }),
+    "?mode=4&q=radiohead&type=albums&sort=recent&page=2"
+  );
+
+  // Mode 4 browse deletes default/empty search params
+  assert.equal(
+    buildListeningUrlSearch("?mode=4&q=old&type=tracks&sort=oldest&page=3", {
+      activeMode: 4,
+      profileTarget: null,
+      profileRange: "1y",
+      search: { query: "   ", filter: "all", sort: "most-plays", page: 1 },
+    }),
+    "?mode=4"
+  );
+
+  // Opening a profile clears q, type, sort, page
+  assert.equal(
+    buildListeningUrlSearch("?mode=4&q=radiohead&type=albums&sort=recent&page=2", {
+      activeMode: 4,
+      profileTarget: { kind: "artist", key: "a1" },
+      profileRange: "1y",
+      search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
+    }),
+    "?mode=4&artist=a1&prange=1y"
+  );
+
+  // Leaving Mode 4 clears q, type, sort, page
+  assert.equal(
+    buildListeningUrlSearch("?mode=4&q=radiohead&type=albums&sort=recent&page=2&range=1w", {
+      activeMode: 0,
+      profileTarget: null,
+      profileRange: "1y",
+      search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
+    }),
+    "?range=1w"
+  );
+});
+
+test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump, syncFromLocation, and clearProfileCache", async () => {
   const origFetch = globalThis.fetch;
   const requests: URLSearchParams[] = [];
   const artist: ProfileTarget = { kind: "artist", key: "radiohead" };
   const album: ProfileTarget = { kind: "album", key: "radiohead::in rainbows" };
   const track: ProfileTarget = { kind: "track", key: "weird-fishes" };
-  const args = { activeMode: 4, visitorTimezone: "UTC", initialProfileRange: "6m" } as const;
+  const artist2: ProfileTarget = { kind: "artist", key: "thom-yorke" };
+  const args = { activeMode: 4, visitorTimezone: "UTC", initialProfileRange: "6m", initialSearchQuery: "in rainbows" } as const;
 
   try {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -279,33 +327,121 @@ test("useSearchProfile keeps one back origin for Artist to Album and Album to Tr
       requests.push(params);
       const target = searchUtils.parseProfileTarget(params);
       assert.ok(target);
-      return Response.json(makeProfile({ ...target, range: searchUtils.parseRangeKey(params.get("prange")) ?? "1w" }));
+      return Response.json(
+        makeProfile({
+          ...target,
+          name: `Name:${target.key}`,
+          range: searchUtils.parseRangeKey(params.get("prange")) ?? "1w",
+        })
+      );
     }) as typeof fetch;
 
-    for (const { initialProfile, related, origin } of [
-      { initialProfile: artist, related: album, origin: artist },
-      { initialProfile: album, related: track, origin: album },
-      { initialProfile: track, related: album, origin: null },
-    ]) {
-      await withHookReact(async (harness) => {
-        const render = () => harness.renderOnce({ ...args, initialProfile });
-        render().handleOpenRelatedProfile(related);
-        await flushMicrotasks();
+    // Multi-hop: Artist -> Album -> Track -> Artist2 -> Back -> Back -> Jump to Search
+    await withHookReact(async (harness) => {
+      const render = () => harness.renderOnce({ ...args, initialProfile: artist });
+      let state = render();
+      assert.equal(state.searchQuery, "in rainbows");
+      await flushMicrotasks();
+      state = render();
 
-        const relatedState = render();
-        assert.deepEqual(relatedState.profileTarget, related);
-        assert.equal(relatedState.returnsTo, origin?.kind ?? null);
-        assert.equal(requests.at(-1)?.get(related.kind), related.key);
-        assert.equal(requests.at(-1)?.get("prange"), "6m");
+      // Artist -> Album
+      state.handleOpenRelatedProfile(album);
+      await flushMicrotasks();
+      state = render();
+      assert.deepEqual(state.profileTarget, album);
+      assert.equal(state.returnsTo, "artist");
+      assert.equal(state.profileHistory.length, 1);
+      assert.deepEqual(state.profileHistory[0], { target: artist, range: "6m", name: "Name:radiohead" });
 
-        relatedState.handleSelectProfileRange("1m");
-        render().handleProfileBack();
-        const backState = render();
-        assert.deepEqual(backState.profileTarget, origin);
-        assert.equal(backState.returnsTo, null);
-        if (origin) assert.equal(backState.profileRange, "6m");
-      });
-    }
+      // Ping-pong dedupe: navigating back to top of history (Artist) pops instead of pushing
+      state.handleOpenRelatedProfile(artist);
+      await flushMicrotasks();
+      state = render();
+      assert.deepEqual(state.profileTarget, artist);
+      assert.equal(state.profileHistory.length, 0);
+
+      // Re-traverse Artist -> Album (1m) -> Track -> Artist2
+      state.handleOpenRelatedProfile(album);
+      await flushMicrotasks();
+      state = render();
+      state.handleSelectProfileRange("1m");
+      await flushMicrotasks();
+      state = render();
+
+      state.handleOpenRelatedProfile(track);
+      await flushMicrotasks();
+      state = render();
+      assert.equal(state.profileHistory.length, 2);
+      assert.equal(state.returnsTo, "album");
+
+      state.handleOpenRelatedProfile(artist2);
+      await flushMicrotasks();
+      state = render();
+      assert.equal(state.profileHistory.length, 3);
+      assert.equal(state.returnsTo, "track");
+
+      // Back -> Track (1m)
+      state.handleProfileBack();
+      state = render();
+      assert.deepEqual(state.profileTarget, track);
+      assert.equal(state.profileRange, "1m");
+      assert.equal(state.profileHistory.length, 2);
+
+      // Back -> Album (1m)
+      state.handleProfileBack();
+      state = render();
+      assert.deepEqual(state.profileTarget, album);
+      assert.equal(state.profileRange, "1m");
+      assert.equal(state.profileHistory.length, 1);
+
+      // Jump to index 0 -> Artist (6m)
+      state.handleJumpToHistory(0);
+      state = render();
+      assert.deepEqual(state.profileTarget, artist);
+      assert.equal(state.profileRange, "6m");
+      assert.equal(state.profileHistory.length, 0);
+
+      // Jump to -1 -> Search
+      state.handleOpenRelatedProfile(album);
+      await flushMicrotasks();
+      state = render();
+      assert.equal(state.profileHistory.length, 1);
+      state.handleJumpToHistory(-1);
+      state = render();
+      assert.equal(state.profileTarget, null);
+      assert.equal(state.profileHistory.length, 0);
+
+      // syncFromLocation: open Artist -> Album, then popstate back to Artist pops top, then null clears
+      state.handleOpenProfile(artist);
+      await flushMicrotasks();
+      state = render();
+      state.handleOpenRelatedProfile(album);
+      await flushMicrotasks();
+      state = render();
+      assert.equal(state.profileHistory.length, 1);
+
+      state.syncFromLocation(artist, "1y");
+      state = render();
+      assert.deepEqual(state.profileTarget, artist);
+      assert.equal(state.profileRange, "1y");
+      assert.equal(state.profileHistory.length, 0);
+
+      state.syncFromLocation(null, null);
+      state = render();
+      assert.equal(state.profileTarget, null);
+      assert.equal(state.profileHistory.length, 0);
+
+      // clearProfileCache forces a fresh fetch for a previously cached profile
+      state.handleOpenProfile(artist);
+      state = render();
+      const countBeforeClear = requests.length;
+      state.clearProfileCache();
+      state.handleReturnToSearch();
+      state = render();
+      state.handleOpenProfile(artist);
+      render();
+      assert.equal(requests.length, countBeforeClear + 1);
+    });
   } finally {
     globalThis.fetch = origFetch;
   }
@@ -354,11 +490,34 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
     ["0", "--", "15 JAN 2024", "18 NOV 2024"]
   );
 
-  // Old range metrics must NOT leak while new range is loading or mismatched
+  // Plays formatted with toLocaleString()
+  assert.equal(
+    formatProfileRibbonMetrics(
+      makeProfile({ plays: 12345 }),
+      "ready",
+      { kind: "artist", key: "artist-1" },
+      "1w",
+      "UTC"
+    )[0],
+    (12345).toLocaleString()
+  );
+
+  // Same-target data stays displayed during loading (zero-flash range transition)
   assert.deepEqual(
     formatProfileRibbonMetrics(
       artist1w,
       "loading",
+      { kind: "artist", key: "artist-1" },
+      "all",
+      "UTC"
+    ),
+    ["42", "3 / 50", "15 JAN 2024", "18 NOV 2024"]
+  );
+  // Mismatched range when ready, or not_found/error status, must NOT leak
+  assert.deepEqual(
+    formatProfileRibbonMetrics(
+      artist1w,
+      "ready",
       { kind: "artist", key: "artist-1" },
       "all",
       "UTC"
@@ -368,9 +527,19 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
   assert.deepEqual(
     formatProfileRibbonMetrics(
       artist1w,
-      "ready",
+      "not_found",
       { kind: "artist", key: "artist-1" },
-      "all",
+      "1w",
+      "UTC"
+    ),
+    ["--", "--", "--", "--"]
+  );
+  assert.deepEqual(
+    formatProfileRibbonMetrics(
+      artist1w,
+      "error",
+      { kind: "artist", key: "artist-1" },
+      "1w",
       "UTC"
     ),
     ["--", "--", "--", "--"]
@@ -763,4 +932,181 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   assert.equal(mode3.props.initialMode, 0);
   assert.equal(mode3.props.initialProfile, null);
   assert.equal(mode3.props.initialProfileRange, null);
+});
+
+test("useSearchProfile: clearProfileCache invalidates in-flight requests and refreshes mounted profile while retaining same-target data", async () => {
+  const origFetch = globalThis.fetch;
+
+  try {
+    await withHookReact(async (harness) => {
+      const requests: Array<{
+        url: string;
+        signal?: AbortSignal;
+        resolve: (res: Response) => void;
+      }> = [];
+
+      globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        return new Promise<Response>((resolve) => {
+          requests.push({
+            url: String(input),
+            signal: init?.signal ?? undefined,
+            resolve,
+          });
+        });
+      }) as typeof fetch;
+
+      const args = {
+        activeMode: 4 as const,
+        visitorTimezone: "UTC",
+        initialProfile: { kind: "artist" as const, key: "radiohead" },
+        initialProfileRange: "1y" as const,
+      };
+
+      // Initial mount loads profile (plays = 12)
+      harness.renderOnce(args);
+      assert.equal(requests.length, 1);
+      requests[0].resolve(
+        Response.json(makeProfile({ kind: "artist", key: "radiohead", range: "1y", plays: 12 }))
+      );
+      await flushMicrotasks();
+      let state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(state.profileData?.plays, 12);
+
+      // Start a range switch to 6m (in-flight pre-sync request)
+      state.handleSelectProfileRange("6m");
+      state = harness.renderOnce(args);
+      assert.equal(requests.length, 2);
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(state.profileData?.plays, 12);
+
+      // Clear cache while request #2 is in-flight
+      state.clearProfileCache();
+      state = harness.renderOnce(args);
+      assert.equal(requests[1].signal?.aborted, true, "Pre-sync in-flight request must be aborted");
+      assert.equal(requests.length, 3, "Fresh request must be triggered immediately");
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(
+        state.profileData?.plays,
+        12,
+        "Same-target data must be retained during refresh"
+      );
+
+      // Resolving stale pre-sync request must be ignored and not repopulate cache
+      requests[1].resolve(
+        Response.json(makeProfile({ kind: "artist", key: "radiohead", range: "6m", plays: 999 }))
+      );
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(state.profileData?.plays, 12);
+
+      // Resolving fresh post-sync request updates mounted profile
+      requests[2].resolve(
+        Response.json(makeProfile({ kind: "artist", key: "radiohead", range: "6m", plays: 42 }))
+      );
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(state.profileData?.plays, 42);
+
+      // Calling clearProfileCache while ready refreshes mounted profile in place
+      state.clearProfileCache();
+      state = harness.renderOnce(args);
+      assert.equal(requests.length, 4, "clearProfileCache must refresh currently mounted profile");
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(
+        state.profileData?.plays,
+        42,
+        "Same-target data must stay visible while refreshing"
+      );
+
+      requests[3].resolve(
+        Response.json(makeProfile({ kind: "artist", key: "radiohead", range: "6m", plays: 55 }))
+      );
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(state.profileData?.plays, 55);
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test("useSearchProfile: syncFromLocation restores exact bounded history stack when provided and keeps two-arg fallback", async () => {
+  const origFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const params = new URL(String(input), "http://127.0.0.1:8888").searchParams;
+      const target = searchUtils.parseProfileTarget(params);
+      assert.ok(target);
+      return Response.json(
+        makeProfile({
+          ...target,
+          name: `Name:${target.key}`,
+          range: searchUtils.parseRangeKey(params.get("prange")) ?? "1y",
+        })
+      );
+    }) as typeof fetch;
+
+    await withHookReact(async (harness) => {
+      const args = { activeMode: 4 as const, visitorTimezone: "UTC" };
+      const artist: ProfileTarget = { kind: "artist", key: "radiohead" };
+      const album: ProfileTarget = { kind: "album", key: "radiohead::in rainbows" };
+      const track: ProfileTarget = { kind: "track", key: "weird-fishes" };
+
+      const artistEntry: ProfileHistoryEntry = { target: artist, range: "6m", name: "Name:radiohead" };
+      const albumEntry: ProfileHistoryEntry = { target: album, range: "1m", name: "Name:radiohead::in rainbows" };
+
+      // Start on Search (empty history)
+      let state = harness.renderOnce(args);
+      assert.equal(state.profileTarget, null);
+      assert.equal(state.profileHistory.length, 0);
+
+      // Native Forward from Search directly to Track with saved history stack
+      state.syncFromLocation(track, "1m", [artistEntry, albumEntry]);
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.deepEqual(state.profileTarget, track);
+      assert.equal(state.profileRange, "1m");
+      assert.deepEqual(state.profileHistory, [artistEntry, albumEntry]);
+      assert.equal(state.returnsTo, "album");
+
+      // Native Back after SEARCH reset / non-top jump restores exact ancestry
+      state.handleReturnToSearch();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0);
+
+      state.syncFromLocation(album, "6m", [artistEntry]);
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.deepEqual(state.profileTarget, album);
+      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileHistory, [artistEntry]);
+
+      // Provided history stack is bounded to 20 entries (keeps most recent 20)
+      const oversized: ProfileHistoryEntry[] = Array.from({ length: 25 }, (_, i) => ({
+        target: { kind: "artist", key: `artist-${i}` },
+        range: "1y",
+        name: `Artist ${i}`,
+      }));
+      state.syncFromLocation(track, "1y", oversized);
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 20);
+      assert.equal(state.profileHistory[0].target.key, "artist-5");
+      assert.equal(state.profileHistory[19].target.key, "artist-24");
+
+      // Two-argument fallback still pops top when landing on top of stack
+      state.syncFromLocation({ kind: "artist", key: "artist-24" }, "1y");
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 19);
+      assert.equal(state.profileHistory[18].target.key, "artist-23");
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+  }
 });
