@@ -98,3 +98,34 @@ export function parseProfileTarget(
 
   return null;
 }
+
+export function resolveDisplayFilter(
+  status: "idle" | "loading" | "ready" | "error",
+  requested: SearchFilter,
+  dataFilter: SearchFilter | null
+): SearchFilter {
+  if (status === "loading" && dataFilter !== null) {
+    return dataFilter;
+  }
+  return requested;
+}
+
+export function getSearchStatusText(args: {
+  status: "idle" | "loading" | "ready" | "error";
+  query: string;
+  hasResults: boolean;
+}): string | null {
+  if (args.status === "loading") {
+    return null;
+  }
+  if (args.status === "error") {
+    return "SEARCH FAILED";
+  }
+  if (args.status === "idle") {
+    return "QUERY TOO LONG";
+  }
+  if (args.status === "ready" && !args.hasResults) {
+    return args.query.trim() ? "[ NO MATCHES ]" : "[ NO PLAYS IN ARCHIVE ]";
+  }
+  return null;
+}

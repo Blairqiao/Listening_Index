@@ -12,6 +12,7 @@ import {
   type SearchSort,
 } from "@/lib/search-types";
 import { formatCompactPlayDate } from "@/lib/profile-stats";
+import { getSearchStatusText, resolveDisplayFilter } from "@/lib/search-utils";
 import { searchChipClass, SortMenu } from "./SortMenu";
 import { useSearch } from "./useSearch";
 import { Artwork, getFallbackSwatchColor } from "../../Artwork";
@@ -49,6 +50,7 @@ function ResultRow({
   subtitle,
   lastPlayedText,
   onClick,
+  disabled,
 }: {
   name: string;
   imageUrl: string | null;
@@ -57,12 +59,14 @@ function ResultRow({
   subtitle?: React.ReactNode;
   lastPlayedText?: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
-      className="w-full text-left group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] focus:bg-[#111110] focus:outline-none focus-visible:ring-1 focus-visible:ring-music-accent border-b border-[#191917]"
+      className="w-full text-left group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] focus:bg-[#111110] focus:outline-none focus-visible:ring-1 focus-visible:ring-music-accent border-b border-[#191917] disabled:cursor-default"
     >
       <Artwork src={imageUrl} alt="" size={38} swatchColor={getFallbackSwatchColor(swatchName)} />
       <div className="min-w-0 flex-1 pl-1">
@@ -120,7 +124,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
 }) => {
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-  const { status, data } = useSearch(query, sort, page, filter);
+  const { status, data, dataFilter } = useSearch(query, sort, page, filter);
+  const displayFilter = resolveDisplayFilter(status, filter, dataFilter);
 
   const setMergedRef = useCallback(
     (element: HTMLInputElement | null) => {
@@ -135,24 +140,19 @@ export const SearchView: React.FC<SearchViewProps> = ({
   const albums = data?.albums ?? [];
   const hasArtists = !!data?.artists.length;
   const hasResults =
-    filter === "all"
+    displayFilter === "all"
       ? hasArtists || albums.length > 0 || !!data?.tracks.length
-      : filter === "tracks"
+      : displayFilter === "tracks"
         ? !!data?.tracks.length
-        : filter === "artists"
+        : displayFilter === "artists"
           ? hasArtists
           : albums.length > 0;
 
-  let statusText: string | null = null;
-  if (status === "loading") {
-    statusText = query.trim() ? "SEARCHING…" : "LOADING CATALOG…";
-  } else if (status === "error") {
-    statusText = "SEARCH FAILED";
-  } else if (status === "idle") {
-    statusText = "QUERY TOO LONG";
-  } else if (status === "ready" && !hasResults) {
-    statusText = query.trim() ? "[ NO MATCHES ]" : "[ NO PLAYS IN ARCHIVE ]";
-  }
+  const statusText = getSearchStatusText({
+    status,
+    query,
+    hasResults,
+  });
 
   let placeholder = "SEARCH TRACKS, ARTISTS OR ALBUMS";
   let inputAriaLabel = "Search tracks, artists or albums";
@@ -229,6 +229,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isSortMenuOpen, canPrev, canNext, onPageChange, page]);
 
+  const isRowDisabled = status === "loading";
+
   const renderTrackRow = (track: NonNullable<typeof data>["tracks"][number]): JSX.Element => (
     <ResultRow
       key={track.id}
@@ -245,6 +247,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
         </>
       }
       onClick={() => onOpenProfile({ kind: "track", key: track.id })}
+      disabled={isRowDisabled}
     />
   );
 
@@ -256,6 +259,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       plays={artist.plays}
       lastPlayedText={formatLastPlayed(artist.lastPlayedAt)}
       onClick={() => onOpenProfile({ kind: "artist", key: artist.key })}
+      disabled={isRowDisabled}
     />
   );
 
@@ -268,6 +272,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       lastPlayedText={formatLastPlayed(album.lastPlayedAt)}
       subtitle={album.artist}
       onClick={() => onOpenProfile({ kind: "album", key: album.key })}
+      disabled={isRowDisabled}
     />
   );
 
@@ -288,9 +293,32 @@ export const SearchView: React.FC<SearchViewProps> = ({
   };
 
   const renderResults = () => {
+    if (status === "loading" && !data) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 md:gap-x-[26px]">
+          {[0, 1].map((colIndex) => (
+            <div key={colIndex} className="min-w-0 flex flex-col">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={colIndex * 4 + idx}
+                  className="flex items-center gap-3 px-1 h-[54px] md:h-[55px] border-b border-[#191917] animate-pulse"
+                >
+                  <div className="w-[38px] h-[38px] rounded bg-[#141413] flex-none" />
+                  <div className="min-w-0 flex-1 pl-1 space-y-1.5">
+                    <div className="h-3.5 bg-[#191917] rounded w-36 max-w-[70%]" />
+                    <div className="h-2.5 bg-[#141413] rounded w-24 max-w-[50%]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     if (!hasResults || !data) return null;
 
-    if (filter === "all") {
+    if (displayFilter === "all") {
       const tracksOnlyMixed = !hasArtists && albums.length === 0 && data.tracks.length > 0;
 
       if (tracksOnlyMixed) {
@@ -336,13 +364,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
       );
     }
 
-    if (filter === "tracks") {
+    if (displayFilter === "tracks") {
       return renderBalancedGrid("TRACKS", data.tracks.map(renderTrackRow));
     }
-    if (filter === "artists") {
+    if (displayFilter === "artists") {
       return renderBalancedGrid("ARTISTS", data.artists.map(renderArtistRow));
     }
-    if (filter === "albums") {
+    if (displayFilter === "albums") {
       return renderBalancedGrid("ALBUMS", albums.map(renderAlbumRow));
     }
     return null;
@@ -446,7 +474,8 @@ export const SearchView: React.FC<SearchViewProps> = ({
       {/* Results */}
       <div
         key={page}
-        className={`transition-opacity duration-150 ${status === "loading" ? "opacity-60" : "opacity-100"}`}
+        aria-busy={status === "loading" ? "true" : undefined}
+        className={`transition-opacity duration-150 ${status === "loading" ? "opacity-60 pointer-events-none" : "opacity-100"}`}
       >
         {renderResults()}
       </div>

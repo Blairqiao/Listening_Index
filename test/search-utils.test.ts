@@ -9,6 +9,8 @@ import {
   parseSearchFilter,
   parseSearchSort,
   parseSearchPage,
+  resolveDisplayFilter,
+  getSearchStatusText,
 } from '../src/lib/search-utils';
 import { SEARCH_SINGLE_TYPE_ROWS } from '../src/lib/search-types';
 
@@ -204,4 +206,45 @@ test('parseSearchPage defaults invalid pages and enforces the 16-row limit', () 
   assert.equal(parseSearchPage(String(maxSafePage)), maxSafePage);
   assert.equal(parseSearchPage(String(maxSafePage + 1)), 1);
   assert.equal(parseSearchPage('999999999999999999999999'), 1);
+});
+
+test('resolveDisplayFilter resolves display filter based on status and dataFilter', () => {
+  // loading with dataFilter set returns dataFilter
+  assert.equal(resolveDisplayFilter('loading', 'tracks', 'artists'), 'artists');
+  assert.equal(resolveDisplayFilter('loading', 'all', 'albums'), 'albums');
+
+  // ready returns requested filter
+  assert.equal(resolveDisplayFilter('ready', 'tracks', 'artists'), 'tracks');
+  assert.equal(resolveDisplayFilter('ready', 'all', null), 'all');
+
+  // loading with null dataFilter returns requested filter
+  assert.equal(resolveDisplayFilter('loading', 'tracks', null), 'tracks');
+  assert.equal(resolveDisplayFilter('loading', 'all', null), 'all');
+
+  // idle and error return requested filter
+  assert.equal(resolveDisplayFilter('idle', 'tracks', 'artists'), 'tracks');
+  assert.equal(resolveDisplayFilter('error', 'albums', 'tracks'), 'albums');
+});
+
+test('getSearchStatusText returns appropriate status text or null', () => {
+  // loading: null for both empty and non-empty queries
+  assert.equal(getSearchStatusText({ status: 'loading', query: '', hasResults: false }), null);
+  assert.equal(getSearchStatusText({ status: 'loading', query: 'radio', hasResults: false }), null);
+  assert.equal(getSearchStatusText({ status: 'loading', query: 'radio', hasResults: true }), null);
+
+  // error: "SEARCH FAILED"
+  assert.equal(getSearchStatusText({ status: 'error', query: '', hasResults: false }), 'SEARCH FAILED');
+  assert.equal(getSearchStatusText({ status: 'error', query: 'radio', hasResults: false }), 'SEARCH FAILED');
+
+  // idle: "QUERY TOO LONG"
+  assert.equal(getSearchStatusText({ status: 'idle', query: 'a'.repeat(101), hasResults: false }), 'QUERY TOO LONG');
+
+  // ready without results: empty vs non-empty queries
+  assert.equal(getSearchStatusText({ status: 'ready', query: '', hasResults: false }), '[ NO PLAYS IN ARCHIVE ]');
+  assert.equal(getSearchStatusText({ status: 'ready', query: '   ', hasResults: false }), '[ NO PLAYS IN ARCHIVE ]');
+  assert.equal(getSearchStatusText({ status: 'ready', query: 'radio', hasResults: false }), '[ NO MATCHES ]');
+
+  // ready with results: null
+  assert.equal(getSearchStatusText({ status: 'ready', query: '', hasResults: true }), null);
+  assert.equal(getSearchStatusText({ status: 'ready', query: 'radio', hasResults: true }), null);
 });
