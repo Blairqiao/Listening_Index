@@ -178,7 +178,7 @@ test("ProfileView: Album header, Track shares, no repeated artwork, and Recent P
   assert.match(markup, /\[ TOP TRACKS \]/);
   assert.match(markup, /w-\[34px\][^>]*>50%<\/span>/);
   assert.match(markup, /\[ RECENT PLAYS \]/);
-  assert.match(markup, /\[ ALBUM STATS \]/);
+  assert.doesNotMatch(markup, /\[ ALBUM STATS \]/);
   assert.match(markup, /ARTIST SHARE.*?50%/);
   assert.match(markup, /TRACKS HEARD.*?8 \/ 10/);
   assert.match(markup, /FULL-ALBUM SESSIONS.*?3/);
@@ -191,7 +191,7 @@ test("ProfileView: Album header, Track shares, no repeated artwork, and Recent P
   assert.doesNotMatch(recentPlays, /<img/);
   assert.doesNotMatch(recentPlays, />In Rainbows</);
 
-  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ ALBUM STATS ]"));
+  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ MORE BY RADIOHEAD ]"));
   assert.doesNotMatch(topTracks, /<img/);
   assert.match(topTracks, /md:max-h-\[220px\]/);
   assert.match(topTracks, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
@@ -291,11 +291,10 @@ test("ProfileView: SSR ready state for artist profile with 88px header, Spotify 
   assert.match(markup, /<button type="button" (?!role="listitem")[^>]*>.*?Reckoner.*?<\/button>/);
   assert.doesNotMatch(markup, /<button[^>]*role="listitem"/);
   assert.ok(markup.includes("[ TOP ALBUMS ]"), "Artist profile must render [ TOP ALBUMS ]");
-  assert.match(markup, /\[ ARTIST STATS \]/);
+  assert.doesNotMatch(markup, /\[ ARTIST STATS \]|PEAK DAY/);
   assert.match(markup, /LISTENING TIME.*?4H/);
   assert.match(markup, /ACTIVE DAYS.*?18/);
-  assert.match(markup, /LONGEST STREAK.*?6 DAYS/);
-  assert.match(markup, /PEAK DAY.*?11 · 12 NOV 24/);
+  assert.match(markup, /Longest streak: 6 days \(Nov 9–14, 2024\)/);
   assert.doesNotMatch(markup, /md:row-start-4/);
 });
 
@@ -355,11 +354,10 @@ test("ProfileView: SSR ready state for track profile with stats, duration/partia
   assert.match(markup, /\[ SHARE OF RADIOHEAD \]/);
   assert.match(markup, /50% · 25 PLAYS/);
   assert.match(markup, /OF 50/);
-  // Streak is in [ TRACK STATS ], not duplicated in the chart footer when stats is present
-  assert.doesNotMatch(markup, /LONGEST STREAK · 5 DAYS/);
-  assert.match(markup, /\[ TRACK STATS \]/);
+  assert.doesNotMatch(markup, /\[ TRACK STATS \]/);
   assert.match(markup, /COMPLETION.*?92%/);
   assert.match(markup, /ALBUM SHARE.*?63%/);
+  assert.match(markup, /Longest streak: 5 days \(Nov 13–17, 2024\)/);
   assert.match(markup, /\[ OFTEN PLAYED WITH \]/);
   assert.match(markup, /Nude.*?Radiohead.*?7×/);
   assert.match(markup, /<div class="min-w-0 md:col-span-full">(?:(?!<\/div>).)*?\[ SHARE OF RADIOHEAD \]/);
@@ -377,7 +375,7 @@ test("ProfileView: SSR ready state for track profile with stats, duration/partia
   assert.match(fromAlbum, /md:max-h-\[220px\]/);
   assert.match(fromAlbum, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
 
-  const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("TRACK STATS"));
+  const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("FROM THIS ALBUM"));
   assert.doesNotMatch(recent, /<img|Weird Fishes/);
   assert.ok(recent.includes("12:30"), "Must format recent play time in America/Chicago");
   assert.ok(recent.includes("5:10"), "Must render full play duration");
@@ -385,7 +383,7 @@ test("ProfileView: SSR ready state for track profile with stats, duration/partia
   assert.ok(recent.includes("PARTIAL"), "Must tag partial plays");
 });
 
-test("ProfileView: Track without stats falls back to chart streak readout and renders cleanly without msPlayed", () => {
+test("ProfileView: Track without stats omits the streak and renders cleanly without msPlayed", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
       data: mockTrackProfile,
@@ -395,7 +393,8 @@ test("ProfileView: Track without stats falls back to chart streak readout and re
     })
   );
 
-  assert.match(markup, /\[ OVER TIME \].*?Activity cadence histogram.*?LONGEST STREAK · 5 DAYS/);
+  assert.match(markup, /\[ OVER TIME \].*?Activity cadence histogram/);
+  assert.doesNotMatch(markup, /LONGEST STREAK/);
   const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("FROM THIS ALBUM"));
   assert.doesNotMatch(recent, /0:00|PARTIAL/);
 });
@@ -566,4 +565,183 @@ test("ProfileView spreads Track recent plays over two columns when right column 
   assert.equal(columns.match(/>18 NOV</g)?.length, 2);
   assert.match(columns, /hidden md:inline[^>]*>18 NOV</);
   assert.equal(columns.match(/h-8/g)?.length, 6);
+});
+
+test("ProfileHeader: Artist markup contains PLAYS, RANK, LISTENING TIME, ACTIVE DAYS, PLAY SHARE, TRACKS HEARD, COMPLETION and no PEAK DAY", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        stats: {
+          totalMs: 14_400_000,
+          activeDays: 18,
+          longestStreakDays: 6,
+          longestStreakStart: "2024-11-09",
+          longestStreakEnd: "2024-11-14",
+          peakDay: { date: "2024-11-12", plays: 11 },
+          playShare: 0.25,
+          tracksHeardInRange: 12,
+          tracksHeardLifetime: 20,
+          completionRate: 0.88,
+        },
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(markup, /PLAYS/);
+  assert.match(markup, /RANK/);
+  assert.match(markup, /LISTENING TIME/);
+  assert.match(markup, /ACTIVE DAYS/);
+  assert.match(markup, /PLAY SHARE/);
+  assert.match(markup, /25%/);
+  assert.match(markup, /TRACKS HEARD/);
+  assert.match(markup, /12 \/ 20/);
+  assert.match(markup, /COMPLETION/);
+  assert.match(markup, /88%/);
+  assert.doesNotMatch(markup, /PEAK DAY/);
+  assert.doesNotMatch(markup, /\[ ARTIST STATS \]/);
+});
+
+test("ProfileHeader: Album markup contains FULL-ALBUM SESSIONS; Track markup contains ALBUM SHARE but not PLAY SHARE", () => {
+  const albumMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockAlbumProfile,
+        stats: {
+          totalMs: 7_200_000,
+          activeDays: 12,
+          longestStreakDays: 4,
+          longestStreakStart: "2024-11-08",
+          longestStreakEnd: "2024-11-11",
+          peakDay: null,
+          artistShare: 0.5,
+          tracksHeardInRange: 8,
+          tracksHeardLifetime: 10,
+          fullAlbumSessions: 3,
+        },
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(albumMarkup, /FULL-ALBUM SESSIONS/);
+  assert.match(albumMarkup, /ARTIST SHARE/);
+  assert.doesNotMatch(albumMarkup, /\[ ALBUM STATS \]/);
+
+  const trackMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockTrackProfile,
+        stats: {
+          totalMs: 4_500_000,
+          activeDays: 9,
+          longestStreakDays: 5,
+          longestStreakStart: "2024-11-13",
+          longestStreakEnd: "2024-11-17",
+          peakDay: null,
+          completionRate: 0.92,
+          albumShare: 0.625,
+        },
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(trackMarkup, /ALBUM SHARE/);
+  assert.match(trackMarkup, /COMPLETION/);
+  assert.doesNotMatch(trackMarkup, /PLAY SHARE/);
+  assert.doesNotMatch(trackMarkup, /\[ TRACK STATS \]/);
+});
+
+test("ProfileHeader: streak sentence formats for 2+ days and is absent for 1 day", () => {
+  const sixDayMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        stats: {
+          totalMs: 14_400_000,
+          activeDays: 18,
+          longestStreakDays: 6,
+          longestStreakStart: "2024-11-07",
+          longestStreakEnd: "2024-11-12",
+          peakDay: null,
+        },
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(sixDayMarkup, /Longest streak: 6 days \(Nov 7–12, 2024\)/);
+
+  const oneDayMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        stats: {
+          totalMs: 14_400_000,
+          activeDays: 1,
+          longestStreakDays: 1,
+          longestStreakStart: "2024-11-12",
+          longestStreakEnd: "2024-11-12",
+          peakDay: null,
+        },
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.doesNotMatch(oneDayMarkup, /Longest streak/);
+});
+
+test("ProfileHeader: rank renders 1 / 50 by default and percentile with rankFormat='percentile'", () => {
+  const defaultMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+      onToggleRankFormat: () => {},
+    })
+  );
+
+  assert.match(defaultMarkup, /1 \/ 50/);
+  assert.match(defaultMarkup, /aria-label="Rank 1 \/ 50\. Toggle between rank position and percentile"/);
+
+  const percentileMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+      rankFormat: "percentile",
+      onToggleRankFormat: () => {},
+    })
+  );
+
+  assert.match(percentileMarkup, /TOP 2%/);
+  assert.match(percentileMarkup, /aria-label="Rank TOP 2%\. Toggle between rank position and percentile"/);
+});
+
+test("ProfileHeader: FIRST PLAY subline is present with formatted dates in visitor timezone", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(markup, /FIRST PLAY 15 JAN 2024 · LAST 18 NOV 2024/);
 });
