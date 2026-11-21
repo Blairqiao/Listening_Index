@@ -251,7 +251,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none shrink-0">
           <div className="flex items-center gap-2">
-            <Upload className="w-3.5 h-3.5 text-music-accent" />
+            <Upload className="w-4 h-4 text-music-accent" />
             <h2 className="font-mono text-[13px] text-[#EDEDE8]">
               Import Spotify streaming history
             </h2>

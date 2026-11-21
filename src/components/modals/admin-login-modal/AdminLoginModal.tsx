@@ -99,7 +99,7 @@ export const AdminLoginModal: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-music-accent" />
+            <Lock className="w-4 h-4 text-music-accent" />
             <h2
               id="admin-login-modal-title"
               className="font-mono text-[13px] text-[#EDEDE8] whitespace-nowrap"
@@ -147,7 +147,7 @@ export const AdminLoginModal: React.FC = () => {
                 className="px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -166,7 +166,7 @@ export const AdminLoginModal: React.FC = () => {
             >
               {isAuthenticating ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Authenticating...</span>
                 </>
               ) : (

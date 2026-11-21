@@ -101,3 +101,31 @@ test("small UI text is at least 10px (glyph-only spans excepted)", () => {
   }
   assert.deepEqual(offenders, []);
 });
+
+const ICON_TAG = /<(ArrowUpRight|Check|ChevronDown|Copy|ExternalLink|Eye|EyeOff|FileArchive|Loader2|Lock|Menu|Music2|Unlock|Upload|X)\b/;
+
+test("nav icons scale with the nav text (14px mobile, 16px desktop)", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(
+      ConfigProvider,
+      null,
+      React.createElement(ModeTabs, { activeMode: 0, onSelectMode: () => {}, isAuthenticated: false })
+    )
+  );
+  const icons = markup.match(/<svg[^>]*lucide-(menu|lock)[^>]*>/g) ?? [];
+  assert.equal(icons.length, 2);
+  for (const icon of icons) assert.match(icon, /w-3\.5 h-3\.5 sm:w-4 sm:h-4/);
+});
+
+test("no UI icon renders below 14px", () => {
+  const offenders: string[] = [];
+  for (const file of sourceFiles("src/components")) {
+    const lines = read(file).split("\n");
+    lines.forEach((line, i) => {
+      const iconContext = ICON_TAG.test(line) || ICON_TAG.test(lines[i - 1] ?? "");
+      if (!iconContext) return;
+      if (/\bw-3 h-3\b|size=\{(?:[0-9]|1[0-3])\}/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, []);
+});

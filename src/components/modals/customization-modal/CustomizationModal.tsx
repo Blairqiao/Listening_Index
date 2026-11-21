@@ -219,7 +219,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <Menu className="w-3.5 h-3.5 text-music-accent" />
+            <Menu className="w-4 h-4 text-music-accent" />
             <h2
               id="customization-modal-title"
               className="font-mono text-[13px] text-[#EDEDE8] whitespace-nowrap"
@@ -319,7 +319,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       rel="noopener noreferrer"
                       className="text-[#6A6A64] hover:text-music-accent ml-2"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 </div>
@@ -342,7 +342,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       rel="noopener noreferrer"
                       className="text-[#6A6A64] hover:text-music-accent ml-2"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 </div>
@@ -399,12 +399,12 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                 >
                   {copiedCode ? (
                     <>
-                      <Check className="w-3 h-3 text-music-accent" />
+                      <Check className="w-3.5 h-3.5 text-music-accent" />
                       <span className="text-music-accent">Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3.5 h-3.5" />
                       <span className="sm:hidden">Copy</span>
                       <span className="hidden sm:inline">Copy config.ts</span>
                     </>
@@ -445,7 +445,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                     </span>
                   ) : (
                     <>
-                      <Check className="w-3.5 h-3.5 text-music-accent" />
+                      <Check className="w-4 h-4 text-music-accent" />
                       <span>
                         {isDbConfigured
                           ? "Deployed"
