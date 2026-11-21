@@ -114,7 +114,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
                 : ""
             }`}
           >
-            <div className="font-mono text-[11px] text-[#5A5A55] flex items-center justify-between">
+            <div className="font-mono text-[12px] text-[#5A5A55] flex items-center justify-between">
               <span>{label}</span>
             </div>
             <div

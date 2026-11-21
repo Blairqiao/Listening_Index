@@ -39,7 +39,7 @@ export const Artwork: React.FC<ArtworkProps> = ({
         title="Track delisted on Spotify"
         aria-label="Track delisted"
       >
-        <span className="text-[10px] font-mono select-none">✕</span>
+        <span className="text-[11px] font-mono select-none">✕</span>
       </span>
     );
   }

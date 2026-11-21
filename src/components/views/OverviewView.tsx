@@ -33,10 +33,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       {/* Left Column: Top Tracks (1.5fr) */}
       <div className="min-w-0">
         <div className="flex justify-between items-baseline mb-2 select-none">
-          <span className="font-mono text-[11px] text-[#5A5A55]">
+          <span className="font-mono text-[12px] text-[#5A5A55]">
             Top tracks
           </span>
-          <span className="font-mono text-[11px] text-[#5A5A55]">
+          <span className="font-mono text-[12px] text-[#5A5A55]">
             Plays
           </span>
         </div>
@@ -49,10 +49,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 className={`flex items-center gap-3 px-1 h-[54px] md:h-[55px] animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
                   }`}
               >
-                <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none">
+                <span className="font-mono text-[12px] text-[#2E2E2A] w-[18px] flex-none">
                   {String(idx + 1).padStart(2, "0")}
                 </span>
-                <span className="font-mono text-[10.5px] w-[22px] flex-none text-center text-[#2E2E2A]">
+                <span className="font-mono text-[11.5px] w-[22px] flex-none text-center text-[#2E2E2A]">
                   ·
                 </span>
                 <div className="w-[38px] h-[38px] rounded bg-[#141413] flex-none" />
@@ -85,13 +85,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       }`}
                   >
                     {/* Rank Index */}
-                    <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                    <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                       {track.rank}
                     </span>
 
                     {/* 2-Character Rank Drift Indicator */}
                     <span
-                      className={`font-mono text-[10.5px] w-[22px] flex-none text-center tabular-nums select-none ${isNew
+                      className={`font-mono text-[11.5px] w-[22px] flex-none text-center tabular-nums select-none ${isNew
                           ? "text-music-accent font-medium"
                           : isNeutral
                             ? "text-[#4A4A46]"
@@ -121,7 +121,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       >
                         {track.name}
                       </a>
-                      <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+                      <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
                         {track.artistId ? (
                           <a
                             href={`https://open.spotify.com/artist/${track.artistId}`}
@@ -155,7 +155,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     </div>
 
                     {/* Play Count */}
-                    <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                    <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums select-all">
                       {track.plays.toLocaleString()}
                     </span>
                   </div>
@@ -180,7 +180,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
         {/* Artist index (top 5) */}
         <div>
-          <div className="font-mono text-[11px] text-[#5A5A55] mb-2 select-none">
+          <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Artist index
           </div>
           <div className="flex flex-col" role="list">
@@ -191,7 +191,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
                     }`}
                 >
-                  <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
+                  <span className="font-mono text-[12px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="h-3 bg-[#191917] rounded w-28 flex-1" />
@@ -212,13 +212,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer no-underline hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
-                      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                      <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {artist.rank}
                       </span>
                       <span className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent transition-none">
                         {artist.name}
                       </span>
-                      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                      <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums select-all">
                         {artist.count.toLocaleString()}
                       </span>
                     </a>
@@ -241,7 +241,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* Album index (top 5) */}
         <div>
-          <div className="font-mono text-[11px] text-[#5A5A55] mb-2 select-none">
+          <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Album index
           </div>
           <div className="flex flex-col" role="list">
@@ -252,7 +252,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   className={`flex items-baseline gap-2.5 py-2 px-1 animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
                     }`}
                 >
-                  <span className="font-mono text-[11px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
+                  <span className="font-mono text-[12px] text-[#2E2E2A] w-[18px] flex-none tabular-nums select-none">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
                   <div className="h-3 bg-[#191917] rounded w-32 flex-1" />
@@ -278,7 +278,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
-                      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                      <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {album.rank}
                       </span>
                       <div className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
@@ -300,12 +300,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-[11px] text-[#6A6A64] truncate hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline"
+                          className="font-mono text-[12px] text-[#6A6A64] truncate hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline"
                         >
                           {album.artist}
                         </a>
                       </div>
-                      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums select-all">
+                      <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums select-all">
                         {album.count.toLocaleString()}
                       </span>
                     </div>

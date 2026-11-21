@@ -19,7 +19,7 @@ import { Artwork, getFallbackSwatchColor } from "../../Artwork";
 
 const pageButtonClass = `${searchChipClass} disabled:cursor-default disabled:opacity-40 disabled:hover:text-[#6A6A64] disabled:hover:border-[#26261F]`;
 
-const headingLabelClass = "font-mono text-[11px] text-[#5A5A55]";
+const headingLabelClass = "font-mono text-[12px] text-[#5A5A55]";
 
 function ResultHeading({
   label,
@@ -74,18 +74,18 @@ function ResultRow({
           {name}
         </span>
         {subtitle != null && (
-          <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5">
+          <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5">
             {subtitle}
           </div>
         )}
       </div>
       <div className="flex-none flex items-center gap-2 text-right">
         {lastPlayedText && (
-          <span className="font-mono text-[10.5px] text-[#5A5A55] tabular-nums">
+          <span className="font-mono text-[11.5px] text-[#5A5A55] tabular-nums">
             {lastPlayedText}
           </span>
         )}
-        <span className="font-mono text-[11px] text-[#8A8A83] tabular-nums">
+        <span className="font-mono text-[12px] text-[#8A8A83] tabular-nums">
           {plays.toLocaleString()}
         </span>
       </div>
@@ -331,7 +331,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             <ResultHeading label="Tracks" rightHeader={rightHeader} />
             <div className="flex flex-col">
               {data.tracks.length === 0 ? (
-                <div className="font-mono text-[11px] text-[#4A4A46] py-3 px-1 select-none">
+                <div className="font-mono text-[12px] text-[#4A4A46] py-3 px-1 select-none">
                   No tracks
                 </div>
               ) : (
@@ -395,7 +395,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => onFilterChange?.(opt.value)}
-                className={`font-mono text-[11px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
+                className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
                   isActive
                     ? "border-music-accent text-music-accent bg-transparent"
                     : "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent"
@@ -403,7 +403,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               >
                 <span>{opt.label}</span>
                 {count !== undefined && (
-                  <span className="hidden sm:inline ml-1 font-mono text-[10px] text-[#5A5A55] tabular-nums">
+                  <span className="hidden sm:inline ml-1 font-mono text-[11px] text-[#5A5A55] tabular-nums">
                     {count}
                   </span>
                 )}
@@ -423,7 +423,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               type="button"
               onClick={onRandomProfile}
               aria-label="Open random profile"
-              className="font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
+              className="font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
             >
               Random
             </button>
@@ -466,7 +466,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             </button>
           )}
         </div>
-        <div className="px-1 font-mono text-[11px] text-[#8A8A83] empty:hidden mt-2" role="status">
+        <div className="px-1 font-mono text-[12px] text-[#8A8A83] empty:hidden mt-2" role="status">
           {statusText}
         </div>
       </div>
@@ -482,7 +482,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
 
       {/* Bottom Hairline Pagination */}
       {showPagination && (
-        <div className="w-full py-5 px-1 select-none font-mono text-[11px] flex items-center gap-3">
+        <div className="w-full py-5 px-1 select-none font-mono text-[12px] flex items-center gap-3">
           <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
           <nav aria-label="Search results pages" className="inline-flex items-center gap-1.5">
             <button

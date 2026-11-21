@@ -34,13 +34,13 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
 
   return (
     <div>
-      <span className="font-mono text-[11px] text-[#5A5A55] block mb-2 select-none">
+      <span className="font-mono text-[12px] text-[#5A5A55] block mb-2 select-none">
         Analysis
       </span>
 
       {/* FIRST PLAYS */}
       <div className="flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none">
-        <span className="font-mono text-[11px] text-[#5A5A55]">
+        <span className="font-mono text-[12px] text-[#5A5A55]">
           First plays
         </span>
         <span className="font-mono text-[13px] text-[#EDEDE8] tabular-nums">
@@ -55,7 +55,7 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
           topTrackHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
         }`}
       >
-        <span className="font-mono text-[11px] text-[#5A5A55] flex-none">
+        <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
           Top track
         </span>
         <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
@@ -88,7 +88,7 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
             topAlbumHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
           }`}
         >
-          <span className="font-mono text-[11px] text-[#5A5A55] flex-none">
+          <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
             Top album
           </span>
           <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
@@ -120,7 +120,7 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
             topArtistHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
           }`}
         >
-          <span className="font-mono text-[11px] text-[#5A5A55] flex-none">
+          <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
             Top artist
           </span>
           <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">

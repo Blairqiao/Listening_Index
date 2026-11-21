@@ -119,7 +119,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
                   <button
                     type="button"
                     onClick={onTransferPlayback}
-                    className="font-mono text-[11px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
+                    className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
                     title="Transfer playback to this browser"
                   >
                     <span className="sm:hidden">Transfer</span>
@@ -158,7 +158,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               e.currentTarget.blur();
               if (!isSyncing) onSelectRange(r.key);
             }}
-            className={`font-mono text-[11px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
+            className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
               isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
             } ${
               isActive
@@ -181,17 +181,17 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         const count = streamLogCount ?? 50;
         if (count === 0) {
           return (
-            <span className="font-mono text-[11px] text-[#6A6A64]">
+            <span className="font-mono text-[12px] text-[#6A6A64]">
               No tracks
             </span>
           );
         }
         return (
           <>
-            <span className="md:hidden font-mono text-[11px] text-[#6A6A64]">
+            <span className="md:hidden font-mono text-[12px] text-[#6A6A64]">
               Last {count}
             </span>
-            <span className="hidden md:inline font-mono text-[11px] text-[#6A6A64]">
+            <span className="hidden md:inline font-mono text-[12px] text-[#6A6A64]">
               Last {count} tracks
             </span>
           </>
@@ -209,7 +209,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         if (!isAuthenticated) {
           return (
             <span
-              className={`font-mono text-[11px] ${
+              className={`font-mono text-[12px] ${
                 syncError
                   ? "text-[#FF6B6B]"
                   : isSessionOpen
@@ -228,7 +228,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onClick={onTriggerSync}
             disabled={isSyncing}
             title={syncError || "Click to trigger manual sync"}
-            className={`font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
+            className={`font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
               syncError
                 ? "text-[#FF6B6B]"
                 : isSyncing
@@ -249,7 +249,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               type="button"
               onClick={onToggleLayout}
               aria-label="Toggle player layout between split and stacked"
-              className="font-mono text-[11px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
+              className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
               title="Toggle between Split Console and Stacked Stage"
             >
               <span>{layout === "stacked" ? "Layout: stacked" : "Layout: split"}</span>
@@ -361,7 +361,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       }`}
     >
       {/* Left Slot: Scope Label or Profile Navigation */}
-      <Scope className={`font-mono text-[11px] text-[#5A5A55] whitespace-nowrap sm:mr-4 ${showsProfileNav ? "min-w-0 flex items-center" : ""}`}>
+      <Scope className={`font-mono text-[12px] text-[#5A5A55] whitespace-nowrap sm:mr-4 ${showsProfileNav ? "min-w-0 flex items-center" : ""}`}>
         {showsProfileNav ? (
           <nav aria-label="Profile navigation" className="flex items-center gap-1.5 min-w-0 overflow-hidden">
             {renderProfileNav()}

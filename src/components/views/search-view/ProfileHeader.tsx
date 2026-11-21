@@ -33,7 +33,7 @@ function formatPlayDate(iso: string | null | undefined, tz: string): string {
   return formatLogStartDate(date, tz);
 }
 
-const STAT_LABEL_CLASS = "font-mono text-[9.5px] md:text-[10px] text-[#5A5A55]";
+const STAT_LABEL_CLASS = "font-mono text-[10.5px] md:text-[11px] text-[#5A5A55]";
 const STAT_VALUE_CLASS = "font-mono text-[13px] tabular-nums whitespace-nowrap";
 
 const StatCell: React.FC<{ label: string; value: string; muted?: boolean }> = ({
@@ -83,7 +83,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <Artwork src={data.imageUrl} alt={data.name} size={88} />
 
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10.5px] text-music-accent mb-1 select-none">
+          <div className="font-mono text-[11.5px] text-music-accent mb-1 select-none">
             {KICKER_BY_KIND[data.kind]}
           </div>
 
@@ -110,7 +110,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           {(isTrack || isAlbum) && data.artistName && (
-            <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+            <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
               <span className="text-[#5A5A55]">Artist · </span>
               {artistKey ? (
                 <button
@@ -127,7 +127,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           )}
 
           {isTrack && data.albumName && (
-            <div className="mt-0.5 truncate font-mono text-[11.5px] leading-tight text-[#6A6A64] select-none">
+            <div className="mt-0.5 truncate font-mono text-[12.5px] leading-tight text-[#6A6A64] select-none">
               <span className="text-[#5A5A55]">Album · </span>
               {albumKey ? (
                 <button
@@ -214,7 +214,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       </div>
 
       {streakSentence && (
-        <div className="font-mono text-[11.5px] text-[#8A8A83] mt-3 select-none">
+        <div className="font-mono text-[12.5px] text-[#8A8A83] mt-3 select-none">
           {streakSentence}
         </div>
       )}

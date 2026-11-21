@@ -79,3 +79,25 @@ test("metric ribbon labels are sentence case and values use the display font", (
   );
   assert.match(markup, /font-display/);
 });
+
+test("nav tabs use the larger type scale", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(
+      ConfigProvider,
+      null,
+      React.createElement(ModeTabs, { activeMode: 0, onSelectMode: () => {}, isAuthenticated: false })
+    )
+  );
+  assert.match(markup, /role="tab"[^>]*class="[^"]*text-\[11px\] sm:text-\[13px\]/);
+});
+
+test("small UI text is at least 10px (glyph-only spans excepted)", () => {
+  const offenders: string[] = [];
+  for (const file of sourceFiles("src/components")) {
+    read(file).split("\n").forEach((line, i) => {
+      if (line.includes(">▲<")) return;
+      if (/text-\[(?:[0-9]|9\.5)px\]/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, []);
+});

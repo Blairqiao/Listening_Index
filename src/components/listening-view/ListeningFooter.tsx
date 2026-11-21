@@ -22,7 +22,7 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
       <div />
 
       {/* System Telemetry Status (click "Synced X ago" to sync manually) */}
-      <div className="flex items-center font-mono text-[11px]">
+      <div className="flex items-center font-mono text-[12px]">
         {isAuthenticated ? (
           <button
             type="button"

@@ -13,7 +13,7 @@ function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
-const headingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
+const headingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 // Same frame and bar styling as ActivityChart, so switching views doesn't move the page.
 export function HourChart({
@@ -62,7 +62,7 @@ export function HourChart({
             );
           })}
         </div>
-        <div aria-hidden="true" className="grid grid-cols-24 gap-[2px] mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+        <div aria-hidden="true" className="grid grid-cols-24 gap-[2px] mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
           {axis.map(({ label, position }) => <span key={label} className={position}>{label}</span>)}
         </div>
       </div>

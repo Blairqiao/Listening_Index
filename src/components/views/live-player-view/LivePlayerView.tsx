@@ -169,37 +169,37 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-[#5A5A55] text-[10px]">
+            <div className="w-full h-full flex items-center justify-center text-[#5A5A55] text-[11px]">
               No art
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-music-accent">
+            <span className="text-[11px] text-music-accent">
               {isPlaying ? "Now streaming" : isLinked ? "Paused" : "Offline"}
             </span>
           </div>
           <div className="text-[16px] sm:text-[18px] text-[#EDEDE8] truncate font-bold mt-0.5">
             {displayTrack.name}
           </div>
-          <div className="text-[12px] text-[#8A8A82] truncate mt-0.5">
+          <div className="text-[13px] text-[#8A8A82] truncate mt-0.5">
             {displayTrack.artist}
           </div>
-          <div className="text-[11px] text-[#5A5A55] truncate mt-0.5">
+          <div className="text-[12px] text-[#5A5A55] truncate mt-0.5">
             {displayTrack.album}
           </div>
         </div>
       </div>
 
       {playerStatus === "unlinked" && (
-        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[#141413] border border-[#22221E] text-[#8A8A82] text-[10px] font-mono">
+        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[#141413] border border-[#22221E] text-[#8A8A82] text-[11px] font-mono">
           <span className="truncate">Spotify not linked · open Spotify modal</span>
         </div>
       )}
 
       {playerStatus === "error" && (
-        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-red-500/10 border border-red-500/30 text-[#FF6B6B] text-[10px] font-mono">
+        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-red-500/10 border border-red-500/30 text-[#FF6B6B] text-[11px] font-mono">
           <span className="truncate">{errorMessage || "Player Error"}</span>
           <button
             type="button"
@@ -213,7 +213,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
       {/* Scrubber */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between text-[10px] text-[#5A5A55] tabular-nums">
+        <div className="flex items-center justify-between text-[11px] text-[#5A5A55] tabular-nums">
           <span>{msToClock(position)}</span>
           <span>{msToClock(displayTrack.durationMs)}</span>
         </div>
@@ -228,7 +228,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
       </div>
 
       {/* Transport, Context Selector & Volume Controls */}
-      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-[#161614] text-[11px] gap-2 relative">
+      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-[#161614] text-[12px] gap-2 relative">
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
@@ -288,7 +288,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             <button
               type="button"
               onClick={() => setIsContextSelectorOpen((prev) => !prev)}
-              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 font-mono max-w-[150px] sm:max-w-[200px] truncate text-[10px]"
+              className="px-2 py-0.5 border border-[#22221E] text-music-accent hover:border-music-accent hover:bg-music-accent/10 bg-[#0E0E0D] cursor-pointer transition-colors flex items-center gap-1.5 font-mono max-w-[150px] sm:max-w-[200px] truncate text-[11px]"
               title="Select playback context (Auto Play or user playlist)"
             >
               <span className="truncate">
@@ -305,8 +305,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   className="fixed inset-0 z-20"
                   onClick={() => setIsContextSelectorOpen(false)}
                 />
-                <div className="absolute right-0 bottom-full mb-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[10px]">
-                  <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] border-b border-[#1A1A18]">
+                <div className="absolute right-0 bottom-full mb-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[11px]">
+                  <div className="px-2.5 py-1 text-[#6A6A64] text-[10px] border-b border-[#1A1A18]">
                     Choose playback context
                   </div>
 
@@ -322,15 +322,15 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   >
                     <div className="truncate">
                       <span>⚡ Auto Play</span>
-                      <span className="text-[#6A6A64] ml-1.5 text-[9px]">Recent Favorites (Top 100)</span>
+                      <span className="text-[#6A6A64] ml-1.5 text-[10px]">Recent Favorites (Top 100)</span>
                     </div>
-                    {selectedContext.type === "auto" && <span className="text-music-accent text-[9px]">Active</span>}
+                    {selectedContext.type === "auto" && <span className="text-music-accent text-[10px]">Active</span>}
                   </button>
 
                   {/* Playlists section */}
                   {userPlaylists.length > 0 ? (
                     <>
-                      <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] border-t border-b border-[#1A1A18] mt-1">
+                      <div className="px-2.5 py-1 text-[#6A6A64] text-[10px] border-t border-b border-[#1A1A18] mt-1">
                         Spotify playlists ({userPlaylists.length})
                       </div>
                       {userPlaylists.map((pl) => {
@@ -349,7 +349,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                             <span className="truncate pr-2">
                               ♫ {pl.name}
                             </span>
-                            <div className="flex items-center gap-1.5 shrink-0 text-[9px] text-[#6A6A64]">
+                            <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-[#6A6A64]">
                               <span>{pl.trackCount} tracks</span>
                               {isSelected && <span className="text-music-accent">Active</span>}
                             </div>
@@ -358,7 +358,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                       })}
                     </>
                   ) : (
-                    <div className="px-2.5 py-2 text-[#5A5A55] text-[9px] border-t border-[#1A1A18] mt-1 text-center font-mono">
+                    <div className="px-2.5 py-2 text-[#5A5A55] text-[10px] border-t border-[#1A1A18] mt-1 text-center font-mono">
                       No Spotify playlists loaded
                     </div>
                   )}
@@ -367,7 +367,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0 font-mono">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#5A5A55] shrink-0 font-mono">
             <span className="">Vol</span>
             <input
               type="range"
@@ -394,12 +394,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
           {/* Right Side: Spectrum Tower (7 cols) - Hidden on mobile (< 768px) */}
           <div className="hidden md:flex md:col-span-7 flex-col justify-between">
-            <div className="flex items-center justify-between text-[10px] text-[#5A5A55] mb-2">
+            <div className="flex items-center justify-between text-[11px] text-[#5A5A55] mb-2">
               <span>Spectrum visualizer · 32 bands</span>
               <button
                 type="button"
                 onClick={toggleSourceMode}
-                className="font-mono text-[10px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
+                className="font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
                 title="Click to toggle visualizer audio source (synthetic oscillator vs live hardware audio)"
               >
                 {sourceMode === "live" ? "Live audio" : "Synthetic"}
@@ -424,12 +424,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     <section aria-label="Variant A: Stacked Stage" className="space-y-3 font-mono">
       {/* Top Section: Spectrum Stage - Hidden on mobile (< 768px) */}
       <div className="hidden md:block border border-[#1C1C1A] bg-[#080808] p-3 sm:p-4 select-none">
-        <div className="flex items-center justify-between text-[10px] text-[#5A5A55] mb-2">
+        <div className="flex items-center justify-between text-[11px] text-[#5A5A55] mb-2">
           <span>Spectrum visualizer · 32 bands</span>
           <button
             type="button"
             onClick={toggleSourceMode}
-            className="font-mono text-[10px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
+            className="font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
             title="Click to toggle visualizer audio source (synthetic oscillator vs live hardware audio)"
           >
             {sourceMode === "live" ? "Live audio" : "Synthetic"}

@@ -83,7 +83,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   if (status === "not_found" || status === "error") {
     return (
       <div className="mt-4 md:mt-6 select-none">
-        <div role="status" className="mt-6 font-mono text-[11px] text-[#5A5A55]">
+        <div role="status" className="mt-6 font-mono text-[12px] text-[#5A5A55]">
           {status === "not_found" ? "Not in archive" : "Couldn't load profile"}
         </div>
       </div>
@@ -230,7 +230,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       onMouseLeave={() => setActiveSegmentId(null)}
       className={`group flex items-center gap-3 px-1 ${PROFILE_ROW_HEIGHT_CLASS[rowSize]} w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
     >
-      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+      <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
         {String(idx + 1).padStart(2, "0")}
       </span>
       {showArtwork && (
@@ -243,10 +243,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <span className={`font-sans ${rowSize === "compact" ? "text-[13px]" : "text-[14px]"} tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent transition-none leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
         {track.name}
       </span>
-      <span className="font-mono text-[11px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
+      <span className="font-mono text-[12px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
         {formatShare(artistShare(track.plays, plays))}
       </span>
-      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums">
+      <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
         {track.plays.toLocaleString()}
       </span>
     </button>
@@ -264,7 +264,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none" : ""
         }`}
       >
-        <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+        <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
           {String(idx + 1).padStart(2, "0")}
         </span>
         <Artwork
@@ -275,7 +275,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <span className={`font-sans text-[13px] text-[#EDEDE8] flex-1 truncate leading-snug${key ? " group-hover:text-music-accent transition-none" : ""}`}>
           {album.name}
         </span>
-        <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums">
+        <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
           {album.plays.toLocaleString()}
         </span>
       </Row>
@@ -336,7 +336,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Bottom section: zero-plays state or 2-column fixed-height boxes */}
       {data.plays === 0 ? (
         <div className="min-w-0 md:col-span-full">
-          <div className="font-mono text-[11px] text-[#5A5A55] py-4 select-none">
+          <div className="font-mono text-[12px] text-[#5A5A55] py-4 select-none">
             No plays in this range
           </div>
         </div>
@@ -367,11 +367,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   >
                     <div className="flex w-[56px] flex-none flex-col justify-center font-mono select-none">
                       {play.dayGroup && (
-                        <span className="text-[10px] text-[#5A5A55] leading-tight">
+                        <span className="text-[11px] text-[#5A5A55] leading-tight">
                           {play.dayGroup}
                         </span>
                       )}
-                      <span className="text-[11px] text-[#5A5A55] tabular-nums leading-tight">
+                      <span className="text-[12px] text-[#5A5A55] tabular-nums leading-tight">
                         {play.timeStr}
                       </span>
                     </div>
@@ -385,7 +385,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         {play.title}
                       </span>
                       {play.album && (
-                        <span className="block font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+                        <span className="block font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
                           {play.album}
                         </span>
                       )}
@@ -419,16 +419,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onMouseLeave={() => setActiveSegmentId(null)}
                     className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent ${isActive ? "bg-[#111110]" : ""}`}
                   >
-                    <span className="font-mono text-[11.5px] text-[#5A5A55] select-none">
+                    <span className="font-mono text-[12.5px] text-[#5A5A55] select-none">
                       {play.dayGroup ?? null}
                     </span>
-                    <span className="font-mono text-[11.5px] text-[#8A8A83] tabular-nums select-none">
+                    <span className="font-mono text-[12.5px] text-[#8A8A83] tabular-nums select-none">
                       {play.timeStr}
                     </span>
                     <span className={`min-w-0 font-sans text-[13px] tracking-[-0.01em] truncate leading-snug select-none ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                       {play.title}
                     </span>
-                    <span className="pl-2 font-mono text-[11px] text-[#6A6A64] text-right tabular-nums select-none">
+                    <span className="pl-2 font-mono text-[12px] text-[#6A6A64] text-right tabular-nums select-none">
                       {hasMsPlayed ? formatDurationMs(play.msPlayed!) : ""}
                     </span>
                   </button>
@@ -451,7 +451,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 return (
                   <div
                     key={play.id}
-                    className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[11.5px]"
+                    className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[12.5px]"
                   >
                     <span className="text-[#5A5A55]">
                       {play.dayGroup ?? null}
@@ -462,7 +462,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         <>
                           {formatDurationMs(play.msPlayed!)}
                           {isPartial && (
-                            <span className="ml-1.5 text-[10px] text-[#5A5A55]">Partial</span>
+                            <span className="ml-1.5 text-[11px] text-[#5A5A55]">Partial</span>
                           )}
                         </>
                       )}
@@ -533,13 +533,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   const rowClass = "group flex items-center gap-3 px-1 h-8 w-full text-left border-b border-[#191917]";
                   const row = (
                     <>
-                      <span className="font-mono text-[11px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
+                      <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {String(idx + 1).padStart(2, "0")}
                       </span>
                       <span className={`font-sans text-[13px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
                         {track.name}
                       </span>
-                      <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums">
+                      <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
                         {track.plays.toLocaleString()}
                       </span>
                     </>
@@ -585,11 +585,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       <span className="font-sans text-[13px] tracking-[-0.01em] text-[#EDEDE8] group-hover:text-music-accent transition-none">
                         {track.name}
                       </span>
-                      <span className="font-mono text-[11px] text-[#6A6A64]">
+                      <span className="font-mono text-[12px] text-[#6A6A64]">
                         {` · ${track.artist}`}
                       </span>
                     </span>
-                    <span className="font-mono text-[11px] text-[#8A8A83] flex-none tabular-nums">
+                    <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
                       {track.coPlays.toLocaleString()}×
                     </span>
                   </button>

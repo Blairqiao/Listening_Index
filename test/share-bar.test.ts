@@ -151,7 +151,7 @@ test("ActivityChart retains the default heading and supports an aside", () => {
   const activity = { range: "1d", activityCadence: [] } as const;
   const props = { ...activity, activityCadence: [] };
   const markup = renderToStaticMarkup(React.createElement(ActivityChart, props));
-  assert.match(markup, /<div class="font-mono text-\[11px\] text-\[#5A5A55\] mb-2 select-none">Activity \/ 1d<\/div>/);
+  assert.match(markup, /<div class="font-mono text-\[12px\] text-\[#5A5A55\] mb-2 select-none">Activity \/ 1d<\/div>/);
   const aside = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, headerAside: "Longest streak" }));
   assert.match(aside, /Longest streak/);
   const bare = renderToStaticMarkup(React.createElement(ActivityChart, { ...props, label: "Plays", showRange: false }));
