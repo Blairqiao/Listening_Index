@@ -462,7 +462,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               }}
               className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
             >
-              <X size={14} aria-hidden="true" />
+              <X size={16} aria-hidden="true" />
             </button>
           )}
         </div>

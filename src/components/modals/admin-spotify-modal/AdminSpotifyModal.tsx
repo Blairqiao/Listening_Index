@@ -373,7 +373,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2">
             <Music2
-              className={`w-3.5 h-3.5 ${
+              className={`w-4 h-4 ${
                 currentMode === "onboarding"
                   ? "text-music-accent animate-slow-blink"
                   : currentMode === "expiring"
@@ -424,7 +424,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         className="text-music-accent underline underline-offset-2 hover:opacity-80 inline-flex items-center gap-1"
                       >
                         Spotify Developer Dashboard
-                        <ExternalLink className="w-3 h-3 inline" />
+                        <ExternalLink className="w-3.5 h-3.5 inline" />
                       </a>{" "}
                       before connecting.
                     </p>
@@ -450,12 +450,12 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         >
                           {copiedTarget === "production" ? (
                             <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-400" />
                               <span className="text-emerald-400 font-bold">Copied</span>
                             </>
                           ) : (
                             <>
-                              <Copy className="w-3.5 h-3.5" />
+                              <Copy className="w-4 h-4" />
                               <span>Copy</span>
                             </>
                           )}
@@ -482,12 +482,12 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         >
                           {copiedTarget === "local" ? (
                             <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-4 h-4 text-emerald-400" />
                               <span className="text-emerald-400 font-bold">Copied</span>
                             </>
                           ) : (
                             <>
-                              <Copy className="w-3.5 h-3.5" />
+                              <Copy className="w-4 h-4" />
                               <span>Copy</span>
                             </>
                           )}
@@ -508,7 +508,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     >
                       {isBusy ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Authorizing Spotify...</span>
                         </>
                       ) : (
@@ -543,7 +543,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-music-accent underline-offset-4 truncate">
                           {displayName}
                         </span>
-                        <ExternalLink className="w-3 h-3 text-[#6A6A64] group-hover/profile:text-music-accent shrink-0 transition-colors" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-music-accent shrink-0 transition-colors" />
                       </a>
                     </div>
 
@@ -572,7 +572,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     >
                       {isBusy ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Re-linking...</span>
                         </>
                       ) : (
@@ -623,7 +623,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-amber-400 underline-offset-4 truncate">
                           {displayName}
                         </span>
-                        <ExternalLink className="w-3 h-3 text-[#6A6A64] group-hover/profile:text-amber-400 shrink-0 transition-colors" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-amber-400 shrink-0 transition-colors" />
                       </a>
                     </div>
 
@@ -652,7 +652,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     >
                       {isBusy ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                           <span>Renewing...</span>
                         </>
                       ) : (

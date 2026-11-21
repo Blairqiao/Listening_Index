@@ -110,7 +110,7 @@ export function SortMenu({
       >
         <span>Sort:</span>
         <span>{SEARCH_SORT_OPTIONS[selectedIndex].label}</span>
-        <ChevronDown size={12} strokeWidth={1.75} aria-hidden="true" className="flex-none" />
+        <ChevronDown size={14} strokeWidth={1.75} aria-hidden="true" className="flex-none" />
       </button>
       {open && (
         <ul

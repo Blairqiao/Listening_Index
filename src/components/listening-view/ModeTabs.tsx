@@ -138,7 +138,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             aria-label="Import Spotify Extended Streaming History"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <Upload className="w-3 h-3" />
+            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         )}
 
@@ -156,7 +156,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                 : "text-[#5A5A55] hover:text-music-accent"
             }`}
           >
-            <Music2 className="w-3 h-3" />
+            <Music2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         )}
 
@@ -168,7 +168,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           aria-label="Appearance and configuration settings"
           className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
         >
-          <Menu className="w-3 h-3" />
+          <Menu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
 
         {isAuthenticated ? (
@@ -179,7 +179,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             aria-label="Lock admin session"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <Unlock className="w-3 h-3 text-music-accent" />
+            <Unlock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-music-accent" />
           </button>
         ) : (
           <button
@@ -189,7 +189,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             aria-label="Admin login"
             className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <Lock className="w-3 h-3" />
+            <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
         )}
       </div>

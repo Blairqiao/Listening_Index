@@ -80,7 +80,7 @@ export const HistoryDropzone: React.FC<HistoryDropzoneProps> = ({
       {/* Instructions */}
       <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[#6A6A64] text-[11px] space-y-1.5">
         <div className="flex items-center gap-1.5 text-[#EDEDE8] font-bold">
-          <FileArchive className="w-3.5 h-3.5 text-music-accent" />
+          <FileArchive className="w-4 h-4 text-music-accent" />
           <span>How to request your export from Spotify</span>
         </div>
         <p>
