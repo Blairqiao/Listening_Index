@@ -81,7 +81,12 @@ function createHookHarness() {
     }
   };
 
-  return { mockReact, runTurn, cleanup };
+  const resetCursor = () => {
+    stateCursor = 0;
+    effectCursor = 0;
+  };
+
+  return { mockReact, runTurn, cleanup, resetCursor };
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -182,7 +187,7 @@ test("SearchView browses on empty input and accepts a single character", async (
   assert.match(browseHtml, /aria-label="Next page"[^>]*>NEXT →</);
   assert.match(browseHtml, />PAGE<\/span> 01</);
   const shortHtml = render("r");
-  assert.match(shortHtml, /SEARCHING/);
+  assert.doesNotMatch(shortHtml, /SEARCHING/);
   assert.doesNotMatch(shortHtml, /TYPE 2/);
 
   // 3. Too long query (>100 characters)
@@ -206,9 +211,10 @@ test("SearchView browses on empty input and accepts a single character", async (
       onOpenProfile: () => {},
     })
   );
-  assert.ok(
-    loadingHtml.includes("SEARCHING…"),
-    "Uncached valid query must show SEARCHING…"
+  assert.doesNotMatch(
+    loadingHtml,
+    /SEARCHING/,
+    "Uncached valid query must not show SEARCHING"
   );
 
   // 5. Ready with no results -> [ NO MATCHES ] (cached via hook execution)
@@ -601,6 +607,7 @@ test("useSearch hook: filter-specific cache keys, clearSearchCache invalidation,
     // 1. Filter-specific cache key: initial fetch with tracks
     let res = harness.runTurn("radiohead", "most-plays", 1, "tracks");
     assert.equal(res.status, "loading");
+    assert.equal(res.dataFilter, null, "dataFilter must be null when data is null");
     mock.timers.tick(250);
     await flushMicrotasks();
     assert.equal(fetchUrls.length, 1);
@@ -608,11 +615,13 @@ test("useSearch hook: filter-specific cache keys, clearSearchCache invalidation,
 
     res = harness.runTurn("radiohead", "most-plays", 1, "tracks");
     assert.equal(res.status, "ready");
+    assert.equal(res.dataFilter, "tracks", "dataFilter must be tracks for ready response");
     assert.equal(res.data?.artists[0]?.name, "Artist radiohead tracks");
 
     // 2. Switching filter to 'artists' for same query is a cache miss
     res = harness.runTurn("radiohead", "most-plays", 1, "artists");
     assert.equal(res.status, "loading");
+    assert.equal(res.dataFilter, "tracks", "dataFilter must remain tracks while loading new filter");
     assert.equal(res.data?.artists[0]?.name, "Artist radiohead tracks", "Retains prior ready results while loading");
     mock.timers.tick(250);
     await flushMicrotasks();
@@ -621,18 +630,22 @@ test("useSearch hook: filter-specific cache keys, clearSearchCache invalidation,
 
     res = harness.runTurn("radiohead", "most-plays", 1, "artists");
     assert.equal(res.status, "ready");
+    assert.equal(res.dataFilter, "artists", "dataFilter must be artists when ready");
     assert.equal(res.data?.artists[0]?.name, "Artist radiohead artists");
 
     // 3. clearSearchCache invalidates cache and triggers refetch on same query
     clearSearchCache();
     res = harness.runTurn("radiohead", "most-plays", 1, "artists");
     assert.equal(res.status, "loading", "After clearSearchCache, entry must not hit cache");
+    assert.equal(res.dataFilter, "artists", "dataFilter remains artists while previous data is retained");
+    assert.equal(res.data?.artists[0]?.name, "Artist radiohead artists");
     mock.timers.tick(250);
     await flushMicrotasks();
     assert.equal(fetchUrls.length, 3, "Refetch must occur after clearSearchCache");
 
     res = harness.runTurn("radiohead", "most-plays", 1, "artists");
     assert.equal(res.status, "ready");
+    assert.equal(res.dataFilter, "artists");
 
     // 4. Stale pre-clear in-flight response must be discarded after clearSearchCache
     res = harness.runTurn("hang-pre-clear", "most-plays", 1, "all");
@@ -953,4 +966,122 @@ test("SearchView input: filter-specific placeholder and aria-label", () => {
   );
   assert.match(allHtml, /placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"/);
   assert.match(allHtml, /aria-label="Search tracks, artists or albums"/);
+});
+
+test("SearchView renders dimmed previous artist rows with pointer-events-none and aria-busy when loading uncached tracks", async () => {
+  clearSearchCache();
+  const mockArtistResponse: SearchResponse = {
+    query: "radio",
+    hasMore: false,
+    artists: [
+      {
+        key: "radiohead",
+        name: "Radiohead",
+        plays: 1420,
+        imageUrl: null,
+      },
+    ],
+    albums: [],
+    tracks: [],
+  };
+
+  await primeSearch("radio", mockArtistResponse, undefined, undefined, "artists");
+
+  const origUseState = React.useState;
+  const origUseEffect = React.useEffect;
+  const harness = createHookHarness();
+  (React as unknown as { useState: unknown }).useState = harness.mockReact.useState;
+  (React as unknown as { useEffect: unknown }).useEffect = harness.mockReact.useEffect;
+
+  try {
+    // 1. First render with cached artists
+    harness.resetCursor();
+    renderToStaticMarkup(
+      React.createElement(SearchView, {
+        query: "radio",
+        filter: "artists",
+        onQueryChange: () => {},
+        onOpenProfile: () => {},
+      })
+    );
+
+    // 2. Second render with tracks (uncached -> loading, retains artists data)
+    harness.resetCursor();
+    const html = renderToStaticMarkup(
+      React.createElement(SearchView, {
+        query: "radio",
+        filter: "tracks",
+        onQueryChange: () => {},
+        onOpenProfile: () => {},
+      })
+    );
+
+    assert.match(html, /Radiohead/, "Must render previous Artist row name while loading tracks");
+    assert.match(html, /aria-busy="true"/, "Must render aria-busy='true' on results wrapper");
+    assert.match(html, /pointer-events-none/, "Must render pointer-events-none on results wrapper");
+    assert.match(html, /opacity-60/, "Must render opacity-60 on results wrapper");
+    const staleButton = html.match(/<button\b[^>]*>.*?<\/button>/g)?.find((button) => button.includes(">Radiohead</span>"));
+    assert.ok(staleButton, "Must render stale Artist button");
+    assert.match(staleButton, /^<button\b[^>]*\sdisabled=""/, "Stale Artist button must be disabled");
+
+    // 3. Prime empty tracks response and verify transition to ready with [ NO MATCHES ]
+    await primeSearch(
+      "radio",
+      {
+        query: "radio",
+        hasMore: false,
+        artists: [],
+        albums: [],
+        tracks: [],
+      },
+      undefined,
+      undefined,
+      "tracks"
+    );
+
+    harness.resetCursor();
+    const readyHtml = renderToStaticMarkup(
+      React.createElement(SearchView, {
+        query: "radio",
+        filter: "tracks",
+        onQueryChange: () => {},
+        onOpenProfile: () => {},
+      })
+    );
+
+    assert.match(readyHtml, /\[ NO MATCHES \]/, "Empty tracks response must show [ NO MATCHES ]");
+    assert.doesNotMatch(readyHtml, /Radiohead/, "Stale artist must be gone once tracks response resolves");
+    assert.doesNotMatch(readyHtml, /aria-busy="true"/, "Must not render aria-busy when ready");
+    assert.doesNotMatch(readyHtml, /pointer-events-none/, "Must not render pointer-events-none when ready");
+  } finally {
+    harness.cleanup();
+    (React as unknown as { useState: unknown }).useState = origUseState;
+    (React as unknown as { useEffect: unknown }).useEffect = origUseEffect;
+  }
+});
+
+test("SearchView first load renders 8 skeleton rows when uncached and data is null", () => {
+  clearSearchCache();
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "uncached-first-load",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+    })
+  );
+
+  // Must not render loading text
+  assert.doesNotMatch(html, /SEARCHING…/);
+  assert.doesNotMatch(html, /LOADING CATALOG…/);
+
+  // Must render aria-busy and pointer-events-none
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /pointer-events-none/);
+
+  // Must render 8 skeleton rows
+  const skeletonSquareMatches = html.match(/w-\[38px\] h-\[38px\] rounded bg-\[#141413\]/g);
+  assert.equal(skeletonSquareMatches?.length, 8, "Must render 8 skeleton row artwork squares");
+
+  const skeletonRowMatches = html.match(/h-\[54px\] md:h-\[55px\] border-b border-\[#191917\] animate-pulse/g);
+  assert.equal(skeletonRowMatches?.length, 8, "Must render 8 skeleton rows");
 });
