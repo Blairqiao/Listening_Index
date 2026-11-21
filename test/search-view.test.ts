@@ -734,15 +734,15 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   // Pill totals counts with hidden sm:inline markup
   assert.match(
     html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">42<\/span>/
+    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">42<\/span>/
   );
   assert.match(
     html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">12<\/span>/
+    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">12<\/span>/
   );
   assert.match(
     html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[10px\] text-\[#5A5A55\] tabular-nums">5<\/span>/
+    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">5<\/span>/
   );
 
   // Filter pill styling: ControlRow padding and visible focus-visible outline

@@ -25,7 +25,7 @@ export const ListeningHeader: React.FC<ListeningHeaderProps> = ({ syncError }) =
           </h1>
         </a>
         {syncError && (
-          <span className="font-mono text-[10px] text-[#FF6B6B]">
+          <span className="font-mono text-[11px] text-[#FF6B6B]">
             {syncError}
           </span>
         )}

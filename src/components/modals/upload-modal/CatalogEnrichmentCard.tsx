@@ -23,7 +23,7 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
 
   return (
     <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3.5 space-y-2">
-      <div className="flex items-center justify-between text-[10px]">
+      <div className="flex items-center justify-between text-[11px]">
         <span className="text-[#6A6A64] flex items-center gap-1.5 font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-music-accent" />
           Database enrichment status
@@ -44,7 +44,7 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
         />
       </div>
 
-      <div className="flex items-center justify-between text-[9.5px] text-[#6A6A64]">
+      <div className="flex items-center justify-between text-[10.5px] text-[#6A6A64]">
         <span>
           Enriched: <strong className="text-[#EDEDE8]">{progress.enriched.toLocaleString()}</strong>
         </span>

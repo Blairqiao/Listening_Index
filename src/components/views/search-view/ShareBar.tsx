@@ -1,8 +1,8 @@
 import React from "react";
 import { artistShare, formatShare, OTHER_SEGMENT_ID, type ShareSegment } from "@/lib/profile-stats";
 
-const headingClass = "mb-2 font-mono text-[11px] text-[#5A5A55] select-none";
-const legendClass = "mt-2 flex justify-between gap-2 font-mono text-[11px] text-[#8A8A83] tabular-nums";
+const headingClass = "mb-2 font-mono text-[12px] text-[#5A5A55] select-none";
+const legendClass = "mt-2 flex justify-between gap-2 font-mono text-[12px] text-[#8A8A83] tabular-nums";
 
 function playCountLabel(plays: number): string {
   return `${plays.toLocaleString()} ${plays === 1 ? "play" : "plays"}`;

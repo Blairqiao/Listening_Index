@@ -76,7 +76,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       ? activityCadence[activityCadence.length - 1].date
       : "";
 
-  const headingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
+  const headingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
   const defaultHeadingText = showRange ? `${label} / ${range === "all" ? "all" : range}` : label;
 
   return (
@@ -162,7 +162,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
         {/* Contextual markers according to range */}
         {range === "1d" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             <span>-24h</span>
             <span>-12h</span>
             <span>Now</span>
@@ -170,7 +170,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         )}
 
         {range === "1w" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               ["-7d", "-6d", "-5d", "-4d", "-3d", "-2d", "Now"].map((m, i) => (
                 <span key={i} className="text-center flex-1 truncate">
@@ -192,7 +192,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         )}
 
         {range === "1m" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
                 <span>-30d</span>
@@ -218,7 +218,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         )}
 
         {range === "6m" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
                 <span>-6m</span>
@@ -239,7 +239,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         )}
 
         {range === "1y" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
                 <span>-12m</span>
@@ -267,7 +267,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         )}
 
         {range === "all" && (
-          <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
+          <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
                 <span>All-time</span>

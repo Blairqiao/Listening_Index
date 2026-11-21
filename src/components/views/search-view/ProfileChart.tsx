@@ -13,8 +13,8 @@ type ChartView = "time" | "hour" | "day";
 
 // Combined label + toggle button on the left, styled like the live player's Synthetic toggle.
 const toggleHeadingClass =
-  "font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
-const staticHeadingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
+  "font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
+const staticHeadingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {
   range: RangeKey;
@@ -130,7 +130,7 @@ export function ProfileChart({
         />
       )}
       {(hasHour || hasDay) && (
-        <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 text-[#8A8A83] tabular-nums">
+        <div className="mt-1 h-4 text-right font-mono text-[12px] leading-4 text-[#8A8A83] tabular-nums">
           {readout(currentView, hourOfDay, dayOfWeek, streakDays)}
         </div>
       )}

@@ -3,7 +3,7 @@ import { peakDayOfWeek } from "@/lib/profile-stats";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const headingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
+const headingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 export function DayOfWeekChart({
   counts,
@@ -59,7 +59,7 @@ export function DayOfWeekChart({
         </div>
         <div
           aria-hidden="true"
-          className="grid grid-cols-7 text-center gap-[4px] mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]"
+          className="grid grid-cols-7 text-center gap-[4px] mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]"
         >
           {DAY_LABELS.map((dayLabel) => (
             <span key={dayLabel}>{dayLabel}</span>
