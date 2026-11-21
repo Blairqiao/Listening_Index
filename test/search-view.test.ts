@@ -752,8 +752,8 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   // Active filter styling: tracks is active -> border-music-accent text-music-accent
   assert.match(html, /border-music-accent text-music-accent[^>]*>[^<]*<span>TRACKS<\/span>/);
 
-  // Bracket sort trigger: [ SORT: MOST PLAYS ⌄ ]
-  assert.match(html, /\[ SORT:.*MOST PLAYS.*⌄ \]/);
+  // Bracketed sort trigger with a chevron icon
+  assert.match(html, /\[ SORT:<\/span><span>MOST PLAYS<\/span><svg\b[^>]*lucide-chevron-down[^>]*>.*?<\/svg><span>\]<\/span>/);
   assert.match(html, /aria-label="Sort by"/);
 
   // Random button
