@@ -148,7 +148,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
       <div
         data-profile-stats=""
-        className="mt-3 md:mt-4 flex flex-wrap gap-x-6 md:gap-x-8 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3"
+        className="mt-3 md:mt-4 flex flex-wrap md:justify-between gap-x-6 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3"
       >
         <StatCell label="PLAYS" value={data.plays.toLocaleString()} />
 
