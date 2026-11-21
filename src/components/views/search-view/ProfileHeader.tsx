@@ -129,7 +129,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           )}
 
           {hasDates && (
-            <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+            <div className="font-mono text-[11.5px] text-[#6A6A64] leading-tight mt-0.5 select-none">
               FIRST PLAY {firstPlayDate} · LAST {lastPlayDate}
             </div>
           )}

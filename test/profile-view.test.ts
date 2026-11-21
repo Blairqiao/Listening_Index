@@ -754,6 +754,7 @@ test("ProfileHeader: FIRST PLAY subline is present with formatted dates in visit
   );
 
   assert.match(markup, /FIRST PLAY 15 JAN 2024 · LAST 18 NOV 2024/);
+  assert.doesNotMatch(markup, /class="[^"]*\btruncate\b[^"]*">FIRST PLAY/);
 });
 
 test("ProfileBox: Artist with 1 top Track renders 4 placeholders in TOP TRACKS", () => {
