@@ -153,6 +153,24 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
         }
       );
 
+      const assertStreakDates = (stats: {
+        longestStreakDays: number;
+        longestStreakStart: string | null;
+        longestStreakEnd: string | null;
+      }) => {
+        if (stats.longestStreakDays === 0) {
+          assert.equal(stats.longestStreakStart, null);
+          assert.equal(stats.longestStreakEnd, null);
+        } else {
+          assert.equal(typeof stats.longestStreakStart, "string");
+          assert.equal(typeof stats.longestStreakEnd, "string");
+          assert.ok(stats.longestStreakStart! <= stats.longestStreakEnd!);
+          const spanDays =
+            (Date.parse(stats.longestStreakEnd!) - Date.parse(stats.longestStreakStart!)) / 86_400_000 + 1;
+          assert.equal(spanDays, stats.longestStreakDays);
+        }
+      };
+
       for (const { track, profile } of trackPairs) {
         assert.ok(profile, `expected track profile for ${track.id} in ${range}`);
         assert.equal(profile.kind, "track");
@@ -160,6 +178,8 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
         assert.equal(profile.plays, track.plays);
         assert.equal(profile.rank, Number(track.rank));
         assert.ok(profile.rankedTotal >= (profile.rank ?? 0));
+        assert.ok(profile.stats);
+        assertStreakDates(profile.stats);
       }
 
       for (const { index: i, artist, profile } of artistPairs) {
@@ -168,6 +188,23 @@ test("search and profile DB queries", { skip: skipWithoutDb }, async (t) => {
         assert.equal(profile.plays, artist.count);
         assert.equal(profile.rank, i + 1);
         assert.ok(profile.rankedTotal >= (profile.rank ?? 0));
+        assert.ok(profile.stats);
+        assertStreakDates(profile.stats);
+        if (profile.plays > 0) {
+          assert.equal(typeof profile.stats.playShare, "number");
+          assert.ok(profile.stats.playShare! > 0 && profile.stats.playShare! <= 1);
+        } else {
+          assert.equal(profile.stats.playShare, null);
+        }
+        assert.equal(typeof profile.stats.tracksHeardInRange, "number");
+        assert.equal(typeof profile.stats.tracksHeardLifetime, "number");
+        assert.ok(profile.stats.tracksHeardInRange! <= profile.stats.tracksHeardLifetime!);
+        assert.ok(
+          profile.stats.completionRate === null ||
+            (typeof profile.stats.completionRate === "number" &&
+              profile.stats.completionRate >= 0 &&
+              profile.stats.completionRate <= 1),
+        );
       }
     }
   });

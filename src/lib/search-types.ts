@@ -96,12 +96,15 @@ export interface ProfileSummaryStats {
   totalMs: number;
   activeDays: number;
   longestStreakDays: number;
+  longestStreakStart: string | null; // local YYYY-MM-DD of the streak's first day; null when longestStreakDays = 0
+  longestStreakEnd: string | null;   // local YYYY-MM-DD of the streak's last day; null when longestStreakDays = 0
   peakDay: ProfilePeakDay | null;
   completionRate?: number | null;
   artistPlays?: number;
   artistShare?: number | null;
   albumPlays?: number;
   albumShare?: number | null;
+  playShare?: number | null;         // Artist profiles: the Artist's Plays / all Plays in range
   tracksHeardInRange?: number;
   tracksHeardLifetime?: number;
   fullAlbumSessions?: number;
