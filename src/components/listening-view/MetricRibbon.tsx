@@ -118,7 +118,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
               <span>{label}</span>
             </div>
             <div
-              className={`font-display font-stretch-semi-condensed text-[18px] sm:text-[19px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all ${
+              className={`font-display text-[18px] sm:text-[19px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all ${
                 isLoading ? "opacity-60 transition-opacity duration-150" : ""
               }`}
             >

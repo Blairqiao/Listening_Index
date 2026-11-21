@@ -20,7 +20,7 @@ export const ListeningHeader: React.FC<ListeningHeaderProps> = ({ syncError }) =
           rel="noopener noreferrer"
           className="group flex items-baseline gap-3 focus:outline-none cursor-pointer bg-transparent border-0 p-0 text-left no-underline"
         >
-          <h1 className="font-display font-stretch-semi-condensed text-[28px] sm:text-[38px] font-medium tracking-[-0.045em] text-[#EDEDE8] leading-none">
+          <h1 className="font-display text-[28px] sm:text-[38px] font-medium tracking-[-0.05em] text-[#EDEDE8] leading-none">
             {config.title}<span className="text-music-accent">.</span>
           </h1>
         </a>

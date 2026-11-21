@@ -21,17 +21,23 @@ function sourceFiles(dir: string): string[] {
 
 const uiFiles = [...sourceFiles("src/components"), ...sourceFiles("src/app"), ...sourceFiles("src/lib")];
 
-test("layout loads Martian Mono (width axis) and Spline Sans Mono only", () => {
+test("layout loads IBM Plex Mono and Spline Sans Mono only", () => {
   const layout = read("src/app/layout.tsx");
-  assert.match(layout, /Martian_Mono/);
+  assert.match(layout, /IBM_Plex_Mono/);
+  assert.match(layout, /weight:\s*\[[^\]]*"500"/);
   assert.match(layout, /Spline_Sans_Mono/);
-  assert.match(layout, /axes:\s*\[\s*"wdth"\s*\]/);
-  assert.doesNotMatch(layout, /Space_Grotesk|JetBrains_Mono/);
+  assert.doesNotMatch(layout, /Martian_Mono|Space_Grotesk|JetBrains_Mono/);
 });
 
-test("theme maps display to Martian and sans/mono to Spline with a CJK fallback", () => {
+test("display text does not use font-stretch (IBM Plex Mono has no width axis)", () => {
+  const offenders = uiFiles.filter((file) => /font-stretch/.test(read(file)));
+  assert.deepEqual(offenders, []);
+});
+
+test("theme maps display to IBM Plex Mono and sans/mono to Spline with a CJK fallback", () => {
   const css = read("src/app/globals.css");
-  assert.match(css, /--font-display:\s*var\(--font-martian-mono\)/);
+  assert.match(css, /--font-display:\s*var\(--font-ibm-plex-mono\)[^;]*PingFang SC/);
+  assert.doesNotMatch(css, /martian/i);
   assert.match(css, /--font-sans:\s*var\(--font-spline-sans-mono\)[^;]*PingFang SC/);
   assert.match(css, /--font-mono:\s*var\(--font-spline-sans-mono\)[^;]*PingFang SC/);
 });
