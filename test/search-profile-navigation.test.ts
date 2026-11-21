@@ -468,14 +468,14 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       "1w",
       "America/Chicago"
     ),
-    ["42", "3 / 50", "15 JAN 2024", "18 NOV 2024"]
+    ["42", "3 / 50", "15 Jan 2024", "18 Nov 2024"]
   );
 
   assert.equal(
     formatProfileRibbonMetrics(
       artist1w, "ready", { kind: "artist", key: "artist-1" }, "1w", "UTC", "percentile"
     )[1],
-    "TOP 6%"
+    "Top 6%"
   );
 
   // Zero rank formats as "--"
@@ -487,7 +487,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       "1w",
       "UTC"
     ),
-    ["0", "--", "15 JAN 2024", "18 NOV 2024"]
+    ["0", "--", "15 Jan 2024", "18 Nov 2024"]
   );
 
   // Plays formatted with toLocaleString()
@@ -511,7 +511,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       "all",
       "UTC"
     ),
-    ["42", "3 / 50", "15 JAN 2024", "18 NOV 2024"]
+    ["42", "3 / 50", "15 Jan 2024", "18 Nov 2024"]
   );
   // Mismatched range when ready, or not_found/error status, must NOT leak
   assert.deepEqual(

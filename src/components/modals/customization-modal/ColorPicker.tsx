@@ -224,10 +224,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             title={`Active Accent: ${currentHex}`}
           />
           <div className="flex flex-col">
-            <span className="font-mono text-[9px] tracking-[0.12em] text-[#6A6A64]">
-              COLOR
+            <span className="font-mono text-[9px] text-[#6A6A64]">
+              Color
             </span>
-            <div className="flex items-center font-mono text-[13px] tracking-[0.08em] text-[#EDEDE8] bg-[#141413] border border-[#26261F] px-2 py-0.5">
+            <div className="flex items-center font-mono text-[13px] text-[#EDEDE8] bg-[#141413] border border-[#26261F] px-2 py-0.5">
               <span className="text-[#6A6A64] mr-1 select-none">#</span>
               <input
                 type="text"
@@ -236,7 +236,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 onBlur={handleHexInputBlur}
                 maxLength={8}
                 spellCheck={false}
-                className="w-16 bg-transparent border-0 text-[#EDEDE8] font-mono text-[13px] tracking-[0.08em] uppercase focus:outline-none"
+                className="w-16 bg-transparent border-0 text-[#EDEDE8] font-mono text-[13px] focus:outline-none"
                 placeholder="76FF49"
               />
             </div>
@@ -245,10 +245,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
         {/* HSV Coordinate Readout */}
         <div className="flex flex-col items-end">
-          <span className="font-mono text-[9px] tracking-[0.12em] text-[#6A6A64]">
-            COORDINATES
+          <span className="font-mono text-[9px] text-[#6A6A64]">
+            Coordinates
           </span>
-          <span className="font-mono text-[11px] tracking-[0.06em] text-[#8A8A82]">
+          <span className="font-mono text-[11px] text-[#8A8A82]">
             H:{Math.round(hsv.h)}° S:{Math.round(hsv.s)}% V:{Math.round(hsv.v)}%
           </span>
         </div>
@@ -256,7 +256,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
       {/* 4. Curated Presets Palette */}
       <div className="flex flex-col gap-1.5 pt-1">
-        <span className="font-mono text-[9px] tracking-[0.14em] text-[#6A6A64] uppercase">
+        <span className="font-mono text-[9px] text-[#6A6A64]">
           Preset Colors
         </span>
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5" role="group" aria-label="Color presets">

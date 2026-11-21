@@ -134,9 +134,9 @@ test("ListeningFooter maintains clean system telemetry without prompt notificati
 
   // Telemetry indicators present
   assert.ok(
-    footerSource.includes("[ SYNCING... ]") &&
-    footerSource.includes("[ ▪ LIVE ]") &&
-    footerSource.includes("[ SYNCED"),
+    footerSource.includes("Syncing...") &&
+    footerSource.includes("▪ Live") &&
+    footerSource.includes("Synced {syncedAgo}"),
     "ListeningFooter must render standard sync and live telemetry indicators"
   );
 

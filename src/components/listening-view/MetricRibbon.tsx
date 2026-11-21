@@ -23,24 +23,24 @@ export const getRibbonLabels = (
   switch (mode) {
     case 0:
       return [
-        overviewTimeUnit === "hours" ? "HOURS" : "MINUTES",
-        "TRACKS",
-        "ARTISTS",
-        "DAILY AVG",
+        overviewTimeUnit === "hours" ? "Hours" : "Minutes",
+        "Tracks",
+        "Artists",
+        "Daily avg",
       ];
     case 1:
-      return ["TOTAL PLAYS", "UNIQUE TRACKS", "UNIQUE ARTISTS", "CURRENT STREAK"];
+      return ["Total plays", "Unique tracks", "Unique artists", "Current streak"];
     case 2:
-      return ["SESSION RUNTIME", "TOTAL TRACKS", "UNIQUE ARTISTS", "START TIME"];
+      return ["Session runtime", "Total tracks", "Unique artists", "Start time"];
     case 3:
       return [
-        "TRACK RANK",
-        "TRACK PLAYS",
-        "ARTIST RANK",
-        "ARTIST PLAYS",
+        "Track rank",
+        "Track plays",
+        "Artist rank",
+        "Artist plays",
       ];
     case 4:
-      return ["PLAYS", "RANK", "FIRST PLAYED", "LAST PLAYED"];
+      return ["Plays", "Rank", "First played", "Last played"];
   }
 };
 
@@ -114,11 +114,11 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
                 : ""
             }`}
           >
-            <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] flex items-center justify-between">
+            <div className="font-mono text-[11px] text-[#5A5A55] flex items-center justify-between">
               <span>{label}</span>
             </div>
             <div
-              className={`font-mono text-[19px] sm:text-[20px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all ${
+              className={`font-display font-stretch-semi-condensed text-[18px] sm:text-[19px] text-[#EDEDE8] tabular-nums mt-1.5 leading-tight select-all ${
                 isLoading ? "opacity-60 transition-opacity duration-150" : ""
               }`}
             >

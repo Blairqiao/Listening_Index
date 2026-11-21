@@ -119,13 +119,13 @@ export function getSearchStatusText(args: {
     return null;
   }
   if (args.status === "error") {
-    return "SEARCH FAILED";
+    return "Search failed";
   }
   if (args.status === "idle") {
-    return "QUERY TOO LONG";
+    return "Query too long";
   }
   if (args.status === "ready" && !args.hasResults) {
-    return args.query.trim() ? "[ NO MATCHES ]" : "[ NO PLAYS IN ARCHIVE ]";
+    return args.query.trim() ? "No matches" : "No plays in archive";
   }
   return null;
 }

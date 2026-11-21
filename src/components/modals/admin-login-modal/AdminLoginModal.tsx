@@ -102,7 +102,7 @@ export const AdminLoginModal: React.FC = () => {
             <Lock className="w-3.5 h-3.5 text-music-accent" />
             <h2
               id="admin-login-modal-title"
-              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
+              className="font-mono text-[12px] text-[#EDEDE8] whitespace-nowrap"
             >
               Admin Authentication
             </h2>
@@ -123,7 +123,7 @@ export const AdminLoginModal: React.FC = () => {
           <div className="space-y-1.5">
             <label
               htmlFor="admin-login-password"
-              className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64]"
+              className="block font-mono text-[10px] text-[#6A6A64]"
             >
               Master Password
             </label>
@@ -153,7 +153,7 @@ export const AdminLoginModal: React.FC = () => {
           </div>
 
           {authError && (
-            <div className="font-mono text-[10px] tracking-[0.06em] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
+            <div className="font-mono text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
               {authError}
             </div>
           )}
@@ -162,7 +162,7 @@ export const AdminLoginModal: React.FC = () => {
             <button
               type="submit"
               disabled={isAuthenticating || !password.trim()}
-              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[11px] font-bold tracking-[0.08em] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[11px] font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
             >
               {isAuthenticating ? (
                 <>

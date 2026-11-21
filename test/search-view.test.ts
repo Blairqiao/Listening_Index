@@ -145,7 +145,7 @@ test("SearchView SSR: renders named input, placeholder, maxLength, and page scro
   assert.ok(html.includes('type="search"'), 'Must render type="search"');
   assert.ok(html.includes('name="search"'), 'Must render name="search"');
   assert.ok(
-    html.includes('placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"'),
+    html.includes('placeholder="Search tracks, artists or albums"'),
     "Must render correct placeholder"
   );
   assert.ok(
@@ -178,14 +178,14 @@ test("SearchView browses on empty input and accepts a single character", async (
   );
   const browseHtml = render("");
   assert.match(browseHtml, /Default Artist/);
-  assert.doesNotMatch(browseHtml, /\[ ALBUMS \]/);
+  assert.doesNotMatch(browseHtml, /text-\[#5A5A55\]">Albums</);
   assert.doesNotMatch(browseHtml, /<select\b/);
   assert.match(browseHtml, /aria-haspopup="listbox"/);
   assert.match(browseHtml, /aria-label="Sort by"/);
-  assert.match(browseHtml, />MOST PLAYS</);
-  assert.match(browseHtml, /aria-label="Previous page"[^>]*>← PREV</);
-  assert.match(browseHtml, /aria-label="Next page"[^>]*>NEXT →</);
-  assert.match(browseHtml, />PAGE<\/span> 01</);
+  assert.match(browseHtml, />Most plays</);
+  assert.match(browseHtml, /aria-label="Previous page"[^>]*>← Prev</);
+  assert.match(browseHtml, /aria-label="Next page"[^>]*>Next →</);
+  assert.match(browseHtml, />Page<\/span> 01</);
   const shortHtml = render("r");
   assert.doesNotMatch(shortHtml, /SEARCHING/);
   assert.doesNotMatch(shortHtml, /TYPE 2/);
@@ -199,8 +199,8 @@ test("SearchView browses on empty input and accepts a single character", async (
     })
   );
   assert.ok(
-    longHtml.includes("QUERY TOO LONG"),
-    "Query >100 chars must show QUERY TOO LONG"
+    longHtml.includes("Query too long"),
+    "Query >100 chars must show Query too long"
   );
 
   // 4. Loading query (valid query, not yet cached)
@@ -233,8 +233,8 @@ test("SearchView browses on empty input and accepts a single character", async (
     })
   );
   assert.ok(
-    noMatchesHtml.includes("[ NO MATCHES ]"),
-    "Empty response must show [ NO MATCHES ]"
+    noMatchesHtml.includes("No matches"),
+    "Empty response must show No matches"
   );
 });
 
@@ -282,10 +282,10 @@ test("SearchView results rendering: columns, row style, artwork, and buttons wit
   );
 
   // Column headers
-  assert.ok(html.includes("[ ARTISTS ]"), "Must render [ ARTISTS ] header");
-  assert.ok(html.includes("[ TRACKS ]"), "Must render [ TRACKS ] header");
-  assert.match(html, /\[ TRACKS \].*\[ ARTISTS \].*\[ ALBUMS \]/);
-  assert.match(html, /md:h-\[55px\][^>]*><span[^>]*>\[ ALBUMS \]/);
+  assert.ok(html.includes('text-[#5A5A55]">Artists<'), "Must render Artists header");
+  assert.ok(html.includes('text-[#5A5A55]">Tracks<'), "Must render Tracks header");
+  assert.match(html, /text-\[#5A5A55\]">Tracks<.*text-\[#5A5A55\]">Artists<.*text-\[#5A5A55\]">Albums</);
+  assert.match(html, /md:h-\[55px\][^>]*><span[^>]*>Albums</);
 
   // Verify role="list" was removed from column containers
   assert.ok(
@@ -318,7 +318,7 @@ test("SearchView results rendering: columns, row style, artwork, and buttons wit
   assert.match(albumButton, />124<\/span>/);
 
   // Status line is clean when results exist
-  assert.ok(!html.includes("[ NO MATCHES ]"), "Should not show no matches");
+  assert.ok(!html.includes("No matches"), "Should not show no matches");
   assert.ok(!html.includes("SEARCHING…"), "Should not show searching when cached");
 });
 
@@ -339,10 +339,10 @@ test("SearchView shows album-only results with a standard heading", async () => 
     })
   );
 
-  assert.match(html, /\[ NO TRACKS \]/);
-  assert.match(html, /\[ ALBUMS \].*>Amnesiac</);
-  assert.doesNotMatch(html, /\[ ARTISTS \]|\[ NO ARTISTS \]|\[ NO MATCHES \]/);
-  assert.doesNotMatch(html, /md:h-\[55px\][^>]*><span[^>]*>\[ ALBUMS \]/);
+  assert.match(html, /No tracks/);
+  assert.match(html, /text-\[#5A5A55\]">Albums<.*>Amnesiac</);
+  assert.doesNotMatch(html, /text-\[#5A5A55\]">Artists<|No artists|No matches/);
+  assert.doesNotMatch(html, /md:h-\[55px\][^>]*><span[^>]*>Albums</);
 });
 
 test("useSearch hook behavior: debounce, abort, stale response, error-whitespace regression, and cache hit", async () => {
@@ -722,14 +722,14 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   // Filter group & accessibility
   assert.match(html, /role="group"/);
   assert.match(html, /aria-label="Filter by type"/);
-  assert.match(html, /aria-pressed="true"[^>]*>[^<]*<span>TRACKS<\/span>/);
-  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ALL<\/span>/);
-  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ARTISTS<\/span>/);
-  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>ALBUMS<\/span>/);
-  assert.match(html, />ALL<\/span>/);
-  assert.match(html, />TRACKS<\/span>/);
-  assert.match(html, />ARTISTS<\/span>/);
-  assert.match(html, />ALBUMS<\/span>/);
+  assert.match(html, /aria-pressed="true"[^>]*>[^<]*<span>Tracks<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>All<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>Artists<\/span>/);
+  assert.match(html, /aria-pressed="false"[^>]*>[^<]*<span>Albums<\/span>/);
+  assert.match(html, />All<\/span>/);
+  assert.match(html, />Tracks<\/span>/);
+  assert.match(html, />Artists<\/span>/);
+  assert.match(html, />Albums<\/span>/);
 
   // Pill totals counts with hidden sm:inline markup
   assert.match(
@@ -750,14 +750,14 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   assert.match(html, /focus-visible:outline-music-accent/);
 
   // Active filter styling: tracks is active -> border-music-accent text-music-accent
-  assert.match(html, /border-music-accent text-music-accent[^>]*>[^<]*<span>TRACKS<\/span>/);
+  assert.match(html, /border-music-accent text-music-accent[^>]*>[^<]*<span>Tracks<\/span>/);
 
   // Bracketed sort trigger with a chevron icon
-  assert.match(html, /\[ SORT:<\/span><span>MOST PLAYS<\/span><svg\b[^>]*lucide-chevron-down[^>]*>.*?<\/svg><span>\]<\/span>/);
+  assert.match(html, /Sort:<\/span><span>Most plays<\/span><svg\b[^>]*lucide-chevron-down[^>]*>.*?<\/svg>/);
   assert.match(html, /aria-label="Sort by"/);
 
   // Random button
-  assert.match(html, /\[ RANDOM \]/);
+  assert.match(html, /Random/);
   assert.match(html, /aria-label="Open random profile"/);
 
   // When onRandomProfile is omitted, [ RANDOM ] is not rendered
@@ -768,7 +768,7 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
       onOpenProfile: () => {},
     })
   );
-  assert.doesNotMatch(noRandomHtml, /\[ RANDOM \]/);
+  assert.doesNotMatch(noRandomHtml, /Random/);
 });
 
 test("SearchView single-filter layout: balanced 2-column grid, recency headers, and lastPlayedAt formatting", async () => {
@@ -803,19 +803,19 @@ test("SearchView single-filter layout: balanced 2-column grid, recency headers, 
   );
 
   // Heading for single filter
-  assert.match(recentHtml, /\[ TRACKS \]/);
-  assert.doesNotMatch(recentHtml, /\[ ARTISTS \]/);
-  assert.doesNotMatch(recentHtml, /\[ ALBUMS \]/);
+  assert.match(recentHtml, /text-\[#5A5A55\]">Tracks</);
+  assert.doesNotMatch(recentHtml, /text-\[#5A5A55\]">Artists</);
+  assert.doesNotMatch(recentHtml, /text-\[#5A5A55\]">Albums</);
 
   // Recency header on recent sort
-  assert.match(recentHtml, /LAST PLAYED · PLAYS/);
+  assert.match(recentHtml, /Last played · plays/);
 
   // Balanced 2-column grid
   assert.match(recentHtml, /md:grid-cols-2/);
   assert.match(recentHtml, /md:gap-x-\[26px\]/);
 
   // Last played date formatting: 2026-11-20T01:30:00Z in America/New_York formatted as "19 NOV 26"
-  assert.match(recentHtml, /19 NOV 26/);
+  assert.match(recentHtml, /19 Nov 26/);
 
   // Column wrappers must not have role="list"
   assert.ok(!recentHtml.includes('role="list"'));
@@ -851,8 +851,8 @@ test("SearchView single-filter layout: balanced 2-column grid, recency headers, 
       visitorTimezone: "America/New_York",
     })
   );
-  assert.match(oldestHtml, /LAST PLAYED · PLAYS/);
-  assert.match(oldestHtml, /19 NOV 26/);
+  assert.match(oldestHtml, /Last played · plays/);
+  assert.match(oldestHtml, /19 Nov 26/);
 });
 
 test("SearchView Tracks-only mixed layout when filter is 'all'", async () => {
@@ -883,9 +883,9 @@ test("SearchView Tracks-only mixed layout when filter is 'all'", async () => {
     })
   );
 
-  assert.match(html, /\[ TRACKS \]/);
-  assert.doesNotMatch(html, /\[ ARTISTS \]/);
-  assert.doesNotMatch(html, /\[ ALBUMS \]/);
+  assert.match(html, /text-\[#5A5A55\]">Tracks</);
+  assert.doesNotMatch(html, /text-\[#5A5A55\]">Artists</);
+  assert.doesNotMatch(html, /text-\[#5A5A55\]">Albums</);
   // Full width split into 2 columns
   assert.match(html, /md:grid-cols-2/);
 });
@@ -913,7 +913,7 @@ test("SearchView bottom hairline pagination: totalPages, divider, and DOM order"
   // Bottom hairline pagination with hairlines
   assert.match(html, /flex-1 h-\[1px\] bg-\[#1C1C1A\]/);
   assert.match(html, /aria-label="Search results pages"/);
-  assert.match(html, /PAGE<\/span> 01 \/ 12/);
+  assert.match(html, /Page<\/span> 01 \/ 12/);
 
   // Position: pagination must appear after results
   const artistIndex = html.indexOf("Page Artist");
@@ -931,7 +931,7 @@ test("SearchView input: filter-specific placeholder and aria-label", () => {
       filter: "tracks",
     })
   );
-  assert.match(tracksHtml, /placeholder="SEARCH TRACKS"/);
+  assert.match(tracksHtml, /placeholder="Search tracks"/);
   assert.match(tracksHtml, /aria-label="Search tracks"/);
 
   const artistsHtml = renderToStaticMarkup(
@@ -942,7 +942,7 @@ test("SearchView input: filter-specific placeholder and aria-label", () => {
       filter: "artists",
     })
   );
-  assert.match(artistsHtml, /placeholder="SEARCH ARTISTS"/);
+  assert.match(artistsHtml, /placeholder="Search artists"/);
   assert.match(artistsHtml, /aria-label="Search artists"/);
 
   const albumsHtml = renderToStaticMarkup(
@@ -953,7 +953,7 @@ test("SearchView input: filter-specific placeholder and aria-label", () => {
       filter: "albums",
     })
   );
-  assert.match(albumsHtml, /placeholder="SEARCH ALBUMS"/);
+  assert.match(albumsHtml, /placeholder="Search albums"/);
   assert.match(albumsHtml, /aria-label="Search albums"/);
 
   const allHtml = renderToStaticMarkup(
@@ -964,7 +964,7 @@ test("SearchView input: filter-specific placeholder and aria-label", () => {
       filter: "all",
     })
   );
-  assert.match(allHtml, /placeholder="SEARCH TRACKS, ARTISTS OR ALBUMS"/);
+  assert.match(allHtml, /placeholder="Search tracks, artists or albums"/);
   assert.match(allHtml, /aria-label="Search tracks, artists or albums"/);
 });
 
@@ -1049,7 +1049,7 @@ test("SearchView renders dimmed previous artist rows with pointer-events-none an
       })
     );
 
-    assert.match(readyHtml, /\[ NO MATCHES \]/, "Empty tracks response must show [ NO MATCHES ]");
+    assert.match(readyHtml, /No matches/, "Empty tracks response must show No matches");
     assert.doesNotMatch(readyHtml, /Radiohead/, "Stale artist must be gone once tracks response resolves");
     assert.doesNotMatch(readyHtml, /aria-busy="true"/, "Must not render aria-busy when ready");
     assert.doesNotMatch(readyHtml, /pointer-events-none/, "Must not render pointer-events-none when ready");

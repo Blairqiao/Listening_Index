@@ -16,15 +16,15 @@ interface ModeTabsProps {
 }
 
 export const BASE_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
-  { id: 0, label: "[ OVERVIEW ]", abbrev: "[ OVR ]" },
-  { id: 1, label: "[ STREAM LOG ]", abbrev: "[ LOG ]" },
-  { id: 2, label: "[ SESSIONS ]", abbrev: "[ SES ]" },
-  { id: 4, label: "[ SEARCH ]", abbrev: "[ SRCH ]" },
+  { id: 0, label: "Overview", abbrev: "Overview" },
+  { id: 1, label: "Stream log", abbrev: "Log" },
+  { id: 2, label: "Sessions", abbrev: "Sessions" },
+  { id: 4, label: "Search", abbrev: "Search" },
 ];
 
 export const ADMIN_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   ...BASE_MODES,
-  { id: 3, label: "[ LIVE PLAYER ]", abbrev: "[ LIVE ]" },
+  { id: 3, label: "Live player", abbrev: "Live" },
 ];
 
 export function getAvailableModes(isAuthenticated: boolean): Array<{ id: Mode; label: string; abbrev: string }> {
@@ -100,7 +100,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
       aria-label="Listening index view modes"
       className="flex flex-wrap items-center justify-between gap-y-1 sm:flex-nowrap mt-4 md:mt-5 border-b border-[#1C1C1A] select-none"
     >
-      <div className="flex gap-1.5 sm:gap-6 mr-1.5 sm:mr-4">
+      <div className="flex gap-3.5 sm:gap-6 mr-3 sm:mr-4">
         {modes.map((m) => {
           const isActive = activeMode === m.id;
           return (
@@ -115,7 +115,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                 e.currentTarget.blur();
                 if (!isSyncing) onSelectMode(m.id);
               }}
-              className={`font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b focus:outline-none focus-visible:outline-none whitespace-nowrap ${isSyncing ? "cursor-wait" : "cursor-pointer"
+              className={`font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b focus:outline-none focus-visible:outline-none whitespace-nowrap ${isSyncing ? "cursor-wait" : "cursor-pointer"
                 } ${isActive
                   ? "text-music-accent border-music-accent"
                   : "text-[#5A5A55] border-transparent hover:text-[#EDEDE8]"
@@ -128,7 +128,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
         })}
       </div>
 
-      <div className="ml-auto flex items-center gap-1 sm:gap-2.5 shrink-0">
+      <div className="ml-auto flex items-center gap-3 sm:gap-3.5 shrink-0">
         
         {isAuthenticated && onOpenUpload && (
           <button
@@ -136,11 +136,9 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={onOpenUpload}
             title="Import Spotify Extended Streaming History (.zip / .json)"
             aria-label="Import Spotify Extended Streaming History"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <span>[</span>
             <Upload className="w-3 h-3" />
-            <span>]</span>
           </button>
         )}
 
@@ -150,7 +148,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={handleOpenSpotify}
             title={spotifyTab.title}
             aria-label="Manage Spotify connection"
-            className={`inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap ${
+            className={`inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap ${
               spotifyTab.variant === "setup"
                 ? "text-music-accent hover:text-[#EDEDE8] animate-slow-blink"
                 : spotifyTab.variant === "expiring"
@@ -158,9 +156,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                 : "text-[#5A5A55] hover:text-music-accent"
             }`}
           >
-            <span>[</span>
             <Music2 className="w-3 h-3" />
-            <span>]</span>
           </button>
         )}
 
@@ -170,11 +166,9 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           onClick={openModal}
           title={isAuthenticated ? "Open configuration settings" : "Open appearance settings"}
           aria-label="Appearance and configuration settings"
-          className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
         >
-          <span>[</span>
           <Menu className="w-3 h-3" />
-          <span>]</span>
         </button>
 
         {isAuthenticated ? (
@@ -183,11 +177,9 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={logout}
             title="Admin session active · click to lock"
             aria-label="Lock admin session"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <span>[</span>
             <Unlock className="w-3 h-3 text-music-accent" />
-            <span>]</span>
           </button>
         ) : (
           <button
@@ -195,11 +187,9 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={openAdminLoginModal}
             title="Admin login"
             aria-label="Admin login"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] tracking-[0.06em] sm:tracking-[0.12em] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors uppercase cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[10px] sm:text-[11px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
           >
-            <span>[</span>
             <Lock className="w-3 h-3" />
-            <span>]</span>
           </button>
         )}
       </div>

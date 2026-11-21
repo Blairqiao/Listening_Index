@@ -30,8 +30,8 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
 }) => {
   return (
     <div className="pt-3 border-t border-[#1F1F1A] space-y-2.5">
-      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-        <span>SCHEDULED SYNC (CRON)</span>
+      <div className="flex items-center justify-between font-mono text-[10px] text-[#6A6A64]">
+        <span>Scheduled sync (cron)</span>
         <button
           type="button"
           onClick={onRegenerateSyncKey}
@@ -45,7 +45,7 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
               <span>Rotating...</span>
             </>
           ) : (
-            <span>[ Regenerate ]</span>
+            <span>Regenerate</span>
           )}
         </button>
       </div>
@@ -58,7 +58,7 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
           type="button"
           onClick={onCopySyncUrl}
           disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
-          className={`px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] ${hoverColorClass} hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40`}
+          className={`px-3 py-2 border-l border-[#26261F] font-mono text-[10px] text-[#EDEDE8] ${hoverColorClass} hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40`}
           title="Copy Scheduled Sync URL"
         >
           {copiedSyncUrl ? (

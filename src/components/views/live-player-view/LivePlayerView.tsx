@@ -170,14 +170,14 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-[#5A5A55] text-[10px]">
-              NO ART
+              No art
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-music-accent tracking-[0.16em] uppercase">
-              {isPlaying ? "NOW STREAMING" : isLinked ? "PAUSED" : "OFFLINE"}
+            <span className="text-[10px] text-music-accent">
+              {isPlaying ? "Now streaming" : isLinked ? "Paused" : "Offline"}
             </span>
           </div>
           <div className="text-[16px] sm:text-[18px] text-[#EDEDE8] truncate font-bold mt-0.5">
@@ -194,7 +194,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
       {playerStatus === "unlinked" && (
         <div className="flex items-center justify-between gap-2 px-2 py-1 bg-[#141413] border border-[#22221E] text-[#8A8A82] text-[10px] font-mono">
-          <span className="truncate">SPOTIFY NOT LINKED · OPEN SPOTIFY MODAL</span>
+          <span className="truncate">Spotify not linked · open Spotify modal</span>
         </div>
       )}
 
@@ -306,8 +306,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   onClick={() => setIsContextSelectorOpen(false)}
                 />
                 <div className="absolute right-0 bottom-full mb-1 z-30 w-[280px] sm:w-[320px] bg-[#0E0E0D] border border-[#26261F] shadow-2xl py-1 max-h-[220px] overflow-y-auto scrollbar-hidden font-mono text-[10px]">
-                  <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-b border-[#1A1A18]">
-                    CHOOSE PLAYBACK CONTEXT
+                  <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] border-b border-[#1A1A18]">
+                    Choose playback context
                   </div>
 
                   {/* Auto Play option */}
@@ -330,8 +330,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
                   {/* Playlists section */}
                   {userPlaylists.length > 0 ? (
                     <>
-                      <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] uppercase tracking-wider border-t border-b border-[#1A1A18] mt-1">
-                        SPOTIFY PLAYLISTS ({userPlaylists.length})
+                      <div className="px-2.5 py-1 text-[#6A6A64] text-[9px] border-t border-b border-[#1A1A18] mt-1">
+                        Spotify playlists ({userPlaylists.length})
                       </div>
                       {userPlaylists.map((pl) => {
                         const isSelected = selectedContext.type === "playlist" && selectedContext.uri === pl.uri;
@@ -368,7 +368,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-[#5A5A55] shrink-0 font-mono">
-            <span className="tracking-wider">VOL</span>
+            <span className="">Vol</span>
             <input
               type="range"
               min={0}
@@ -394,15 +394,15 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
           {/* Right Side: Spectrum Tower (7 cols) - Hidden on mobile (< 768px) */}
           <div className="hidden md:flex md:col-span-7 flex-col justify-between">
-            <div className="flex items-center justify-between text-[10px] tracking-[0.14em] text-[#5A5A55] mb-2">
-              <span>SPECTRUM VISUALIZER · 32 BANDS</span>
+            <div className="flex items-center justify-between text-[10px] text-[#5A5A55] mb-2">
+              <span>Spectrum visualizer · 32 bands</span>
               <button
                 type="button"
                 onClick={toggleSourceMode}
-                className="font-mono text-[10px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
+                className="font-mono text-[10px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
                 title="Click to toggle visualizer audio source (synthetic oscillator vs live hardware audio)"
               >
-                {sourceMode === "live" ? "[ LIVE AUDIO ]" : "[ SYNTHETIC ]"}
+                {sourceMode === "live" ? "Live audio" : "Synthetic"}
               </button>
             </div>
             <SpectrumCanvas
@@ -424,15 +424,15 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     <section aria-label="Variant A: Stacked Stage" className="space-y-3 font-mono">
       {/* Top Section: Spectrum Stage - Hidden on mobile (< 768px) */}
       <div className="hidden md:block border border-[#1C1C1A] bg-[#080808] p-3 sm:p-4 select-none">
-        <div className="flex items-center justify-between text-[10px] tracking-[0.14em] text-[#5A5A55] mb-2">
-          <span>SPECTRUM VISUALIZER · 32 BANDS</span>
+        <div className="flex items-center justify-between text-[10px] text-[#5A5A55] mb-2">
+          <span>Spectrum visualizer · 32 bands</span>
           <button
             type="button"
             onClick={toggleSourceMode}
-            className="font-mono text-[10px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
+            className="font-mono text-[10px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
             title="Click to toggle visualizer audio source (synthetic oscillator vs live hardware audio)"
           >
-            {sourceMode === "live" ? "[ LIVE AUDIO ]" : "[ SYNTHETIC ]"}
+            {sourceMode === "live" ? "Live audio" : "Synthetic"}
           </button>
         </div>
         <SpectrumCanvas

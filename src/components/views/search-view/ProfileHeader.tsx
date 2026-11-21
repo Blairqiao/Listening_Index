@@ -21,9 +21,9 @@ export interface ProfileHeaderProps {
 }
 
 const KICKER_BY_KIND: Record<ProfileKind, string> = {
-  track: "[ TRACK ]",
-  artist: "[ ARTIST ]",
-  album: "[ ALBUM ]",
+  track: "Track",
+  artist: "Artist",
+  album: "Album",
 };
 
 function formatPlayDate(iso: string | null | undefined, tz: string): string {
@@ -33,7 +33,7 @@ function formatPlayDate(iso: string | null | undefined, tz: string): string {
   return formatLogStartDate(date, tz);
 }
 
-const STAT_LABEL_CLASS = "font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]";
+const STAT_LABEL_CLASS = "font-mono text-[9.5px] md:text-[10px] text-[#5A5A55]";
 const STAT_VALUE_CLASS = "font-mono text-[13px] tabular-nums whitespace-nowrap";
 
 const StatCell: React.FC<{ label: string; value: string; muted?: boolean }> = ({
@@ -83,7 +83,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         <Artwork src={data.imageUrl} alt={data.name} size={88} />
 
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10.5px] tracking-[0.16em] text-music-accent mb-1 select-none">
+          <div className="font-mono text-[10.5px] text-music-accent mb-1 select-none">
             {KICKER_BY_KIND[data.kind]}
           </div>
 
@@ -111,7 +111,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
           {(isTrack || isAlbum) && data.artistName && (
             <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
-              <span className="text-[#5A5A55]">ARTIST · </span>
+              <span className="text-[#5A5A55]">Artist · </span>
               {artistKey ? (
                 <button
                   type="button"
@@ -128,7 +128,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
           {isTrack && data.albumName && (
             <div className="mt-0.5 truncate font-mono text-[11.5px] leading-tight text-[#6A6A64] select-none">
-              <span className="text-[#5A5A55]">ALBUM · </span>
+              <span className="text-[#5A5A55]">Album · </span>
               {albumKey ? (
                 <button
                   type="button"
@@ -150,7 +150,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         data-profile-stats=""
         className="mt-3 md:mt-4 flex flex-wrap md:justify-between gap-x-6 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3"
       >
-        <StatCell label="PLAYS" value={data.plays.toLocaleString()} />
+        <StatCell label="Plays" value={data.plays.toLocaleString()} />
 
         {onToggleRankFormat && hasRank ? (
           <button
@@ -160,38 +160,38 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             title="Click to toggle between rank and percentile"
             className="flex flex-col text-left cursor-pointer group focus-visible:outline-music-accent"
           >
-            <span className={STAT_LABEL_CLASS}>RANK</span>
+            <span className={STAT_LABEL_CLASS}>Rank</span>
             <span className={`${STAT_VALUE_CLASS} text-[#EDEDE8] group-hover:text-music-accent`}>
               {rankValue}
             </span>
           </button>
         ) : (
-          <StatCell label="RANK" value={rankValue} />
+          <StatCell label="Rank" value={rankValue} />
         )}
 
         <StatCell
-          label="LISTENING TIME"
+          label="Listening time"
           value={data.stats ? formatListeningDuration(data.stats.totalMs) : "--"}
         />
         <StatCell
-          label="ACTIVE DAYS"
+          label="Active days"
           value={data.stats ? data.stats.activeDays.toLocaleString() : "--"}
         />
 
         {isArtist && (
           <>
-            <StatCell label="PLAY SHARE" value={formatShare(data.stats?.playShare ?? null)} muted />
-            <StatCell label="TRACKS HEARD" value={tracksHeard} muted />
-            <StatCell label="COMPLETION" value={formatShare(data.stats?.completionRate ?? null)} muted />
+            <StatCell label="Play share" value={formatShare(data.stats?.playShare ?? null)} muted />
+            <StatCell label="Tracks heard" value={tracksHeard} muted />
+            <StatCell label="Completion" value={formatShare(data.stats?.completionRate ?? null)} muted />
           </>
         )}
 
         {isAlbum && (
           <>
-            <StatCell label="ARTIST SHARE" value={formatShare(data.stats?.artistShare ?? null)} muted />
-            <StatCell label="TRACKS HEARD" value={tracksHeard} muted />
+            <StatCell label="Artist share" value={formatShare(data.stats?.artistShare ?? null)} muted />
+            <StatCell label="Tracks heard" value={tracksHeard} muted />
             <StatCell
-              label="FULL-ALBUM SESSIONS"
+              label="Full-album sessions"
               value={(data.stats?.fullAlbumSessions ?? 0).toLocaleString()}
               muted
             />
@@ -200,15 +200,15 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
         {isTrack && (
           <>
-            <StatCell label="COMPLETION" value={formatShare(data.stats?.completionRate ?? null)} muted />
-            <StatCell label="ALBUM SHARE" value={formatShare(data.stats?.albumShare ?? null)} muted />
+            <StatCell label="Completion" value={formatShare(data.stats?.completionRate ?? null)} muted />
+            <StatCell label="Album share" value={formatShare(data.stats?.albumShare ?? null)} muted />
           </>
         )}
 
         {hasDates && (
           <>
-            <StatCell label="FIRST PLAY" value={firstPlayDate} muted />
-            <StatCell label="LAST PLAY" value={lastPlayDate} muted />
+            <StatCell label="First play" value={firstPlayDate} muted />
+            <StatCell label="Last play" value={lastPlayDate} muted />
           </>
         )}
       </div>

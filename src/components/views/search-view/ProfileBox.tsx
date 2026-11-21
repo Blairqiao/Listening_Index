@@ -66,8 +66,8 @@ export const ProfileBox: React.FC<ProfileBoxProps> = ({
       <div
         className={
           headingAsRow
-            ? `${rowHeightClass} flex items-end justify-between pb-2 font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] select-none`
-            : "mb-2 flex justify-between font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] select-none"
+            ? `${rowHeightClass} flex items-end justify-between pb-2 font-mono text-[11px] text-[#5A5A55] select-none`
+            : "mb-2 flex justify-between font-mono text-[11px] text-[#5A5A55] select-none"
         }
       >
         <span>{heading}</span>
@@ -100,9 +100,9 @@ export const ProfileBox: React.FC<ProfileBoxProps> = ({
           type="button"
           aria-expanded={expanded}
           onClick={() => setExpanded((prev) => !prev)}
-          className="md:hidden w-full py-2 font-mono text-[10px] tracking-[0.12em] text-[#8A8A83] hover:text-[#EDEDE8] cursor-pointer"
+          className="md:hidden w-full py-2 font-mono text-[10px] text-[#8A8A83] hover:text-[#EDEDE8] cursor-pointer"
         >
-          {expanded ? "SHOW FEWER ⌃" : `SHOW ALL ${itemCount} ⌄`}
+          {expanded ? "Show fewer ⌃" : `Show all ${itemCount} ⌄`}
         </button>
       )}
     </div>

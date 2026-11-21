@@ -20,8 +20,8 @@ test("ModeTabs: Mode 4 Search tab configuration and rendering", () => {
   // Check BASE_MODES: last mode must be Mode 4 with "[ SEARCH ]" and abbrev "[ SRCH ]"
   const searchBaseTab = BASE_MODES.find((m) => (m.id) === 4);
   assert.ok(searchBaseTab, "BASE_MODES must include Mode 4");
-  assert.equal(searchBaseTab?.label, "[ SEARCH ]");
-  assert.equal(searchBaseTab?.abbrev, "[ SRCH ]");
+  assert.equal(searchBaseTab?.label, "Search");
+  assert.equal(searchBaseTab?.abbrev, "Search");
   assert.equal(
     BASE_MODES[BASE_MODES.length - 1].id,
     4,
@@ -61,11 +61,10 @@ test("ModeTabs: Mode 4 Search tab configuration and rendering", () => {
       })
     )
   );
-  assert.ok(guestMarkup.includes("[ SEARCH ]"), "Guest markup must contain [ SEARCH ]");
-  assert.ok(guestMarkup.includes("[ SRCH ]"), "Guest markup must contain [ SRCH ]");
-  assert.ok(
-    !guestMarkup.includes("[ LIVE PLAYER ]"),
-    "Guest markup must NOT contain [ LIVE PLAYER ]"
+  assert.ok(guestMarkup.includes(">Search<"), "Guest markup must contain Search");
+    assert.ok(
+    !guestMarkup.includes("Live player"),
+    "Guest markup must NOT contain Live player"
   );
   assert.ok(
     guestMarkup.includes('aria-selected="true"'),
@@ -84,17 +83,17 @@ test("ModeTabs: Mode 4 Search tab configuration and rendering", () => {
       })
     )
   );
-  assert.ok(adminMarkup.includes("[ SEARCH ]"), "Admin markup must contain [ SEARCH ]");
-  assert.ok(adminMarkup.includes("[ LIVE PLAYER ]"), "Admin markup must contain [ LIVE PLAYER ]");
+  assert.ok(adminMarkup.includes(">Search<"), "Admin markup must contain Search");
+  assert.ok(adminMarkup.includes("Live player"), "Admin markup must contain Live player");
   assert.ok(
-    adminMarkup.indexOf("[ SEARCH ]") < adminMarkup.indexOf("[ LIVE PLAYER ]"),
-    "[ SEARCH ] must appear before [ LIVE PLAYER ] in admin markup"
+    adminMarkup.indexOf(">Search<") < adminMarkup.indexOf("Live player"),
+    "Search must appear before Live player in admin markup"
   );
 });
 
 test("MetricRibbon: Mode 4 labels and rendering", () => {
   const labels = getRibbonLabels(4);
-  assert.deepEqual(labels, ["PLAYS", "RANK", "FIRST PLAYED", "LAST PLAYED"]);
+  assert.deepEqual(labels, ["Plays", "Rank", "First played", "Last played"]);
 
   const ribbonMarkup = renderToStaticMarkup(
     React.createElement(MetricRibbon, {
@@ -102,10 +101,10 @@ test("MetricRibbon: Mode 4 labels and rendering", () => {
       metrics: ["--", "--", "--", "--"],
     })
   );
-  assert.ok(ribbonMarkup.includes("PLAYS"), "Ribbon must render PLAYS");
-  assert.ok(ribbonMarkup.includes("RANK"), "Ribbon must render RANK");
-  assert.ok(ribbonMarkup.includes("FIRST PLAYED"), "Ribbon must render FIRST PLAYED");
-  assert.ok(ribbonMarkup.includes("LAST PLAYED"), "Ribbon must render LAST PLAYED");
+  assert.ok(ribbonMarkup.includes("Plays"), "Ribbon must render Plays");
+  assert.ok(ribbonMarkup.includes("Rank"), "Ribbon must render Rank");
+  assert.ok(ribbonMarkup.includes("First played"), "Ribbon must render First played");
+  assert.ok(ribbonMarkup.includes("Last played"), "Ribbon must render Last played");
   assert.ok(
     !ribbonMarkup.includes("opacity-60 transition-opacity duration-150"),
     "MetricRibbon values must not be dimmed when isLoading is omitted or false"
@@ -114,7 +113,7 @@ test("MetricRibbon: Mode 4 labels and rendering", () => {
   const loadingMarkup = renderToStaticMarkup(
     React.createElement(MetricRibbon, {
       mode: 4,
-      metrics: ["1,234", "#12", "JAN 2024", "TODAY"],
+      metrics: ["1,234", "#12", "Jan 2024", "Today"],
       isLoading: true,
     })
   );
@@ -136,7 +135,7 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
       sessionTagTime: "",
     })
   );
-  assert.ok(searchMarkup.includes("SEARCH"), "ControlRow mode 4 without profile must display SEARCH");
+  assert.ok(searchMarkup.includes("Search"), "ControlRow mode 4 without profile must display Search");
   assert.ok(
     !searchMarkup.includes("Time range filters"),
     "ControlRow mode 4 without profile must NOT render range buttons"
@@ -159,8 +158,8 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
     })
   );
   assert.ok(
-    trackProfileMarkup.includes("TRACK PROFILE"),
-    "ControlRow mode 4 track profile must display TRACK PROFILE"
+    trackProfileMarkup.includes("Track profile"),
+    "ControlRow mode 4 track profile must display Track profile"
   );
   assert.ok(
     trackProfileMarkup.includes("Time range filters"),
@@ -184,8 +183,8 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
     })
   );
   assert.ok(
-    artistProfileMarkup.includes("ARTIST PROFILE"),
-    "ControlRow mode 4 artist profile must display ARTIST PROFILE"
+    artistProfileMarkup.includes("Artist profile"),
+    "ControlRow mode 4 artist profile must display Artist profile"
   );
   assert.ok(
     artistProfileMarkup.includes("Time range filters"),

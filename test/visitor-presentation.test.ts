@@ -19,7 +19,7 @@ test('all retained Stream Log rows format raw timestamps and local day headers i
   const chicago = render('America/Chicago');
   assert.equal((utc.match(/00:30/g) || []).length, 75);
   assert.equal((chicago.match(/19:30/g) || []).length, 75);
-  assert.match(utc, /01 OCT/);
-  assert.match(chicago, /30 SEP/);
-  assert.doesNotMatch(chicago, /01 OCT/);
+  assert.match(utc, /01 Oct/);
+  assert.match(chicago, /30 Sep/);
+  assert.doesNotMatch(chicago, /01 Oct/);
 });

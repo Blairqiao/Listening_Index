@@ -187,7 +187,7 @@ test('N019: 1y cadence includes 13th month when time has elapsed past 00:00:00 o
 
   assert.equal(activityCadence.length, 13, 'Must contain 13 month buckets when after 00:00:00 on the 1st');
   const earliest = activityCadence[0];
-  assert.equal(earliest.date, 'NOV', 'Earliest bucket must be NOV (from previous year)');
+  assert.equal(earliest.date, 'Nov', 'Earliest bucket must be Nov (from previous year)');
   assert.equal(earliest.count, 1, 'Nov 2025 play must be included');
 });
 

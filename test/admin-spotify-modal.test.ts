@@ -142,8 +142,8 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
 
   // 2. Onboarding mode renders clear step-based setup flow without artificial status cards
   assert.ok(
-    modalSource.includes("STEP 1: REGISTER REDIRECT URIS") &&
-    modalSource.includes("STEP 2: CONNECT ACCOUNT"),
+    modalSource.includes("Step 1: register redirect URIs") &&
+    modalSource.includes("Step 2: connect account"),
     "AdminSpotifyModal onboarding mode must render step-based setup workflow"
   );
   assert.ok(
@@ -153,8 +153,8 @@ test("AdminSpotifyModal visual design cohesion and removal of AI status dots", a
 
   // 3. Connected and expiring modes render status cards
   assert.ok(
-    modalSource.includes("CONNECTED"),
-    "AdminSpotifyModal connected mode must render monospace CONNECTED status tag"
+    modalSource.includes("Connected"),
+    "AdminSpotifyModal connected mode must render monospace Connected status tag"
   );
 
   // 4. Redirect URI code boxes must have scrollbar-hidden to eliminate visible scrollbars

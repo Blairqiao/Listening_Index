@@ -47,7 +47,7 @@ export function formatStreamLogMetrics(
   const playsStr = raw.totalPlays.toLocaleString();
   const tracksStr = raw.uniqueTracks.toLocaleString();
   const artistsStr = raw.uniqueArtists.toLocaleString();
-  const streakStr = `${raw.streakDays} ${raw.streakDays === 1 ? "DAY" : "DAYS"}`;
+  const streakStr = `${raw.streakDays} ${raw.streakDays === 1 ? "day" : "days"}`;
 
   return [playsStr, tracksStr, artistsStr, streakStr];
 }
@@ -167,13 +167,13 @@ export function formatCatalogPercentile(
   total: number
 ): string {
   if (rank == null || rank <= 0 || total <= 0) {
-    return "NEW";
+    return "New";
   }
   const p = (rank / total) * 100;
   if (p < 1) {
-    return `TOP ${p.toFixed(1)}%`;
+    return `Top ${p.toFixed(1)}%`;
   }
-  return `TOP ${Math.round(p)}%`;
+  return `Top ${Math.round(p)}%`;
 }
 
 export function formatRankDisplay(
@@ -182,7 +182,7 @@ export function formatRankDisplay(
   format: "rank" | "percentile"
 ): string {
   if (rank == null || rank <= 0) {
-    return "NEW";
+    return "New";
   }
   if (format === "rank") {
     return total > 0
@@ -195,7 +195,7 @@ export function formatRankDisplay(
 
 export function formatPlaysDisplay(plays: number): string {
   const countStr = plays.toLocaleString();
-  return `${countStr} ${plays === 1 ? "PLAY" : "PLAYS"}`;
+  return `${countStr} ${plays === 1 ? "play" : "plays"}`;
 }
 
 export function formatDurationMs(ms: number): string {
@@ -221,10 +221,10 @@ export function formatDayGroup(date: Date, tz = "UTC"): string {
       month: "short",
     }).formatToParts(date);
     const day = parts.find((p) => p.type === "day")?.value || "";
-    const month = parts.find((p) => p.type === "month")?.value.toUpperCase() || "";
+    const month = parts.find((p) => p.type === "month")?.value || "";
     return `${day} ${month}`;
   } catch {
-    return date.toISOString().slice(5, 10).toUpperCase();
+    return date.toISOString().slice(5, 10);
   }
 }
 
@@ -233,14 +233,14 @@ export function formatStreamLogDateSpan(
   newestDateStr?: string,
   tz = "UTC"
 ): string {
-  if (!oldestDateStr && !newestDateStr) return "STREAM LOG";
+  if (!oldestDateStr && !newestDateStr) return "Stream log";
   if (!oldestDateStr || !newestDateStr) {
     const d = new Date(newestDateStr || oldestDateStr!);
-    return isNaN(d.getTime()) ? "STREAM LOG" : formatDayGroup(d, tz);
+    return isNaN(d.getTime()) ? "Stream log" : formatDayGroup(d, tz);
   }
   const oldest = new Date(oldestDateStr);
   const newest = new Date(newestDateStr);
-  if (isNaN(oldest.getTime()) || isNaN(newest.getTime())) return "STREAM LOG";
+  if (isNaN(oldest.getTime()) || isNaN(newest.getTime())) return "Stream log";
 
   const oldestGroup = formatDayGroup(oldest, tz);
   const newestGroup = formatDayGroup(newest, tz);

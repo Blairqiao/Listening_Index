@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Martian_Mono, Spline_Sans_Mono } from "next/font/google";
 import { getActiveSiteConfig } from "@/lib/db/queries";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const martianMono = Martian_Mono({
+  variable: "--font-martian-mono",
   subsets: ["latin"],
+  axes: ["wdth"],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const splineSansMono = Spline_Sans_Mono({
+  variable: "--font-spline-sans-mono",
   subsets: ["latin"],
 });
 
@@ -40,7 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${martianMono.variable} ${splineSansMono.variable} h-full antialiased`}
     >
       <head>
         <style

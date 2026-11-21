@@ -67,7 +67,7 @@ export const HistoryDropzone: React.FC<HistoryDropzoneProps> = ({
           <Upload className="w-5 h-5 text-music-accent" />
         </div>
         <div>
-          <p className="text-[12px] font-bold text-[#EDEDE8] uppercase tracking-[0.08em]">
+          <p className="text-[12px] font-bold text-[#EDEDE8]">
             Click or drop Spotify history files here
           </p>
           <p className="text-[#6A6A64] text-[10px] mt-1">
@@ -79,7 +79,7 @@ export const HistoryDropzone: React.FC<HistoryDropzoneProps> = ({
 
       {/* Instructions */}
       <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[#6A6A64] text-[10px] space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[#EDEDE8] font-bold uppercase tracking-[0.08em]">
+        <div className="flex items-center gap-1.5 text-[#EDEDE8] font-bold">
           <FileArchive className="w-3.5 h-3.5 text-music-accent" />
           <span>How to request your export from Spotify</span>
         </div>
