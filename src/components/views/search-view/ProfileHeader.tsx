@@ -33,6 +33,20 @@ function formatPlayDate(iso: string | null | undefined, tz: string): string {
   return formatLogStartDate(date, tz);
 }
 
+const STAT_LABEL_CLASS = "font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]";
+const STAT_VALUE_CLASS = "font-mono text-[13px] tabular-nums whitespace-nowrap";
+
+const StatCell: React.FC<{ label: string; value: string; muted?: boolean }> = ({
+  label,
+  value,
+  muted = false,
+}) => (
+  <div className="flex flex-col">
+    <span className={STAT_LABEL_CLASS}>{label}</span>
+    <span className={`${STAT_VALUE_CLASS} ${muted ? "text-[#8A8A83]" : "text-[#EDEDE8]"}`}>{value}</span>
+  </div>
+);
+
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   data,
   visitorTimezone,
@@ -61,10 +75,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     : "--";
 
   const streakSentence = data.stats ? formatStreakSentence(data.stats) : null;
+  const tracksHeard = `${(data.stats?.tracksHeardInRange ?? 0).toLocaleString()} / ${(data.stats?.tracksHeardLifetime ?? 0).toLocaleString()}`;
 
   return (
     <div className="min-w-0 md:col-span-full">
-      <div className="flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4">
+      <div className="flex items-center gap-3 md:gap-4">
         <Artwork src={data.imageUrl} alt={data.name} size={88} />
 
         <div className="min-w-0 flex-1">
@@ -103,7 +118,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   onClick={() => onOpenProfile({ kind: "artist", key: artistKey })}
                   className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
                 >
-                  {data.artistName} →
+                  {data.artistName}
                 </button>
               ) : (
                 data.artistName
@@ -120,7 +135,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   onClick={() => onOpenProfile({ kind: "album", key: albumKey })}
                   className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
                 >
-                  {data.albumName} →
+                  {data.albumName}
                 </button>
               ) : (
                 data.albumName
@@ -128,152 +143,74 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             </div>
           )}
 
-          {hasDates && (
-            <div className="font-mono text-[11.5px] text-[#6A6A64] leading-tight mt-0.5 select-none">
-              FIRST PLAY {firstPlayDate} · LAST {lastPlayDate}
-            </div>
-          )}
         </div>
+      </div>
 
-        <div className="w-full md:w-auto basis-full md:basis-auto border-t md:border-t-0 border-[#191917] pt-2.5 md:pt-0 md:flex-none">
-          <div className="grid grid-cols-4 gap-x-5 gap-y-2">
-            <div className="flex flex-col">
-              <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                PLAYS
-              </span>
-              <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#EDEDE8]">
-                {data.plays.toLocaleString()}
-              </span>
-            </div>
+      <div
+        data-profile-stats=""
+        className="mt-3 md:mt-4 flex flex-wrap gap-x-6 md:gap-x-8 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3"
+      >
+        <StatCell label="PLAYS" value={data.plays.toLocaleString()} />
 
-            {onToggleRankFormat && hasRank ? (
-              <button
-                type="button"
-                onClick={onToggleRankFormat}
-                aria-label={`Rank ${rankValue}. Toggle between rank position and percentile`}
-                title="Click to toggle between rank and percentile"
-                className="flex flex-col text-left cursor-pointer group focus-visible:outline-music-accent"
-              >
-                <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                  RANK
-                </span>
-                <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#EDEDE8] group-hover:text-music-accent">
-                  {rankValue}
-                </span>
-              </button>
-            ) : (
-              <div className="flex flex-col">
-                <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                  RANK
-                </span>
-                <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#EDEDE8]">
-                  {rankValue}
-                </span>
-              </div>
-            )}
+        {onToggleRankFormat && hasRank ? (
+          <button
+            type="button"
+            onClick={onToggleRankFormat}
+            aria-label={`Rank ${rankValue}. Toggle between rank position and percentile`}
+            title="Click to toggle between rank and percentile"
+            className="flex flex-col text-left cursor-pointer group focus-visible:outline-music-accent"
+          >
+            <span className={STAT_LABEL_CLASS}>RANK</span>
+            <span className={`${STAT_VALUE_CLASS} text-[#EDEDE8] group-hover:text-music-accent`}>
+              {rankValue}
+            </span>
+          </button>
+        ) : (
+          <StatCell label="RANK" value={rankValue} />
+        )}
 
-            <div className="flex flex-col">
-              <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                LISTENING TIME
-              </span>
-              <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#EDEDE8]">
-                {data.stats ? formatListeningDuration(data.stats.totalMs) : "--"}
-              </span>
-            </div>
+        <StatCell
+          label="LISTENING TIME"
+          value={data.stats ? formatListeningDuration(data.stats.totalMs) : "--"}
+        />
+        <StatCell
+          label="ACTIVE DAYS"
+          value={data.stats ? data.stats.activeDays.toLocaleString() : "--"}
+        />
 
-            <div className="flex flex-col">
-              <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                ACTIVE DAYS
-              </span>
-              <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#EDEDE8]">
-                {data.stats ? data.stats.activeDays.toLocaleString() : "--"}
-              </span>
-            </div>
+        {isArtist && (
+          <>
+            <StatCell label="PLAY SHARE" value={formatShare(data.stats?.playShare ?? null)} muted />
+            <StatCell label="TRACKS HEARD" value={tracksHeard} muted />
+            <StatCell label="COMPLETION" value={formatShare(data.stats?.completionRate ?? null)} muted />
+          </>
+        )}
 
-            {isArtist && (
-              <>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    PLAY SHARE
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {formatShare(data.stats?.playShare ?? null)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    TRACKS HEARD
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {`${(data.stats?.tracksHeardInRange ?? 0).toLocaleString()} / ${(data.stats?.tracksHeardLifetime ?? 0).toLocaleString()}`}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    COMPLETION
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {formatShare(data.stats?.completionRate ?? null)}
-                  </span>
-                </div>
-                <div aria-hidden="true" />
-              </>
-            )}
+        {isAlbum && (
+          <>
+            <StatCell label="ARTIST SHARE" value={formatShare(data.stats?.artistShare ?? null)} muted />
+            <StatCell label="TRACKS HEARD" value={tracksHeard} muted />
+            <StatCell
+              label="FULL-ALBUM SESSIONS"
+              value={(data.stats?.fullAlbumSessions ?? 0).toLocaleString()}
+              muted
+            />
+          </>
+        )}
 
-            {isAlbum && (
-              <>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    ARTIST SHARE
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {formatShare(data.stats?.artistShare ?? null)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    TRACKS HEARD
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {`${(data.stats?.tracksHeardInRange ?? 0).toLocaleString()} / ${(data.stats?.tracksHeardLifetime ?? 0).toLocaleString()}`}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    FULL-ALBUM SESSIONS
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {(data.stats?.fullAlbumSessions ?? 0).toLocaleString()}
-                  </span>
-                </div>
-                <div aria-hidden="true" />
-              </>
-            )}
+        {isTrack && (
+          <>
+            <StatCell label="COMPLETION" value={formatShare(data.stats?.completionRate ?? null)} muted />
+            <StatCell label="ALBUM SHARE" value={formatShare(data.stats?.albumShare ?? null)} muted />
+          </>
+        )}
 
-            {isTrack && (
-              <>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    COMPLETION
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {formatShare(data.stats?.completionRate ?? null)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-mono text-[9.5px] md:text-[10px] tracking-[0.14em] text-[#5A5A55]">
-                    ALBUM SHARE
-                  </span>
-                  <span className="font-mono text-[13px] tabular-nums whitespace-nowrap text-[#8A8A83]">
-                    {formatShare(data.stats?.albumShare ?? null)}
-                  </span>
-                </div>
-                <div aria-hidden="true" />
-                <div aria-hidden="true" />
-              </>
-            )}
-          </div>
-        </div>
+        {hasDates && (
+          <>
+            <StatCell label="FIRST PLAY" value={firstPlayDate} muted />
+            <StatCell label="LAST PLAY" value={lastPlayDate} muted />
+          </>
+        )}
       </div>
 
       {streakSentence && (

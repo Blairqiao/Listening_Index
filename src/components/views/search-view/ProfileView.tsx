@@ -24,16 +24,23 @@ export interface ProfileViewProps {
 
 // Desktop row budgets per profile kind so both columns match height:
 // Artist (tall): 10 = 5 + 1 heading row + 4
-// Album (compact): 17 = 17
-// Track (compact): 17 = 8 + 1 heading row + 8
+// Album (compact): 10 = 10
+// Track (compact): 11 = 5 + 1 heading row + 5
 const ARTIST_RECENT_ROWS = 10;
 const ARTIST_TOP_TRACKS_ROWS = 5;
 const ARTIST_TOP_ALBUMS_ROWS = 4;
 
-const COMPACT_RECENT_ROWS = 17;
-const ALBUM_TOP_TRACKS_ROWS = 17;
-const TRACK_ALBUM_TRACKS_ROWS = 8;
-const TRACK_RELATED_ROWS = 8;
+const ALBUM_RECENT_ROWS = 10;
+const ALBUM_TOP_TRACKS_ROWS = 10;
+const TRACK_RECENT_ROWS = 11;
+const TRACK_ALBUM_TRACKS_ROWS = 5;
+const TRACK_RELATED_ROWS = 5;
+
+const RECENT_ROWS_BY_KIND: Record<ProfileKind, number> = {
+  artist: ARTIST_RECENT_ROWS,
+  album: ALBUM_RECENT_ROWS,
+  track: TRACK_RECENT_ROWS,
+};
 
 const RANKED_MOBILE_LIMIT = 4;
 
@@ -85,13 +92,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (status === "loading" && !data) {
     const skeletonRowSize: ProfileRowSize = pendingKind === "artist" ? "tall" : "compact";
-    const skeletonRecentRows = pendingKind === "artist" ? ARTIST_RECENT_ROWS : COMPACT_RECENT_ROWS;
+    const skeletonRecentRows = RECENT_ROWS_BY_KIND[pendingKind];
     const loadingScrollKey = `loading-${pendingKind}`;
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none">
         <div className="min-w-0 md:col-span-full">
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
             <div className="w-[88px] h-[88px] bg-[#141413] animate-pulse flex-none" />
             <div className="min-w-0 flex-1 space-y-2">
               <div className="h-3 bg-[#191917] rounded w-16 animate-pulse" />
@@ -99,18 +106,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {pendingKind !== "artist" && (
                 <div className="h-3 bg-[#141413] rounded w-32 animate-pulse" />
               )}
-              <div className="h-3 bg-[#141413] rounded w-40 animate-pulse" />
             </div>
-            <div className="w-full md:w-auto basis-full md:basis-auto border-t md:border-t-0 border-[#191917] pt-2.5 md:pt-0 md:flex-none">
-              <div className="grid grid-cols-4 gap-x-5 gap-y-2">
-                {Array.from({ length: 8 }).map((_, idx) => (
-                  <div key={idx} className="flex flex-col gap-1">
-                    <div className="h-2.5 w-12 bg-[#141413] rounded animate-pulse" />
-                    <div className="h-3.5 w-10 bg-[#191917] rounded animate-pulse" />
-                  </div>
-                ))}
+          </div>
+          <div className="mt-3 md:mt-4 flex flex-wrap gap-x-6 md:gap-x-8 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div key={idx} className="flex flex-col gap-1">
+                <div className="h-2.5 w-12 bg-[#141413] rounded animate-pulse" />
+                <div className="h-3.5 w-10 bg-[#191917] rounded animate-pulse" />
               </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -395,7 +399,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {isAlbum && (
             <ProfileBox
               heading="[ RECENT PLAYS ]"
-              rows={COMPACT_RECENT_ROWS}
+              rows={ALBUM_RECENT_ROWS}
               rowSize="compact"
               itemCount={recentPlaysWithPresentation.length}
               scrollKey={scrollKey}
@@ -436,7 +440,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {isTrack && (
             <ProfileBox
               heading="[ RECENT PLAYS ]"
-              rows={COMPACT_RECENT_ROWS}
+              rows={TRACK_RECENT_ROWS}
               rowSize="compact"
               itemCount={recentPlaysWithPresentation.length}
               scrollKey={scrollKey}
