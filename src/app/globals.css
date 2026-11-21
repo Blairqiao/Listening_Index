@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: var(--font-martian-mono), "Martian Mono", "PingFang SC", "Noto Sans SC", monospace;
+  --font-display: var(--font-ibm-plex-mono), "IBM Plex Mono", "PingFang SC", "Noto Sans SC", monospace;
   --font-sans: var(--font-spline-sans-mono), "Spline Sans Mono", "PingFang SC", "Noto Sans SC", monospace;
   --font-mono: var(--font-spline-sans-mono), "Spline Sans Mono", "PingFang SC", "Noto Sans SC", monospace;
 

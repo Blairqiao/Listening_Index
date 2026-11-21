@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Martian_Mono, Spline_Sans_Mono } from "next/font/google";
+import { IBM_Plex_Mono, Spline_Sans_Mono } from "next/font/google";
 import { getActiveSiteConfig } from "@/lib/db/queries";
 import "./globals.css";
 
-const martianMono = Martian_Mono({
-  variable: "--font-martian-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
-  axes: ["wdth"],
+  weight: ["400", "500"],
 });
 
 const splineSansMono = Spline_Sans_Mono({
@@ -41,7 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${martianMono.variable} ${splineSansMono.variable} h-full antialiased`}
+      className={`${ibmPlexMono.variable} ${splineSansMono.variable} h-full antialiased`}
     >
       <head>
         <style
