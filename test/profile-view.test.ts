@@ -172,7 +172,7 @@ test("ProfileView: Album header, Track shares, no repeated artwork, and Recent P
   assert.match(markup, /\[ ALBUM \]/);
   assert.match(markup, /<a href="https:\/\/open\.spotify\.com\/album\/5vkqYmiPBYLaalcmjujWxK" target="_blank" rel="noopener noreferrer"[^>]*><span[^>]*>In Rainbows<\/span>/);
   assert.match(markup, /w-\[88px\]|width="88"/);
-  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead →<\/button>/);
+  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead<\/button>/);
   assert.match(markup, /\[ OVER TIME \]/);
   assert.match(markup, /\[ SHARE OF PLAYS \]/);
   assert.match(markup, /\[ TOP TRACKS \]/);
@@ -239,7 +239,7 @@ test("ProfileView links Artist and Track Album names only when keyed", () => {
   const unkeyedTrack = renderToStaticMarkup(
     React.createElement(ProfileView, { ...props, data: mockTrackProfile })
   );
-  assert.match(keyedTrack, /ALBUM · <\/span><button[^>]*>In Rainbows →<\/button>/);
+  assert.match(keyedTrack, /ALBUM · <\/span><button[^>]*>In Rainbows<\/button>/);
   assert.match(unkeyedTrack, /ALBUM · <\/span>In Rainbows<\/div>/);
   assert.doesNotMatch(unkeyedTrack, /<button[^>]*>In Rainbows/);
 });
@@ -369,7 +369,7 @@ test("ProfileView: SSR ready state for track profile with stats, duration/partia
   assert.match(markup, /<div[^>]*aria-current="true"[^>]*>.*?text-music-accent[^>]*>Weird Fishes \/ Arpeggi/);
   assert.match(markup, /<button[^>]*>(?:(?!<\/button>).)*House of Cards.*?<\/button>/);
   assert.match(markup, /w-\[88px\]|width="88"/);
-  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead →<\/button>/);
+  assert.match(markup, /ARTIST · <\/span><button[^>]*>Radiohead<\/button>/);
   assert.doesNotMatch(markup, /FIRST PLAYED|LAST PLAYED|LIFETIME/);
 
   const fromAlbum = markup.slice(markup.indexOf("FROM THIS ALBUM"), markup.indexOf("OFTEN PLAYED WITH"));
@@ -533,7 +533,7 @@ test("ProfileView always renders FROM THIS ALBUM for a single ranked Track with 
   );
   assert.match(markup, /\[ FROM THIS ALBUM \]/);
   const fromAlbum = markup.slice(markup.indexOf("[ FROM THIS ALBUM ]"), markup.indexOf("[ OFTEN PLAYED WITH ]"));
-  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 7);
+  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 4);
   assert.match(markup, /\[ OVER TIME \]/);
 });
 
@@ -568,13 +568,13 @@ test("ProfileView keeps two-column layout for Track even when right-column lists
   assert.doesNotMatch(markup, /md:grid-cols-2/);
   const recent = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ FROM THIS ALBUM ]"));
   assert.equal(recent.match(/>18 NOV</g)?.length ?? 0, 1);
-  assert.equal(recent.match(/data-profile-placeholder/g)?.length ?? 0, 11);
+  assert.equal(recent.match(/data-profile-placeholder/g)?.length ?? 0, 5);
 
   const fromAlbum = markup.slice(markup.indexOf("[ FROM THIS ALBUM ]"), markup.indexOf("[ OFTEN PLAYED WITH ]"));
-  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 8);
+  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 5);
 
   const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
-  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 8);
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 5);
 });
 
 test("ProfileHeader: Artist markup contains PLAYS, RANK, LISTENING TIME, ACTIVE DAYS, PLAY SHARE, TRACKS HEARD, COMPLETION and no PEAK DAY", () => {
@@ -753,8 +753,13 @@ test("ProfileHeader: FIRST PLAY subline is present with formatted dates in visit
     })
   );
 
-  assert.match(markup, /FIRST PLAY 15 JAN 2024 · LAST 18 NOV 2024/);
-  assert.doesNotMatch(markup, /class="[^"]*\btruncate\b[^"]*">FIRST PLAY/);
+  assert.doesNotMatch(markup, /→/);
+  assert.doesNotMatch(markup, /FIRST PLAY 15 JAN 2024 · LAST/);
+  const statsStart = markup.indexOf("data-profile-stats");
+  assert.ok(statsStart > markup.indexOf("Radiohead"), "stats row renders after the title");
+  const statsRow = markup.slice(statsStart, markup.indexOf("[ OVER TIME ]"));
+  assert.match(statsRow, /PLAYS.*RANK.*LISTENING TIME.*ACTIVE DAYS.*FIRST PLAY<\/span><span[^>]*>15 JAN 2024<\/span>.*LAST PLAY<\/span><span[^>]*>18 NOV 2024<\/span>/);
+  assert.doesNotMatch(markup, /grid-cols-4/);
 });
 
 test("ProfileBox: Artist with 1 top Track renders 4 placeholders in TOP TRACKS", () => {
@@ -779,7 +784,7 @@ test("ProfileBox: Artist with 1 top Track renders 4 placeholders in TOP TRACKS",
   assert.match(topAlbums, /--box-h:220px/);
 });
 
-test("ProfileBox: Album with 3 top Tracks renders 14 placeholders in TOP TRACKS and no MORE BY", () => {
+test("ProfileBox: Album with 3 top Tracks renders 7 placeholders in TOP TRACKS and no MORE BY", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
       data: {
@@ -800,11 +805,13 @@ test("ProfileBox: Album with 3 top Tracks renders 14 placeholders in TOP TRACKS 
 
   assert.doesNotMatch(markup, /MORE BY/);
   const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"));
-  assert.equal(topTracks.match(/data-profile-placeholder/g)?.length ?? 0, 14);
-  assert.match(topTracks, /--box-h:544px/);
+  assert.equal(topTracks.match(/data-profile-placeholder/g)?.length ?? 0, 7);
+  assert.match(topTracks, /--box-h:320px/);
+  const recent = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ TOP TRACKS ]"));
+  assert.match(recent, /--box-h:320px/);
 });
 
-test("ProfileBox: Track with empty relatedTracks renders [ OFTEN PLAYED WITH ] and 8 placeholders", () => {
+test("ProfileBox: Track with empty relatedTracks renders [ OFTEN PLAYED WITH ] and 5 placeholders", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
       data: {
@@ -819,8 +826,13 @@ test("ProfileBox: Track with empty relatedTracks renders [ OFTEN PLAYED WITH ] a
 
   assert.match(markup, /\[ OFTEN PLAYED WITH \]/);
   const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
-  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 8);
-  assert.match(related, /--box-h:256px/);
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 5);
+  assert.match(related, /--box-h:160px/);
+  const fromAlbum = markup.slice(markup.indexOf("[ FROM THIS ALBUM ]"), markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.match(fromAlbum, /--box-h:160px/);
+  // 5 + 1 heading row + 5 = 11 rows, so both columns end level.
+  const recent = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ FROM THIS ALBUM ]"));
+  assert.match(recent, /--box-h:352px/);
 });
 
 test("ProfileView: Artist recent plays show day label inside first row of each day without separate day-group headers", () => {
@@ -916,7 +928,7 @@ test("ProfileView: Track renders all relatedTracks without slice(0, 4) cap", () 
   const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
   assert.match(related, /Related 5/);
   assert.match(related, /Related 6/);
-  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 2);
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 0);
 });
 
 test("ProfileView keeps a reloading profile visible, dimmed, busy and blocked to input", () => {
