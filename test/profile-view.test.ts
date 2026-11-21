@@ -918,3 +918,31 @@ test("ProfileView: Track renders all relatedTracks without slice(0, 4) cap", () 
   assert.match(related, /Related 6/);
   assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 2);
 });
+
+test("ProfileView keeps a reloading profile visible, dimmed, busy and blocked to input", () => {
+  const reloading = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "loading",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+  const rootTag = reloading.slice(0, reloading.indexOf(">") + 1);
+  assert.match(rootTag, /opacity-60/);
+  assert.match(rootTag, /pointer-events-none/);
+  assert.match(rootTag, /aria-busy="true"/);
+  assert.match(reloading, /\[ ARTIST \]/);
+  assert.doesNotMatch(reloading, /LOADING|SEARCHING/);
+
+  const ready = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+  const readyRoot = ready.slice(0, ready.indexOf(">") + 1);
+  assert.doesNotMatch(readyRoot, /pointer-events-none|aria-busy="true"|opacity-60/);
+});
