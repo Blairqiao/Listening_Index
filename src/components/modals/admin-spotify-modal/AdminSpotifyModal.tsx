@@ -330,7 +330,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
   const currentMode = resolveAdminSpotifyMode(status, initialModeOverride);
 
   const displayName =
-    status?.displayName || (initialModeOverride === "connected" ? "OWNER" : "SPOTIFY ACCOUNT");
+    status?.displayName || (initialModeOverride === "connected" ? "Owner" : "Spotify account");
 
   const profileUrl = useMemo(
     () => resolveSpotifyProfileUrl(status?.displayName, status?.profileUrl),
@@ -383,9 +383,9 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
             />
             <h2
               id="admin-spotify-modal-title"
-              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
+              className="font-mono text-[12px] text-[#EDEDE8] whitespace-nowrap"
             >
-              SPOTIFY ACCOUNT SETUP
+              Spotify account setup
             </h2>
           </div>
           <button
@@ -404,7 +404,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
           {isLoading && !status && !initialModeOverride ? (
             <div className="py-8 flex flex-col items-center justify-center gap-2 font-mono text-[11px] text-[#6A6A64]">
               <Loader2 className="w-4 h-4 animate-spin text-music-accent" />
-              <span>[ CHECKING CONNECTION STATUS... ]</span>
+              <span>Checking connection status...</span>
             </div>
           ) : (
             <>
@@ -412,8 +412,8 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
               {currentMode === "onboarding" && (
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <div className="font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                      STEP 1: REGISTER REDIRECT URIS
+                    <div className="font-mono text-[10px] text-[#6A6A64]">
+                      Step 1: register redirect URIs
                     </div>
                     <p className="font-mono text-[11px] leading-relaxed text-[#A6A69F]">
                       Add your production and local callback URIs to your App Settings in the{" "}
@@ -432,10 +432,10 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
 
                   <div className="space-y-2.5">
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                        <span>PRODUCTION REDIRECT URI</span>
+                      <div className="flex items-center justify-between font-mono text-[10px] text-[#6A6A64]">
+                        <span>Production redirect URI</span>
                         {redirectDisplay.activeEnvironment === "production" && (
-                          <span className="text-music-accent">[ ACTIVE ]</span>
+                          <span className="text-music-accent">Active</span>
                         )}
                       </div>
                       <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
@@ -445,7 +445,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCopyUri(redirectDisplay.productionUri, "production")}
-                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
                           title="Copy Production Redirect URI"
                         >
                           {copiedTarget === "production" ? (
@@ -464,10 +464,10 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <div className="flex items-center justify-between font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                        <span>LOCAL DEV REDIRECT URI (LOOPBACK)</span>
+                      <div className="flex items-center justify-between font-mono text-[10px] text-[#6A6A64]">
+                        <span>Local dev redirect URI (loopback)</span>
                         {redirectDisplay.activeEnvironment === "local" && (
-                          <span className="text-music-accent">[ ACTIVE ]</span>
+                          <span className="text-music-accent">Active</span>
                         )}
                       </div>
                       <div className="flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent">
@@ -477,7 +477,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCopyUri(redirectDisplay.localUri, "local")}
-                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] tracking-[0.12em] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[10px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
                           title="Copy Local Redirect URI"
                         >
                           {copiedTarget === "local" ? (
@@ -497,14 +497,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   </div>
 
                   <div className="pt-2 space-y-2">
-                    <div className="font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                      STEP 2: CONNECT ACCOUNT
+                    <div className="font-mono text-[10px] text-[#6A6A64]">
+                      Step 2: connect account
                     </div>
                     <button
                       type="button"
                       onClick={handleConnect}
                       disabled={isBusy || status?.canConnect === false}
-                      className="w-full py-2.5 px-4 bg-music-accent text-black font-mono text-[11px] font-bold tracking-[0.08em] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+                      className="w-full py-2.5 px-4 bg-music-accent text-black font-mono text-[11px] font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
                     >
                       {isBusy ? (
                         <>
@@ -530,14 +530,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   {/* Unified Status Card */}
                   <div className="bg-[#141413] border border-[#26261F] p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
-                        CONNECTED
+                      <span className="text-[10px] text-[#6A6A64]">
+                        Connected
                       </span>
                       <a
                         href={profileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/profile inline-flex items-center gap-1.5 text-[11px] tracking-[0.08em] text-[#EDEDE8] hover:text-music-accent font-semibold truncate transition-colors cursor-pointer"
+                        className="group/profile inline-flex items-center gap-1.5 text-[11px] text-[#EDEDE8] hover:text-music-accent font-semibold truncate transition-colors cursor-pointer"
                         title={`Open ${displayName}'s Spotify Profile`}
                       >
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-music-accent underline-offset-4 truncate">
@@ -548,10 +548,10 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     </div>
 
                     <div className="pt-2.5 border-t border-[#1F1F1A] flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
-                        TOKEN LIFECYCLE
+                      <span className="text-[10px] text-[#6A6A64]">
+                        Token lifecycle
                       </span>
-                      <span className="text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-[0.12em] text-[#EDEDE8] font-bold shrink-0 whitespace-nowrap">
+                      <span className="text-[10px] sm:text-[11px] text-[#EDEDE8] font-bold shrink-0 whitespace-nowrap">
                         {effectiveDaysRemaining !== null ? `${effectiveDaysRemaining} days remaining` : "Connected"}
                       </span>
                     </div>
@@ -568,7 +568,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleConnect}
                       disabled={isBusy || status?.canConnect === false}
-                      className="flex-1 py-2 px-3 border border-music-accent text-music-accent hover:bg-music-accent/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 py-2 px-3 border border-music-accent text-music-accent hover:bg-music-accent/10 font-mono text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isBusy ? (
                         <>
@@ -583,7 +583,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleDisconnect}
                       disabled={isBusy}
-                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] transition-colors cursor-pointer disabled:opacity-50"
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] transition-colors cursor-pointer disabled:opacity-50"
                       title="Disconnect Spotify account"
                     >
                       Disconnect
@@ -610,14 +610,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                   {/* Unified Status Card */}
                   <div className="bg-[#141413] border border-amber-500/30 p-4 space-y-3">
                     <div className="flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
-                        CONNECTED
+                      <span className="text-[10px] text-[#6A6A64]">
+                        Connected
                       </span>
                       <a
                         href={profileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/profile inline-flex items-center gap-1.5 text-[11px] tracking-[0.08em] text-[#EDEDE8] hover:text-amber-400 font-semibold uppercase truncate transition-colors cursor-pointer"
+                        className="group/profile inline-flex items-center gap-1.5 text-[11px] text-[#EDEDE8] hover:text-amber-400 font-semibold truncate transition-colors cursor-pointer"
                         title={`Open ${displayName}'s Spotify Profile`}
                       >
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-amber-400 underline-offset-4 truncate">
@@ -628,10 +628,10 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                     </div>
 
                     <div className="pt-2.5 border-t border-[#1F1F1A] flex items-center justify-between gap-3 font-mono">
-                      <span className="text-[10px] tracking-[0.12em] text-[#6A6A64] uppercase">
-                        TOKEN LIFECYCLE
+                      <span className="text-[10px] text-[#6A6A64]">
+                        Token lifecycle
                       </span>
-                      <span className="text-[10px] sm:text-[11px] tracking-[0.08em] sm:tracking-[0.12em] text-amber-400 font-bold shrink-0 whitespace-nowrap">
+                      <span className="text-[10px] sm:text-[11px] text-amber-400 font-bold shrink-0 whitespace-nowrap">
                         {effectiveDaysRemaining !== null ? `${effectiveDaysRemaining} days remaining` : "Expiring soon"}
                       </span>
                     </div>
@@ -648,7 +648,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleConnect}
                       disabled={isBusy || status?.canConnect === false}
-                      className="flex-1 py-2 px-3 border border-amber-400 text-amber-400 hover:bg-amber-400/10 font-mono text-[11px] font-bold tracking-[0.08em] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 py-2 px-3 border border-amber-400 text-amber-400 hover:bg-amber-400/10 font-mono text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isBusy ? (
                         <>
@@ -663,7 +663,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleDisconnect}
                       disabled={isBusy}
-                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] tracking-[0.12em] uppercase transition-colors cursor-pointer disabled:opacity-50"
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[10px] transition-colors cursor-pointer disabled:opacity-50"
                       title="Disconnect Spotify account"
                     >
                       Disconnect
@@ -691,7 +691,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
 
           {/* Error Banner */}
           {error && (
-            <div className="font-mono text-[10px] tracking-[0.06em] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
+            <div className="font-mono text-[10px] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
               {error}
             </div>
           )}

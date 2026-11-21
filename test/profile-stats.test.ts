@@ -125,7 +125,7 @@ test("share segments preserve order and include positive counts and remainder", 
   ];
   assert.deepEqual(buildShareSegments(tracks, 10), [
     ...listed,
-    { id: OTHER_SEGMENT_ID, label: "Other Tracks", plays: 3 },
+    { id: OTHER_SEGMENT_ID, label: "Other tracks", plays: 3 },
   ]);
   assert.deepEqual(buildShareSegments(tracks, 7), listed);
   assert.deepEqual(buildShareSegments(tracks, 6), listed);
@@ -241,26 +241,26 @@ test("countFullAlbumSessions counts sessions with minDistinctTracks, respecting 
 });
 
 test("formatListeningDuration formats 0m, <1m, minutes, hours, and 100h+", () => {
-  assert.equal(formatListeningDuration(-500), "0M");
-  assert.equal(formatListeningDuration(0), "0M");
-  assert.equal(formatListeningDuration(1), "<1M");
-  assert.equal(formatListeningDuration(59_999), "<1M");
-  assert.equal(formatListeningDuration(60_000), "1M");
-  assert.equal(formatListeningDuration(120_000), "2M");
-  assert.equal(formatListeningDuration(59 * 60_000), "59M");
+  assert.equal(formatListeningDuration(-500), "0m");
+  assert.equal(formatListeningDuration(0), "0m");
+  assert.equal(formatListeningDuration(1), "<1m");
+  assert.equal(formatListeningDuration(59_999), "<1m");
+  assert.equal(formatListeningDuration(60_000), "1m");
+  assert.equal(formatListeningDuration(120_000), "2m");
+  assert.equal(formatListeningDuration(59 * 60_000), "59m");
 
-  // Rounding 59m 50s up to 60m formats as "1H", never "60M" or "1H 60M"
-  assert.equal(formatListeningDuration(59 * 60_000 + 50_000), "1H");
+  // Rounding 59m 50s up to 60m formats as "1h", never "60m" or "1h 60m"
+  assert.equal(formatListeningDuration(59 * 60_000 + 50_000), "1h");
 
   // 1 <= hours < 100
-  assert.equal(formatListeningDuration(60 * 60_000), "1H");
-  assert.equal(formatListeningDuration(90 * 60_000), "1H 30M");
-  assert.equal(formatListeningDuration(99 * 3_600_000), "99H");
-  assert.equal(formatListeningDuration(99 * 3_600_000 + 45 * 60_000), "99H 45M");
+  assert.equal(formatListeningDuration(60 * 60_000), "1h");
+  assert.equal(formatListeningDuration(90 * 60_000), "1h 30m");
+  assert.equal(formatListeningDuration(99 * 3_600_000), "99h");
+  assert.equal(formatListeningDuration(99 * 3_600_000 + 45 * 60_000), "99h 45m");
 
-  // >= 100 hours uses toLocaleString() + "H"
-  assert.equal(formatListeningDuration(100 * 3_600_000), "100H");
-  assert.equal(formatListeningDuration(1_234 * 3_600_000), `${(1_234).toLocaleString()}H`);
+  // >= 100 hours uses toLocaleString() + "h"
+  assert.equal(formatListeningDuration(100 * 3_600_000), "100h");
+  assert.equal(formatListeningDuration(1_234 * 3_600_000), `${(1_234).toLocaleString()}h`);
 });
 
 test("formatCompactPlayDate formats DD MMM YY in timezone and returns -- for invalid dates", () => {
@@ -271,11 +271,11 @@ test("formatCompactPlayDate formats DD MMM YY in timezone and returns -- for inv
   assert.equal(formatCompactPlayDate("2024-11-18T12:00:00Z", "Invalid/Tz"), "--");
 
   // Standard UTC date
-  assert.equal(formatCompactPlayDate("2024-11-18T12:00:00Z", "UTC"), "18 NOV 24");
+  assert.equal(formatCompactPlayDate("2024-11-18T12:00:00Z", "UTC"), "18 Nov 24");
 
   // Timezone shifts date back
-  assert.equal(formatCompactPlayDate("2024-11-18T01:00:00Z", "America/New_York"), "17 NOV 24");
+  assert.equal(formatCompactPlayDate("2024-11-18T01:00:00Z", "America/New_York"), "17 Nov 24");
 
   // Timezone shifts date forward
-  assert.equal(formatCompactPlayDate("2024-11-18T20:00:00Z", "Asia/Tokyo"), "19 NOV 24");
+  assert.equal(formatCompactPlayDate("2024-11-18T20:00:00Z", "Asia/Tokyo"), "19 Nov 24");
 });

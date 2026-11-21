@@ -268,7 +268,7 @@ export function buildActivityCadence(params: {
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
         month: "short",
-      }).format(new Date(weekStartKey + "T12:00:00")).toUpperCase();
+      }).format(new Date(weekStartKey + "T12:00:00"));
 
       const isNewMonth = monthAbbr !== lastMonth;
       if (isNewMonth) lastMonth = monthAbbr;
@@ -310,7 +310,7 @@ export function buildActivityCadence(params: {
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
         month: "short",
-      }).format(bucketDateUtc).toUpperCase();
+      }).format(bucketDateUtc);
 
       const startTime = new Date(Date.UTC(targetYear, targetMonth - 1, 1, 0, 0, 0, 0)).toISOString();
       const endTime = new Date(Date.UTC(targetYear, targetMonth, 0, 23, 59, 59, 999)).toISOString();
@@ -389,7 +389,7 @@ export function buildProfileCadence(
     const startTime = month.toISOString();
     const endTime = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1) - 1).toISOString();
     monthlyCadence.push({
-      date: label.format(month).toUpperCase(),
+      date: label.format(month),
       count: monthCounts.get(startTime.slice(0, 7)) ?? 0,
       startTime,
       endTime,

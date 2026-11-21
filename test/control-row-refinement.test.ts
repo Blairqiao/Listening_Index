@@ -15,7 +15,7 @@ test("formatStreamLogDateSpan formats date ranges correctly", () => {
     "2026-10-26T22:00:00.000Z",
     "UTC"
   );
-  assert.equal(span, "24 OCT – 26 OCT");
+  assert.equal(span, "24 Oct – 26 Oct");
 
   // 2. Same-day entries
   const sameDay = formatStreamLogDateSpan(
@@ -23,10 +23,10 @@ test("formatStreamLogDateSpan formats date ranges correctly", () => {
     "2026-10-26T22:00:00.000Z",
     "UTC"
   );
-  assert.equal(sameDay, "26 OCT");
+  assert.equal(sameDay, "26 Oct");
 
   // 3. Fallbacks
-  assert.equal(formatStreamLogDateSpan(undefined, undefined), "STREAM LOG");
+  assert.equal(formatStreamLogDateSpan(undefined, undefined), "Stream log");
 });
 
 test("ControlRow component supports dynamic scope labels for Stream Log, Sessions, and Live Player", () => {
@@ -68,16 +68,16 @@ test("ControlRow shows the Album profile label and the profile back destination"
     sessionTagTime: "",
     profileKind: "album",
   } as const;
-  assert.match(renderToStaticMarkup(React.createElement(ControlRow, props)), />ALBUM PROFILE</);
+  assert.match(renderToStaticMarkup(React.createElement(ControlRow, props)), />Album profile</);
 
-  for (const [returnsTo, label] of [["album", "ALBUM"], ["artist", "ARTIST"], [null, "SEARCH"]] as const) {
+  for (const [returnsTo, label] of [["album", "album"], ["artist", "artist"], [null, "search"]] as const) {
     const markup = renderToStaticMarkup(React.createElement(ControlRow, {
       ...props,
       profileKind: returnsTo === "album" ? "track" : "album",
       returnsTo,
       onProfileBack: () => {},
     }));
-    assert.match(markup, new RegExp(`<button[^>]*>← BACK TO ${label}</button>`));
+    assert.match(markup, new RegExp(`<button[^>]*>← Back to ${label}</button>`));
   }
 });
 
@@ -127,7 +127,7 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
   assert.ok(markup.includes("flex items-center gap-1.5 min-w-0 overflow-hidden"), "Nav must have overflow/gap discipline");
 
   // Desktop search button and ancestors
-  assert.ok(markup.includes("← SEARCH"), "Must render ← SEARCH on desktop");
+  assert.ok(markup.includes("← Search"), "Must render ← Search on desktop");
   assert.ok(markup.includes("Radiohead"), "Must render ancestor name Radiohead");
   assert.ok(markup.includes("In Rainbows"), "Must render direct parent name In Rainbows");
   assert.ok(markup.includes("max-w-[140px] truncate"), "Must truncate ancestor button text cleanly");
@@ -135,7 +135,7 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
 
   // Mobile layout
   assert.ok(markup.includes("← In Rainbows"), "Mobile view must show ← <DIRECT PARENT NAME>");
-  assert.ok(markup.includes(">SEARCH</button>"), "Mobile view must show subtle SEARCH escape link");
+  assert.ok(markup.includes(">Search</button>"), "Mobile view must show subtle Search escape link");
 
   // Range controls should not shrink
   assert.ok(markup.includes("shrink-0"), "ControlRow range container must have shrink-0");
@@ -163,10 +163,10 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
   }
 
   const buttons = findButtons(ControlRow(props));
-  const searchBtn = buttons.find((b) => b.props?.children === "← SEARCH");
-  assert.ok(searchBtn, "Must find desktop ← SEARCH button");
+  const searchBtn = buttons.find((b) => b.props?.children === "← Search");
+  assert.ok(searchBtn, "Must find desktop ← Search button");
   searchBtn.props?.onClick?.();
-  assert.equal(returnedToSearch, true, "Clicking ← SEARCH must call onReturnToSearch");
+  assert.equal(returnedToSearch, true, "Clicking ← Search must call onReturnToSearch");
 
   const radioheadBtn = buttons.find((b) => b.props?.children === "Radiohead");
   assert.ok(radioheadBtn, "Must find Radiohead ancestor button");
@@ -185,9 +185,9 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
     onReturnToSearch: undefined,
     onJumpToHistory: (idx: number) => { fallbackJumpedIndex = idx; },
   });
-  const fallbackSearchBtn = findButtons(fallbackTree).find((b) => b.props?.children === "← SEARCH");
+  const fallbackSearchBtn = findButtons(fallbackTree).find((b) => b.props?.children === "← Search");
   fallbackSearchBtn?.props?.onClick?.();
-  assert.equal(fallbackJumpedIndex, -1, "Clicking ← SEARCH without onReturnToSearch must call onJumpToHistory(-1)");
+  assert.equal(fallbackJumpedIndex, -1, "Clicking ← Search without onReturnToSearch must call onJumpToHistory(-1)");
 });
 
 test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () => {

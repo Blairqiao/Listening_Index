@@ -87,13 +87,13 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}
-      <div className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.75fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 pb-2 border-b border-[#1C1C1A] text-[#5A5A55] font-mono text-[11px] tracking-[0.14em]">
-        <span>TIME</span>
-        <span>TITLE</span>
+      <div className="grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.75fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 pb-2 border-b border-[#1C1C1A] text-[#5A5A55] font-mono text-[11px]">
+        <span>Time</span>
+        <span>Title</span>
         <span></span>
-        <span>ARTIST</span>
-        <span className="hidden md:inline">ALBUM</span>
-        <span className="text-right">DUR</span>
+        <span>Artist</span>
+        <span className="hidden md:inline">Album</span>
+        <span className="text-right">Dur</span>
       </div>
 
       {/* 2. Scrollable Body Container (h-auto on mobile, fixed h-[544px] on desktop) */}
@@ -136,7 +136,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                   {/* Day separator row if dayGroup changes */}
                   {entry.dayGroup && (
                     <div className="pt-3 pb-1.5 px-1 border-b border-[#1C1C1A] select-none">
-                      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
+                      <span className="font-mono text-[11px] text-[#5A5A55]">
                         {entry.dayGroup}
                       </span>
                     </div>
@@ -145,11 +145,11 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                   {/* Session gap separator if time gap > 30 minutes */}
                   {entry.sessionGap && (
                     <div className="flex items-center gap-2.5 py-[9px] px-1 border-b border-[#191917] select-none">
-                      <span className="font-mono text-[11px] tracking-[0.1em] text-[#4A4A46]">
+                      <span className="font-mono text-[11px] text-[#4A4A46]">
                         ⌄ {entry.sessionGap.durationStr}
                       </span>
                       <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
-                      <span className="font-mono text-[11px] tracking-[0.1em] text-[#4A4A46]">
+                      <span className="font-mono text-[11px] text-[#4A4A46]">
                         {entry.sessionGap.sessionGapLabel}
                       </span>
                     </div>
@@ -250,7 +250,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     disabled={isLoadingMore}
                     onClick={handleLoadMore}
-                    className={`group font-mono text-[11px] tracking-[0.1em] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
+                    className={`group font-mono text-[11px] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
                       }`}
                   >
                     <span className="md:hidden">
@@ -275,8 +275,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
               <div className="w-full py-5 px-1 select-none font-mono text-[11px] flex items-center gap-3">
                 <span className="flex-1 h-[1px] bg-[#1C1C1A]" />
                 <div className="inline-flex items-center gap-[4px]">
-                  <div className="font-mono text-[11px] tracking-[0.1em] px-3.5 py-1.5 border border-[#1C1C1A] text-[#4A4A46] bg-[#0A0A09] flex items-center gap-2">
-                    <span>[ ALL {totalPlays || entries.length} HISTORICAL PLAYS ARCHIVED ]</span>
+                  <div className="font-mono text-[11px] px-3.5 py-1.5 border border-[#1C1C1A] text-[#4A4A46] bg-[#0A0A09] flex items-center gap-2">
+                    <span>All {totalPlays || entries.length} historical plays archived</span>
                   </div>
                   <button
                     type="button"

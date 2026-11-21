@@ -582,7 +582,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const streamLogDateSpan = React.useMemo(() => {
     const entries = streamLogData.entries;
-    if (!entries || entries.length === 0) return "STREAM LOG";
+    if (!entries || entries.length === 0) return "Stream log";
     const newest = entries[0]?.playedAt;
     const oldest = entries[entries.length - 1]?.playedAt;
     return formatStreamLogDateSpan(oldest, newest, visitorTimezone);

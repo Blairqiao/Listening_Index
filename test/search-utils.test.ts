@@ -233,16 +233,16 @@ test('getSearchStatusText returns appropriate status text or null', () => {
   assert.equal(getSearchStatusText({ status: 'loading', query: 'radio', hasResults: true }), null);
 
   // error: "SEARCH FAILED"
-  assert.equal(getSearchStatusText({ status: 'error', query: '', hasResults: false }), 'SEARCH FAILED');
-  assert.equal(getSearchStatusText({ status: 'error', query: 'radio', hasResults: false }), 'SEARCH FAILED');
+  assert.equal(getSearchStatusText({ status: 'error', query: '', hasResults: false }), 'Search failed');
+  assert.equal(getSearchStatusText({ status: 'error', query: 'radio', hasResults: false }), 'Search failed');
 
   // idle: "QUERY TOO LONG"
-  assert.equal(getSearchStatusText({ status: 'idle', query: 'a'.repeat(101), hasResults: false }), 'QUERY TOO LONG');
+  assert.equal(getSearchStatusText({ status: 'idle', query: 'a'.repeat(101), hasResults: false }), 'Query too long');
 
   // ready without results: empty vs non-empty queries
-  assert.equal(getSearchStatusText({ status: 'ready', query: '', hasResults: false }), '[ NO PLAYS IN ARCHIVE ]');
-  assert.equal(getSearchStatusText({ status: 'ready', query: '   ', hasResults: false }), '[ NO PLAYS IN ARCHIVE ]');
-  assert.equal(getSearchStatusText({ status: 'ready', query: 'radio', hasResults: false }), '[ NO MATCHES ]');
+  assert.equal(getSearchStatusText({ status: 'ready', query: '', hasResults: false }), 'No plays in archive');
+  assert.equal(getSearchStatusText({ status: 'ready', query: '   ', hasResults: false }), 'No plays in archive');
+  assert.equal(getSearchStatusText({ status: 'ready', query: 'radio', hasResults: false }), 'No matches');
 
   // ready with results: null
   assert.equal(getSearchStatusText({ status: 'ready', query: '', hasResults: true }), null);

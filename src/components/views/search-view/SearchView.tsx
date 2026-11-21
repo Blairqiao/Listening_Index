@@ -19,14 +19,14 @@ import { Artwork, getFallbackSwatchColor } from "../../Artwork";
 
 const pageButtonClass = `${searchChipClass} disabled:cursor-default disabled:opacity-40 disabled:hover:text-[#6A6A64] disabled:hover:border-[#26261F]`;
 
-const headingLabelClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]";
+const headingLabelClass = "font-mono text-[11px] text-[#5A5A55]";
 
 function ResultHeading({
   label,
   afterArtists = false,
-  rightHeader = "PLAYS",
+  rightHeader = "Plays",
 }: {
-  label: "TRACKS" | "ARTISTS" | "ALBUMS";
+  label: "Tracks" | "Artists" | "Albums";
   afterArtists?: boolean;
   rightHeader?: string;
 }) {
@@ -36,7 +36,7 @@ function ResultHeading({
 
   return (
     <div className={`flex justify-between items-baseline ${spacing}`}>
-      <span className={headingLabelClass}>[ {label} ]</span>
+      <span className={headingLabelClass}>{label}</span>
       <span className={headingLabelClass}>{rightHeader}</span>
     </div>
   );
@@ -154,21 +154,21 @@ export const SearchView: React.FC<SearchViewProps> = ({
     hasResults,
   });
 
-  let placeholder = "SEARCH TRACKS, ARTISTS OR ALBUMS";
+  let placeholder = "Search tracks, artists or albums";
   let inputAriaLabel = "Search tracks, artists or albums";
   if (filter === "tracks") {
-    placeholder = "SEARCH TRACKS";
+    placeholder = "Search tracks";
     inputAriaLabel = "Search tracks";
   } else if (filter === "artists") {
-    placeholder = "SEARCH ARTISTS";
+    placeholder = "Search artists";
     inputAriaLabel = "Search artists";
   } else if (filter === "albums") {
-    placeholder = "SEARCH ALBUMS";
+    placeholder = "Search albums";
     inputAriaLabel = "Search albums";
   }
 
   const isRecencySort = sort === "recent" || sort === "oldest";
-  const rightHeader = isRecencySort ? "LAST PLAYED · PLAYS" : "PLAYS";
+  const rightHeader = isRecencySort ? "Last played · plays" : "Plays";
 
   const formatLastPlayed = (iso?: string | null): string | undefined => {
     if (!isRecencySort || !iso) return undefined;
@@ -277,7 +277,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   );
 
   const renderBalancedGrid = (
-    label: "TRACKS" | "ARTISTS" | "ALBUMS",
+    label: "Tracks" | "Artists" | "Albums",
     items: JSX.Element[]
   ): JSX.Element => {
     const mid = Math.ceil(items.length / 2);
@@ -322,17 +322,17 @@ export const SearchView: React.FC<SearchViewProps> = ({
       const tracksOnlyMixed = !hasArtists && albums.length === 0 && data.tracks.length > 0;
 
       if (tracksOnlyMixed) {
-        return renderBalancedGrid("TRACKS", data.tracks.map(renderTrackRow));
+        return renderBalancedGrid("Tracks", data.tracks.map(renderTrackRow));
       }
 
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-[26px]">
           <div className="min-w-0">
-            <ResultHeading label="TRACKS" rightHeader={rightHeader} />
+            <ResultHeading label="Tracks" rightHeader={rightHeader} />
             <div className="flex flex-col">
               {data.tracks.length === 0 ? (
                 <div className="font-mono text-[11px] text-[#4A4A46] py-3 px-1 select-none">
-                  [ NO TRACKS ]
+                  No tracks
                 </div>
               ) : (
                 data.tracks.map(renderTrackRow)
@@ -344,7 +344,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             <div className="min-w-0">
               {hasArtists && (
                 <div>
-                  <ResultHeading label="ARTISTS" rightHeader={rightHeader} />
+                  <ResultHeading label="Artists" rightHeader={rightHeader} />
                   <div className="flex flex-col">
                     {data.artists.map(renderArtistRow)}
                   </div>
@@ -352,7 +352,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               )}
               {albums.length > 0 && (
                 <div>
-                  <ResultHeading label="ALBUMS" afterArtists={hasArtists} rightHeader={rightHeader} />
+                  <ResultHeading label="Albums" afterArtists={hasArtists} rightHeader={rightHeader} />
                   <div className="flex flex-col">
                     {albums.map(renderAlbumRow)}
                   </div>
@@ -365,13 +365,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
     }
 
     if (displayFilter === "tracks") {
-      return renderBalancedGrid("TRACKS", data.tracks.map(renderTrackRow));
+      return renderBalancedGrid("Tracks", data.tracks.map(renderTrackRow));
     }
     if (displayFilter === "artists") {
-      return renderBalancedGrid("ARTISTS", data.artists.map(renderArtistRow));
+      return renderBalancedGrid("Artists", data.artists.map(renderArtistRow));
     }
     if (displayFilter === "albums") {
-      return renderBalancedGrid("ALBUMS", albums.map(renderAlbumRow));
+      return renderBalancedGrid("Albums", albums.map(renderAlbumRow));
     }
     return null;
   };
@@ -395,13 +395,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => onFilterChange?.(opt.value)}
-                className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
+                className={`font-mono text-[11px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
                   isActive
                     ? "border-music-accent text-music-accent bg-transparent"
                     : "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent"
                 }`}
               >
-                <span>{opt.label.toUpperCase()}</span>
+                <span>{opt.label}</span>
                 {count !== undefined && (
                   <span className="hidden sm:inline ml-1 font-mono text-[10px] text-[#5A5A55] tabular-nums">
                     {count}
@@ -423,9 +423,9 @@ export const SearchView: React.FC<SearchViewProps> = ({
               type="button"
               onClick={onRandomProfile}
               aria-label="Open random profile"
-              className="font-mono text-[11px] tracking-[0.1em] uppercase bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
+              className="font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
             >
-              [ RANDOM ]
+              Random
             </button>
           )}
         </div>
@@ -492,10 +492,10 @@ export const SearchView: React.FC<SearchViewProps> = ({
               onClick={() => onPageChange?.(page - 1)}
               className={pageButtonClass}
             >
-              ← PREV
+              ← Prev
             </button>
             <span className="tabular-nums whitespace-nowrap text-[#8A8A83]">
-              <span className="text-[#5A5A55] tracking-[0.14em]">PAGE</span>{" "}
+              <span className="text-[#5A5A55]">Page</span>{" "}
               {String(page).padStart(2, "0")}
               {data?.totalPages !== undefined && (
                 <> / {String(data.totalPages).padStart(2, "0")}</>
@@ -508,7 +508,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               onClick={() => onPageChange?.(page + 1)}
               className={pageButtonClass}
             >
-              NEXT →
+              Next →
             </button>
           </nav>
           <span className="flex-1 h-[1px] bg-[#1C1C1A]" />

@@ -1,11 +1,11 @@
 import React from "react";
 import { artistShare, formatShare, OTHER_SEGMENT_ID, type ShareSegment } from "@/lib/profile-stats";
 
-const headingClass = "mb-2 font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] select-none";
-const legendClass = "mt-2 flex justify-between gap-2 font-mono text-[11px] tracking-[0.08em] text-[#8A8A83] tabular-nums";
+const headingClass = "mb-2 font-mono text-[11px] text-[#5A5A55] select-none";
+const legendClass = "mt-2 flex justify-between gap-2 font-mono text-[11px] text-[#8A8A83] tabular-nums";
 
 function playCountLabel(plays: number): string {
-  return `${plays.toLocaleString()} ${plays === 1 ? "PLAY" : "PLAYS"}`;
+  return `${plays.toLocaleString()} ${plays === 1 ? "play" : "plays"}`;
 }
 
 export function ProportionShareBar({ heading, part, total }: { heading: string; part: number; total: number }) {
@@ -20,7 +20,7 @@ export function ProportionShareBar({ heading, part, total }: { heading: string; 
       </div>
       <div className={legendClass}>
         <span className="text-music-accent">{formatShare(artistShare(part, total))} · {playCountLabel(part)}</span>
-        <span className="shrink-0">OF {total.toLocaleString()}</span>
+        <span className="shrink-0">of {total.toLocaleString()}</span>
       </div>
     </div>
   );
@@ -73,12 +73,12 @@ export function SegmentedShareBar({ heading, segments, total, activeId, onActive
         {active ? (
           <>
             <span className="truncate text-music-accent">
-              {active.label.toUpperCase()} · {formatShare(artistShare(active.plays, total))}
+              {active.label} · {formatShare(artistShare(active.plays, total))}
             </span>
-            <span className="shrink-0">{active.plays.toLocaleString()} OF {total.toLocaleString()}</span>
+            <span className="shrink-0">{active.plays.toLocaleString()} of {total.toLocaleString()}</span>
           </>
         ) : (
-          <span>{total.toLocaleString()} PLAYS</span>
+          <span>{total.toLocaleString()} plays</span>
         )}
       </div>
     </div>

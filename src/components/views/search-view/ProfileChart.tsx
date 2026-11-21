@@ -7,14 +7,14 @@ import { peakDayOfWeek, peakHour } from "@/lib/profile-stats";
 import { HourChart } from "./HourChart";
 import { DayOfWeekChart } from "./DayOfWeekChart";
 
-const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 type ChartView = "time" | "hour" | "day";
 
-// Combined label + toggle button on the left: bracketed view label in the style of the live player's [ SYNTHETIC ] toggle.
+// Combined label + toggle button on the left, styled like the live player's Synthetic toggle.
 const toggleHeadingClass =
-  "font-mono text-[11px] tracking-[0.14em] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
-const staticHeadingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
+  "font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
+const staticHeadingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {
   range: RangeKey;
@@ -35,14 +35,14 @@ function readout(
 ): string | null {
   if (view === "hour" && hourOfDay) {
     const peak = peakHour(hourOfDay);
-    return peak === null ? null : `PEAK ${String(peak).padStart(2, "0")}:00`;
+    return peak === null ? null : `Peak ${String(peak).padStart(2, "0")}:00`;
   }
   if (view === "day" && dayOfWeek) {
     const peak = peakDayOfWeek(dayOfWeek);
-    return peak === null ? null : `PEAK ${DAY_LABELS[peak]}`;
+    return peak === null ? null : `Peak ${DAY_LABELS[peak]}`;
   }
   if (streakDays <= 0) return null;
-  return `LONGEST STREAK · ${streakDays.toLocaleString()} ${streakDays === 1 ? "DAY" : "DAYS"}`;
+  return `Longest streak · ${streakDays.toLocaleString()} ${streakDays === 1 ? "day" : "days"}`;
 }
 
 export function ProfileChart({
@@ -87,13 +87,13 @@ export function ProfileChart({
         ? "time"
         : view;
 
-  let viewTitle = "[ OVER TIME ]";
+  let viewTitle = "Over time";
   let switchSrText = hasHour ? ", switch to plays by hour" : ", switch to plays by day of week";
   if (currentView === "hour") {
-    viewTitle = "[ BY HOUR ]";
+    viewTitle = "By hour";
     switchSrText = hasDay ? ", switch to plays by day of week" : ", switch to plays over time";
   } else if (currentView === "day") {
-    viewTitle = "[ BY DAY ]";
+    viewTitle = "By day";
     switchSrText = ", switch to plays over time";
   }
 
@@ -108,7 +108,7 @@ export function ProfileChart({
       <span className="sr-only">{switchSrText}</span>
     </button>
   ) : (
-    <div className={staticHeadingClass}>[ PLAYS ]</div>
+    <div className={staticHeadingClass}>Plays</div>
   );
 
   return (
@@ -119,7 +119,7 @@ export function ProfileChart({
         <DayOfWeekChart counts={dayOfWeek} heading={heading} />
       ) : (
         <ActivityChart
-          label="PLAYS"
+          label="Plays"
           range={range}
           activityCadence={activityCadence}
           monthlyCadence={monthlyCadence}
@@ -130,7 +130,7 @@ export function ProfileChart({
         />
       )}
       {(hasHour || hasDay) && (
-        <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 tracking-[0.08em] text-[#8A8A83] tabular-nums">
+        <div className="mt-1 h-4 text-right font-mono text-[11px] leading-4 text-[#8A8A83] tabular-nums">
           {readout(currentView, hourOfDay, dayOfWeek, streakDays)}
         </div>
       )}

@@ -22,12 +22,12 @@ test("ControlRow: renders exact count and handles 0 tracks without defaulting to
   );
 
   assert.ok(
-    markup25.includes("[ LAST 25 ]"),
-    "ControlRow must render [ LAST 25 ] on mobile"
+    markup25.includes(">Last 25<"),
+    "ControlRow must render Last 25 on mobile"
   );
   assert.ok(
-    markup25.includes("[ LAST 25 TRACKS ]"),
-    "ControlRow must render [ LAST 25 TRACKS ] on desktop"
+    markup25.includes("Last 25 tracks"),
+    "ControlRow must render Last 25 tracks on desktop"
   );
   assert.ok(
     markup25.includes("md:hidden") && markup25.includes("hidden md:inline"),
@@ -48,12 +48,12 @@ test("ControlRow: renders exact count and handles 0 tracks without defaulting to
   );
 
   assert.ok(
-    markup0.includes("[ NO TRACKS ]"),
-    "ControlRow must render [ NO TRACKS ] when count is 0 instead of defaulting to 50"
+    markup0.includes("No tracks"),
+    "ControlRow must render No tracks when count is 0 instead of defaulting to 50"
   );
   assert.ok(
-    !markup0.includes("[ LAST 50 ]"),
-    "ControlRow must not render [ LAST 50 ] when count is 0"
+    !markup0.includes("Last 50"),
+    "ControlRow must not render Last 50 when count is 0"
   );
 });
 

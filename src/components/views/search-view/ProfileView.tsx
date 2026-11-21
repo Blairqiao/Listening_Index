@@ -83,8 +83,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   if (status === "not_found" || status === "error") {
     return (
       <div className="mt-4 md:mt-6 select-none">
-        <div role="status" className="mt-6 font-mono text-[11px] text-[#5A5A55] tracking-[0.14em]">
-          {status === "not_found" ? "[ NOT IN ARCHIVE ]" : "[ COULDN'T LOAD PROFILE ]"}
+        <div role="status" className="mt-6 font-mono text-[11px] text-[#5A5A55]">
+          {status === "not_found" ? "Not in archive" : "Couldn't load profile"}
         </div>
       </div>
     );
@@ -123,13 +123,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             range="1m"
             activityCadence={[]}
             isLoading={true}
-            label="PLAYS"
+            label="Plays"
             visitorTimezone={visitorTimezone}
           />
         </div>
 
         <ProfileBox
-          heading="[ RECENT PLAYS ]"
+          heading="Recent plays"
           rows={skeletonRecentRows}
           rowSize={skeletonRowSize}
           itemCount={0}
@@ -141,8 +141,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {pendingKind === "artist" && (
           <div className="flex min-w-0 flex-col gap-4 md:gap-0">
             <ProfileBox
-              heading="[ TOP TRACKS ]"
-              rightLabel="PLAYS"
+              heading="Top tracks"
+              rightLabel="Plays"
               rows={ARTIST_TOP_TRACKS_ROWS}
               rowSize="tall"
               itemCount={0}
@@ -151,8 +151,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {null}
             </ProfileBox>
             <ProfileBox
-              heading="[ TOP ALBUMS ]"
-              rightLabel="PLAYS"
+              heading="Top albums"
+              rightLabel="Plays"
               rows={ARTIST_TOP_ALBUMS_ROWS}
               rowSize="tall"
               itemCount={0}
@@ -166,8 +166,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {pendingKind === "album" && (
           <ProfileBox
-            heading="[ TOP TRACKS ]"
-            rightLabel="PLAYS"
+            heading="Top tracks"
+            rightLabel="Plays"
             rows={ALBUM_TOP_TRACKS_ROWS}
             rowSize="compact"
             itemCount={0}
@@ -180,8 +180,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {pendingKind === "track" && (
           <div className="flex min-w-0 flex-col gap-4 md:gap-0">
             <ProfileBox
-              heading="[ FROM THIS ALBUM ]"
-              rightLabel="PLAYS"
+              heading="From this album"
+              rightLabel="Plays"
               rows={TRACK_ALBUM_TRACKS_ROWS}
               rowSize="compact"
               itemCount={0}
@@ -190,8 +190,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {null}
             </ProfileBox>
             <ProfileBox
-              heading="[ OFTEN PLAYED WITH ]"
-              rightLabel="CO-PLAYS"
+              heading="Often played with"
+              rightLabel="Co-plays"
               rows={TRACK_RELATED_ROWS}
               rowSize="compact"
               itemCount={0}
@@ -314,7 +314,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {isTrack && data.plays > 0 && (
         <div className="min-w-0 md:col-span-full">
           <ProportionShareBar
-            heading={`[ SHARE OF ${data.artistName?.toUpperCase() || "ARTIST"} ]`}
+            heading={`Share of ${data.artistName || "artist"}`}
             part={data.plays}
             total={data.stats?.artistPlays ?? data.trackStats?.artistPlays ?? 0}
           />
@@ -324,7 +324,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {(isArtist || isAlbum) && data.plays > 0 && (
         <div className="min-w-0 md:col-span-full">
           <SegmentedShareBar
-            heading="[ SHARE OF PLAYS ]"
+            heading="Share of plays"
             segments={segments}
             total={data.plays}
             activeId={activeSegmentId}
@@ -336,16 +336,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Bottom section: zero-plays state or 2-column fixed-height boxes */}
       {data.plays === 0 ? (
         <div className="min-w-0 md:col-span-full">
-          <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] py-4 select-none">
-            [ NO PLAYS IN THIS RANGE ]
+          <div className="font-mono text-[11px] text-[#5A5A55] py-4 select-none">
+            No plays in this range
           </div>
         </div>
       ) : (
         <>
-          {/* Left column: [ RECENT PLAYS ] */}
+          {/* Left column: recent plays */}
           {isArtist && (
             <ProfileBox
-              heading="[ RECENT PLAYS ]"
+              heading="Recent plays"
               rows={ARTIST_RECENT_ROWS}
               rowSize="tall"
               itemCount={recentPlaysWithPresentation.length}
@@ -367,7 +367,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   >
                     <div className="flex w-[56px] flex-none flex-col justify-center font-mono select-none">
                       {play.dayGroup && (
-                        <span className="text-[10px] tracking-[0.12em] text-[#5A5A55] leading-tight">
+                        <span className="text-[10px] text-[#5A5A55] leading-tight">
                           {play.dayGroup}
                         </span>
                       )}
@@ -398,7 +398,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           {isAlbum && (
             <ProfileBox
-              heading="[ RECENT PLAYS ]"
+              heading="Recent plays"
               rows={ALBUM_RECENT_ROWS}
               rowSize="compact"
               itemCount={recentPlaysWithPresentation.length}
@@ -419,7 +419,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onMouseLeave={() => setActiveSegmentId(null)}
                     className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent ${isActive ? "bg-[#111110]" : ""}`}
                   >
-                    <span className="font-mono text-[11.5px] text-[#5A5A55] tracking-[0.08em] select-none">
+                    <span className="font-mono text-[11.5px] text-[#5A5A55] select-none">
                       {play.dayGroup ?? null}
                     </span>
                     <span className="font-mono text-[11.5px] text-[#8A8A83] tabular-nums select-none">
@@ -439,7 +439,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           {isTrack && (
             <ProfileBox
-              heading="[ RECENT PLAYS ]"
+              heading="Recent plays"
               rows={TRACK_RECENT_ROWS}
               rowSize="compact"
               itemCount={recentPlaysWithPresentation.length}
@@ -453,7 +453,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     key={play.id}
                     className="grid grid-cols-[72px_56px_1fr] items-center h-8 px-1 border-b border-[#191917] font-mono text-[11.5px]"
                   >
-                    <span className="text-[#5A5A55] tracking-[0.08em]">
+                    <span className="text-[#5A5A55]">
                       {play.dayGroup ?? null}
                     </span>
                     <span className="text-[#8A8A83] tabular-nums">{play.timeStr}</span>
@@ -462,7 +462,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         <>
                           {formatDurationMs(play.msPlayed!)}
                           {isPartial && (
-                            <span className="ml-1.5 text-[10px] tracking-[0.08em] text-[#5A5A55]">PARTIAL</span>
+                            <span className="ml-1.5 text-[10px] text-[#5A5A55]">Partial</span>
                           )}
                         </>
                       )}
@@ -477,8 +477,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {isArtist && (
             <div className="flex min-w-0 flex-col gap-4 md:gap-0">
               <ProfileBox
-                heading="[ TOP TRACKS ]"
-                rightLabel="PLAYS"
+                heading="Top tracks"
+                rightLabel="Plays"
                 rows={ARTIST_TOP_TRACKS_ROWS}
                 rowSize="tall"
                 itemCount={data.topTracks.length}
@@ -488,8 +488,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {data.topTracks.map((track, idx) => renderTopTrack(track, idx, true, "tall"))}
               </ProfileBox>
               <ProfileBox
-                heading="[ TOP ALBUMS ]"
-                rightLabel="PLAYS"
+                heading="Top albums"
+                rightLabel="Plays"
                 rows={ARTIST_TOP_ALBUMS_ROWS}
                 rowSize="tall"
                 itemCount={data.topAlbums.length}
@@ -505,8 +505,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {/* Right column: Album */}
           {isAlbum && (
             <ProfileBox
-              heading="[ TOP TRACKS ]"
-              rightLabel="PLAYS"
+              heading="Top tracks"
+              rightLabel="Plays"
               rows={ALBUM_TOP_TRACKS_ROWS}
               rowSize="compact"
               itemCount={data.topTracks.length}
@@ -521,8 +521,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {isTrack && (
             <div className="flex min-w-0 flex-col gap-4 md:gap-0">
               <ProfileBox
-                heading="[ FROM THIS ALBUM ]"
-                rightLabel="PLAYS"
+                heading="From this album"
+                rightLabel="Plays"
                 rows={TRACK_ALBUM_TRACKS_ROWS}
                 rowSize="compact"
                 itemCount={albumTracks.length}
@@ -560,8 +560,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 })}
               </ProfileBox>
               <ProfileBox
-                heading="[ OFTEN PLAYED WITH ]"
-                rightLabel="CO-PLAYS"
+                heading="Often played with"
+                rightLabel="Co-plays"
                 rows={TRACK_RELATED_ROWS}
                 rowSize="compact"
                 itemCount={relatedTracks.length}

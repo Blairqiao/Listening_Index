@@ -1,9 +1,9 @@
 import React from "react";
 import { peakDayOfWeek } from "@/lib/profile-stats";
 
-const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
+const headingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
 
 export function DayOfWeekChart({
   counts,
@@ -29,10 +29,10 @@ export function DayOfWeekChart({
           </div>
         )
       ) : headerAside == null ? (
-        <div className={headingClass}>[ WHEN IT PLAYS ]</div>
+        <div className={headingClass}>When it plays</div>
       ) : (
         <div className="flex justify-between items-baseline gap-2">
-          <span className={headingClass}>[ WHEN IT PLAYS ]</span>
+          <span className={headingClass}>When it plays</span>
           {headerAside}
         </div>
       )}

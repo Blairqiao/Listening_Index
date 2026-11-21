@@ -83,18 +83,18 @@ export function computeLivePlayerMetrics(
 
 /** Human-readable time since the last sync, as shown in the footer. */
 export function computeSyncedAgo(date: Date | null, now = Date.now()): string {
-  if (!date) return "JUST NOW";
+  if (!date) return "Just now";
   const diffMs = now - date.getTime();
-  if (diffMs < 0) return "JUST NOW";
+  if (diffMs < 0) return "Just now";
   const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 45) return "JUST NOW";
+  if (diffSec < 45) return "Just now";
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin === 1) return "1M AGO";
-  if (diffMin < 60) return `${diffMin}M AGO`;
+  if (diffMin === 1) return "1m ago";
+  if (diffMin < 60) return `${diffMin}m ago`;
   const diffHours = Math.floor(diffMin / 60);
-  if (diffHours === 1) return "1H AGO";
-  if (diffHours < 24) return `${diffHours}H AGO`;
-  return `${Math.floor(diffHours / 24)}D AGO`;
+  if (diffHours === 1) return "1h ago";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${Math.floor(diffHours / 24)}d ago`;
 }
 
 const STREAM_LOG_DEPTH_KEY = "stream_log_depth";

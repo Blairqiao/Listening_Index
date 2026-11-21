@@ -140,7 +140,7 @@ export function buildShareSegments(
     .map(({ id, name, plays }) => ({ id, label: name, plays }));
   const remainder = total - segments.reduce((sum, { plays }) => sum + plays, 0);
   if (remainder > 0) {
-    segments.push({ id: OTHER_SEGMENT_ID, label: "Other Tracks", plays: remainder });
+    segments.push({ id: OTHER_SEGMENT_ID, label: "Other tracks", plays: remainder });
   }
   return segments;
 }
@@ -227,16 +227,16 @@ export function countFullAlbumSessions(
 
 export function formatListeningDuration(ms: number): string {
   const clampedMs = Math.max(0, Number.isFinite(ms) ? ms : 0);
-  if (clampedMs === 0) return "0M";
-  if (clampedMs < 60_000) return "<1M";
+  if (clampedMs === 0) return "0m";
+  if (clampedMs < 60_000) return "<1m";
   const totalMinutes = Math.round(clampedMs / 60_000);
-  if (totalMinutes < 60) return `${totalMinutes}M`;
+  if (totalMinutes < 60) return `${totalMinutes}m`;
   const hours = Math.floor(totalMinutes / 60);
   const remMins = totalMinutes % 60;
   if (hours < 100) {
-    return remMins === 0 ? `${hours}H` : `${hours}H ${remMins}M`;
+    return remMins === 0 ? `${hours}h` : `${hours}h ${remMins}m`;
   }
-  return `${Math.round(clampedMs / 3_600_000).toLocaleString()}H`;
+  return `${Math.round(clampedMs / 3_600_000).toLocaleString()}h`;
 }
 
 export function formatCompactPlayDate(iso: string | null | undefined, tz: string): string {
@@ -255,7 +255,7 @@ export function formatCompactPlayDate(iso: string | null | undefined, tz: string
     const month = parts.find((p) => p.type === "month")?.value;
     const year = parts.find((p) => p.type === "year")?.value;
     if (!day || !month || !year) return "--";
-    return `${day} ${month} ${year}`.toUpperCase();
+    return `${day} ${month} ${year}`;
   } catch {
     return "--";
   }

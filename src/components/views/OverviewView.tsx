@@ -33,11 +33,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       {/* Left Column: Top Tracks (1.5fr) */}
       <div className="min-w-0">
         <div className="flex justify-between items-baseline mb-2 select-none">
-          <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-            [ TOP TRACKS ]
+          <span className="font-mono text-[11px] text-[#5A5A55]">
+            Top tracks
           </span>
-          <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-            PLAYS
+          <span className="font-mono text-[11px] text-[#5A5A55]">
+            Plays
           </span>
         </div>
 
@@ -99,7 +99,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         }`}
                       title={`Rank drift: ${track.drift}`}
                     >
-                      {track.drift}
+                      {isNew ? "New" : track.drift}
                     </span>
 
                     {/* 38px Square Real Album Art with Color Swatch Fallback */}
@@ -178,10 +178,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
       {/* Right Column: Artist Index, Album Index, Activity Tracker (1fr) */}
       <div className="flex flex-col gap-4 md:gap-0 md:justify-between h-full min-w-0">
-        {/* [ ARTIST INDEX ] (Top 5) */}
+        {/* Artist index (top 5) */}
         <div>
-          <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none">
-            [ ARTIST INDEX ]
+          <div className="font-mono text-[11px] text-[#5A5A55] mb-2 select-none">
+            Artist index
           </div>
           <div className="flex flex-col" role="list">
             {isLoading && topArtists.length === 0 ? (
@@ -239,10 +239,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </div>
         </div>
 
-        {/* [ ALBUM INDEX ] (Top 5) */}
+        {/* Album index (top 5) */}
         <div>
-          <div className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none">
-            [ ALBUM INDEX ]
+          <div className="font-mono text-[11px] text-[#5A5A55] mb-2 select-none">
+            Album index
           </div>
           <div className="flex flex-col" role="list">
             {isLoading && topAlbums.length === 0 ? (

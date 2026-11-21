@@ -31,7 +31,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   activityCadence: yearlyOrRangeCadence = [],
   monthlyCadence,
   isLoading = false,
-  label = "ACTIVITY",
+  label = "Activity",
   headerAside,
   showRange = true,
   visitorTimezone: propTimezone,
@@ -76,8 +76,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       ? activityCadence[activityCadence.length - 1].date
       : "";
 
-  const headingClass = "font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] mb-2 select-none";
-  const defaultHeadingText = showRange ? `[ ${label} / ${range === "all" ? "ALL" : range.toUpperCase()} ]` : `[ ${label} ]`;
+  const headingClass = "font-mono text-[11px] text-[#5A5A55] mb-2 select-none";
+  const defaultHeadingText = showRange ? `${label} / ${range === "all" ? "all" : range}` : label;
 
   return (
     <div>
@@ -163,16 +163,16 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         {/* Contextual markers according to range */}
         {range === "1d" && (
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
-            <span>-24H</span>
-            <span>-12H</span>
-            <span>NOW</span>
+            <span>-24h</span>
+            <span>-12h</span>
+            <span>Now</span>
           </div>
         )}
 
         {range === "1w" && (
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              ["-7D", "-6D", "-5D", "-4D", "-3D", "-2D", "NOW"].map((m, i) => (
+              ["-7d", "-6d", "-5d", "-4d", "-3d", "-2d", "Now"].map((m, i) => (
                 <span key={i} className="text-center flex-1 truncate">
                   {m}
                 </span>
@@ -195,11 +195,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
-                <span>-30D</span>
-                <span>-22D</span>
-                <span>-15D</span>
-                <span>-7D</span>
-                <span>NOW</span>
+                <span>-30d</span>
+                <span>-22d</span>
+                <span>-15d</span>
+                <span>-7d</span>
+                <span>Now</span>
               </>
             ) : activityCadence.some((item) => item.markerLabel) ? (
               activityCadence
@@ -221,11 +221,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
-                <span>-6M</span>
-                <span>-5M</span>
-                <span>-4M</span>
-                <span>-3M</span>
-                <span>NOW</span>
+                <span>-6m</span>
+                <span>-5m</span>
+                <span>-4m</span>
+                <span>-3m</span>
+                <span>Now</span>
               </>
             ) : (
               (activityCadence.some((item) => item.markerLabel)
@@ -242,11 +242,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
-                <span>-12M</span>
-                <span>-9M</span>
-                <span>-6M</span>
-                <span>-3M</span>
-                <span>NOW</span>
+                <span>-12m</span>
+                <span>-9m</span>
+                <span>-6m</span>
+                <span>-3m</span>
+                <span>Now</span>
               </>
             ) : activityCadence.length <= 12 ? (
               activityCadence.map((item, i) => (
@@ -270,8 +270,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           <div className="flex justify-between mt-1.5 font-mono text-[10px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
               <>
-                <span>ALL-TIME</span>
-                <span>NOW</span>
+                <span>All-time</span>
+                <span>Now</span>
               </>
             ) : (
               axisLabels.map((item, i) => {
