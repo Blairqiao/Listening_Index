@@ -6,7 +6,7 @@ import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
 import { formatDurationMs } from "@/lib/format-utils";
 import { artistShare, buildShareSegments, formatShare, segmentIdForTrack } from "@/lib/profile-stats";
 import { ProfileChart } from "./ProfileChart";
-import { ProfileStatsPanel } from "./ProfileStatsPanel";
+import { ProfileHeader } from "./ProfileHeader";
 import { ProportionShareBar, SegmentedShareBar } from "./ShareBar";
 import { Artwork } from "../../Artwork";
 import { ActivityChart } from "../ActivityChart";
@@ -17,13 +17,9 @@ export interface ProfileViewProps {
   visitorTimezone: string;
   onOpenProfile: (target: ProfileTarget) => void;
   pendingKind?: ProfileKind;
+  rankFormat?: "rank" | "percentile";
+  onToggleRankFormat?: () => void;
 }
-
-const KICKER_BY_KIND: Record<ProfileKind, string> = {
-  track: "[ TRACK ]",
-  artist: "[ ARTIST ]",
-  album: "[ ALBUM ]",
-};
 
 function ProfileRankedList({
   label,
@@ -68,6 +64,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   visitorTimezone,
   onOpenProfile,
   pendingKind = "track",
+  rankFormat,
+  onToggleRankFormat,
 }) => {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const profileIdentity = data ? JSON.stringify([data.kind, data.key, data.range]) : null;
@@ -181,16 +179,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (!data) return null;
 
-  const { artistKey, albumKey } = data;
   const isTrack = data.kind === "track";
-  const streak = data.trackStats?.longestStreakDays ?? 0;
   const albumTracks = data.albumTracks ?? [];
   const hasAlbumList = isTrack && albumTracks.length >= 2;
   const relatedTracks = data.relatedTracks ?? [];
   const hasRelatedTracks = isTrack && relatedTracks.length > 0;
   const moreAlbums = data.moreAlbums ?? [];
   const hasMoreAlbums = isAlbum && moreAlbums.length > 0;
-  const hasTrackRightColumn = isTrack && (Boolean(data.stats) || hasAlbumList || hasRelatedTracks);
+  const hasTrackRightColumn = isTrack && (hasAlbumList || hasRelatedTracks);
 
   // Without right-column content the Track's recent plays take the full width, split into two columns.
   const recentSpansFull = data.plays === 0 || (isTrack && !hasTrackRightColumn);
@@ -201,9 +197,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const hours = data.plays > 0 ? data.hourOfDay : undefined;
   const dayOfWeek = data.plays > 0 ? data.dayOfWeek : undefined;
-  const spotifyUrl = /^[a-zA-Z0-9]{22}$/.test(data.key)
-    ? `https://open.spotify.com/${data.kind}/${data.key}`
-    : null;
 
   const renderTopTrack = (track: ProfileData["topTracks"][number], idx: number, showArtwork: boolean) => (
     <button
@@ -273,57 +266,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         status === "loading" ? "opacity-60" : ""
       }`}
     >
-      {/* Unified 88px header for Track, Artist, and Album */}
-      <div className="flex items-center gap-3 md:gap-4 min-w-0 md:col-span-full">
-        <Artwork
-          src={data.imageUrl}
-          alt={data.name}
-          size={88}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10.5px] tracking-[0.16em] text-music-accent mb-1 select-none">
-            {KICKER_BY_KIND[data.kind]}
-          </div>
-          <div className="font-sans text-[20px] md:text-[24px] font-medium tracking-[-0.01em] text-[#EDEDE8] truncate leading-tight select-none">
-            {spotifyUrl ? (
-              <a
-                href={spotifyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group inline-flex max-w-full items-baseline hover:text-music-accent focus-visible:outline-music-accent"
-              >
-                <span className="truncate">{data.name}</span>
-                <span aria-hidden="true" className="ml-2 font-mono text-[12px] text-[#6A6A64] group-hover:text-music-accent">↗</span>
-                <span className="sr-only">(opens in Spotify)</span>
-              </a>
-            ) : data.name}
-          </div>
-          {(isTrack || isAlbum) && data.artistName && (
-            <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
-              <span className="text-[#5A5A55]">ARTIST · </span>
-              {artistKey ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenProfile({ kind: "artist", key: artistKey })}
-                  className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
-                >{data.artistName} →</button>
-              ) : data.artistName}
-            </div>
-          )}
-          {isTrack && data.albumName && (
-            <div className="mt-0.5 truncate font-mono text-[11.5px] leading-tight text-[#6A6A64] select-none">
-              <span className="text-[#5A5A55]">ALBUM · </span>
-              {albumKey ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenProfile({ kind: "album", key: albumKey })}
-                  className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
-                >{data.albumName} →</button>
-              ) : data.albumName}
-            </div>
-          )}
-        </div>
-      </div>
+      <ProfileHeader
+        data={data}
+        visitorTimezone={visitorTimezone}
+        onOpenProfile={onOpenProfile}
+        rankFormat={rankFormat}
+        onToggleRankFormat={onToggleRankFormat}
+      />
 
       {/* Chart */}
       <div className="min-w-0 md:col-span-full">
@@ -335,7 +284,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           visitorTimezone={visitorTimezone}
           hourOfDay={hours}
           dayOfWeek={dayOfWeek}
-          streakDays={isTrack && !data.stats ? streak : 0}
         />
       </div>
 
@@ -475,9 +423,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <ProfileRankedList key={`${data.key}-albums`} label="ALBUMS">
                 {data.topAlbums.map((album, idx) => renderAlbumRow(album, idx, data.topAlbums.length))}
               </ProfileRankedList>
-              {data.stats && (
-                <ProfileStatsPanel kind="artist" stats={data.stats} />
-              )}
             </div>
           )}
 
@@ -487,9 +432,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <ProfileRankedList key={`${data.key}-tracks`} label="TRACKS">
                 {data.topTracks.map((track, idx) => renderTopTrack(track, idx, false))}
               </ProfileRankedList>
-              {data.stats && (
-                <ProfileStatsPanel kind="album" stats={data.stats} />
-              )}
               {hasMoreAlbums && (
                 <ProfileRankedList
                   key={`${data.key}-more-albums`}
@@ -505,9 +447,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {/* Right column: Track */}
           {hasTrackRightColumn && (
             <div className="flex min-w-0 flex-col gap-6">
-              {data.stats && (
-                <ProfileStatsPanel kind="track" stats={data.stats} />
-              )}
               {hasAlbumList && (
                 <ProfileRankedList key={data.key} label="TRACKS" heading="[ FROM THIS ALBUM ]">
                   {albumTracks.map((track, idx) => {

@@ -776,7 +776,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             />
           )}
 
-          {(activeMode !== 4 || profileTarget) && (
+          {activeMode !== 4 && (
             <MetricRibbon
               mode={activeMode}
               metrics={currentMetrics}
@@ -786,10 +786,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               artistRankFormat={artistRankFormat}
               onToggleTrackRank={handleToggleTrackRank}
               onToggleArtistRank={handleToggleArtistRank}
-              onToggleProfileRank={activeMode === 4 && profileMetrics[1] !== "--"
-                ? profileTarget?.kind === "track" ? handleToggleTrackRank : handleToggleArtistRank
-                : undefined}
-              isLoading={activeMode === 4 && profileStatus === "loading" && Boolean(profileData)}
             />
           )}
 
@@ -847,6 +843,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   status={profileStatus}
                   visitorTimezone={visitorTimezone}
                   pendingKind={profileTarget.kind}
+                  rankFormat={profileTarget.kind === "track" ? trackRankFormat : artistRankFormat}
+                  onToggleRankFormat={profileTarget.kind === "track" ? handleToggleTrackRank : handleToggleArtistRank}
                   onOpenProfile={(target) => {
                     shouldPushHistoryRef.current = true;
                     handleOpenRelatedProfile(target);
