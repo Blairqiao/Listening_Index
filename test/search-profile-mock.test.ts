@@ -645,3 +645,59 @@ test('Album fullAlbumSessions matches countFullAlbumSessions', () => {
   assert.equal(profile.stats.fullAlbumSessions, expectedSessions);
   assert.equal(profile.stats.fullAlbumSessions, 2);
 });
+
+function assertStreakDatesConsistent(stats: {
+  longestStreakDays: number;
+  longestStreakStart: string | null;
+  longestStreakEnd: string | null;
+}) {
+  if (stats.longestStreakDays === 0) {
+    assert.equal(stats.longestStreakStart, null);
+    assert.equal(stats.longestStreakEnd, null);
+  } else {
+    assert.equal(typeof stats.longestStreakStart, 'string');
+    assert.equal(typeof stats.longestStreakEnd, 'string');
+    assert.ok(stats.longestStreakStart! <= stats.longestStreakEnd!);
+    const spanDays =
+      (Date.parse(stats.longestStreakEnd!) - Date.parse(stats.longestStreakStart!)) / 86_400_000 + 1;
+    assert.equal(spanDays, stats.longestStreakDays);
+  }
+}
+
+test('getMockProfile fills streak dates for Track and Artist and Artist summary invariants', () => {
+  const trackId = CATALOG.radiohead_weird_fishes.id;
+  const artistId = CATALOG.radiohead_weird_fishes.artistId;
+
+  const trackProfile = getMockProfile({ kind: 'track', key: trackId }, 'all', 'UTC')!;
+  assert.ok(trackProfile?.stats);
+  assert.ok(trackProfile.stats.longestStreakDays > 0);
+  assertStreakDatesConsistent(trackProfile.stats);
+
+  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, 'all', 'UTC')!;
+  assert.ok(artistProfile?.stats);
+  assert.ok(artistProfile.plays > 0);
+  assertStreakDatesConsistent(artistProfile.stats);
+  assert.equal(typeof artistProfile.stats.playShare, 'number');
+  assert.ok(artistProfile.stats.playShare! > 0 && artistProfile.stats.playShare! <= 1);
+  assert.equal(typeof artistProfile.stats.tracksHeardInRange, 'number');
+  assert.equal(typeof artistProfile.stats.tracksHeardLifetime, 'number');
+  assert.ok(artistProfile.stats.tracksHeardInRange! > 0);
+  assert.ok(artistProfile.stats.tracksHeardInRange! <= artistProfile.stats.tracksHeardLifetime!);
+  assert.ok(
+    artistProfile.stats.completionRate === null ||
+      (typeof artistProfile.stats.completionRate === 'number' &&
+        artistProfile.stats.completionRate >= 0 &&
+        artistProfile.stats.completionRate <= 1),
+  );
+
+  const zeroPlaysArtist = Object.values(CATALOG)
+    .map(({ artistId: key }) => getMockProfile({ kind: 'artist', key }, '1d', 'UTC'))
+    .find((profile) => profile?.plays === 0);
+  assert.ok(zeroPlaysArtist?.stats);
+  assert.equal(zeroPlaysArtist.stats.longestStreakDays, 0);
+  assertStreakDatesConsistent(zeroPlaysArtist.stats);
+  assert.equal(zeroPlaysArtist.stats.playShare, null);
+  assert.equal(zeroPlaysArtist.stats.tracksHeardInRange, 0);
+  assert.ok(zeroPlaysArtist.stats.tracksHeardLifetime! > 0);
+  assert.equal(zeroPlaysArtist.stats.completionRate, null);
+});
