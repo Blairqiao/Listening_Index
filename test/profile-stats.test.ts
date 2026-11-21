@@ -10,8 +10,10 @@ import {
   formatCompactPlayDate,
   formatListeningDuration,
   formatShare,
+  formatStreakSentence,
   hourHistogram,
   longestStreak,
+  longestStreakRange,
   OTHER_SEGMENT_ID,
   peakDayOfWeek,
   peakHour,
@@ -24,6 +26,73 @@ test("longestStreak counts distinct consecutive calendar days", () => {
     "2025-01-02", "2024-12-31", "2025-01-01", "2025-01-01", "2025-01-04",
   ]), 3);
   assert.equal(longestStreak(["2026-03-07", "2026-03-08", "2026-03-09"]), 3);
+});
+
+test("longestStreakRange identifies days and bounds for streaks", () => {
+  assert.deepEqual(longestStreakRange([]), { days: 0, start: null, end: null });
+  assert.deepEqual(longestStreakRange(["2024-03-05"]), {
+    days: 1,
+    start: "2024-03-05",
+    end: "2024-03-05",
+  });
+  assert.deepEqual(
+    longestStreakRange(["2024-01-03", "2024-01-01", "2024-01-02", "2024-01-02"]),
+    { days: 3, start: "2024-01-01", end: "2024-01-03" },
+  );
+  assert.deepEqual(
+    longestStreakRange([
+      "2024-01-01", "2024-01-02", "2024-01-03",
+      "2024-02-01", "2024-02-02", "2024-02-03",
+    ]),
+    { days: 3, start: "2024-02-01", end: "2024-02-03" },
+  );
+  assert.deepEqual(
+    longestStreakRange(["2024-01-01", "2024-01-02", "2024-01-04", "2024-01-05"]),
+    { days: 2, start: "2024-01-04", end: "2024-01-05" },
+  );
+});
+
+test("formatStreakSentence formats streak ranges and returns null for invalid inputs", () => {
+  assert.equal(
+    formatStreakSentence({
+      longestStreakDays: 12,
+      longestStreakStart: "2024-03-03",
+      longestStreakEnd: "2024-03-14",
+    }),
+    "Longest streak: 12 days (Mar 3–14, 2024)",
+  );
+  assert.equal(
+    formatStreakSentence({
+      longestStreakDays: 6,
+      longestStreakStart: "2024-02-27",
+      longestStreakEnd: "2024-03-03",
+    }),
+    "Longest streak: 6 days (Feb 27 – Mar 3, 2024)",
+  );
+  assert.equal(
+    formatStreakSentence({
+      longestStreakDays: 4,
+      longestStreakStart: "2024-12-30",
+      longestStreakEnd: "2025-01-02",
+    }),
+    "Longest streak: 4 days (Dec 30, 2024 – Jan 2, 2025)",
+  );
+  assert.equal(
+    formatStreakSentence({
+      longestStreakDays: 1,
+      longestStreakStart: "2024-03-03",
+      longestStreakEnd: "2024-03-03",
+    }),
+    null,
+  );
+  assert.equal(
+    formatStreakSentence({
+      longestStreakDays: 5,
+      longestStreakStart: null,
+      longestStreakEnd: "2024-03-14",
+    }),
+    null,
+  );
 });
 
 test("hourHistogram includes all 24 hours", () => {

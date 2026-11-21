@@ -3,7 +3,7 @@ import { isCatalogFullyEnriched } from "./enrichment";
 import { sanitizeTimezone } from "./helpers";
 import { OVERVIEW_INTERVAL_CONFIG } from "./overview";
 import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cadence";
-import { artistShare, computePeakDay, longestStreak } from "@/lib/profile-stats";
+import { artistShare, computePeakDay, longestStreakRange } from "@/lib/profile-stats";
 import type { RangeKey } from "@/lib/types";
 import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
@@ -60,9 +60,12 @@ function summarizeDailyCounts(rows: Record<string, unknown>[]) {
     date: String(row.day),
     plays: Number(row.plays),
   }));
+  const streak = longestStreakRange(days.map((d) => d.date));
   return {
     activeDays: days.filter((d) => d.plays > 0).length,
-    longestStreakDays: longestStreak(days.map((d) => d.date)),
+    longestStreakDays: streak.days,
+    longestStreakStart: streak.start,
+    longestStreakEnd: streak.end,
     peakDay: computePeakDay(days),
   };
 }
@@ -267,7 +270,7 @@ export async function getProfile(
       minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
     });
 
-    const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+    const dailySummary = summarizeDailyCounts(
       dailyCountRows as Record<string, unknown>[],
     );
     const totalMs = Number(aggRows[0]?.total_ms ?? 0);
@@ -308,15 +311,13 @@ export async function getProfile(
       trackStats: {
         artistShare: artistShare(plays, artistPlays),
         artistPlays,
-        longestStreakDays,
+        longestStreakDays: dailySummary.longestStreakDays,
       },
       hourOfDay: toHourOfDay(hourRows),
       dayOfWeek: toDayOfWeek(dayOfWeekRows),
       stats: {
         totalMs,
-        activeDays,
-        longestStreakDays,
-        peakDay,
+        ...dailySummary,
         completionRate,
         artistPlays,
         artistShare: artistShare(plays, artistPlays),
@@ -398,6 +399,8 @@ export async function getProfile(
     dayOfWeekRows,
     dailyCountRows,
     aggRows,
+    allPlayRows,
+    lifetimeTrackRows,
   ] = await Promise.all([
     sql`
       SELECT plays::int, rank::int FROM (
@@ -499,9 +502,23 @@ export async function getProfile(
       GROUP BY 1;
     `,
     sql`
-      SELECT COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms
+      SELECT
+        COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms,
+        COUNT(DISTINCT p.track_id)::int AS tracks_heard_in_range,
+        AVG(LEAST(p.ms_played::float / NULLIF(t.duration_ms, 0), 1.0))
+          FILTER (WHERE t.duration_ms > 0) AS completion_rate
       FROM plays p JOIN tracks t ON p.track_id = t.id
       WHERE ${timeFilter} AND ${artistFilter};
+    `,
+    sql`
+      SELECT COUNT(*)::int AS plays
+      FROM plays p
+      WHERE ${timeFilter};
+    `,
+    sql`
+      SELECT COUNT(DISTINCT p.track_id)::int AS tracks_heard_lifetime
+      FROM plays p JOIN tracks t ON p.track_id = t.id
+      WHERE ${artistFilter};
     `,
   ]);
 
@@ -519,10 +536,15 @@ export async function getProfile(
     minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
   });
 
-  const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+  const dailySummary = summarizeDailyCounts(
     dailyCountRows as Record<string, unknown>[],
   );
   const totalMs = Number(aggRows[0]?.total_ms ?? 0);
+  const tracksHeardInRange = Number(aggRows[0]?.tracks_heard_in_range ?? 0);
+  const completionRate =
+    aggRows[0]?.completion_rate != null ? Number(aggRows[0].completion_rate) : null;
+  const allPlays = Number(allPlayRows[0]?.plays ?? 0);
+  const tracksHeardLifetime = Number(lifetimeTrackRows[0]?.tracks_heard_lifetime ?? 0);
 
   const topTracks: ProfileTopTrack[] = topTrackRows.map((row) => ({
     id: String(row.id),
@@ -557,9 +579,11 @@ export async function getProfile(
     dayOfWeek: toDayOfWeek(dayOfWeekRows),
     stats: {
       totalMs,
-      activeDays,
-      longestStreakDays,
-      peakDay,
+      ...dailySummary,
+      playShare: artistShare(plays, allPlays),
+      completionRate,
+      tracksHeardInRange,
+      tracksHeardLifetime,
     },
     topTracks,
     topAlbums,
@@ -802,7 +826,7 @@ async function getAlbumProfile(
     minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
   });
 
-  const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(
+  const dailySummary = summarizeDailyCounts(
     dailyCountRows as Record<string, unknown>[],
   );
   const totalMs = Number(aggRows[0]?.total_ms ?? 0);
@@ -846,9 +870,7 @@ async function getAlbumProfile(
     dayOfWeek: toDayOfWeek(dayOfWeekRows),
     stats: {
       totalMs,
-      activeDays,
-      longestStreakDays,
-      peakDay,
+      ...dailySummary,
       artistPlays,
       artistShare: artistShare(albumArtistPlays, artistPlays),
       tracksHeardInRange,

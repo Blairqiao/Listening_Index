@@ -34,7 +34,7 @@ import {
   countFullAlbumSessions,
   dayOfWeekHistogram,
   hourHistogram,
-  longestStreak,
+  longestStreakRange,
 } from "@/lib/profile-stats";
 import { normalizeForSearch } from "@/lib/search-utils";
 import { computeSearchTotalPages, planSideColumn } from "@/lib/search-layout";
@@ -583,9 +583,12 @@ function summarizeDailyCounts(localTimes: Array<{ day: string }>) {
     dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
   }
   const days = [...dayCounts.entries()].map(([date, plays]) => ({ date, plays }));
+  const streak = longestStreakRange(days.map((d) => d.date));
   return {
     activeDays: days.length,
-    longestStreakDays: longestStreak(days.map((d) => d.date)),
+    longestStreakDays: streak.days,
+    longestStreakStart: streak.start,
+    longestStreakEnd: streak.end,
     peakDay: computePeakDay(days),
   };
 }
@@ -760,7 +763,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
 
     const { artistId, albumId, album } = targetLifetimePlays[0];
     const localTimes = getLocalPlayTimes(targetInRangePlays, effectiveTz);
-    const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(localTimes);
+    const dailySummary = summarizeDailyCounts(localTimes);
     const totalMs = targetInRangePlays.reduce((sum, p) => sum + p.msPlayed, 0);
     const completionRate = computeCompletionRate(targetInRangePlays);
 
@@ -811,15 +814,13 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       trackStats: {
         artistShare: artistShare(inRangePlayCount, artistPlays),
         artistPlays,
-        longestStreakDays,
+        longestStreakDays: dailySummary.longestStreakDays,
       },
       hourOfDay: hourHistogram(localTimes.map(({ hour }) => hour)),
       dayOfWeek: dayOfWeekHistogram(localTimes.map(({ isoDow }) => isoDow)),
       stats: {
         totalMs,
-        activeDays,
-        longestStreakDays,
-        peakDay,
+        ...dailySummary,
         completionRate,
         artistPlays,
         artistShare: artistShare(inRangePlayCount, artistPlays),
@@ -920,7 +921,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       .slice(0, PROFILE_ALBUM_PROFILE_TRACKS_LIMIT);
 
     const albumLocalTimes = getLocalPlayTimes(albumInRangePlays, effectiveTz);
-    const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(albumLocalTimes);
+    const albumDailySummary = summarizeDailyCounts(albumLocalTimes);
     const totalMs = albumInRangePlays.reduce((sum, p) => sum + p.msPlayed, 0);
 
     let artistPlays = 0;
@@ -962,9 +963,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       dayOfWeek: dayOfWeekHistogram(albumLocalTimes.map(({ isoDow }) => isoDow)),
       stats: {
         totalMs,
-        activeDays,
-        longestStreakDays,
-        peakDay,
+        ...albumDailySummary,
         artistPlays,
         artistShare: artistShare(albumArtistPlays, artistPlays),
         tracksHeardInRange,
@@ -1060,8 +1059,11 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
   const topAlbums = aggregateArtistAlbums(targetInRangePlays, undefined, PROFILE_TOP_ALBUMS_LIMIT);
 
   const artistLocalTimes = getLocalPlayTimes(targetInRangePlays, effectiveTz);
-  const { activeDays, longestStreakDays, peakDay } = summarizeDailyCounts(artistLocalTimes);
+  const artistDailySummary = summarizeDailyCounts(artistLocalTimes);
   const totalMs = targetInRangePlays.reduce((sum, p) => sum + p.msPlayed, 0);
+  const completionRate = computeCompletionRate(targetInRangePlays);
+  const tracksHeardInRange = new Set(targetInRangePlays.map((p) => p.trackId)).size;
+  const tracksHeardLifetime = new Set(targetLifetimePlays.map((p) => p.trackId)).size;
 
   return {
     kind: "artist",
@@ -1081,9 +1083,11 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     dayOfWeek: dayOfWeekHistogram(artistLocalTimes.map(({ isoDow }) => isoDow)),
     stats: {
       totalMs,
-      activeDays,
-      longestStreakDays,
-      peakDay,
+      ...artistDailySummary,
+      playShare: artistShare(inRangePlayCount, allInRangePlays.length),
+      completionRate,
+      tracksHeardInRange,
+      tracksHeardLifetime,
     },
     topTracks,
     topAlbums,

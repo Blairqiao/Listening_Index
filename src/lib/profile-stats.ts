@@ -1,19 +1,108 @@
-import type { ProfilePeakDay } from "./search-types";
+import type { ProfilePeakDay, ProfileSummaryStats } from "./search-types";
 import { SESSION_GAP_MS } from "./session-calculation";
 
 const DAY_MS = 86_400_000;
 
-export function longestStreak(days: string[]): number {
-  let longest = 0;
-  let current = 0;
-  let previous = -Infinity;
-  for (const day of [...new Set(days)].sort()) {
-    const timestamp = Date.parse(day);
-    current = timestamp - previous === DAY_MS ? current + 1 : 1;
-    longest = Math.max(longest, current);
-    previous = timestamp;
+export interface StreakRange {
+  days: number;
+  start: string | null;
+  end: string | null;
+}
+
+export function longestStreakRange(days: string[]): StreakRange {
+  const sorted = [...new Set(days)].sort();
+  if (sorted.length === 0) {
+    return { days: 0, start: null, end: null };
   }
-  return longest;
+
+  let bestDays = 0;
+  let bestStart: string | null = null;
+  let bestEnd: string | null = null;
+
+  let currentDays = 0;
+  let currentStart: string | null = null;
+  let previousTimestamp = -Infinity;
+
+  for (const day of sorted) {
+    const timestamp = Date.parse(day);
+    if (timestamp - previousTimestamp === DAY_MS) {
+      currentDays += 1;
+    } else {
+      currentDays = 1;
+      currentStart = day;
+    }
+    if (currentDays >= bestDays) {
+      bestDays = currentDays;
+      bestStart = currentStart;
+      bestEnd = day;
+    }
+    previousTimestamp = timestamp;
+  }
+
+  return { days: bestDays, start: bestStart, end: bestEnd };
+}
+
+export function longestStreak(days: string[]): number {
+  return longestStreakRange(days).days;
+}
+
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function parseUtcDate(dateStr: string): Date | null {
+  const parts = dateStr.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) return null;
+  const [year, month, day] = parts;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const timestamp = Date.UTC(year, month - 1, day);
+  const date = new Date(timestamp);
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
+export function formatStreakSentence(
+  stats: Pick<ProfileSummaryStats, "longestStreakDays" | "longestStreakStart" | "longestStreakEnd">,
+): string | null {
+  if (
+    !stats ||
+    typeof stats.longestStreakDays !== "number" ||
+    stats.longestStreakDays < 2 ||
+    !stats.longestStreakStart ||
+    !stats.longestStreakEnd
+  ) {
+    return null;
+  }
+
+  const startDate = parseUtcDate(stats.longestStreakStart);
+  const endDate = parseUtcDate(stats.longestStreakEnd);
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  const startYear = startDate.getUTCFullYear();
+  const startMonth = SHORT_MONTHS[startDate.getUTCMonth()];
+  const startDay = startDate.getUTCDate();
+
+  const endYear = endDate.getUTCFullYear();
+  const endMonth = SHORT_MONTHS[endDate.getUTCMonth()];
+  const endDay = endDate.getUTCDate();
+
+  let range: string;
+  if (startYear === endYear) {
+    if (startDate.getUTCMonth() === endDate.getUTCMonth()) {
+      range = `${startMonth} ${startDay}–${endDay}, ${startYear}`;
+    } else {
+      range = `${startMonth} ${startDay} – ${endMonth} ${endDay}, ${startYear}`;
+    }
+  } else {
+    range = `${startMonth} ${startDay}, ${startYear} – ${endMonth} ${endDay}, ${endYear}`;
+  }
+
+  return `Longest streak: ${stats.longestStreakDays} days (${range})`;
 }
 
 export function hourHistogram(hours: number[]): number[] {
