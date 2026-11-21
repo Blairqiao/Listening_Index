@@ -280,8 +280,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   return (
     <div
+      aria-busy={status === "loading" || undefined}
       className={`grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none ${
-        status === "loading" ? "opacity-60" : ""
+        status === "loading" ? "opacity-60 pointer-events-none" : ""
       }`}
     >
       <ProfileHeader
