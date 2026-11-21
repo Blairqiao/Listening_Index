@@ -182,19 +182,21 @@ test("ProfileView: Album header, Track shares, no repeated artwork, and Recent P
   assert.match(markup, /ARTIST SHARE.*?50%/);
   assert.match(markup, /TRACKS HEARD.*?8 \/ 10/);
   assert.match(markup, /FULL-ALBUM SESSIONS.*?3/);
-  assert.match(markup, /\[ MORE BY RADIOHEAD \]/);
-  assert.match(markup, /Kid A/);
+  assert.doesNotMatch(markup, /MORE BY/);
+  assert.doesNotMatch(markup, /Kid A/);
 
   const recentPlays = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ TOP TRACKS ]"));
   assert.match(recentPlays, /aria-label="Open Track profile for Weird Fishes \/ Arpeggi"/);
+  assert.match(recentPlays, /h-8/);
   assert.match(recentPlays, /5:18/);
   assert.doesNotMatch(recentPlays, /<img/);
   assert.doesNotMatch(recentPlays, />In Rainbows</);
 
-  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ MORE BY RADIOHEAD ]"));
+  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"));
   assert.doesNotMatch(topTracks, /<img/);
-  assert.match(topTracks, /md:max-h-\[220px\]/);
-  assert.match(topTracks, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
+  assert.match(topTracks, /md:h-\(--box-h\)/);
+  assert.match(topTracks, /overflow-y-auto scrollbar-hidden/);
+  assert.match(topTracks, /h-8/);
 
   assert.doesNotMatch(markup, /\[ TOP ALBUMS \]|\[ SHARE OF RADIOHEAD \]/);
 
@@ -372,8 +374,9 @@ test("ProfileView: SSR ready state for track profile with stats, duration/partia
 
   const fromAlbum = markup.slice(markup.indexOf("FROM THIS ALBUM"), markup.indexOf("OFTEN PLAYED WITH"));
   assert.doesNotMatch(fromAlbum, /<img/);
-  assert.match(fromAlbum, /md:max-h-\[220px\]/);
-  assert.match(fromAlbum, /max-md:\[&amp;&gt;\*:nth-child\(n\+5\)\]:hidden/);
+  assert.match(fromAlbum, /md:h-\(--box-h\)/);
+  assert.match(fromAlbum, /overflow-y-auto scrollbar-hidden/);
+  assert.match(fromAlbum, /h-8/);
 
   const recent = markup.slice(markup.indexOf("RECENT PLAYS"), markup.indexOf("FROM THIS ALBUM"));
   assert.doesNotMatch(recent, /<img|Weird Fishes/);
@@ -447,7 +450,9 @@ test("ProfileView: SSR loading skeleton respects pendingKind with 88px header", 
     })
   );
   assert.match(trackSkeleton, /w-\[88px\] h-\[88px\]/);
-  assert.match(trackSkeleton, /\[ TRACK STATS \]/);
+  assert.match(trackSkeleton, /\[ FROM THIS ALBUM \]/);
+  assert.match(trackSkeleton, /\[ OFTEN PLAYED WITH \]/);
+  assert.doesNotMatch(trackSkeleton, /\[ TRACK STATS \]/);
 
   const artistSkeleton = renderToStaticMarkup(
     React.createElement(ProfileView, {
@@ -460,6 +465,7 @@ test("ProfileView: SSR loading skeleton respects pendingKind with 88px header", 
   );
   assert.match(artistSkeleton, /w-\[88px\] h-\[88px\]/);
   assert.match(artistSkeleton, /\[ TOP TRACKS \]/);
+  assert.match(artistSkeleton, /\[ TOP ALBUMS \]/);
 });
 
 test("ProfileView: SSR error and not_found states", () => {
@@ -516,7 +522,7 @@ test("ActivityChart: default label is ACTIVITY and accessible semantics preserve
   assert.ok(defaultMarkup.includes("NOW"), "1d range must render NOW marker");
 });
 
-test("ProfileView hides the album section for a single ranked Track", () => {
+test("ProfileView always renders FROM THIS ALBUM for a single ranked Track with placeholder rows", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
       data: { ...mockTrackProfile, albumTracks: mockTrackProfile.albumTracks?.slice(0, 1) },
@@ -525,7 +531,9 @@ test("ProfileView hides the album section for a single ranked Track", () => {
       onOpenProfile: () => {},
     })
   );
-  assert.doesNotMatch(markup, /FROM THIS ALBUM/);
+  assert.match(markup, /\[ FROM THIS ALBUM \]/);
+  const fromAlbum = markup.slice(markup.indexOf("[ FROM THIS ALBUM ]"), markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 7);
   assert.match(markup, /\[ OVER TIME \]/);
 });
 
@@ -543,7 +551,7 @@ test("ProfileView hides the Track story sections at zero plays", () => {
   assert.doesNotMatch(markup, /LONGEST STREAK|WHEN IT PLAYS|OVER TIME|SHARE OF|FROM THIS ALBUM|RECENT PLAYS/);
 });
 
-test("ProfileView spreads Track recent plays over two columns when right column has no content", () => {
+test("ProfileView keeps two-column layout for Track even when right-column lists are empty", () => {
   const recentPlays = Array.from({ length: 6 }, (_, i) => ({
     ...mockTrackProfile.recentPlays[0],
     id: `play-${i}`,
@@ -551,20 +559,22 @@ test("ProfileView spreads Track recent plays over two columns when right column 
   }));
   const markup = renderToStaticMarkup(
     React.createElement(ProfileView, {
-      data: { ...mockTrackProfile, albumTracks: [], recentPlays },
+      data: { ...mockTrackProfile, albumTracks: [], relatedTracks: [], recentPlays },
       status: "ready",
       visitorTimezone: "UTC",
       onOpenProfile: () => {},
     })
   );
-  assert.doesNotMatch(markup, /FROM THIS ALBUM/);
-  assert.match(markup, /md:col-span-full"><div><div[^>]*><span[^>]*>\[ RECENT PLAYS \]/);
-  assert.match(markup, /md:grid-cols-2/);
-  const columns = markup.slice(markup.indexOf("md:grid-cols-2"));
-  // One date label for the day, plus a desktop-only repeat at the top of the second column.
-  assert.equal(columns.match(/>18 NOV</g)?.length, 2);
-  assert.match(columns, /hidden md:inline[^>]*>18 NOV</);
-  assert.equal(columns.match(/h-8/g)?.length, 6);
+  assert.doesNotMatch(markup, /md:grid-cols-2/);
+  const recent = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ FROM THIS ALBUM ]"));
+  assert.equal(recent.match(/>18 NOV</g)?.length ?? 0, 1);
+  assert.equal(recent.match(/data-profile-placeholder/g)?.length ?? 0, 11);
+
+  const fromAlbum = markup.slice(markup.indexOf("[ FROM THIS ALBUM ]"), markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.equal(fromAlbum.match(/data-profile-placeholder/g)?.length ?? 0, 8);
+
+  const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 8);
 });
 
 test("ProfileHeader: Artist markup contains PLAYS, RANK, LISTENING TIME, ACTIVE DAYS, PLAY SHARE, TRACKS HEARD, COMPLETION and no PEAK DAY", () => {
@@ -744,4 +754,166 @@ test("ProfileHeader: FIRST PLAY subline is present with formatted dates in visit
   );
 
   assert.match(markup, /FIRST PLAY 15 JAN 2024 · LAST 18 NOV 2024/);
+});
+
+test("ProfileBox: Artist with 1 top Track renders 4 placeholders in TOP TRACKS", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        topTracks: mockArtistProfile.topTracks.slice(0, 1),
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ TOP ALBUMS ]"));
+  assert.equal(topTracks.match(/data-profile-placeholder/g)?.length ?? 0, 4);
+  assert.match(topTracks, /--box-h:275px/);
+
+  const topAlbums = markup.slice(markup.indexOf("[ TOP ALBUMS ]"));
+  assert.equal(topAlbums.match(/data-profile-placeholder/g)?.length ?? 0, 3);
+  assert.match(topAlbums, /--box-h:220px/);
+});
+
+test("ProfileBox: Album with 3 top Tracks renders 14 placeholders in TOP TRACKS and no MORE BY", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockAlbumProfile,
+        topTracks: [
+          ...mockAlbumProfile.topTracks,
+          { id: "track-3", name: "Nude", plays: 8, albumImageUrl: null },
+        ],
+        moreAlbums: [
+          { key: "kid-a-key", name: "Kid A", plays: 31, imageUrl: null },
+        ],
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.doesNotMatch(markup, /MORE BY/);
+  const topTracks = markup.slice(markup.indexOf("[ TOP TRACKS ]"));
+  assert.equal(topTracks.match(/data-profile-placeholder/g)?.length ?? 0, 14);
+  assert.match(topTracks, /--box-h:544px/);
+});
+
+test("ProfileBox: Track with empty relatedTracks renders [ OFTEN PLAYED WITH ] and 8 placeholders", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockTrackProfile,
+        relatedTracks: [],
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  assert.match(markup, /\[ OFTEN PLAYED WITH \]/);
+  const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 8);
+  assert.match(related, /--box-h:256px/);
+});
+
+test("ProfileView: Artist recent plays show day label inside first row of each day without separate day-group headers", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        recentPlays: [
+          {
+            ...mockArtistProfile.recentPlays[0],
+            id: "play-1",
+            playedAt: "2024-11-18T18:30:00.000Z",
+            title: "Weird Fishes / Arpeggi",
+          },
+          {
+            ...mockArtistProfile.recentPlays[0],
+            id: "play-2",
+            playedAt: "2024-11-18T17:15:00.000Z",
+            title: "Reckoner",
+          },
+          {
+            ...mockArtistProfile.recentPlays[0],
+            id: "play-3",
+            playedAt: "2024-11-17T21:00:00.000Z",
+            title: "Nude",
+          },
+        ],
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  const recent = markup.slice(markup.indexOf("[ RECENT PLAYS ]"), markup.indexOf("[ TOP TRACKS ]"));
+  assert.doesNotMatch(recent, /border-\[#1C1C1A\]/);
+  assert.match(recent, /<button[^>]*aria-label="Open Track profile for Weird Fishes \/ Arpeggi"[^>]*>(?:(?!<\/button>).)*>18 NOV<(?:(?!<\/button>).)*>18:30</);
+  const reckonerButton = recent.match(/<button[^>]*aria-label="Open Track profile for Reckoner"[^>]*>.*?<\/button>/)?.[0] ?? "";
+  assert.ok(reckonerButton.length > 0);
+  assert.doesNotMatch(reckonerButton, /18 NOV/);
+  assert.match(reckonerButton, /17:15/);
+  assert.match(recent, /<button[^>]*aria-label="Open Track profile for Nude"[^>]*>(?:(?!<\/button>).)*>17 NOV<(?:(?!<\/button>).)*>21:00</);
+  assert.equal(recent.match(/data-profile-placeholder/g)?.length ?? 0, 7);
+});
+
+test("ProfileBox: mobileLimit collapses extra rows with static selector and renders SHOW ALL toggle", () => {
+  const topTracks = Array.from({ length: 6 }, (_, i) => ({
+    id: `track-${i + 1}`,
+    name: `Track ${i + 1}`,
+    plays: 20 - i,
+    albumImageUrl: null,
+  }));
+
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockArtistProfile,
+        topTracks,
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  const topTracksSection = markup.slice(markup.indexOf("[ TOP TRACKS ]"), markup.indexOf("[ TOP ALBUMS ]"));
+  assert.match(topTracksSection, /max-md:\[&amp;&gt;\[data-mobile-collapsed\]\]:hidden/);
+  assert.equal(topTracksSection.match(/data-mobile-collapsed="true"/g)?.length ?? 0, 2);
+  assert.match(topTracksSection, /SHOW ALL 6/);
+});
+
+test("ProfileView: Track renders all relatedTracks without slice(0, 4) cap", () => {
+  const relatedTracks = Array.from({ length: 6 }, (_, i) => ({
+    id: `rel-${i + 1}`,
+    name: `Related ${i + 1}`,
+    artist: "Radiohead",
+    albumImageUrl: null,
+    coPlays: 10 - i,
+  }));
+
+  const markup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: {
+        ...mockTrackProfile,
+        relatedTracks,
+      },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  const related = markup.slice(markup.indexOf("[ OFTEN PLAYED WITH ]"));
+  assert.match(related, /Related 5/);
+  assert.match(related, /Related 6/);
+  assert.equal(related.match(/data-profile-placeholder/g)?.length ?? 0, 2);
 });
