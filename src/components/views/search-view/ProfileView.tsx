@@ -108,7 +108,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               )}
             </div>
           </div>
-          <div className="mt-3 md:mt-4 flex flex-wrap gap-x-6 md:gap-x-8 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3">
+          <div className="mt-3 md:mt-4 flex flex-wrap md:justify-between gap-x-6 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3">
             {Array.from({ length: 8 }).map((_, idx) => (
               <div key={idx} className="flex flex-col gap-1">
                 <div className="h-2.5 w-12 bg-[#141413] rounded animate-pulse" />

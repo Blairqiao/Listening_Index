@@ -760,6 +760,7 @@ test("ProfileHeader: FIRST PLAY subline is present with formatted dates in visit
   const statsRow = markup.slice(statsStart, markup.indexOf("[ OVER TIME ]"));
   assert.match(statsRow, /PLAYS.*RANK.*LISTENING TIME.*ACTIVE DAYS.*FIRST PLAY<\/span><span[^>]*>15 JAN 2024<\/span>.*LAST PLAY<\/span><span[^>]*>18 NOV 2024<\/span>/);
   assert.doesNotMatch(markup, /grid-cols-4/);
+  assert.match(markup, /data-profile-stats="" class="[^"]*\bflex-wrap\b[^"]*\bmd:justify-between\b/);
 });
 
 test("ProfileBox: Artist with 1 top Track renders 4 placeholders in TOP TRACKS", () => {
