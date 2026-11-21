@@ -261,9 +261,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none shrink-0">
           <div className="flex items-center gap-2">
-            <Upload className="w-3.5 h-3.5 text-music-accent" />
-            <h2 className="font-mono text-[12px] uppercase tracking-[0.14em] text-[#EDEDE8]">
-              IMPORT SPOTIFY STREAMING HISTORY
+            <Upload className="w-4 h-4 text-music-accent" />
+            <h2 className="font-mono text-[13px] text-[#EDEDE8]">
+              Import Spotify streaming history
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 sm:p-6 space-y-5 font-mono text-[11px] overflow-y-auto overscroll-contain scrollbar-hidden">
+        <div className="p-5 sm:p-6 space-y-5 font-mono text-[12px] overflow-y-auto overscroll-contain scrollbar-hidden">
           {/* Always-Visible Database Enrichment Status Bar */}
           {isDbConfigured && enrichmentProgress && (
             <CatalogEnrichmentCard progress={enrichmentProgress} />
@@ -289,11 +289,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           {!isDbConfigured ? (
             /* Locked Gate State */
             <div className="border border-[#3A2222] bg-[#140D0D] p-4 text-[#FF7A7A] space-y-2">
-              <div className="flex items-center gap-2 font-bold uppercase tracking-[0.08em]">
+              <div className="flex items-center gap-2 font-bold">
                 <AlertTriangle className="w-4 h-4" />
                 <span>Database Not Configured</span>
               </div>
-              <p className="text-[11px] text-[#D49A9A] leading-relaxed">
+              <p className="text-[12px] text-[#D49A9A] leading-relaxed">
                 A connected PostgreSQL database (<code className="text-[#FFC4C4]">DATABASE_URL</code>) is
                 required to store your streaming history.
               </p>
@@ -311,20 +311,20 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <Loader2 className="w-5 h-5 text-music-accent animate-spin flex-none" />
                 <div className="space-y-1 overflow-hidden">
                   <div className="flex items-center gap-2">
-                    <span className="text-music-accent font-bold tracking-[0.08em]">
+                    <span className="text-music-accent font-bold">
                       {step === "inspecting"
                         ? "Decompressing archive..."
                         : "Ingesting plays into database..."}
                     </span>
                   </div>
-                  <p className="text-[#A8A8A2] text-[11px] truncate">{statusMessage}</p>
+                  <p className="text-[#A8A8A2] text-[12px] truncate">{statusMessage}</p>
                 </div>
               </div>
 
               {/* Ingestion Progress Bar */}
               <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] text-[#6A6A64]">
-                  <span>RAW INGESTION (QUALIFIED &ge; 30S)</span>
+                <div className="flex justify-between text-[11px] text-[#6A6A64]">
+                  <span>Raw ingestion (qualified &ge; 30s)</span>
                   <span>
                     {stage1Total > 0
                       ? `${Math.round((stage1Current / stage1Total) * 100)}% (${stage1Current}/${stage1Total})`
@@ -344,33 +344,33 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           ) : step === "completed" ? (
             /* Completed State */
             <div className="space-y-4 py-2">
-              <div className="flex items-center gap-2.5 text-music-accent font-bold uppercase tracking-[0.08em]">
+              <div className="flex items-center gap-2.5 text-music-accent font-bold">
                 <Check className="w-5 h-5" />
                 <span>Upload Successful</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[11px]">
+              <div className="grid grid-cols-3 gap-2 border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[12px]">
                 <div>
-                  <span className="text-[#6A6A64] block text-[10px]">QUALIFIED PLAYS</span>
+                  <span className="text-[#6A6A64] block text-[11px]">Qualified plays</span>
                   <span className="text-[#EDEDE8] font-bold text-[14px]">
                     {summary.totalPlays.toLocaleString()}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#6A6A64] block text-[10px]">NEW PLAYS ADDED</span>
+                  <span className="text-[#6A6A64] block text-[11px]">New plays added</span>
                   <span className="text-music-accent font-bold text-[14px]">
                     {summary.newPlays.toLocaleString()}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#6A6A64] block text-[10px]">DUPLICATES SKIPPED</span>
+                  <span className="text-[#6A6A64] block text-[11px]">Duplicates skipped</span>
                   <span className="text-[#A8A8A2] font-bold text-[14px]">
                     {Math.max(0, summary.totalPlays - summary.newPlays).toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <p className="text-[#A8A8A2] text-[11px] leading-relaxed">
+              <p className="text-[#A8A8A2] text-[12px] leading-relaxed">
                 All qualified stream events are saved in your database and immediately active on your dashboard.
                 Album artwork and track metadata will enrich automatically in the background and as you browse.
               </p>
@@ -383,7 +383,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold uppercase tracking-[0.08em] hover:opacity-90 transition-opacity cursor-pointer"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold hover:opacity-90 transition-opacity cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   <span>View Dashboard</span>
@@ -393,17 +393,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           ) : (
             /* Error State */
             <div className="space-y-3 py-2">
-              <div className="flex items-center gap-2 text-[#FF7A7A] font-bold uppercase tracking-[0.08em]">
+              <div className="flex items-center gap-2 text-[#FF7A7A] font-bold">
                 <AlertTriangle className="w-5 h-5" />
                 <span>Upload Failed</span>
               </div>
-              <div className="border border-[#3A2222] bg-[#140D0D] p-3 text-[#FFB3B3] text-[11px] break-words">
+              <div className="border border-[#3A2222] bg-[#140D0D] p-3 text-[#FFB3B3] text-[12px] break-words">
                 {errorMessage}
               </div>
               <button
                 type="button"
                 onClick={handleReset}
-                className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors uppercase tracking-[0.08em] cursor-pointer"
+                className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors cursor-pointer"
               >
                 Try Again
               </button>

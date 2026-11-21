@@ -32,6 +32,6 @@ test('ControlRow shows the placeholder scope label while the Overview has no sta
       sessionTagTime: '--',
     })
   );
-  assert.ok(markup.includes('SINCE --'));
+  assert.ok(markup.includes('Since --'));
   assert.ok(!markup.includes('Invalid Date') && !markup.includes('NaN'));
 });

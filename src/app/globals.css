@@ -2,8 +2,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-space-grotesk), "Space Grotesk", "PingFang SC", "Noto Sans SC", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-display: var(--font-ibm-plex-mono), "IBM Plex Mono", "PingFang SC", "Noto Sans SC", monospace;
+  --font-sans: var(--font-spline-sans-mono), "Spline Sans Mono", "PingFang SC", "Noto Sans SC", monospace;
+  --font-mono: var(--font-spline-sans-mono), "Spline Sans Mono", "PingFang SC", "Noto Sans SC", monospace;
 
   --color-music-accent: var(--music-accent);
 }
@@ -25,7 +26,6 @@ body {
   overflow-x: hidden;
   background-color: #080808;
   color: #EDEDE8;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: none;

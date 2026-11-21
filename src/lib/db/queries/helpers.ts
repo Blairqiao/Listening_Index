@@ -73,10 +73,10 @@ export function formatDayGroupTz(date: Date, tz = DEFAULT_TIMEZONE): string {
       month: "short",
     }).formatToParts(date);
     const day = parts.find((p) => p.type === "day")?.value || "";
-    const month = parts.find((p) => p.type === "month")?.value.toUpperCase() || "";
+    const month = parts.find((p) => p.type === "month")?.value || "";
     return `${day} ${month}`;
   } catch {
-    return date.toISOString().slice(5, 10).toUpperCase();
+    return date.toISOString().slice(5, 10);
   }
 }
 
@@ -89,24 +89,24 @@ export function formatLogStartDate(date: Date, tz = DEFAULT_TIMEZONE): string {
       year: "numeric",
     }).formatToParts(date);
     const day = parts.find((p) => p.type === "day")?.value || "";
-    const month = parts.find((p) => p.type === "month")?.value.toUpperCase() || "";
+    const month = parts.find((p) => p.type === "month")?.value || "";
     const year = parts.find((p) => p.type === "year")?.value || "";
     return `${day} ${month} ${year}`;
   } catch {
-    return date.toISOString().slice(0, 10).toUpperCase();
+    return date.toISOString().slice(0, 10);
   }
 }
 
 export function formatSessionAge(ageMs: number): string {
   const ageMins = Math.max(1, Math.round(ageMs / 60000));
   if (ageMins < 60) {
-    return `${ageMins}M`;
+    return `${ageMins}m`;
   }
   const ageHours = Math.floor(ageMins / 60);
   if (ageHours < 24) {
-    return `${ageHours}H`;
+    return `${ageHours}h`;
   }
   const ageDays = Math.floor(ageHours / 24);
-  return `${ageDays}D`;
+  return `${ageDays}d`;
 }
 

@@ -1,5 +1,14 @@
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
+import {
+  DEFAULT_SEARCH_FILTER,
+  DEFAULT_SEARCH_SORT,
+  type ProfileData,
+  type ProfileTarget,
+  type SearchFilter,
+  type SearchSort,
+} from "@/lib/search-types";
+import { formatLogStartDate } from "@/lib/db/queries/helpers";
 import { formatRankDisplay, formatPlaysDisplay } from "@/lib/format-utils";
 
 /** Every Overview range, active first so the visible view refreshes before the rest. */
@@ -82,18 +91,18 @@ export function computeLivePlayerMetrics(
 
 /** Human-readable time since the last sync, as shown in the footer. */
 export function computeSyncedAgo(date: Date | null, now = Date.now()): string {
-  if (!date) return "JUST NOW";
+  if (!date) return "Just now";
   const diffMs = now - date.getTime();
-  if (diffMs < 0) return "JUST NOW";
+  if (diffMs < 0) return "Just now";
   const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 45) return "JUST NOW";
+  if (diffSec < 45) return "Just now";
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin === 1) return "1M AGO";
-  if (diffMin < 60) return `${diffMin}M AGO`;
+  if (diffMin === 1) return "1m ago";
+  if (diffMin < 60) return `${diffMin}m ago`;
   const diffHours = Math.floor(diffMin / 60);
-  if (diffHours === 1) return "1H AGO";
-  if (diffHours < 24) return `${diffHours}H AGO`;
-  return `${Math.floor(diffHours / 24)}D AGO`;
+  if (diffHours === 1) return "1h ago";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${Math.floor(diffHours / 24)}d ago`;
 }
 
 /** Rows in one Stream Log page; also the depth of a head refresh. */
@@ -204,3 +213,125 @@ export const EMPTY_STREAM_LOG: StreamLogData = {
   metrics: ["--", "--", "--", "--"],
   entries: [],
 };
+
+export type ProfileStatus = "loading" | "ready" | "not_found" | "error";
+
+export function getProfileCacheKey(
+  target: ProfileTarget,
+  range: RangeKey,
+  visitorTimezone: string
+): string {
+  return `${target.kind}:${range}:${visitorTimezone}:${target.key}`;
+}
+
+export function resolveDisplayedProfileData(
+  data: ProfileData | null,
+  target: ProfileTarget | null
+): ProfileData | null {
+  if (!data || !target) return null;
+  if (data.kind !== target.kind || data.key !== target.key) return null;
+  return data;
+}
+
+export function formatProfileRibbonMetrics(
+  data: ProfileData | null,
+  status: ProfileStatus,
+  target: ProfileTarget | null,
+  range: RangeKey,
+  visitorTimezone: string,
+  rankFormat: "rank" | "percentile" = "rank",
+): [string, string, string, string] {
+  if (
+    (status !== "ready" && status !== "loading") ||
+    !data ||
+    !target ||
+    data.kind !== target.kind ||
+    data.key !== target.key ||
+    (status === "ready" && data.range !== range)
+  ) {
+    return ["--", "--", "--", "--"];
+  }
+
+  const plays = data.plays.toLocaleString();
+  const rank =
+    data.rank !== null && data.rank > 0
+      ? formatRankDisplay(data.rank, data.rankedTotal, rankFormat)
+      : "--";
+
+  const formatDate = (iso: string | null): string => {
+    if (!iso) return "--";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "--";
+    return formatLogStartDate(d, visitorTimezone);
+  };
+
+  return [plays, rank, formatDate(data.firstPlayedAt), formatDate(data.lastPlayedAt)];
+}
+
+export function buildListeningUrlSearch(
+  currentSearch: string,
+  state: {
+    activeMode: Mode;
+    profileTarget: ProfileTarget | null;
+    profileRange: RangeKey;
+    search?: {
+      query: string;
+      filter: SearchFilter;
+      sort: SearchSort;
+      page: number;
+    };
+  }
+): string {
+  const raw = currentSearch.startsWith("?") ? currentSearch.slice(1) : currentSearch;
+  const params = new URLSearchParams(raw);
+  const target = state.activeMode === 4 ? state.profileTarget : null;
+
+  for (const kind of ["track", "artist", "album"]) {
+    if (kind !== target?.kind) params.delete(kind);
+  }
+
+  if (state.activeMode === 4) {
+    params.set("mode", "4");
+  } else if (params.get("mode") === "4") {
+    params.delete("mode");
+  }
+
+  if (target) {
+    params.set(target.kind, target.key);
+    params.set("prange", state.profileRange);
+  } else {
+    params.delete("prange");
+  }
+
+  if (state.activeMode === 4 && !target && state.search) {
+    const trimmedQuery = state.search.query.trim();
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+    } else {
+      params.delete("q");
+    }
+    if (state.search.filter !== DEFAULT_SEARCH_FILTER) {
+      params.set("type", state.search.filter);
+    } else {
+      params.delete("type");
+    }
+    if (state.search.sort !== DEFAULT_SEARCH_SORT) {
+      params.set("sort", state.search.sort);
+    } else {
+      params.delete("sort");
+    }
+    if (state.search.page > 1) {
+      params.set("page", String(state.search.page));
+    } else {
+      params.delete("page");
+    }
+  } else {
+    params.delete("q");
+    params.delete("type");
+    params.delete("sort");
+    params.delete("page");
+  }
+
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}

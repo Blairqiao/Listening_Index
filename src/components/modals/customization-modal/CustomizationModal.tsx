@@ -219,12 +219,12 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <Menu className="w-3.5 h-3.5 text-music-accent" />
+            <Menu className="w-4 h-4 text-music-accent" />
             <h2
               id="customization-modal-title"
-              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
+              className="font-mono text-[13px] text-[#EDEDE8] whitespace-nowrap"
             >
-              {isAuthenticated ? "ACTIVE CONFIGURATION" : "APPEARANCE"}
+              {isAuthenticated ? "Active configuration" : "Appearance"}
             </h2>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -245,15 +245,15 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
           {isAuthenticated && (
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-                <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  IDENTITY
+                <span className="font-mono text-[11px] text-[#8A8A82]">
+                  Identity
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1">
-                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                    SITE TITLE
+                  <label className="block font-mono text-[11px] text-[#6A6A64]">
+                    Site title
                   </label>
                   <input
                     type="text"
@@ -265,14 +265,14 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                    DISPLAY NAME
+                  <label className="block font-mono text-[11px] text-[#6A6A64]">
+                    Display name
                   </label>
                   <input
                     type="text"
                     value={draft.ownerName}
                     onChange={(e) => setDraft({ ...draft, ownerName: e.target.value })}
-                    placeholder="YOUR NAME"
+                    placeholder="Your name"
                     className="w-full bg-[#141413] border border-[#26261F] text-[#EDEDE8] font-sans text-[13px] px-3 py-1.5 focus:border-music-accent focus:outline-none"
                   />
                 </div>
@@ -283,8 +283,8 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
           {/* Section 2: Accent Color (Photo-App Color Picker) */}
           <div className="space-y-3">
             <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-              <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                ACCENT COLOR
+              <span className="font-mono text-[11px] text-[#8A8A82]">
+                Accent color
               </span>
             </div>
 
@@ -295,15 +295,15 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
           {isAuthenticated && (
             <div className="space-y-3">
               <div className="flex items-baseline justify-between border-b border-[#1F1F1C] pb-1.5">
-                <span className="font-mono text-[10px] tracking-[0.16em] text-[#8A8A82] uppercase">
-                  LINKS
+                <span className="font-mono text-[11px] text-[#8A8A82]">
+                  Links
                 </span>
               </div>
 
               <div className="space-y-2.5">
                 <div className="space-y-1">
-                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                    SPOTIFY OR PROFILE URL
+                  <label className="block font-mono text-[11px] text-[#6A6A64]">
+                    Spotify or profile URL
                   </label>
                   <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
                     <input
@@ -311,7 +311,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       value={draft.siteUrl}
                       onChange={(e) => setDraft({ ...draft, siteUrl: e.target.value })}
                       placeholder="https://open.spotify.com/..."
-                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
+                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[13px] focus:outline-none"
                     />
                     <a
                       href={draft.siteUrl}
@@ -319,14 +319,14 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       rel="noopener noreferrer"
                       className="text-[#6A6A64] hover:text-music-accent ml-2"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64] uppercase">
-                    GITHUB REPOSITORY URL
+                  <label className="block font-mono text-[11px] text-[#6A6A64]">
+                    GitHub repository URL
                   </label>
                   <div className="flex items-center bg-[#141413] border border-[#26261F] px-2.5 py-1.5 focus-within:border-music-accent">
                     <input
@@ -334,7 +334,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       value={draft.githubUrl}
                       onChange={(e) => setDraft({ ...draft, githubUrl: e.target.value })}
                       placeholder="https://github.com/..."
-                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] focus:outline-none"
+                      className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[13px] focus:outline-none"
                     />
                     <a
                       href={draft.githubUrl}
@@ -342,7 +342,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                       rel="noopener noreferrer"
                       className="text-[#6A6A64] hover:text-music-accent ml-2"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-4 h-4" />
                     </a>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleResetColor}
                   title={`Reset color to deployed default (${deployedConfig.accentColor})`}
-                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Reset Color</span>
@@ -371,7 +371,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="font-mono text-[11px] tracking-[0.08em] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
+                  className="font-mono text-[12px] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
                 >
                   <span>Save Locally</span>
                 </button>
@@ -384,7 +384,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleReset}
                   title="Revert all settings to defaults from src/config.ts"
-                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span className="sm:hidden">Reset</span>
@@ -395,16 +395,16 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleCopyCode}
                   title="Copy code snippet to paste into src/config.ts"
-                  className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.08em] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
                 >
                   {copiedCode ? (
                     <>
-                      <Check className="w-3 h-3 text-music-accent" />
+                      <Check className="w-3.5 h-3.5 text-music-accent" />
                       <span className="text-music-accent">Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3 h-3" />
+                      <Copy className="w-3.5 h-3.5" />
                       <span className="sm:hidden">Copy</span>
                       <span className="hidden sm:inline">Copy config.ts</span>
                     </>
@@ -417,7 +417,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving || !canSave}
-                  className={`font-mono text-[11px] tracking-[0.08em] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${isSaving
+                  className={`font-mono text-[12px] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${isSaving
                       ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
                       : saveError
                         ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
@@ -445,7 +445,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                     </span>
                   ) : (
                     <>
-                      <Check className="w-3.5 h-3.5 text-music-accent" />
+                      <Check className="w-4 h-4 text-music-accent" />
                       <span>
                         {isDbConfigured
                           ? "Deployed"

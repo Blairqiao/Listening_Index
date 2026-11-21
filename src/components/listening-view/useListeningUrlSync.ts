@@ -39,7 +39,7 @@ export function useListeningUrlSync({
 
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    if (m === "0" || m === "1" || m === "2" || m === "3") {
+    if (m === "0" || m === "1" || m === "2" || m === "3" || m === "4") {
       const requested = parseInt(m, 10) as Mode;
       pendingLivePlayerRef.current = requested === 3 && !isAuthenticated;
       setActiveMode(sanitizeActiveMode(requested, isAuthenticated));

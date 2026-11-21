@@ -222,7 +222,7 @@ export const MOCK_DATA: MockListeningData = {
       }),
     },
     "6m": {
-      logStartDate: "09 MAR 2026",
+      logStartDate: "09 Mar 2026",
       rawMetrics: {
         totalMs: 2526000000,
         trackCount: 1890,
@@ -257,7 +257,7 @@ export const MOCK_DATA: MockListeningData = {
           const monthAbbr = new Intl.DateTimeFormat("en-US", {
             timeZone: "UTC",
             month: "short",
-          }).format(weekStart).toUpperCase();
+          }).format(weekStart);
 
           const isNewMonth = monthAbbr !== lastMonth;
           if (isNewMonth) lastMonth = monthAbbr;
@@ -298,18 +298,18 @@ export const MOCK_DATA: MockListeningData = {
         { rank: "05", name: "Abbey Road", artist: "The Beatles", id: "0ETFjACtuP2ADo6LFhL6HN", artistId: "3WrFJ7ztbogyGnTHbHJFl2", count: 960 },
       ],
       activityCadence: [
-        { month: 9, year: 2025, name: "OCT" },
-        { month: 10, year: 2025, name: "NOV" },
-        { month: 11, year: 2025, name: "DEC" },
-        { month: 0, year: 2026, name: "JAN" },
-        { month: 1, year: 2026, name: "FEB" },
-        { month: 2, year: 2026, name: "MAR" },
-        { month: 3, year: 2026, name: "APR" },
-        { month: 4, year: 2026, name: "MAY" },
-        { month: 5, year: 2026, name: "JUN" },
-        { month: 6, year: 2026, name: "JUL" },
-        { month: 7, year: 2026, name: "AUG" },
-        { month: 8, year: 2026, name: "SEP" },
+        { month: 9, year: 2025, name: "OLCT" },
+        { month: 10, year: 2025, name: "NLOV" },
+        { month: 11, year: 2025, name: "DLEC" },
+        { month: 0, year: 2026, name: "JLAN" },
+        { month: 1, year: 2026, name: "FLEB" },
+        { month: 2, year: 2026, name: "MLAR" },
+        { month: 3, year: 2026, name: "ALPR" },
+        { month: 4, year: 2026, name: "MLAY" },
+        { month: 5, year: 2026, name: "JLUN" },
+        { month: 6, year: 2026, name: "JLUL" },
+        { month: 7, year: 2026, name: "ALUG" },
+        { month: 8, year: 2026, name: "SLEP" },
       ].map((item, i) => ({
         date: item.name,
         startTime: new Date(Date.UTC(item.year, item.month, 1, 0, 0, 0, 0)).toISOString(),

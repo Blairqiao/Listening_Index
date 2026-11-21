@@ -53,6 +53,24 @@ export async function migrateSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS duration_ms INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS enrichment_status TEXT NOT NULL DEFAULT 'pending';
 
+    -- Search columns: NFKD, strip combining marks, lowercase. Postgres fills them on write.
+    -- PG18 defaults generated columns to VIRTUAL, so STORED is explicit.
+    ALTER TABLE tracks
+      ADD COLUMN IF NOT EXISTS name_search TEXT
+        GENERATED ALWAYS AS (lower(regexp_replace(normalize(name, NFKD), '[̀-ͯ]', '', 'g'))) STORED,
+      ADD COLUMN IF NOT EXISTS artist_name_search TEXT
+        GENERATED ALWAYS AS (lower(regexp_replace(normalize(artist_name, NFKD), '[̀-ͯ]', '', 'g'))) STORED,
+      ADD COLUMN IF NOT EXISTS album_name_search TEXT
+        GENERATED ALWAYS AS (lower(regexp_replace(normalize(album_name, NFKD), '[̀-ͯ]', '', 'g'))) STORED;
+
+    ALTER TABLE artists
+      ADD COLUMN IF NOT EXISTS name_search TEXT
+        GENERATED ALWAYS AS (lower(regexp_replace(normalize(name, NFKD), '[̀-ͯ]', '', 'g'))) STORED;
+
+    ALTER TABLE albums
+      ADD COLUMN IF NOT EXISTS name_search TEXT
+        GENERATED ALWAYS AS (lower(regexp_replace(normalize(name, NFKD), '[̀-ͯ]', '', 'g'))) STORED;
+
     -- 2. Plays Ledger
     CREATE TABLE IF NOT EXISTS plays (
       id BIGSERIAL PRIMARY KEY,

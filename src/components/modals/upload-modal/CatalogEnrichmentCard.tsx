@@ -23,10 +23,10 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
 
   return (
     <div className="border border-[#1C1C1A] bg-[#0E0E0D] p-3.5 space-y-2">
-      <div className="flex items-center justify-between text-[10px]">
-        <span className="text-[#6A6A64] uppercase tracking-[0.08em] flex items-center gap-1.5 font-bold">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-[#6A6A64] flex items-center gap-1.5 font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-music-accent" />
-          DATABASE ENRICHMENT STATUS
+          Database enrichment status
         </span>
         <span className="text-[#EDEDE8] font-bold">
           {percentage}%{" "}
@@ -44,12 +44,12 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
         />
       </div>
 
-      <div className="flex items-center justify-between text-[9.5px] text-[#6A6A64]">
+      <div className="flex items-center justify-between text-[10.5px] text-[#6A6A64]">
         <span>
-          ENRICHED: <strong className="text-[#EDEDE8]">{progress.enriched.toLocaleString()}</strong>
+          Enriched: <strong className="text-[#EDEDE8]">{progress.enriched.toLocaleString()}</strong>
         </span>
         <span>
-          STILL NEEDS ENRICHMENT: <strong className="text-amber-500">{progress.pending.toLocaleString()}</strong>
+          Still needs enrichment: <strong className="text-amber-500">{progress.pending.toLocaleString()}</strong>
         </span>
       </div>
     </div>

@@ -29,7 +29,7 @@ export function useListeningSync({
 }: UseListeningSyncParams) {
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncedAgoStr, setSyncedAgoStr] = useState<string>("JUST NOW");
+  const [syncedAgoStr, setSyncedAgoStr] = useState<string>("Just now");
 
   // Recalculate the elapsed-time label every 10 seconds
   useEffect(() => {
@@ -55,7 +55,7 @@ export function useListeningSync({
       if (res.ok && syncData?.success === true) {
         setSyncError(null);
         setLastSyncedAt(syncData.syncedAt ? new Date(syncData.syncedAt) : new Date());
-        setSyncedAgoStr("JUST NOW");
+        setSyncedAgoStr("Just now");
 
         // Existing views stay visible (dimmed) until each range's fresh,
         // enrichment-patched response replaces it.

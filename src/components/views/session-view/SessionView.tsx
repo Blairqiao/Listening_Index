@@ -109,11 +109,11 @@ export const SessionView: React.FC<SessionViewProps> = ({
         {/* Left Column: Track list */}
         <div className="min-w-0">
           <div className="flex justify-between items-baseline mb-2 select-none">
-            <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-              {isOpen ? "[ CURRENT SESSION ]" : "[ LAST SESSION ]"}
+            <span className="font-mono text-[12px] text-[#5A5A55]">
+              {isOpen ? "Current session" : "Last session"}
             </span>
-            <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] uppercase">
-              {activeTracks.length} {activeTracks.length === 1 ? "TRACK" : "TRACKS"}
+            <span className="font-mono text-[12px] text-[#5A5A55]">
+              {activeTracks.length} {activeTracks.length === 1 ? "track" : "tracks"}
             </span>
           </div>
 
@@ -150,12 +150,12 @@ export const SessionView: React.FC<SessionViewProps> = ({
                   className="group flex items-center gap-2.5 px-1 h-[54px] md:h-[55px] border-b border-[#191917] hover:bg-[#111110] transition-none cursor-pointer"
                 >
                   {/* 1. Timestamp (44px, mono 11px, #5A5A55) */}
-                  <span className="font-mono text-[11px] text-[#5A5A55] tabular-nums select-none truncate w-[44px] flex-none">
+                  <span className="font-mono text-[12px] text-[#5A5A55] tabular-nums select-none truncate w-[44px] flex-none">
                     {track.timestamp}
                   </span>
 
                   {/* 2. First-Play Marker (14px, text-music-accent '+', or empty) */}
-                  <span className="w-[14px] text-center font-mono text-[11px] text-music-accent select-none flex-none">
+                  <span className="w-[14px] text-center font-mono text-[12px] text-music-accent select-none flex-none">
                     {track.isFirstPlay ? "+" : ""}
                   </span>
 
@@ -178,7 +178,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                     >
                       {track.title}
                     </a>
-                    <div className="font-mono text-[11.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+                    <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
                       <a
                         href={artistHref}
                         target="_blank"
@@ -210,7 +210,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                   </div>
 
                   {/* 5. Duration (mono 11px #8A8A83, right-aligned) */}
-                  <span className="font-mono text-[11px] text-[#8A8A83] text-right tabular-nums select-none flex-none w-[40px]">
+                  <span className="font-mono text-[12px] text-[#8A8A83] text-right tabular-nums select-none flex-none w-[40px]">
                     {track.duration || "--:--"}
                   </span>
                 </div>
@@ -231,9 +231,9 @@ export const SessionView: React.FC<SessionViewProps> = ({
             <button
               type="button"
               onClick={() => setIsTracksExpanded((prev) => !prev)}
-              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
             >
-              {isTracksExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${activeTracks.length} TRACKS ⌄`}
+              {isTracksExpanded ? "Show less ⌃" : `Show all ${activeTracks.length} tracks ⌄`}
             </button>
           )}
         </div>
@@ -245,8 +245,8 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
           {/* Previous Sessions Panel */}
           <div>
-            <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] block mb-2 select-none">
-              [ PREVIOUS SESSIONS ]
+            <span className="font-mono text-[12px] text-[#5A5A55] block mb-2 select-none">
+              Previous sessions
             </span>
 
             <div
@@ -278,7 +278,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                       }`}
                   >
                     {/* Date (mono 11px, #4A4A46) */}
-                    <span className="font-mono text-[11px] text-[#4A4A46] tabular-nums select-none">
+                    <span className="font-mono text-[12px] text-[#4A4A46] tabular-nums select-none">
                       {sessionItem.dateStr}
                     </span>
 
@@ -291,7 +291,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                     </span>
 
                     {/* Count (mono 11px #8A8A83, right-aligned) */}
-                    <span className="font-mono text-[11px] text-[#8A8A83] text-right tabular-nums select-none">
+                    <span className="font-mono text-[12px] text-[#8A8A83] text-right tabular-nums select-none">
                       {rawCount}
                     </span>
                   </div>
@@ -303,9 +303,9 @@ export const SessionView: React.FC<SessionViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSessionsExpanded((prev) => !prev)}
-                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[10px] tracking-[0.12em] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
               >
-                {isSessionsExpanded ? "SHOW LESS ⌃" : `SHOW ALL ${sessionList.length} SESSIONS ⌄`}
+                {isSessionsExpanded ? "Show less ⌃" : `Show all ${sessionList.length} sessions ⌄`}
               </button>
             )}
           </div>

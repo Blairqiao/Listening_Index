@@ -73,3 +73,7 @@ export { getInitialMusicData } from "./initial-data";
 
 // Live Player Personal Archive Telemetry
 export { getTrackTelemetryStats, type TrackTelemetryStats } from "./track-stats";
+
+// Search & Profiles
+export { searchCatalog, getRandomProfileTarget } from "./search";
+export { getProfile } from "./profile";

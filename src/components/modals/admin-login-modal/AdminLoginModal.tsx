@@ -99,10 +99,10 @@ export const AdminLoginModal: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
           <div className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-music-accent" />
+            <Lock className="w-4 h-4 text-music-accent" />
             <h2
               id="admin-login-modal-title"
-              className="font-mono text-[12px] tracking-[0.16em] text-[#EDEDE8] uppercase whitespace-nowrap"
+              className="font-mono text-[13px] text-[#EDEDE8] whitespace-nowrap"
             >
               Admin Authentication
             </h2>
@@ -123,7 +123,7 @@ export const AdminLoginModal: React.FC = () => {
           <div className="space-y-1.5">
             <label
               htmlFor="admin-login-password"
-              className="block font-mono text-[10px] tracking-[0.1em] text-[#6A6A64]"
+              className="block font-mono text-[11px] text-[#6A6A64]"
             >
               Master Password
             </label>
@@ -138,7 +138,7 @@ export const AdminLoginModal: React.FC = () => {
                   if (authError) setAuthError(null);
                 }}
                 placeholder="Enter admin password..."
-                className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[12px] px-3 py-2 focus:outline-none placeholder:text-[#52524C]"
+                className="w-full bg-transparent border-0 text-[#EDEDE8] font-mono text-[13px] px-3 py-2 focus:outline-none placeholder:text-[#52524C]"
                 autoComplete="current-password"
               />
               <button
@@ -147,13 +147,13 @@ export const AdminLoginModal: React.FC = () => {
                 className="px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           {authError && (
-            <div className="font-mono text-[10px] tracking-[0.06em] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
+            <div className="font-mono text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 px-3 py-1.5">
               {authError}
             </div>
           )}
@@ -162,11 +162,11 @@ export const AdminLoginModal: React.FC = () => {
             <button
               type="submit"
               disabled={isAuthenticating || !password.trim()}
-              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[11px] font-bold tracking-[0.08em] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[12px] font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
             >
               {isAuthenticating ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Authenticating...</span>
                 </>
               ) : (

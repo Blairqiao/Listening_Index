@@ -21,8 +21,8 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
     <footer className="h-10 sm:h-11 md:h-12 flex items-center justify-between border-t border-[#1C1C1A] bg-[#080808] select-none mt-4 md:mt-3">
       <div />
 
-      {/* System Telemetry Status (Clickable manual sync on [ SYNCED X AGO ]) */}
-      <div className="flex items-center font-mono text-[11px]">
+      {/* System Telemetry Status (click "Synced X ago" to sync manually) */}
+      <div className="flex items-center font-mono text-[12px]">
         {isAuthenticated ? (
           <button
             type="button"
@@ -39,14 +39,14 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
             }`}
           >
             {isSyncing ? (
-              <span className="tracking-[0.08em]">[ SYNCING... ]</span>
+              <span className="">Syncing...</span>
             ) : isLive ? (
               <>
-                <span className="sm:hidden tracking-[0.08em] uppercase">[ ▪ LIVE ]</span>
-                <span className="hidden sm:inline tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
+                <span className="sm:hidden">▪ Live</span>
+                <span className="hidden sm:inline">▪ Live · synced {syncedAgo}</span>
               </>
             ) : (
-              <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
+              <span className="">Synced {syncedAgo}</span>
             )}
           </button>
         ) : (
@@ -57,11 +57,11 @@ export const ListeningFooter: React.FC<ListeningFooterProps> = ({
           >
             {isLive ? (
               <>
-                <span className="sm:hidden tracking-[0.08em] uppercase">[ ▪ LIVE ]</span>
-                <span className="hidden sm:inline tracking-[0.08em] uppercase">[ ▪ LIVE · SYNCED {syncedAgo} ]</span>
+                <span className="sm:hidden">▪ Live</span>
+                <span className="hidden sm:inline">▪ Live · synced {syncedAgo}</span>
               </>
             ) : (
-              <span className="tracking-[0.08em] uppercase">[ SYNCED {syncedAgo} ]</span>
+              <span className="">Synced {syncedAgo}</span>
             )}
           </span>
         )}

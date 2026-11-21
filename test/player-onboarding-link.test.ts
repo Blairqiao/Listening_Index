@@ -77,11 +77,11 @@ test("AC-4: LivePlayerView has no link button and notifies user to link Spotify 
 
   // playerStatus === "unlinked" must notify user to link via Spotify modal
   assert.ok(
-    content.includes("SPOTIFY NOT LINKED") || content.includes("LINK YOUR SPOTIFY"),
+    content.includes("Spotify not linked") || content.includes("LINK YOUR SPOTIFY"),
     "LivePlayerView unlinked status must notify user to link Spotify ID"
   );
   assert.ok(
-    content.includes("SPOTIFY MODAL") || content.includes("MODAL (S)"),
+    content.includes("Spotify modal") || content.includes("MODAL (S)"),
     "LivePlayerView unlinked status must instruct user to use Spotify modal (S)"
   );
 });

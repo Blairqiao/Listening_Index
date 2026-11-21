@@ -2,16 +2,44 @@ import { getDb } from "../index";
 import { formatDayGroupTz } from "./helpers";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
 
-export function buildCadenceQuery(range: RangeKey, tz: string) {
+export type CadenceScope =
+  | { kind: "track"; trackId: string }
+  | { kind: "artist"; column: "artist_id" | "artist_group_key"; value: string }
+  | { kind: "album"; column: "album_id" | "album_group_key"; value: string };
+
+export function buildCadenceQuery(range: RangeKey, tz: string, scope?: CadenceScope) {
   const sql = getDb();
+
+  const scopeJoin = scope?.kind === "artist" || scope?.kind === "album"
+    ? sql`
+      JOIN tracks t ON t.id = p.track_id`
+    : sql``;
+
+  const scopeFilter = !scope
+    ? sql``
+    : scope.kind === "track"
+      ? sql`p.track_id = ${scope.trackId}`
+      : scope.kind === "artist"
+        ? scope.column === "artist_id"
+          ? sql`t.artist_id = ${scope.value}`
+          : sql`t.artist_group_key = ${scope.value}`
+        : scope.column === "album_id"
+          ? sql`t.album_id = ${scope.value}`
+          : sql`t.album_group_key = ${scope.value}`;
+
+  const scopeAnd = scope ? sql` AND ${scopeFilter}` : sql``;
+  const scopeWhere = scope
+    ? sql`
+    WHERE ${scopeFilter}`
+    : sql``;
 
   if (range === "1d") {
     return sql`
       SELECT 
           TO_CHAR(DATE_TRUNC('hour', p.played_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:00:00"Z"') AS hour_key,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '24 hours'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '24 hours'${scopeAnd}
       GROUP BY hour_key;
     `;
   }
@@ -22,8 +50,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           FLOOR(EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${tz}) / 6)::int AS block,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '7 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '7 days'${scopeAnd}
       GROUP BY day, block;
     `;
   }
@@ -33,8 +61,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '30 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '30 days'${scopeAnd}
       GROUP BY day;
     `;
   }
@@ -44,8 +72,8 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           (p.played_at AT TIME ZONE ${tz})::date::text AS day,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '180 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '180 days'${scopeAnd}
       GROUP BY day;
     `;
   }
@@ -55,17 +83,26 @@ export function buildCadenceQuery(range: RangeKey, tz: string) {
       SELECT 
           TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym,
           COUNT(*)::int AS count
-      FROM plays p
-      WHERE p.played_at >= NOW() - INTERVAL '365 days'
+      FROM plays p${scopeJoin}
+      WHERE p.played_at >= NOW() - INTERVAL '365 days'${scopeAnd}
       GROUP BY ym;
     `;
   }
 
+  if (scope) {
+    return sql`
+      SELECT TO_CHAR(p.played_at AT TIME ZONE ${tz}, 'YYYY-MM') AS ym, COUNT(*)::int AS count
+      FROM plays p${scopeJoin}${scopeWhere}
+      GROUP BY ym
+      ORDER BY ym ASC;
+    `;
+  }
+
   return sql`
-    SELECT 
+    SELECT
         EXTRACT(YEAR FROM p.played_at AT TIME ZONE ${tz})::int AS play_year,
         COUNT(*)::int AS count
-    FROM plays p
+    FROM plays p${scopeJoin}${scopeWhere}
     GROUP BY play_year
     ORDER BY play_year ASC;
   `;
@@ -238,7 +275,7 @@ export function buildActivityCadence(params: {
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: "UTC",
         month: "short",
-      }).format(calendarDayNoonUtc(weekStartKey)).toUpperCase();
+      }).format(calendarDayNoonUtc(weekStartKey));
 
       const isNewMonth = monthAbbr !== lastMonth;
       if (isNewMonth) lastMonth = monthAbbr;
@@ -280,7 +317,7 @@ export function buildActivityCadence(params: {
       const monthAbbr = new Intl.DateTimeFormat("en-US", {
         timeZone: tz,
         month: "short",
-      }).format(bucketDateUtc).toUpperCase();
+      }).format(bucketDateUtc);
 
       const startTime = new Date(Date.UTC(targetYear, targetMonth - 1, 1, 0, 0, 0, 0)).toISOString();
       const endTime = new Date(Date.UTC(targetYear, targetMonth, 0, 23, 59, 59, 999)).toISOString();
@@ -328,4 +365,44 @@ export function buildActivityCadence(params: {
   }
 
   return { activityCadence };
+}
+
+
+export function buildProfileCadence(
+  params: Parameters<typeof buildActivityCadence>[0],
+): { activityCadence: ActivityBucket[]; monthlyCadence?: ActivityBucket[] } {
+  if (params.range !== "all" || params.cadenceRows.length === 0) {
+    return buildActivityCadence(params);
+  }
+
+  const monthCounts = new Map<string, number>();
+  const yearCounts = new Map<number, number>();
+  for (const row of params.cadenceRows) {
+    const month = String(row.ym);
+    const year = Number(month.slice(0, 4));
+    const count = Number(row.count);
+    monthCounts.set(month, count);
+    yearCounts.set(year, (yearCounts.get(year) ?? 0) + count);
+  }
+
+  const monthKeys = [...monthCounts.keys()].sort();
+  const firstMonth = new Date(monthKeys[0] + "-01T00:00:00Z");
+  const latestMonth = new Date(monthKeys[monthKeys.length - 1] + "-01T00:00:00Z");
+  const now = getLocalCalendarParts(params.now ?? new Date(), params.tz);
+  const end = Math.max(latestMonth.getTime(), Date.UTC(now.year, now.month - 1, 1));
+  const label = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  const monthlyCadence: ActivityBucket[] = [];
+  for (const month = new Date(firstMonth); month.getTime() <= end; month.setUTCMonth(month.getUTCMonth() + 1)) {
+    const startTime = month.toISOString();
+    const endTime = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1) - 1).toISOString();
+    monthlyCadence.push({
+      date: label.format(month),
+      count: monthCounts.get(startTime.slice(0, 7)) ?? 0,
+      startTime,
+      endTime,
+    });
+  }
+
+  const cadenceRows = [...yearCounts].map(([play_year, count]) => ({ play_year, count }));
+  return { ...buildActivityCadence({ ...params, cadenceRows }), monthlyCadence };
 }

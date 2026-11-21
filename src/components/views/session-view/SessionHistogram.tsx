@@ -37,11 +37,11 @@ export const SessionHistogram: React.FC<SessionHistogramProps> = ({
   return (
     <div className="select-none">
       <div className="flex justify-between items-baseline mb-2 select-none">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-          [ SESSIONS / LAST 20 ]
+        <span className="font-mono text-[12px] text-[#5A5A55]">
+          Sessions / last 20
         </span>
-        <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55]">
-          AVERAGE {histData.avgRuntimeMinutes}m
+        <span className="font-mono text-[12px] text-[#5A5A55]">
+          Average {histData.avgRuntimeMinutes}m
         </span>
       </div>
 
@@ -101,7 +101,7 @@ export const SessionHistogram: React.FC<SessionHistogramProps> = ({
       </div>
 
       {/* Date Labels below bars */}
-      <div className="flex justify-between font-mono text-[10px] text-[#5A5A55] mt-1.5 select-none">
+      <div className="flex justify-between font-mono text-[11px] text-[#5A5A55] mt-1.5 select-none">
         <span>{histData.oldestDate}</span>
         <span>{histData.newestDate}</span>
       </div>

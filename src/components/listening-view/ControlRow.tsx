@@ -3,6 +3,7 @@
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
 import { compactDate } from "@/lib/format-utils";
+import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
@@ -19,6 +20,12 @@ interface ControlRowProps {
   sessionIndex?: number;
   totalSessions?: number;
   syncError?: string | null;
+  returnsTo?: ProfileKind | null;
+  onProfileBack?: () => void;
+  profileKind?: ProfileKind | null;
+  profileHistory?: ProfileHistoryEntry[];
+  onJumpToHistory?: (index: number) => void;
+  onReturnToSearch?: () => void;
   // Mode 3: Live Player page-level controls
   layout?: "split" | "stacked";
   onToggleLayout?: () => void;
@@ -28,13 +35,15 @@ interface ControlRowProps {
   onTransferPlayback?: () => void;
 }
 
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 const RANGES: Array<{ key: RangeKey; label: string }> = [
-  { key: "1d", label: "1 D" },
-  { key: "1w", label: "1 W" },
-  { key: "1m", label: "1 M" },
-  { key: "6m", label: "6 M" },
-  { key: "1y", label: "1 Y" },
-  { key: "all", label: "ALL" },
+  { key: "1d", label: "1d" },
+  { key: "1w", label: "1w" },
+  { key: "1m", label: "1m" },
+  { key: "6m", label: "6m" },
+  { key: "1y", label: "1y" },
+  { key: "all", label: "All" },
 ];
 
 export const ControlRow: React.FC<ControlRowProps> = ({
@@ -52,6 +61,12 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   sessionIndex,
   totalSessions,
   syncError,
+  profileKind,
+  onProfileBack,
+  returnsTo,
+  profileHistory,
+  onJumpToHistory,
+  onReturnToSearch,
   layout = "split",
   onToggleLayout,
   isAuthenticated = false,
@@ -62,33 +77,33 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
-        return `SINCE ${compactDate(logStartDate)}`;
+        return `Since ${compactDate(logStartDate)}`;
       case 1:
-        return streamLogDateSpan || "STREAM LOG";
+        return streamLogDateSpan || "Stream log";
       case 2: {
         const num = sessionNumber ?? (sessionIndex != null ? sessionIndex + 1 : 1);
         const total = totalSessions ?? 1;
         const padNum = String(num).padStart(2, "0");
         const padTotal = String(total).padStart(2, "0");
-        return `SESSION ${padNum} / ${padTotal}`;
+        return `Session ${padNum} / ${padTotal}`;
       }
       case 3: {
         if (playerStatus === "checking") {
-          return "CHECKING CONNECTION...";
+          return "Checking connection...";
         }
         if (playerStatus === "unlinked") {
-          return "SPOTIFY NOT LINKED";
+          return "Spotify not linked";
         }
         if (playerStatus === "connecting") {
-          return "CONNECTING TO SPOTIFY...";
+          return "Connecting to Spotify...";
         }
         if (playerStatus === "error") {
-          return <span className="text-[#FF6B6B]">PLAYER ERROR</span>;
+          return <span className="text-[#FF6B6B]">Player error</span>;
         }
         if (activeDevice?.isThisBrowser) {
           return (
             <span className="text-music-accent">
-              DEVICE: LISTENING INDEX · ACTIVE
+              Device: Listening Index · active
             </span>
           );
         }
@@ -96,7 +111,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           return (
             <span className="inline-flex items-center gap-2">
               <span className="text-[#8A8A82] truncate max-w-[200px] sm:max-w-none">
-                LISTENING ON: {activeDevice.name?.toUpperCase() || "EXTERNAL"}
+                Listening on: {activeDevice.name || "external"}
               </span>
               {onTransferPlayback && (
                 <>
@@ -104,90 +119,97 @@ export const ControlRow: React.FC<ControlRowProps> = ({
                   <button
                     type="button"
                     onClick={onTransferPlayback}
-                    className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
+                    className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
                     title="Transfer playback to this browser"
                   >
-                    <span className="sm:hidden">[ TRANSFER ]</span>
-                    <span className="hidden sm:inline">[ TRANSFER HERE ]</span>
+                    <span className="sm:hidden">Transfer</span>
+                    <span className="hidden sm:inline">Transfer here</span>
                   </button>
                 </>
               )}
             </span>
           );
         }
-        return <span className="text-music-accent">DEVICE: LISTENING INDEX</span>;
+        return <span className="text-music-accent">Device: Listening Index</span>;
       }
+      case 4:
+        if (profileKind === "track") return "Track profile";
+        if (profileKind === "artist") return "Artist profile";
+        if (profileKind === "album") return "Album profile";
+        return "Search";
     }
   };
+
+  const renderRangeButtons = () => (
+    <div
+      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
+      role="group"
+      aria-label="Time range filters"
+    >
+      {RANGES.map((r) => {
+        const isActive = range === r.key;
+        return (
+          <button
+            key={r.key}
+            type="button"
+            disabled={isSyncing}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              if (!isSyncing) onSelectRange(r.key);
+            }}
+            className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
+              isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
+            } ${
+              isActive
+                ? "text-music-accent border-music-accent bg-transparent"
+                : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+            }`}
+          >
+            {r.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   const renderControls = () => {
     switch (mode) {
       case 0:
-        return (
-          <div
-            className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5"
-            role="group"
-            aria-label="Time range filters"
-          >
-            {RANGES.map((r) => {
-              const isActive = range === r.key;
-              return (
-                <button
-                  key={r.key}
-                  type="button"
-                  disabled={isSyncing}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={(e) => {
-                    e.currentTarget.blur();
-                    if (!isSyncing) onSelectRange(r.key);
-                  }}
-                  className={`font-mono text-[11px] tracking-[0.08em] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center ${
-                    isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-                  } ${
-                    isActive
-                      ? "text-music-accent border-music-accent bg-transparent"
-                      : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              );
-            })}
-          </div>
-        );
+        return renderRangeButtons();
       case 1: {
         const count = streamLogCount ?? 50;
         if (count === 0) {
           return (
-            <span className="font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-              [ NO TRACKS ]
+            <span className="font-mono text-[12px] text-[#6A6A64]">
+              No tracks
             </span>
           );
         }
         return (
           <>
-            <span className="md:hidden font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-              [ LAST {count} ]
+            <span className="md:hidden font-mono text-[12px] text-[#6A6A64]">
+              Last {count}
             </span>
-            <span className="hidden md:inline font-mono text-[11px] tracking-[0.08em] text-[#6A6A64]">
-              [ LAST {count} TRACKS ]
+            <span className="hidden md:inline font-mono text-[12px] text-[#6A6A64]">
+              Last {count} tracks
             </span>
           </>
         );
       }
       case 2: {
         const sessionContent = syncError
-          ? `[ ${syncError.toUpperCase()} ]`
+          ? syncError
           : isSyncing
-          ? "[ SYNCING... ]"
+          ? "Syncing..."
           : isSessionOpen
-          ? `[ ▪ ACTIVE · SINCE ${sessionTagTime} ]`
-          : `[ CLOSED ${sessionTagTime} AGO ]`;
+          ? `▪ Active · since ${sessionTagTime}`
+          : `Closed ${sessionTagTime} ago`;
 
         if (!isAuthenticated) {
           return (
             <span
-              className={`font-mono text-[11px] tracking-[0.08em] ${
+              className={`font-mono text-[12px] ${
                 syncError
                   ? "text-[#FF6B6B]"
                   : isSessionOpen
@@ -206,7 +228,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onClick={onTriggerSync}
             disabled={isSyncing}
             title={syncError || "Click to trigger manual sync"}
-            className={`font-mono text-[11px] tracking-[0.08em] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
+            className={`font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
               syncError
                 ? "text-[#FF6B6B]"
                 : isSyncing
@@ -227,36 +249,134 @@ export const ControlRow: React.FC<ControlRowProps> = ({
               type="button"
               onClick={onToggleLayout}
               aria-label="Toggle player layout between split and stacked"
-              className="font-mono text-[11px] tracking-[0.08em] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
+              className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
               title="Toggle between Split Console and Stacked Stage"
             >
-              <span>{layout === "stacked" ? "[ LAYOUT: STACKED ]" : "[ LAYOUT: SPLIT ]"}</span>
+              <span>{layout === "stacked" ? "Layout: stacked" : "Layout: split"}</span>
             </button>
           </div>
         );
+      case 4:
+        return profileKind ? renderRangeButtons() : null;
     }
+  };
+
+  const showsRanges = mode === 0 || (mode === 4 && !!profileKind);
+  const showsProfileNav = mode === 4 && profileKind && (onProfileBack || onJumpToHistory);
+
+  const Scope = showsProfileNav ? "div" : "span";
+  const renderProfileNav = () => {
+    if (!profileHistory?.length || !onJumpToHistory) {
+      return (
+        <button
+          type="button"
+          onClick={onProfileBack ?? onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+          className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
+        >
+          {`← Back to ${returnsTo ?? "search"}`}
+        </button>
+      );
+    }
+
+    const directParent = profileHistory[profileHistory.length - 1];
+    const directParentName = directParent.name || capitalize(directParent.target.kind);
+    const hasOverflow = profileHistory.length > 2;
+    const startIdx = Math.max(0, profileHistory.length - 2);
+    const visibleAncestors = profileHistory.slice(startIdx).map((entry, offset) => {
+      const index = startIdx + offset;
+      const isDirectParent = index === profileHistory.length - 1;
+      return { entry, index, isDirectParent };
+    });
+
+    return (
+      <>
+        {/* Mobile (< sm): direct parent + subtle search escape link */}
+        <div className="flex sm:hidden items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={onProfileBack ?? (() => onJumpToHistory?.(profileHistory.length - 1))}
+            className="min-h-7 cursor-pointer text-[#A0A099] hover:text-[#EDEDE8] max-w-[170px] truncate focus-visible:outline-music-accent"
+            title={`Back to ${directParentName}`}
+          >
+            {`← ${directParentName}`}
+          </button>
+          <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+          <button
+            type="button"
+            onClick={onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+            className="min-h-7 cursor-pointer text-[#6A6A64] hover:text-[#EDEDE8] shrink-0 focus-visible:outline-music-accent"
+            title="Return to search"
+          >
+            Search
+          </button>
+        </div>
+
+        {/* Desktop (>= sm): full breadcrumb trail */}
+        <div className="hidden sm:flex items-center gap-1.5 min-w-0">
+          <button
+            type="button"
+            onClick={onReturnToSearch ?? (() => onJumpToHistory?.(-1))}
+            className="min-h-7 cursor-pointer text-[#6A6A64] hover:text-[#EDEDE8] shrink-0 focus-visible:outline-music-accent"
+            title="Return to search"
+          >
+            ← Search
+          </button>
+          {hasOverflow && (
+            <>
+              <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+              <span className="text-[#5A5A55] select-none" aria-hidden="true">…</span>
+            </>
+          )}
+          {visibleAncestors.map(({ entry, index, isDirectParent }) => {
+            const name = entry.name || capitalize(entry.target.kind);
+            return (
+              <React.Fragment key={`${entry.target.kind}-${entry.target.key}-${index}`}>
+                <span className="text-[#3A3A36]" aria-hidden="true">/</span>
+                <button
+                  type="button"
+                  onClick={() => onJumpToHistory?.(index)}
+                  className={`min-h-7 cursor-pointer max-w-[140px] truncate focus-visible:outline-music-accent ${
+                    isDirectParent
+                      ? "text-[#A0A099] hover:text-[#EDEDE8]"
+                      : "text-[#6A6A64] hover:text-[#EDEDE8]"
+                  }`}
+                  title={name}
+                >
+                  {name}
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </>
+    );
   };
 
   return (
     <div
       className={`my-3.5 sm:my-4 md:my-5 select-none ${
-        mode === 0
+        showsRanges
           ? "flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center sm:h-[28px]"
           : "flex justify-between items-center h-[28px]"
       }`}
     >
-      {/* Left Slot: Scope Label */}
-      <span className="font-mono text-[11px] tracking-[0.14em] text-[#5A5A55] whitespace-nowrap sm:mr-4">
-        {getScopeLabel()}
+      {/* Left Slot: Scope Label or Profile Navigation */}
+      <Scope className={`font-mono text-[12px] text-[#5A5A55] whitespace-nowrap sm:mr-4 ${showsProfileNav ? "min-w-0 flex items-center" : ""}`}>
+        {showsProfileNav ? (
+          <nav aria-label="Profile navigation" className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            {renderProfileNav()}
+          </nav>
+        ) : (
+          getScopeLabel()
+        )}
         {syncError && mode !== 2 && (
-          <span className="ml-2 text-[#FF6B6B] tracking-[0.08em]">
-            [ {syncError.toUpperCase()} ]
+          <span className="ml-2 text-[#FF6B6B]">
+            {syncError}
           </span>
         )}
-      </span>
+      </Scope>
 
-      {/* Right Slot: Range Buttons (Mode 0) or Status Tag (Modes 1 & 2) */}
-      <div className={`flex items-center ${mode === 0 ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"}`}>
+      <div className={`flex items-center ${showsRanges ? "w-full sm:w-auto" : "overflow-x-auto scrollbar-hidden"} ${showsProfileNav ? "shrink-0" : ""}`}>
         {renderControls()}
       </div>
     </div>

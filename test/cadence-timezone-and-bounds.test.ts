@@ -187,7 +187,7 @@ test('N019: 1y cadence includes 13th month when time has elapsed past 00:00:00 o
 
   assert.equal(activityCadence.length, 13, 'Must contain 13 month buckets when after 00:00:00 on the 1st');
   const earliest = activityCadence[0];
-  assert.equal(earliest.date, 'NOV', 'Earliest bucket must be NOV (from previous year)');
+  assert.equal(earliest.date, 'Nov', 'Earliest bucket must be Nov (from previous year)');
   assert.equal(earliest.count, 1, 'Nov 2025 play must be included');
 });
 
@@ -239,7 +239,7 @@ function withServerTimezone<T>(serverTz: string, run: () => T): T {
 
 // Bucket startTime is UTC midnight of the visitor's calendar day key.
 function expectedDayLabel(startTime: string): string {
-  const month = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short' }).format(new Date(startTime)).toUpperCase();
+  const month = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short' }).format(new Date(startTime));
   return `${startTime.slice(8, 10)} ${month}`;
 }
 
@@ -254,13 +254,13 @@ for (const { tz, serverTz } of [
       const month = buildActivityCadence({ range: '1m', tz, now, cadenceRows: [{ day: '2026-07-15', count: 4 }] }).activityCadence;
       const july15 = month.find((b) => b.count === 4);
       assert.ok(july15, 'the 15 July bucket must exist');
-      assert.equal(july15.date, '15 JUL');
+      assert.equal(july15.date, '15 Jul');
       for (const bucket of month) assert.equal(bucket.date, expectedDayLabel(bucket.startTime));
 
       const week = buildActivityCadence({ range: '1w', tz, now, cadenceRows: [{ day: '2026-07-15', block: 0, count: 2 }] }).activityCadence;
       const weekJuly15 = week.find((b) => b.count === 2);
       assert.ok(weekJuly15, 'the 15 July block must exist');
-      assert.equal(weekJuly15.date, '15 JUL 00:00–06:00');
+      assert.equal(weekJuly15.date, '15 Jul 00:00–06:00');
       assert.equal(weekJuly15.markerLabel, '15');
       for (const bucket of week) assert.ok(bucket.date.startsWith(expectedDayLabel(bucket.startTime)), bucket.date);
 

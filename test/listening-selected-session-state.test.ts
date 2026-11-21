@@ -49,18 +49,18 @@ function controlRowMarkup(selectedSessionId?: string) {
 
 test('a selected past Session is labelled as closed while a newer Session is open', () => {
   const list = sessionViewMarkup('earlier');
-  assert.ok(list.includes('[ LAST SESSION ]'));
-  assert.ok(!list.includes('[ CURRENT SESSION ]'));
+  assert.ok(list.includes('Last session'));
+  assert.ok(!list.includes('Current session'));
 
   const row = controlRowMarkup('earlier');
-  assert.ok(row.includes('CLOSED 1D AGO'));
-  assert.ok(!row.includes('ACTIVE'));
+  assert.ok(row.includes('Closed 1D ago'));
+  assert.ok(!row.includes('Active'));
 });
 
 test('the open Session keeps its active labels when selected or by default', () => {
   for (const selected of ['open-now', undefined]) {
-    assert.ok(sessionViewMarkup(selected).includes('[ CURRENT SESSION ]'));
-    assert.ok(controlRowMarkup(selected).includes('ACTIVE'));
+    assert.ok(sessionViewMarkup(selected).includes('Current session'));
+    assert.ok(controlRowMarkup(selected).includes('Active'));
   }
 });
 

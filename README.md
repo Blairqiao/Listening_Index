@@ -30,11 +30,15 @@ Groups continuous listening into sessions, marks first-time plays, and tracks se
 
 ![Sessions](public/screenshots/sessions.png)
 
+### Search & profiles
+
+Search Tracks, Artists, and Albums with entity type filters, play-count and recency sorting, and a random profile picker. Every Track, Artist, and Album opens a dedicated profile page with time-range filtering, play cadence charts, share breakdowns, and breadcrumb navigation.
+
 ### Live player
 
 Controls Spotify playback with a 32-band frequency visualizer, split console and stacked stage layouts, and device switching. Shows total plays and archive rank for the current track and artist.
 
-Unlocked with `ADMIN_PASSWORD` via the dedicated admin login modal. Public visitors only see modes 1–3.
+Unlocked with `ADMIN_PASSWORD` via the dedicated admin login modal. Public visitors see Overview, Stream Log, Sessions, and Search; Live Player requires admin login.
 
 ![Live player](public/screenshots/live-player.png)
 
