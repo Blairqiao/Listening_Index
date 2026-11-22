@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getDb } from "../src/lib/db";
-import { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "../src/lib/db/queries/overview";
+import { getOverviewData } from "../src/lib/db/queries/overview";
 import { dbTest, useTestDatabase } from "./helpers/test-db";
 import { searchCatalog } from "../src/lib/db/queries/search";
 import { isCatalogFullyEnriched } from "../src/lib/db/queries/enrichment";
@@ -13,6 +13,14 @@ import {
   longestStreak,
 } from "../src/lib/profile-stats";
 import { getProfile } from "../src/lib/db/queries/profile";
+import {
+  PRESET_SPAN_MS,
+  presetRange,
+  previousWindow,
+  type CadenceGranularity,
+  type RangeSelection,
+} from "../src/lib/range";
+import { formatOverviewMetrics } from "../src/lib/format-utils";
 import {
   PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_RELATED_TRACKS_LIMIT,
@@ -102,10 +110,10 @@ test("search and profile DB queries", dbTest, async (t) => {
         sql,
         `ranks-and-plays-${range}`,
         async () => {
-          const overview = await getOverviewData(range, "UTC");
+          const overview = await getOverviewData(presetRange(range), "UTC");
           const tracksToCheck = overview.topTracks.slice(0, 3);
           const trackProfiles = await Promise.all(
-            tracksToCheck.map((track) => getProfile({ kind: "track", key: track.id }, range, "UTC"))
+            tracksToCheck.map((track) => getProfile({ kind: "track", key: track.id }, presetRange(range), "UTC"))
           );
           const trackPairs = tracksToCheck.map((track, idx) => ({
             track,
@@ -136,7 +144,7 @@ test("search and profile DB queries", dbTest, async (t) => {
 
           const artistProfiles = await Promise.all(
             artistCandidates.map(({ artist }) =>
-              getProfile({ kind: "artist", key: artist.id! }, range, "UTC")
+              getProfile({ kind: "artist", key: artist.id! }, presetRange(range), "UTC")
             )
           );
           const artistPairs = artistCandidates.map((candidate, idx) => ({
@@ -235,8 +243,8 @@ test("search and profile DB queries", dbTest, async (t) => {
         };
 
         const [byId, byGroupKey] = await Promise.all([
-          getProfile({ kind: "artist", key: artistId }, "all", "UTC"),
-          getProfile({ kind: "artist", key: groupKey }, "all", "UTC"),
+          getProfile({ kind: "artist", key: artistId }, presetRange("all"), "UTC"),
+          getProfile({ kind: "artist", key: groupKey }, presetRange("all"), "UTC"),
         ]);
         return { rows, byId, byGroupKey };
       }
@@ -251,7 +259,7 @@ test("search and profile DB queries", dbTest, async (t) => {
   });
 
   await t.test("overview profile keys open the matching profiles", async () => {
-    const overview = await getOverviewData("all", "UTC");
+    const overview = await getOverviewData(presetRange("all"), "UTC");
     const track = overview.topTracks[0];
     const artist = overview.topArtists[0];
     const album = overview.topAlbums[0];
@@ -259,11 +267,11 @@ test("search and profile DB queries", dbTest, async (t) => {
     assert.ok(track.artistKey && track.albumKey && artist.key && album.key && album.artistKey);
 
     const [trackArtist, trackAlbum, artistProfile, albumProfile, albumArtist] = await Promise.all([
-      getProfile({ kind: "artist", key: track.artistKey }, "all", "UTC"),
-      getProfile({ kind: "album", key: track.albumKey }, "all", "UTC"),
-      getProfile({ kind: "artist", key: artist.key }, "all", "UTC"),
-      getProfile({ kind: "album", key: album.key }, "all", "UTC"),
-      getProfile({ kind: "artist", key: album.artistKey }, "all", "UTC"),
+      getProfile({ kind: "artist", key: track.artistKey }, presetRange("all"), "UTC"),
+      getProfile({ kind: "album", key: track.albumKey }, presetRange("all"), "UTC"),
+      getProfile({ kind: "artist", key: artist.key }, presetRange("all"), "UTC"),
+      getProfile({ kind: "album", key: album.key }, presetRange("all"), "UTC"),
+      getProfile({ kind: "artist", key: album.artistKey }, presetRange("all"), "UTC"),
     ]);
     assert.equal(trackArtist?.name, track.artist);
     assert.equal(trackAlbum?.name, track.album);
@@ -277,15 +285,15 @@ test("search and profile DB queries", dbTest, async (t) => {
   await t.test("lifetime fields, recentPlays order/limit, and artist lists", async () => {
     const { overviewAll, topArtist, track1d, trackAll, artist1d, artistAll } =
       await captureStableComparison(sql, "lifetime-fields-and-lists", async () => {
-        const overviewAll = await getOverviewData("all", "UTC");
+        const overviewAll = await getOverviewData(presetRange("all"), "UTC");
         const topTrack = overviewAll.topTracks[0];
         const topArtist = overviewAll.topArtists.find((a) => Boolean(a.id));
 
         const [track1d, trackAll, artist1d, artistAll] = await Promise.all([
-          topTrack ? getProfile({ kind: "track", key: topTrack.id }, "1d", "UTC") : null,
-          topTrack ? getProfile({ kind: "track", key: topTrack.id }, "all", "UTC") : null,
-          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, "1d", "UTC") : null,
-          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, "all", "UTC") : null,
+          topTrack ? getProfile({ kind: "track", key: topTrack.id }, presetRange("1d"), "UTC") : null,
+          topTrack ? getProfile({ kind: "track", key: topTrack.id }, presetRange("all"), "UTC") : null,
+          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, presetRange("1d"), "UTC") : null,
+          topArtist?.id ? getProfile({ kind: "artist", key: topArtist.id }, presetRange("all"), "UTC") : null,
         ]);
 
         return { overviewAll, topArtist, track1d, trackAll, artist1d, artistAll };
@@ -360,8 +368,9 @@ test("search and profile DB queries", dbTest, async (t) => {
       const enriched = await isCatalogFullyEnriched();
 
       return Promise.all((["all", "1m"] as const).map(async (range) => {
+        const sinceIso = range === "all" ? null : new Date(Date.now() - PRESET_SPAN_MS[range]).toISOString();
         const timeFilter = range === "all" ? sql`TRUE` :
-          sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+          sql`p.played_at >= ${sinceIso}::timestamptz`;
         const orderedPlays = await sql`
           SELECT p.id::text, p.track_id, p.played_at
           FROM plays p
@@ -414,7 +423,7 @@ test("search and profile DB queries", dbTest, async (t) => {
 
         return Promise.all(["UTC", "America/Chicago"].map(async (tz) => {
           const [profile, rawPlays, [identity]] = await Promise.all([
-            getProfile({ kind: "track", key: id }, range, tz),
+            getProfile({ kind: "track", key: id }, presetRange(range), tz),
             sql`
               SELECT p.id::text, p.played_at, p.ms_played, t.duration_ms
               FROM plays p JOIN tracks t ON t.id = p.track_id
@@ -423,7 +432,7 @@ test("search and profile DB queries", dbTest, async (t) => {
             sql`SELECT artist_id, artist_group_key, album_id, album_group_key FROM tracks WHERE id = ${id}`,
           ]);
           const artistKey = enriched ? identity.artist_id : identity.artist_group_key;
-          const artist = artistKey == null ? null : await getProfile({ kind: "artist", key: artistKey }, range, tz);
+          const artist = artistKey == null ? null : await getProfile({ kind: "artist", key: artistKey }, presetRange(range), tz);
           const albumFilter = enriched
             ? identity.album_id != null
               ? sql`t.album_id = ${identity.album_id}`
@@ -538,21 +547,22 @@ test("search and profile DB queries", dbTest, async (t) => {
       for (const tz of ["UTC", "America/Chicago"]) {
         const { profile, rawPlays, track } = await captureStableComparison(
           sql, `artist-hours-${range}-${tz}`, async () => {
-            const overview = await getOverviewData(range, tz);
+            const overview = await getOverviewData(presetRange(range), tz);
             const key = overview.topArtists.find((artist) => artist.id)?.id;
             assert.ok(key);
-            const profile = await getProfile({ kind: "artist", key }, range, tz);
+            const profile = await getProfile({ kind: "artist", key }, presetRange(range), tz);
             assert.ok(profile?.topTracks[0]);
             const enriched = await isCatalogFullyEnriched();
             const artistFilter = enriched
               ? sql`t.artist_id = ${profile.key}`
               : sql`t.artist_group_key = ${profile.key}`;
+            const sinceIso = range === "all" ? null : new Date(Date.now() - PRESET_SPAN_MS[range]).toISOString();
             const timeFilter = range === "all" ? sql`TRUE` :
-              sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+              sql`p.played_at >= ${sinceIso}::timestamptz`;
             const [rawPlays, track] = await Promise.all([
               sql`SELECT p.id::text, p.played_at, p.ms_played FROM plays p JOIN tracks t ON t.id = p.track_id
                   WHERE ${artistFilter} AND ${timeFilter}`,
-              getProfile({ kind: "track", key: profile.topTracks[0].id }, range, tz),
+              getProfile({ kind: "track", key: profile.topTracks[0].id }, presetRange(range), tz),
             ]);
             return { profile, rawPlays, track };
           },
@@ -590,7 +600,7 @@ test("search and profile DB queries", dbTest, async (t) => {
         HAVING MAX(played_at) < NOW() - INTERVAL '24 hours'
         ORDER BY MAX(played_at) ASC LIMIT 1;
       `;
-      return track ? getProfile({ kind: "track", key: track.id }, "1d", "America/Chicago") : null;
+      return track ? getProfile({ kind: "track", key: track.id }, presetRange("1d"), "America/Chicago") : null;
     });
 
     assert.ok(profile);
@@ -626,7 +636,7 @@ test("search and profile DB queries", dbTest, async (t) => {
       `;
       assert.ok(row, "expected a track with album_group_key");
       const [profile, [countRow]] = await Promise.all([
-        getGroupKeyProfile({ kind: "track", key: String(row.id) }, "all", "UTC"),
+        getGroupKeyProfile({ kind: "track", key: String(row.id) }, presetRange("all"), "UTC"),
         sql`
           SELECT COUNT(*)::int AS plays
           FROM plays p JOIN tracks t ON t.id = p.track_id
@@ -652,7 +662,7 @@ test("search and profile DB queries", dbTest, async (t) => {
       accentedRes,
       wildcardResults,
     } = await captureStableComparison(sql, "search-catalog", async () => {
-      const overviewAll = await getOverviewData("all", "UTC");
+      const overviewAll = await getOverviewData(presetRange("all"), "UTC");
       const topArtist = overviewAll.topArtists[0];
       if (!topArtist) {
         return {
@@ -776,16 +786,426 @@ test("search and profile DB queries", dbTest, async (t) => {
   await t.test("getProfile returns null for unknown targets", async () => {
     const unknownTrack = await getProfile(
       { kind: "track", key: "unknown-track-000000000000" },
-      "all",
+      presetRange("all"),
       "UTC"
     );
     const unknownArtist = await getProfile(
       { kind: "artist", key: "unknown-artist-000000000000" },
-      "1w",
+      presetRange("1w"),
       "UTC"
     );
 
     assert.equal(unknownTrack, null);
     assert.equal(unknownArtist, null);
+  });
+
+  await t.test("fixed window overview matches DST-aware UTC oracle", async () => {
+    const suffix = `wintest${Date.now()}`;
+    const artistId = `art_${suffix}`;
+    const albumId = `alb_${suffix}`;
+    const trackInId = `trk_in_${suffix}`;
+    const trackBeforeId = `trk_bf_${suffix}`;
+    const trackAfterId = `trk_af_${suffix}`;
+    const artistName = `Window Artist ${suffix}`;
+    const albumName = `Window Album ${suffix}`;
+    const artistGroupKey = artistName.toLowerCase();
+    const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
+
+    try {
+      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      for (const [id, name] of [
+        [trackBeforeId, `Before ${suffix}`],
+        [trackInId, `Inside ${suffix}`],
+        [trackAfterId, `After ${suffix}`],
+      ]) {
+        await sql`
+          INSERT INTO tracks (id, name, artist_name, album_name, artist_id, album_id, artist_group_key, album_group_key, duration_ms, enrichment_status)
+          VALUES (${id}, ${name}, ${artistName}, ${albumName}, ${artistId}, ${albumId}, ${artistGroupKey}, ${albumGroupKey}, 180000, 'enriched')
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
+
+      // 2025-10-31 23:30 CDT (UTC-5), 2025-11-15 12:00 CST (UTC-6), 2025-12-01 00:10 CST (UTC-6)
+      await sql`
+        INSERT INTO plays (played_at, track_id, ms_played)
+        VALUES
+          ('2025-11-01T04:30:00Z'::timestamptz, ${trackBeforeId}, 180000),
+          ('2025-11-15T18:00:00Z'::timestamptz, ${trackInId}, 180000),
+          ('2025-12-01T06:10:00Z'::timestamptz, ${trackAfterId}, 180000)
+        ON CONFLICT (played_at, track_id) DO NOTHING
+      `;
+
+      const sel: RangeSelection = { kind: "window", from: "2025-11-01", to: "2025-11-30" };
+      const [overview, [oracle], [oracleMetrics], oracleTopTracks] = await Promise.all([
+        getOverviewData(sel, "America/Chicago"),
+        sql`SELECT COUNT(*)::int AS count FROM plays WHERE played_at >= '2025-11-01T05:00:00Z' AND played_at < '2025-12-01T06:00:00Z'`,
+        sql`
+          SELECT
+            COUNT(DISTINCT p.track_id)::int AS tracks,
+            COALESCE(SUM(p.ms_played), 0)::bigint AS total_ms
+          FROM plays p
+          WHERE p.played_at >= '2025-11-01T05:00:00Z' AND p.played_at < '2025-12-01T06:00:00Z'
+        `,
+        sql`
+          SELECT p.track_id, COUNT(*)::int AS plays
+          FROM plays p
+          JOIN tracks t ON t.id = p.track_id
+          WHERE p.played_at >= '2025-11-01T05:00:00Z' AND p.played_at < '2025-12-01T06:00:00Z'
+          GROUP BY p.track_id, t.name
+          ORDER BY plays DESC, t.name ASC
+          LIMIT 10
+        `,
+      ]);
+
+      const oracleCount = Number(oracle.count);
+      assert.equal(overview.range, "2025-11-01..2025-11-30");
+      assert.equal(overview.granularity, "day");
+      assert.equal(
+        overview.activityCadence.reduce((sum, b) => sum + b.count, 0),
+        oracleCount,
+      );
+      assert.equal(overview.rawMetrics.trackCount, Number(oracleMetrics.tracks));
+      assert.equal(overview.rawMetrics.totalMs, Number(oracleMetrics.total_ms));
+      assert.deepEqual(
+        overview.topTracks.map((tr) => ({ id: tr.id, plays: tr.plays })),
+        oracleTopTracks.map((r) => ({ id: String(r.track_id), plays: Number(r.plays) })),
+      );
+      assert.equal(overview.topTracks.some((tr) => tr.id === trackBeforeId || tr.id === trackAfterId), false);
+    } finally {
+      await sql`DELETE FROM plays WHERE track_id IN (${trackBeforeId}, ${trackInId}, ${trackAfterId})`;
+      await sql`DELETE FROM tracks WHERE id IN (${trackBeforeId}, ${trackInId}, ${trackAfterId})`;
+      await sql`DELETE FROM albums WHERE id = ${albumId}`;
+      await sql`DELETE FROM artists WHERE id = ${artistId}`;
+    }
+  });
+
+  await t.test("fixed window drift accounts for tracks ranked only in the previous equal-length window", async () => {
+    const suffix = `drifttest${Date.now()}`;
+    const artistId = `art_${suffix}`;
+    const albumId = `alb_${suffix}`;
+    const trackPrevOnly = `trk_po_${suffix}`;
+    const trackBoth = `trk_bo_${suffix}`;
+    const artistName = `Drift Artist ${suffix}`;
+    const albumName = `Drift Album ${suffix}`;
+    const artistGroupKey = artistName.toLowerCase();
+    const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
+
+    try {
+      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      for (const [id, name] of [
+        [trackPrevOnly, `Prev Only ${suffix}`],
+        [trackBoth, `Both Windows ${suffix}`],
+      ]) {
+        await sql`
+          INSERT INTO tracks (id, name, artist_name, album_name, artist_id, album_id, artist_group_key, album_group_key, duration_ms, enrichment_status)
+          VALUES (${id}, ${name}, ${artistName}, ${albumName}, ${artistId}, ${albumId}, ${artistGroupKey}, ${albumGroupKey}, 180000, 'enriched')
+          ON CONFLICT (id) DO NOTHING
+        `;
+      }
+
+      // Window: 2001-02-01..2001-02-28 (28 days, UTC). Previous equal-length window: 2001-01-04..2001-01-31.
+      await sql`
+        INSERT INTO plays (played_at, track_id, ms_played)
+        VALUES
+          ('2001-01-10T10:00:00Z'::timestamptz, ${trackPrevOnly}, 180000),
+          ('2001-01-11T10:00:00Z'::timestamptz, ${trackPrevOnly}, 180000),
+          ('2001-01-12T10:00:00Z'::timestamptz, ${trackPrevOnly}, 180000),
+          ('2001-01-15T10:00:00Z'::timestamptz, ${trackBoth}, 180000),
+          ('2001-02-10T10:00:00Z'::timestamptz, ${trackBoth}, 180000),
+          ('2001-02-11T10:00:00Z'::timestamptz, ${trackBoth}, 180000)
+        ON CONFLICT (played_at, track_id) DO NOTHING
+      `;
+
+      const overview = await getOverviewData(
+        { kind: "window", from: "2001-02-01", to: "2001-02-28" },
+        "UTC",
+      );
+
+      assert.equal(overview.topTracks.some((tr) => tr.id === trackPrevOnly), false);
+      const bothRow = overview.topTracks.find((tr) => tr.id === trackBoth);
+      assert.ok(bothRow, "expected track present in both windows");
+      assert.equal(bothRow.rank, "01");
+      assert.equal(bothRow.drift, "+1");
+    } finally {
+      await sql`DELETE FROM plays WHERE track_id IN (${trackPrevOnly}, ${trackBoth})`;
+      await sql`DELETE FROM tracks WHERE id IN (${trackPrevOnly}, ${trackBoth})`;
+      await sql`DELETE FROM albums WHERE id = ${albumId}`;
+      await sql`DELETE FROM artists WHERE id = ${artistId}`;
+    }
+  });
+
+  await t.test("artist profile respects fixed window bounds and keeps fixed start", async () => {
+    const suffix = `artwin${Date.now()}`;
+    const artistId = `art_${suffix}`;
+    const albumId = `alb_${suffix}`;
+    const trackId = `trk_${suffix}`;
+    const artistName = `Profile Window Artist ${suffix}`;
+    const albumName = `Profile Window Album ${suffix}`;
+    const artistGroupKey = artistName.toLowerCase();
+    const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
+
+    try {
+      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      await sql`
+        INSERT INTO tracks (id, name, artist_name, album_name, artist_id, album_id, artist_group_key, album_group_key, duration_ms, enrichment_status)
+        VALUES (${trackId}, ${`Track ${suffix}`}, ${artistName}, ${albumName}, ${artistId}, ${albumId}, ${artistGroupKey}, ${albumGroupKey}, 180000, 'enriched')
+        ON CONFLICT (id) DO NOTHING
+      `;
+
+      await sql`
+        INSERT INTO plays (played_at, track_id, ms_played)
+        VALUES
+          ('2001-03-31T04:30:00Z'::timestamptz, ${trackId}, 180000),
+          ('2001-04-10T18:00:00Z'::timestamptz, ${trackId}, 180000),
+          ('2001-04-15T18:00:00Z'::timestamptz, ${trackId}, 180000),
+          ('2001-05-01T06:00:00Z'::timestamptz, ${trackId}, 180000)
+        ON CONFLICT (played_at, track_id) DO NOTHING
+      `;
+
+      const profile = await getProfile(
+        { kind: "artist", key: artistId },
+        { kind: "window", from: "2001-04-01", to: "2001-04-30" },
+        "America/Chicago",
+      );
+
+      assert.ok(profile);
+      assert.equal(profile.range, "2001-04-01..2001-04-30");
+      assert.equal(profile.granularity, "day");
+      assert.equal(profile.plays, 2);
+      assert.equal(profile.recentPlays.length, 2);
+      assert.equal(profile.activityCadence.reduce((sum, b) => sum + b.count, 0), 2);
+      assert.equal(profile.activityCadence.length, 30);
+    } finally {
+      await sql`DELETE FROM plays WHERE track_id = ${trackId}`;
+      await sql`DELETE FROM tracks WHERE id = ${trackId}`;
+      await sql`DELETE FROM albums WHERE id = ${albumId}`;
+      await sql`DELETE FROM artists WHERE id = ${artistId}`;
+    }
+  });
+});
+
+// Scoped query-contract tests with a stubbed SQL tag so red/green verification runs without TEST_DATABASE_URL.
+interface StubSqlCall {
+  query: string;
+  values: unknown[];
+}
+
+function createStubSql(resolver: (query: string, values: unknown[]) => unknown[]) {
+  const calls: StubSqlCall[] = [];
+  const flatten = (strings: TemplateStringsArray, vals: unknown[]): { text: string; params: unknown[] } => {
+    let text = "";
+    const params: unknown[] = [];
+    for (let i = 0; i < strings.length; i++) {
+      text += strings[i];
+      if (i < vals.length) {
+        const v = vals[i] as { __sqlFragment?: true; text?: string; params?: unknown[] } | undefined;
+        if (v && typeof v === "object" && v.__sqlFragment) {
+          text += v.text ?? "";
+          params.push(...(v.params ?? []));
+        } else {
+          params.push(v);
+          text += `$${params.length}`;
+        }
+      }
+    }
+    return { text, params };
+  };
+
+  const tag = (strings: TemplateStringsArray, ...vals: unknown[]) => {
+    const { text, params } = flatten(strings, vals);
+    const fragment: {
+      __sqlFragment: true;
+      text: string;
+      params: unknown[];
+      then: Promise<unknown[]>["then"];
+    } = {
+      __sqlFragment: true,
+      text,
+      params,
+      then(onFulfilled, onRejected) {
+        calls.push({ query: text, values: params });
+        return Promise.resolve(resolver(text, params)).then(onFulfilled, onRejected);
+      },
+    };
+    return fragment;
+  };
+
+  return { sql: tag, calls };
+}
+
+test("range-filter, overview, profile, and formatOverviewMetrics contract (stubbed SQL)", async (t) => {
+  await t.test("resolveServerRange queries MIN(played_at) only for all and buildTimeFilter builds expected SQL", async () => {
+    const { sql, calls } = createStubSql((query) => {
+      if (query.includes("MIN(played_at)")) {
+        return [{ log_start_date: "2023-06-15T12:00:00.000Z" }];
+      }
+      return [];
+    });
+
+    const rangeFilter = loadTs("src/lib/db/queries/range-filter.ts", {
+      "../index": { getDb: () => sql },
+    });
+
+    const now = new Date("2025-11-20T18:00:00.000Z");
+
+    const allRes = await rangeFilter.resolveServerRange(presetRange("all"), "America/Chicago", now);
+    assert.equal(calls.length, 1);
+    assert.equal(allRes.granularity, "year");
+    assert.equal(allRes.window.from, "2023-01-01T06:00:00.000Z");
+    assert.equal(allRes.window.to, now.toISOString());
+
+    const allFilter = rangeFilter.buildTimeFilter(presetRange("all"), allRes.window) as { text: string; params: unknown[] };
+    assert.equal(allFilter.text.trim(), "TRUE");
+
+    const weekRes = await rangeFilter.resolveServerRange(presetRange("1w"), "America/Chicago", now);
+    assert.equal(calls.length, 1, "non-all preset must not query MIN(played_at)");
+    assert.equal(weekRes.granularity, "block6h");
+    const weekFilter = rangeFilter.buildTimeFilter(presetRange("1w"), weekRes.window) as { text: string; params: unknown[] };
+    assert.ok(weekFilter.text.includes("p.played_at >="));
+    assert.ok(!weekFilter.text.includes("p.played_at <"));
+    assert.deepEqual(weekFilter.params, [weekRes.window.from]);
+
+    const winSel: RangeSelection = { kind: "window", from: "2025-11-01", to: "2025-11-30" };
+    const winRes = await rangeFilter.resolveServerRange(winSel, "America/Chicago", now);
+    assert.equal(calls.length, 1, "fixed window must not query MIN(played_at)");
+    assert.equal(winRes.granularity, "day");
+    assert.equal(winRes.window.from, "2025-11-01T05:00:00.000Z");
+    assert.equal(winRes.window.to, "2025-12-01T06:00:00.000Z");
+    const winFilter = rangeFilter.buildTimeFilter(winSel, winRes.window) as { text: string; params: unknown[] };
+    assert.ok(winFilter.text.includes("p.played_at >=") && winFilter.text.includes("p.played_at <"));
+    assert.deepEqual(winFilter.params, ["2025-11-01T05:00:00.000Z", "2025-12-01T06:00:00.000Z"]);
+  });
+
+  await t.test("getOverviewData reuses MIN(played_at) on all and binds half-open and previousWindow bounds on windows", async () => {
+    const { sql, calls } = createStubSql((query) => {
+      if (query.includes("MIN(played_at) AS log_start_date")) {
+        return [{ log_start_date: "2023-06-15T12:00:00.000Z" }];
+      }
+      if (query.includes("AS window_min_date")) {
+        return [{ tracks: 4, artists: 2, total_ms: 3_600_000, window_min_date: "2023-06-15T12:00:00.000Z" }];
+      }
+      if (query.includes("AS bucket_key")) {
+        return [{ bucket_key: "2025-11-15", count: 5 }];
+      }
+      return [];
+    });
+
+    const stubs = {
+      "../index": { getDb: () => sql },
+      "./enrichment": { isCatalogFullyEnriched: async () => true },
+      "./ingestion": { getLastSync: async () => "2025-11-20T18:00:00.000Z" },
+    };
+    const rangeFilter = loadTs("src/lib/db/queries/range-filter.ts", stubs);
+    const cadence = loadTs("src/lib/db/queries/cadence.ts", stubs);
+    const overviewMod = loadTs("src/lib/db/queries/overview.ts", {
+      ...stubs,
+      "./range-filter": rangeFilter,
+      "./cadence": cadence,
+    });
+
+    const allData = await overviewMod.getOverviewData(presetRange("all"), "America/Chicago");
+    const minQueriesOnAll = calls.filter((c) => c.query.includes("MIN(played_at) AS log_start_date"));
+    assert.equal(minQueriesOnAll.length, 1, "all preset must not run SELECT MIN(played_at) twice");
+    assert.equal(allData.range, "all");
+    assert.equal(allData.granularity, "year");
+
+    calls.length = 0;
+    const winSel: RangeSelection = { kind: "window", from: "2025-11-01", to: "2025-11-30" };
+    const winData = await overviewMod.getOverviewData(winSel, "America/Chicago");
+    assert.equal(winData.range, "2025-11-01..2025-11-30");
+    assert.equal(winData.granularity, "day");
+    assert.equal(winData.activityCadence.length, 30);
+    assert.equal(winData.activityCadence.reduce((s: number, b: { count: number }) => s + b.count, 0), 5);
+
+    const driftCall = calls.find((c) => c.query.includes("previous_window"));
+    assert.ok(driftCall, "fixed window must compute previous_window drift");
+    const expectedPrev = previousWindow({
+      from: "2025-11-01T05:00:00.000Z",
+      to: "2025-12-01T06:00:00.000Z",
+    });
+    assert.ok(driftCall.values.includes("2025-11-01T05:00:00.000Z"));
+    assert.ok(driftCall.values.includes("2025-12-01T06:00:00.000Z"));
+    assert.ok(driftCall.values.includes(expectedPrev.from));
+    assert.ok(driftCall.values.includes(expectedPrev.to));
+  });
+
+  await t.test("getProfile preserves entity-relative start on all and fixed start on multi-year fixed windows", async () => {
+    const { sql, calls } = createStubSql((query) => {
+      if (query.includes("MIN(played_at) AS log_start_date")) {
+        return [{ log_start_date: "2020-03-01T12:00:00.000Z" }];
+      }
+      if (query.includes("AS resolved_key")) {
+        return [{ resolved_key: "artist-1" }];
+      }
+      if (query.includes("AS lifetime_plays")) {
+        return [{
+          name: "Test Artist",
+          first_played_at: "2024-05-10T12:00:00.000Z",
+          last_played_at: "2025-11-10T12:00:00.000Z",
+          lifetime_plays: 4,
+        }];
+      }
+      if (query.includes("AS bucket_key")) {
+        return [
+          { bucket_key: "2024-05", count: 2 },
+          { bucket_key: "2025-11", count: 2 },
+        ];
+      }
+      if (query.includes("AS rank")) {
+        return [{ plays: 4, rank: 1 }];
+      }
+      if (query.includes("AS total")) {
+        return [{ total: 10 }];
+      }
+      return [];
+    });
+
+    const stubs = {
+      "../index": { getDb: () => sql },
+      "./enrichment": { isCatalogFullyEnriched: async () => true },
+    };
+    const rangeFilter = loadTs("src/lib/db/queries/range-filter.ts", stubs);
+    const cadence = loadTs("src/lib/db/queries/cadence.ts", stubs);
+    const profileMod = loadTs("src/lib/db/queries/profile.ts", {
+      ...stubs,
+      "./range-filter": rangeFilter,
+      "./cadence": cadence,
+    });
+
+    const allProfile = await profileMod.getProfile({ kind: "artist", key: "artist-1" }, presetRange("all"), "America/Chicago");
+    assert.ok(allProfile);
+    assert.equal(allProfile.range, "all");
+    assert.equal(allProfile.granularity, "year");
+    assert.equal(allProfile.activityCadence[0]?.date, "2024", "all preset preserves entity first year instead of global 2020");
+    assert.ok(allProfile.monthlyCadence && allProfile.monthlyCadence.length > 0);
+    const cadenceQueryAll = calls.find((c) => c.query.includes("AS bucket_key"));
+    assert.ok(cadenceQueryAll?.query.includes("YYYY-MM"), "year profile granularity queries month rows");
+
+    calls.length = 0;
+    const fixedSel: RangeSelection = { kind: "window", from: "2022-01-01", to: "2025-12-31" };
+    const fixedProfile = await profileMod.getProfile({ kind: "artist", key: "artist-1" }, fixedSel, "America/Chicago");
+    assert.ok(fixedProfile);
+    assert.equal(fixedProfile.range, "2022-01-01..2025-12-31");
+    assert.equal(fixedProfile.granularity, "year");
+    assert.equal(fixedProfile.activityCadence[0]?.date, "2022", "fixed window keeps selected start year");
+  });
+
+  await t.test("formatOverviewMetrics uses one decimal for hour and block6h and integer otherwise", () => {
+    const raw = { totalMs: 5_400_000, trackCount: 3, artistCount: 2, elapsedDays: 1 };
+    const byGranularity: Record<CadenceGranularity, string> = {
+      hour: "1.5",
+      block6h: "1.5",
+      day: "2",
+      week: "2",
+      month: "2",
+      year: "2",
+    };
+    for (const [granularity, expected] of Object.entries(byGranularity) as Array<[CadenceGranularity, string]>) {
+      const [hoursStr] = formatOverviewMetrics(raw, "hours", granularity);
+      assert.equal(hoursStr, expected, `expected ${expected} for ${granularity}`);
+    }
   });
 });

@@ -1,10 +1,22 @@
 import { getDb } from "../index";
 import { isCatalogFullyEnriched } from "./enrichment";
 import { sanitizeTimezone } from "./helpers";
-import { OVERVIEW_INTERVAL_CONFIG } from "./overview";
-import { buildCadenceQuery, buildProfileCadence, type CadenceScope } from "./cadence";
+import {
+  buildCadenceQuery,
+  buildProfileCadence,
+  cadenceRowGranularity,
+  type CadenceRow,
+  type CadenceScope,
+} from "./cadence";
+import { buildTimeFilter, resolveServerRange } from "./range-filter";
 import { artistShare, computePeakDay, longestStreakRange } from "@/lib/profile-stats";
-import type { RangeKey } from "@/lib/types";
+import {
+  formatRangeParam,
+  resolveRangeWindow,
+  type CadenceGranularity,
+  type RangeSelection,
+  type TimeWindow,
+} from "@/lib/range";
 import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_ALBUM_TRACKS_LIMIT,
@@ -69,17 +81,36 @@ function summarizeDailyCounts(rows: Record<string, unknown>[]) {
   };
 }
 
+function profileDisplayWindow(
+  sel: RangeSelection,
+  globalWindow: TimeWindow,
+  firstPlayedAt: unknown,
+  tz: string,
+  now: Date,
+): TimeWindow {
+  if (sel.kind === "preset" && sel.key === "all" && firstPlayedAt) {
+    return resolveRangeWindow(sel, {
+      now,
+      tz,
+      logStart: toIso(firstPlayedAt),
+    });
+  }
+  return globalWindow;
+}
+
 export async function getProfile(
   target: ProfileTarget,
-  range: RangeKey,
+  sel: RangeSelection,
   tz: string
 ): Promise<ProfileData | null> {
   const sql = getDb();
   const safeTz = sanitizeTimezone(tz);
-  const isAll = range === "all";
-  const timeFilter = isAll
-    ? sql`TRUE`
-    : sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+  const now = new Date();
+  const { window, granularity } = await resolveServerRange(sel, safeTz, now);
+  const timeFilter = buildTimeFilter(sel, window);
+  const rangeParam = formatRangeParam(sel);
+  const profileRowGranularity: CadenceGranularity =
+    granularity === "year" ? "month" : cadenceRowGranularity(granularity);
 
   if (target.kind === "track") {
     const trackRows = await sql`
@@ -149,7 +180,7 @@ export async function getProfile(
           FROM plays p
           WHERE ${timeFilter};
         `,
-        buildCadenceQuery(range, safeTz, { kind: "track", trackId }),
+        buildCadenceQuery(window, profileRowGranularity, safeTz, { kind: "track", trackId }),
         sql`
           SELECT
             p.id::text,
@@ -262,10 +293,11 @@ export async function getProfile(
     const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
 
     const cadence = buildProfileCadence({
-      range,
+      window: profileDisplayWindow(sel, window, trackRow.first_played_at, safeTz, now),
+      granularity,
       tz: safeTz,
-      cadenceRows: cadenceRows as Record<string, unknown>[],
-      minDateRow: { log_start_date: toIso(trackRow.first_played_at) },
+      now,
+      cadenceRows: cadenceRows as CadenceRow[],
     });
 
     const dailySummary = summarizeDailyCounts(
@@ -297,7 +329,8 @@ export async function getProfile(
       artistName: (trackRow.artist_name as string | null) ?? null,
       albumName: (trackRow.album_name as string | null) ?? null,
       imageUrl: (trackRow.image_url as string | null) ?? null,
-      range,
+      range: rangeParam,
+      granularity,
       firstPlayedAt: trackRow.first_played_at ? toIso(trackRow.first_played_at) : null,
       lastPlayedAt: trackRow.last_played_at ? toIso(trackRow.last_played_at) : null,
       plays,
@@ -331,7 +364,7 @@ export async function getProfile(
   }
 
   if (target.kind === "album") {
-    return getAlbumProfile(target, range, safeTz, timeFilter);
+    return getAlbumProfile(target, sel, window, granularity, profileRowGranularity, rangeParam, safeTz, now, timeFilter);
   }
 
   // Artist profile: resolve either key form with active identity form taking precedence.
@@ -432,7 +465,7 @@ export async function getProfile(
       ORDER BY COUNT(p.id) DESC, COALESCE(MAX(al.name), MAX(t.album_name)) ASC
       LIMIT 1;
     `,
-    buildCadenceQuery(range, safeTz, scope),
+    buildCadenceQuery(window, profileRowGranularity, safeTz, scope),
     sql`
       SELECT
         t.id,
@@ -527,10 +560,11 @@ export async function getProfile(
   const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
 
   const cadence = buildProfileCadence({
-    range,
+    window: profileDisplayWindow(sel, window, lifetimeRow.first_played_at, safeTz, now),
+    granularity,
     tz: safeTz,
-    cadenceRows: cadenceRows as Record<string, unknown>[],
-    minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
+    now,
+    cadenceRows: cadenceRows as CadenceRow[],
   });
 
   const dailySummary = summarizeDailyCounts(
@@ -565,7 +599,8 @@ export async function getProfile(
     artistName: null,
     albumName: null,
     imageUrl: (imageRows[0]?.image_url as string | null) ?? null,
-    range,
+    range: rangeParam,
+    granularity,
     firstPlayedAt: lifetimeRow.first_played_at ? toIso(lifetimeRow.first_played_at) : null,
     lastPlayedAt: lifetimeRow.last_played_at ? toIso(lifetimeRow.last_played_at) : null,
     plays,
@@ -590,8 +625,13 @@ export async function getProfile(
 
 async function getAlbumProfile(
   target: ProfileTarget,
-  range: RangeKey,
+  sel: RangeSelection,
+  window: TimeWindow,
+  granularity: CadenceGranularity,
+  profileRowGranularity: CadenceGranularity,
+  rangeParam: string,
   safeTz: string,
+  now: Date,
   timeFilter: ReturnType<ReturnType<typeof getDb>>
 ): Promise<ProfileData | null> {
   const sql = getDb();
@@ -694,7 +734,7 @@ async function getAlbumProfile(
       JOIN tracks t ON p.track_id = t.id
       WHERE ${timeFilter} AND ${albumFilterForRank};
     `,
-    buildCadenceQuery(range, safeTz, scope),
+    buildCadenceQuery(window, profileRowGranularity, safeTz, scope),
     sql`
       SELECT
         t.id,
@@ -816,10 +856,11 @@ async function getAlbumProfile(
   const rankedTotal = Number(rankedTotalRows[0]?.total ?? 0);
 
   const cadence = buildProfileCadence({
-    range,
+    window: profileDisplayWindow(sel, window, lifetimeRow.first_played_at, safeTz, now),
+    granularity,
     tz: safeTz,
-    cadenceRows: cadenceRows as Record<string, unknown>[],
-    minDateRow: { log_start_date: toIso(lifetimeRow.first_played_at) },
+    now,
+    cadenceRows: cadenceRows as CadenceRow[],
   });
 
   const dailySummary = summarizeDailyCounts(
@@ -854,7 +895,8 @@ async function getAlbumProfile(
     artistName: (lifetimeRow.artist_name as string | null) ?? null,
     albumName: null,
     imageUrl: (lifetimeRow.image_url as string | null) ?? null,
-    range,
+    range: rangeParam,
+    granularity,
     firstPlayedAt: lifetimeRow.first_played_at ? toIso(lifetimeRow.first_played_at) : null,
     lastPlayedAt: lifetimeRow.last_played_at ? toIso(lifetimeRow.last_played_at) : null,
     plays,

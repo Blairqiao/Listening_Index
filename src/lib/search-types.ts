@@ -1,4 +1,5 @@
 import type { ActivityBucket, RangeKey } from "@/lib/types";
+import type { CadenceGranularity } from "@/lib/range";
 
 export const SEARCH_RESULT_LIMIT = 8;
 export const SEARCH_TRACK_ROWS = SEARCH_RESULT_LIMIT;
@@ -149,7 +150,8 @@ export interface ProfileData {
   artistName: string | null;   // The Artist on a Track or Album profile. Null for Artist profiles.
   albumName: string | null;    // Track profiles only
   imageUrl: string | null;
-  range: RangeKey;
+  range: string;
+  granularity: CadenceGranularity;
   firstPlayedAt: string | null; // lifetime, ISO
   lastPlayedAt: string | null;  // lifetime, ISO
   plays: number;               // in range

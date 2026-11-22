@@ -18,12 +18,12 @@ export interface StreamLogMetricsRaw {
 export function formatOverviewMetrics(
   raw: OverviewMetricsRaw,
   unit: "minutes" | "hours",
-  range: RangeKey
+  granularity: CadenceGranularity
 ): [string, string, string, string] {
   let timeStr: string;
   if (unit === "hours") {
     const hours = raw.totalMs / 3600000.0;
-    if (range === "1d" || range === "1w") {
+    if (granularity === "hour" || granularity === "block6h") {
       timeStr = hours.toFixed(1);
     } else {
       timeStr = Math.round(hours).toLocaleString();

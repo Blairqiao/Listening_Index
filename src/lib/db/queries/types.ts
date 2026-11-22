@@ -8,6 +8,7 @@ import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "@/lib/format-utils
 
 export type { StreamLogItem } from "@/lib/types";
 export type { RangeKey, AlbumSummary, ActivityDay, ActivityBucket };
+export type { RangeSelection, TimeWindow, CadenceGranularity } from "@/lib/range";
 export type { OverviewMetricsRaw, StreamLogMetricsRaw };
 
 export type { OverviewData, StreamLogData } from "@/lib/types";
