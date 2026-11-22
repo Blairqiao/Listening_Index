@@ -802,6 +802,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 topAlbums={currentOverview.topAlbums}
                 activityCadence={currentOverview.activityCadence}
                 isLoading={!overviewCache[displayedRange] && isDbConfigured}
+                onOpenProfile={(target) => {
+                  shouldPushHistoryRef.current = true;
+                  setActiveMode(4);
+                  handleOpenProfile(target);
+                  window.scrollTo(0, 0);
+                }}
               />
             )}
 

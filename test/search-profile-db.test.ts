@@ -250,6 +250,30 @@ test("search and profile DB queries", dbTest, async (t) => {
     assert.equal(byId.name, byGroupKey.name);
   });
 
+  await t.test("overview profile keys open the matching profiles", async () => {
+    const overview = await getOverviewData("all", "UTC");
+    const track = overview.topTracks[0];
+    const artist = overview.topArtists[0];
+    const album = overview.topAlbums[0];
+    assert.ok(track && artist && album, "expected overview top lists");
+    assert.ok(track.artistKey && track.albumKey && artist.key && album.key && album.artistKey);
+
+    const [trackArtist, trackAlbum, artistProfile, albumProfile, albumArtist] = await Promise.all([
+      getProfile({ kind: "artist", key: track.artistKey }, "all", "UTC"),
+      getProfile({ kind: "album", key: track.albumKey }, "all", "UTC"),
+      getProfile({ kind: "artist", key: artist.key }, "all", "UTC"),
+      getProfile({ kind: "album", key: album.key }, "all", "UTC"),
+      getProfile({ kind: "artist", key: album.artistKey }, "all", "UTC"),
+    ]);
+    assert.equal(trackArtist?.name, track.artist);
+    assert.equal(trackAlbum?.name, track.album);
+    assert.equal(artistProfile?.name, artist.name);
+    assert.equal(artistProfile?.plays, artist.count);
+    assert.equal(albumProfile?.name, album.name);
+    assert.equal(albumProfile?.plays, album.count);
+    assert.equal(albumArtist?.name, album.artist);
+  });
+
   await t.test("lifetime fields, recentPlays order/limit, and artist lists", async () => {
     const { overviewAll, topArtist, track1d, trackAll, artist1d, artistAll } =
       await captureStableComparison(sql, "lifetime-fields-and-lists", async () => {

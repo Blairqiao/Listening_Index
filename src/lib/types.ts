@@ -11,8 +11,10 @@ export interface TrackSummary {
   name: string;
   artist: string;
   artistId?: string;
+  artistKey?: string; // Profile key: Spotify ID, or Group Key before enrichment
   album: string;
   albumId?: string;
+  albumKey?: string;
   duration: string; // '5:18'
   plays: number;
   swatchColor: string;
@@ -108,12 +110,22 @@ export interface SessionData {
   lastSyncedAt?: string;
 }
 
+export interface ArtistSummary {
+  rank: string;
+  name: string;
+  count: number;
+  id?: string;
+  key?: string; // Profile key: Spotify ID, or Group Key before enrichment
+}
+
 export interface AlbumSummary {
   id?: string;
+  key?: string; // Profile key: Spotify ID, or Group Key before enrichment
   rank: string; // '01', '02', etc.
   name: string; // e.g., 'Blonde'
   artist: string; // e.g., 'Frank Ocean'
   artistId?: string;
+  artistKey?: string;
   count: number; // e.g., 241
 }
 
@@ -133,7 +145,7 @@ export interface OverviewData {
   rawMetrics: OverviewMetricsRaw;
   metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg
   topTracks: TrackSummary[];
-  topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
+  topArtists: ArtistSummary[];
   topAlbums: AlbumSummary[];
   activityCadence: ActivityBucket[]; // Multi-scale activity distribution
   lastSyncedAt?: string;

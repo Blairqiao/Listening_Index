@@ -12,6 +12,7 @@ import { buildCadenceQuery, buildActivityCadence } from "./cadence";
 import type { OverviewData, RangeKey } from "./types";
 import type {
   TrackSummary,
+  ArtistSummary,
   AlbumSummary,
 } from "@/lib/types";
 
@@ -76,6 +77,8 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
             t.id AS track_id,
             t.artist_id,
             t.album_id,
+            COALESCE(t.artist_id, t.artist_group_key) AS artist_key,
+            COALESCE(t.album_id, t.album_group_key) AS album_key,
             t.name AS title,
             COALESCE(ar.name, t.artist_name) AS artist,
             COALESCE(al.name, t.album_name) AS album,
@@ -116,6 +119,8 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
             t.id AS track_id,
             t.artist_id,
             t.album_id,
+            COALESCE(t.artist_id, t.artist_group_key) AS artist_key,
+            COALESCE(t.album_id, t.album_group_key) AS album_key,
             t.name AS title,
             COALESCE(ar.name, t.artist_name) AS artist,
             COALESCE(al.name, t.album_name) AS album,
@@ -138,6 +143,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     return sql`
       SELECT 
         ${isEnriched ? sql`t.artist_id` : sql`MAX(t.artist_id)`} AS id,
+        ${artistGroupCol} AS profile_key,
         COALESCE(MAX(ar.name), MAX(t.artist_name)) AS name,
         COUNT(p.id)::int AS count
       FROM plays p
@@ -157,9 +163,11 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     return sql`
       SELECT 
         ${isEnriched ? sql`t.album_id` : sql`MAX(t.album_id)`} AS id,
+        ${albumGroupCol} AS profile_key,
         COALESCE(MAX(al.name), MAX(t.album_name)) AS name,
         COALESCE(MAX(ar.name), MAX(t.artist_name)) AS artist,
         MAX(t.artist_id) AS artist_id,
+        COALESCE(MAX(t.artist_id), MAX(t.artist_group_key)) AS artist_key,
         COUNT(p.id)::int AS count
       FROM plays p
       JOIN tracks t ON p.track_id = t.id
@@ -236,8 +244,10 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     name: row.title,
     artist: row.artist,
     artistId: row.artist_id || undefined,
+    artistKey: row.artist_key || undefined,
     album: row.album,
     albumId: row.album_id || undefined,
+    albumKey: row.album_key || undefined,
     duration: formatDurationMs(row.duration_ms || 0),
     plays: Number(row.plays),
     swatchColor: getSwatchColor(row.track_id + row.title),
@@ -245,8 +255,9 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   }));
 
   // Process top artists
-  const topArtists = rawTopArtists.map((row, idx) => ({
+  const topArtists: ArtistSummary[] = rawTopArtists.map((row, idx) => ({
     id: row.id || undefined,
+    key: row.profile_key || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
     count: Number(row.count),
@@ -255,10 +266,12 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   // Process top albums
   const topAlbums: AlbumSummary[] = rawTopAlbums.map((row, idx) => ({
     id: row.id || undefined,
+    key: row.profile_key || undefined,
     rank: String(idx + 1).padStart(2, "0"),
     name: row.name,
     artist: row.artist,
     artistId: row.artist_id || undefined,
+    artistKey: row.artist_key || undefined,
     count: Number(row.count),
   }));
 

@@ -1,17 +1,47 @@
 "use client";
 
 import React from "react";
-import { TrackSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
+import { TrackSummary, ArtistSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
+import type { ProfileKind, ProfileTarget } from "@/lib/search-types";
 import { Artwork } from "../Artwork";
 import { ActivityChart } from "./ActivityChart";
 
 interface OverviewViewProps {
   range: RangeKey;
   topTracks: TrackSummary[];
-  topArtists: Array<{ rank: string; name: string; count: number; id?: string }>;
+  topArtists: ArtistSummary[];
   topAlbums: AlbumSummary[];
   activityCadence?: ActivityDay[];
   isLoading?: boolean;
+  onOpenProfile?: (target: ProfileTarget) => void;
+}
+
+const KIND_LABEL: Record<ProfileKind, string> = { track: "Track", artist: "Artist", album: "Album" };
+
+// Inline names stay spans so the parent's truncation still applies; the row's own click
+// handler is skipped so a name opens its own profile.
+function profileLinkProps(
+  kind: ProfileKind,
+  key: string,
+  name: string,
+  onOpenProfile?: (target: ProfileTarget) => void
+) {
+  const open = (event: { stopPropagation(): void }) => {
+    event.stopPropagation();
+    onOpenProfile?.({ kind, key });
+  };
+  return {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": `Open ${KIND_LABEL[kind]} profile for ${name}`,
+    onClick: open,
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open(event);
+      }
+    },
+  };
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -21,6 +51,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   topAlbums,
   activityCadence = [],
   isLoading = false,
+  onOpenProfile,
 }) => {
   const displayTracks = topTracks;
 
@@ -74,13 +105,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                   <div
                     key={track.id}
                     role="listitem"
-                    onClick={() =>
-                      window.open(
-                        `https://open.spotify.com/track/${track.id}`,
-                        "_blank",
-                        "noopener,noreferrer"
-                      )
-                    }
+                    data-profile-kind="track"
+                    onClick={() => onOpenProfile?.({ kind: "track", key: track.id })}
                     className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] ${isLast ? "border-b-0" : "border-b border-[#191917]"
                       }`}
                   >
@@ -112,40 +138,31 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
                     {/* Stacked Track Title & Metadata */}
                     <div className="min-w-0 flex-1 pl-1">
-                      <a
-                        href={`https://open.spotify.com/track/${track.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug no-underline select-none"
+                      <span
+                        {...profileLinkProps("track", track.id, track.name, onOpenProfile)}
+                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug select-none focus-visible:outline-music-accent"
                       >
                         {track.name}
-                      </a>
+                      </span>
                       <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
-                        {track.artistId ? (
-                          <a
-                            href={`https://open.spotify.com/artist/${track.artistId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
+                        {track.artistKey ? (
+                          <span
+                            {...profileLinkProps("artist", track.artistKey, track.artist, onOpenProfile)}
+                            className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted text-inherit focus-visible:outline-music-accent"
                           >
                             {track.artist}
-                          </a>
+                          </span>
                         ) : (
                           <span>{track.artist}</span>
                         )}
                         {" • "}
-                        {track.albumId ? (
-                          <a
-                            href={`https://open.spotify.com/album/${track.albumId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
+                        {track.albumKey ? (
+                          <span
+                            {...profileLinkProps("album", track.albumKey, track.album, onOpenProfile)}
+                            className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted text-inherit focus-visible:outline-music-accent"
                           >
                             {track.album}
-                          </a>
+                          </span>
                         ) : (
                           <span>{track.album}</span>
                         )}
@@ -202,26 +219,29 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <>
                 {topArtists.map((artist, idx) => {
                   const isLast = idx === topArtists.length - 1 && topArtists.length >= 5;
+                  const artistKey = artist.key ?? artist.id;
                   return (
-                    <a
+                    <div
                       key={artist.name}
                       role="listitem"
-                      href={artist.id ? `https://open.spotify.com/artist/${artist.id}` : undefined}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer no-underline hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                      data-profile-kind={artistKey ? "artist" : undefined}
+                      onClick={artistKey ? () => onOpenProfile?.({ kind: "artist", key: artistKey }) : undefined}
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 transition-none ${artistKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
                       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {artist.rank}
                       </span>
-                      <span className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent transition-none">
+                      <span
+                        {...(artistKey ? profileLinkProps("artist", artistKey, artist.name, onOpenProfile) : {})}
+                        className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent transition-none focus-visible:outline-music-accent"
+                      >
                         {artist.name}
                       </span>
                       <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums select-all">
                         {artist.count.toLocaleString()}
                       </span>
-                    </a>
+                    </div>
                   );
                 })}
                 {Array.from({ length: artistPlaceholderCount }).map((_, idx) => (
@@ -263,47 +283,33 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <>
                 {topAlbums.map((album, idx) => {
                   const isLast = idx === topAlbums.length - 1 && topAlbums.length >= 5;
+                  const albumKey = album.key ?? album.id;
+                  const albumArtistKey = album.artistKey ?? album.artistId;
                   return (
                     <div
                       key={album.name}
                       role="listitem"
-                      onClick={() =>
-                        album.id &&
-                        window.open(
-                          `https://open.spotify.com/album/${album.id}`,
-                          "_blank",
-                          "noopener,noreferrer"
-                        )
-                      }
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 cursor-pointer hover:bg-[#111110] transition-none ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                      data-profile-kind={albumKey ? "album" : undefined}
+                      onClick={albumKey ? () => onOpenProfile?.({ kind: "album", key: albumKey }) : undefined}
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 transition-none ${albumKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
                       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {album.rank}
                       </span>
                       <div className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
-                        <a
-                          href={album.id ? `https://open.spotify.com/album/${album.id}` : undefined}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-sans text-[13px] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none no-underline"
+                        <span
+                          {...(albumKey ? profileLinkProps("album", albumKey, album.name, onOpenProfile) : {})}
+                          className="font-sans text-[13px] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none focus-visible:outline-music-accent"
                         >
                           {album.name}
-                        </a>
-                        <a
-                          href={
-                            album.artistId
-                              ? `https://open.spotify.com/artist/${album.artistId}`
-                              : undefined
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-[12px] text-[#6A6A64] truncate hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline"
+                        </span>
+                        <span
+                          {...(albumArtistKey ? profileLinkProps("artist", albumArtistKey, album.artist, onOpenProfile) : {})}
+                          className={`font-mono text-[12px] text-[#6A6A64] truncate focus-visible:outline-music-accent ${albumArtistKey ? "hover:text-[#EDEDE8] hover:underline hover:decoration-dotted" : ""}`}
                         >
                           {album.artist}
-                        </a>
+                        </span>
                       </div>
                       <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums select-all">
                         {album.count.toLocaleString()}
