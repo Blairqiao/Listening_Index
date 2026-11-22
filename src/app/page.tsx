@@ -12,7 +12,6 @@ import { DEFAULT_OVERVIEW_RANGE, parseRangeParam, type RangeSelection } from "@/
 import {
   checkSearchQuery,
   parseProfileTarget,
-  parseRangeKey,
   parseSearchFilter,
   parseSearchPage,
   parseSearchSort,
@@ -70,9 +69,8 @@ export default async function Page({ searchParams }: PageProps) {
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;
-  const rawPrange = firstParam(resolvedParams?.prange);
-  const initialProfileRange =
-    initialMode === 4 ? parseRangeKey(rawPrange) : null;
+  const initialProfileRange: RangeSelection | null =
+    initialMode === 4 ? parseRangeParam(firstParam(resolvedParams?.prange)) : null;
 
   const isInitialSearch = initialMode === 4 && !initialProfile;
   const checkedQuery = checkSearchQuery(firstParam(resolvedParams?.q) ?? "");

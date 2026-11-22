@@ -135,7 +135,7 @@ test('buildListeningUrlSearch manages overview range in mode 0 and leaves it alo
       activeMode: 0,
       overviewRange: novWindow,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     `?range=${encodeURIComponent(formatRangeParam(novWindow))}`,
   );
@@ -146,7 +146,7 @@ test('buildListeningUrlSearch manages overview range in mode 0 and leaves it alo
       activeMode: 0,
       overviewRange: presetRange('1y'),
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '?range=1y',
   );
@@ -157,7 +157,7 @@ test('buildListeningUrlSearch manages overview range in mode 0 and leaves it alo
       activeMode: 0,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '',
   );
@@ -168,7 +168,7 @@ test('buildListeningUrlSearch manages overview range in mode 0 and leaves it alo
       activeMode: 1,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '?mode=1&range=2025-11-01..2025-11-30',
   );
@@ -177,7 +177,7 @@ test('buildListeningUrlSearch manages overview range in mode 0 and leaves it alo
       activeMode: 1,
       overviewRange: novWindow,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '?mode=1',
   );
@@ -193,7 +193,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 0,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '',
   );
@@ -202,7 +202,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 0,
       overviewRange: novWindow,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     `?range=${encodeURIComponent(formatRangeParam(novWindow))}`,
   );
@@ -211,7 +211,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 0,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '',
   );
@@ -222,7 +222,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 2,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '?mode=2',
   );
@@ -231,7 +231,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 1,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '?mode=1',
   );
@@ -241,7 +241,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 1,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '',
   );
@@ -252,7 +252,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 0,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
       preservePendingMode3: true,
     }),
     '?mode=3',
@@ -262,7 +262,7 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
       activeMode: 0,
       overviewRange: DEFAULT_OVERVIEW_RANGE,
       profileTarget: null,
-      profileRange: 'all',
+      profileRange: presetRange('all'),
     }),
     '',
   );

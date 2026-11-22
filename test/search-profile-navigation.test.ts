@@ -9,9 +9,11 @@ import * as rangeModule from "../src/lib/range";
 import type { ProfileData, ProfileHistoryEntry, ProfileTarget } from "../src/lib/search-types";
 import type { Mode, RangeKey } from "../src/lib/types";
 import {
+  buildHistoryState,
   buildListeningUrlSearch,
   formatProfileRibbonMetrics,
   getProfileCacheKey,
+  readHistoryState,
   resolveDisplayedProfileData,
 } from "../src/components/listening-view/listening-helpers";
 import { useSearchProfile } from "../src/components/listening-view/useSearchProfile";
@@ -43,9 +45,10 @@ interface UseSearchProfileArgs {
   activeMode: Mode;
   visitorTimezone: string;
   initialProfile?: ProfileTarget | null;
-  initialProfileRange?: RangeKey | null;
+  initialProfileRange?: rangeModule.RangeSelection | null;
   initialSearchQuery?: string;
   isSyncing?: boolean;
+  onRequestPushHistory?: () => void;
 }
 
 function createProfileHookHarness() {
@@ -183,7 +186,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1w",
+      profileRange: rangeModule.presetRange("1w"),
     }),
     "?range=1w&foo=bar&mode=4"
   );
@@ -194,7 +197,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: { kind: "track", key: "t1" },
-      profileRange: "all",
+      profileRange: rangeModule.presetRange("all"),
     }),
     "?mode=4&range=1w&foo=bar&track=t1&prange=all"
   );
@@ -205,7 +208,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: { kind: "artist", key: "a1" },
-      profileRange: "6m",
+      profileRange: rangeModule.presetRange("6m"),
     }),
     "?mode=4&prange=6m&artist=a1"
   );
@@ -216,7 +219,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 0,
       overviewRange: defaultOverview,
       profileTarget: { kind: "track", key: "t1" },
-      profileRange: "all",
+      profileRange: rangeModule.presetRange("all"),
     }),
     "?foo=bar"
   );
@@ -227,7 +230,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 0,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1w",
+      profileRange: rangeModule.presetRange("1w"),
     }),
     ""
   );
@@ -238,7 +241,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 3,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1w",
+      profileRange: rangeModule.presetRange("1w"),
     }),
     "?mode=3&session=s1"
   );
@@ -247,7 +250,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 0,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1w",
+      profileRange: rangeModule.presetRange("1w"),
       preservePendingMode3: true,
     }),
     "?mode=3"
@@ -257,7 +260,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
       activeMode: 0,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1w",
+      profileRange: rangeModule.presetRange("1w"),
     }),
     ""
   );
@@ -270,7 +273,7 @@ test("buildListeningUrlSearch keeps only the active profile key, including Album
     activeMode: 4,
     overviewRange: defaultOverview,
     profileTarget: { kind: "album", key: "k" },
-    profileRange: "1y",
+    profileRange: rangeModule.presetRange("1y"),
   }), "?mode=4&album=k&prange=1y");
 
   for (const kind of ["track", "artist"] as const) {
@@ -278,16 +281,135 @@ test("buildListeningUrlSearch keeps only the active profile key, including Album
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: { kind, key: "k" },
-      profileRange: "1y",
+      profileRange: rangeModule.presetRange("1y"),
     }), `?mode=4&${kind}=k&prange=1y`);
   }
 
   assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
-    activeMode: 4, overviewRange: defaultOverview, profileTarget: null, profileRange: "1y",
+    activeMode: 4, overviewRange: defaultOverview, profileTarget: null, profileRange: rangeModule.presetRange("1y"),
   }), "?mode=4");
   assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
-    activeMode: 0, overviewRange: defaultOverview, profileTarget: { kind: "album", key: "k" }, profileRange: "1y",
+    activeMode: 0, overviewRange: defaultOverview, profileTarget: { kind: "album", key: "k" }, profileRange: rangeModule.presetRange("1y"),
   }), "");
+});
+
+test("window prange round-trips through buildListeningUrlSearch and readHistoryState", () => {
+  const defaultOverview = rangeModule.DEFAULT_OVERVIEW_RANGE;
+  const windowRange: rangeModule.RangeSelection = {
+    kind: "window",
+    from: "2025-11-01",
+    to: "2025-11-30",
+  };
+
+  const urlSearch = buildListeningUrlSearch("?mode=4", {
+    activeMode: 4,
+    overviewRange: defaultOverview,
+    profileTarget: { kind: "artist", key: "radiohead" },
+    profileRange: windowRange,
+  });
+  assert.equal(urlSearch, "?mode=4&artist=radiohead&prange=2025-11-01..2025-11-30");
+
+  const builtState = buildHistoryState({
+    profileHistory: [
+      {
+        target: { kind: "artist", key: "radiohead" },
+        range: windowRange,
+        name: "Radiohead",
+      },
+    ],
+  });
+
+  const restored = readHistoryState(builtState);
+  assert.ok(restored?.profileHistory);
+  assert.equal(restored.profileHistory.length, 1);
+  assert.deepEqual(restored.profileHistory[0].range, windowRange);
+});
+
+test("readHistoryState restores old history string as preset and falls back on invalid range", () => {
+  // Legacy string "1y" restores as { kind: "preset", key: "1y" }
+  const legacyState = {
+    listeningIndex: {
+      profileHistory: [
+        {
+          target: { kind: "artist", key: "radiohead" },
+          range: "1y",
+          name: "Radiohead",
+        },
+      ],
+    },
+  };
+  const restoredLegacy = readHistoryState(legacyState);
+  assert.deepEqual(restoredLegacy?.profileHistory?.[0].range, {
+    kind: "preset",
+    key: "1y",
+  });
+
+  // Invalid range string falls back to DEFAULT_PROFILE_RANGE
+  const invalidState = {
+    listeningIndex: {
+      profileHistory: [
+        {
+          target: { kind: "artist", key: "radiohead" },
+          range: "invalid-range-string",
+          name: "Radiohead",
+        },
+      ],
+    },
+  };
+  const restoredInvalid = readHistoryState(invalidState);
+  assert.deepEqual(
+    restoredInvalid?.profileHistory?.[0].range,
+    { kind: "preset", key: "all" }
+  );
+
+  const malformedState = { listeningIndex: { profileHistory: [{ target: { kind: "artist", key: "radiohead" }, range: { kind: "window" } }] } };
+  assert.deepEqual(readHistoryState(malformedState)?.profileHistory?.[0].range, { kind: "preset", key: "all" });
+
+  // Decodes ONLY namespaced listeningIndex state; unnamespaced state is ignored
+  const unnamespacedState = {
+    profileHistory: [
+      {
+        target: { kind: "artist", key: "radiohead" },
+        range: "1y",
+      },
+    ],
+  };
+  assert.equal(readHistoryState(unnamespacedState), null);
+
+  // Drops malformed entries with invalid targets to prevent breadcrumb navigation crashes
+  const malformedTargetState = {
+    listeningIndex: {
+      profileHistory: [
+        {
+          target: { kind: "artist", key: "radiohead" },
+          range: "1w",
+          name: "Radiohead",
+        },
+        {
+          target: null,
+          range: "1w",
+          name: "Null Target",
+        },
+        {
+          target: { kind: "unknown", key: "bad-kind" },
+          range: "1w",
+        },
+        {
+          target: { kind: "track", key: "   " },
+          range: "1w",
+        },
+        null,
+      ],
+    },
+  };
+  const restoredMalformed = readHistoryState(malformedTargetState);
+  assert.ok(restoredMalformed?.profileHistory);
+  assert.equal(restoredMalformed.profileHistory.length, 1);
+  assert.deepEqual(restoredMalformed.profileHistory[0], {
+    target: { kind: "artist", key: "radiohead" },
+    range: { kind: "preset", key: "1w" },
+    name: "Radiohead",
+  });
 });
 
 test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse and clears them on profile or mode change", () => {
@@ -299,7 +421,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1y",
+      profileRange: rangeModule.presetRange("1y"),
       search: { query: "  radiohead  ", filter: "albums", sort: "recent", page: 2 },
     }),
     "?mode=4&q=radiohead&type=albums&sort=recent&page=2"
@@ -311,7 +433,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1y",
+      profileRange: rangeModule.presetRange("1y"),
       search: { query: "   ", filter: "all", sort: "most-plays", page: 1 },
     }),
     "?mode=4"
@@ -323,7 +445,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
       activeMode: 4,
       overviewRange: defaultOverview,
       profileTarget: { kind: "artist", key: "a1" },
-      profileRange: "1y",
+      profileRange: rangeModule.presetRange("1y"),
       search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
     }),
     "?mode=4&artist=a1&prange=1y"
@@ -335,7 +457,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
       activeMode: 0,
       overviewRange: defaultOverview,
       profileTarget: null,
-      profileRange: "1y",
+      profileRange: rangeModule.presetRange("1y"),
       search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
     }),
     ""
@@ -349,7 +471,7 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
   const album: ProfileTarget = { kind: "album", key: "radiohead::in rainbows" };
   const track: ProfileTarget = { kind: "track", key: "weird-fishes" };
   const artist2: ProfileTarget = { kind: "artist", key: "thom-yorke" };
-  const args = { activeMode: 4, visitorTimezone: "UTC", initialProfileRange: "6m", initialSearchQuery: "in rainbows" } as const;
+  const args = { activeMode: 4, visitorTimezone: "UTC", initialProfileRange: rangeModule.presetRange("6m"), initialSearchQuery: "in rainbows" } as const;
 
   try {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -361,7 +483,7 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
         makeProfile({
           ...target,
           name: `Name:${target.key}`,
-          range: searchUtils.parseRangeKey(params.get("prange")) ?? "1w",
+          range: rangeModule.formatRangeParam(rangeModule.parseRangeParam(params.get("prange")) ?? rangeModule.presetRange("1w")),
         })
       );
     }) as typeof fetch;
@@ -381,7 +503,11 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
       assert.deepEqual(state.profileTarget, album);
       assert.equal(state.returnsTo, "artist");
       assert.equal(state.profileHistory.length, 1);
-      assert.deepEqual(state.profileHistory[0], { target: artist, range: "6m", name: "Name:radiohead" });
+      assert.deepEqual(state.profileHistory[0], {
+        target: artist,
+        range: rangeModule.presetRange("6m"),
+        name: "Name:radiohead",
+      });
 
       // Ping-pong dedupe: navigating back to top of history (Artist) pops instead of pushing
       state.handleOpenRelatedProfile(artist);
@@ -394,7 +520,7 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
       state.handleOpenRelatedProfile(album);
       await flushMicrotasks();
       state = render();
-      state.handleSelectProfileRange("1m");
+      state.handleSelectProfileRange(rangeModule.presetRange("1m"));
       await flushMicrotasks();
       state = render();
 
@@ -414,21 +540,21 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
       state.handleProfileBack();
       state = render();
       assert.deepEqual(state.profileTarget, track);
-      assert.equal(state.profileRange, "1m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("1m"));
       assert.equal(state.profileHistory.length, 2);
 
       // Back -> Album (1m)
       state.handleProfileBack();
       state = render();
       assert.deepEqual(state.profileTarget, album);
-      assert.equal(state.profileRange, "1m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("1m"));
       assert.equal(state.profileHistory.length, 1);
 
       // Jump to index 0 -> Artist (6m)
       state.handleJumpToHistory(0);
       state = render();
       assert.deepEqual(state.profileTarget, artist);
-      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("6m"));
       assert.equal(state.profileHistory.length, 0);
 
       // Jump to -1 -> Search
@@ -450,10 +576,10 @@ test("useSearchProfile supports multi-hop history stack, ping-pong dedupe, jump,
       state = render();
       assert.equal(state.profileHistory.length, 1);
 
-      state.syncFromLocation(artist, "1y");
+      state.syncFromLocation(artist, rangeModule.presetRange("1y"));
       state = render();
       assert.deepEqual(state.profileTarget, artist);
-      assert.equal(state.profileRange, "1y");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("1y"));
       assert.equal(state.profileHistory.length, 0);
 
       state.syncFromLocation(null, null);
@@ -495,7 +621,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "ready",
       { kind: "artist", key: "artist-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "America/Chicago"
     ),
     ["42", "3 / 50", "15 Jan 2024", "18 Nov 2024"]
@@ -503,7 +629,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
 
   assert.equal(
     formatProfileRibbonMetrics(
-      artist1w, "ready", { kind: "artist", key: "artist-1" }, "1w", "UTC", "percentile"
+      artist1w, "ready", { kind: "artist", key: "artist-1" }, rangeModule.presetRange("1w"), "UTC", "percentile"
     )[1],
     "Top 6%"
   );
@@ -514,7 +640,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       makeProfile({ plays: 0, rank: null }),
       "ready",
       { kind: "artist", key: "artist-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "UTC"
     ),
     ["0", "--", "15 Jan 2024", "18 Nov 2024"]
@@ -526,7 +652,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       makeProfile({ plays: 12345 }),
       "ready",
       { kind: "artist", key: "artist-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "UTC"
     )[0],
     (12345).toLocaleString()
@@ -538,7 +664,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "loading",
       { kind: "artist", key: "artist-1" },
-      "all",
+      rangeModule.presetRange("all"),
       "UTC"
     ),
     ["42", "3 / 50", "15 Jan 2024", "18 Nov 2024"]
@@ -549,7 +675,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "ready",
       { kind: "artist", key: "artist-1" },
-      "all",
+      rangeModule.presetRange("all"),
       "UTC"
     ),
     ["--", "--", "--", "--"]
@@ -559,7 +685,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "not_found",
       { kind: "artist", key: "artist-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "UTC"
     ),
     ["--", "--", "--", "--"]
@@ -569,7 +695,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "error",
       { kind: "artist", key: "artist-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "UTC"
     ),
     ["--", "--", "--", "--"]
@@ -581,7 +707,7 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
       artist1w,
       "ready",
       { kind: "track", key: "track-1" },
-      "1w",
+      rangeModule.presetRange("1w"),
       "UTC"
     ),
     ["--", "--", "--", "--"]
@@ -598,9 +724,24 @@ test("formatProfileRibbonMetrics and resolveDisplayedProfileData prevent wrong e
 
   // Cache keys partition by timezone
   assert.notEqual(
-    getProfileCacheKey({ kind: "artist", key: "a:1" }, "1w", "UTC"),
-    getProfileCacheKey({ kind: "artist", key: "a:1" }, "1w", "America/Chicago")
+    getProfileCacheKey({ kind: "artist", key: "a:1" }, rangeModule.presetRange("1w"), "UTC"),
+    getProfileCacheKey({ kind: "artist", key: "a:1" }, rangeModule.presetRange("1w"), "America/Chicago")
   );
+
+  // Cache keys differ between all and a window
+  const allCacheKey = getProfileCacheKey(
+    { kind: "artist", key: "radiohead" },
+    rangeModule.presetRange("all"),
+    "UTC"
+  );
+  const windowCacheKey = getProfileCacheKey(
+    { kind: "artist", key: "radiohead" },
+    { kind: "window", from: "2025-11-01", to: "2025-11-30" },
+    "UTC"
+  );
+  assert.notEqual(allCacheKey, windowCacheKey);
+  assert.equal(allCacheKey, "artist:all:UTC:radiohead");
+  assert.equal(windowCacheKey, "artist:2025-11-01..2025-11-30:UTC:radiohead");
 });
 
 test("useSearchProfile: query persistence, default All, reload prange, dimmed range retention, and timezone cache", async () => {
@@ -634,18 +775,18 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
         activeMode: 4,
         visitorTimezone: "UTC",
         initialProfile: { kind: "track", key: "track-deep" },
-        initialProfileRange: "all",
+        initialProfileRange: rangeModule.presetRange("all"),
       });
       assert.equal(state.profileStatus, "loading");
       assert.deepEqual(state.profileTarget, { kind: "track", key: "track-deep" });
-      assert.equal(state.profileRange, "all");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("all"));
       await flushMicrotasks();
 
       state = harness.renderOnce({
         activeMode: 4,
         visitorTimezone: "UTC",
         initialProfile: { kind: "track", key: "track-deep" },
-        initialProfileRange: "all",
+        initialProfileRange: rangeModule.presetRange("all"),
       });
       assert.equal(state.profileStatus, "ready");
       assert.equal(state.profileData?.plays, 99);
@@ -679,7 +820,7 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
         activeMode: 4,
         visitorTimezone: "UTC",
       });
-      assert.equal(state.profileRange, "all");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("all"));
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
       await flushMicrotasks();
@@ -693,12 +834,12 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
       assert.equal(state.profileData?.range, "all");
 
       // 4. Range switch retains same-target data dimmed during loading
-      state.handleSelectProfileRange("6m");
+      state.handleSelectProfileRange(rangeModule.presetRange("6m"));
       state = harness.renderOnce({
         activeMode: 4,
         visitorTimezone: "UTC",
       });
-      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("6m"));
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData?.key, "artist-radio");
       assert.equal(state.profileData?.range, "all");
@@ -716,7 +857,7 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
         activeMode: 4,
         visitorTimezone: "UTC",
       });
-      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("6m"));
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
       await flushMicrotasks();
@@ -735,7 +876,7 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
         visitorTimezone: "UTC",
       });
       assert.equal(state.profileTarget?.key, "artist-radio");
-      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("6m"));
       assert.equal(state.profileStatus, "ready");
       assert.equal(fetchCalls.length, callsBeforeCached);
 
@@ -778,7 +919,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
         activeMode: 4,
         visitorTimezone: "UTC",
         initialProfile: { kind: "artist", key: "stale-artist" },
-        initialProfileRange: "1w",
+        initialProfileRange: rangeModule.presetRange("1w"),
       });
       assert.equal(requests.length, 1);
 
@@ -856,7 +997,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
         activeMode: 4,
         visitorTimezone: "UTC",
         initialProfile: { kind: "track", key: "nope" },
-        initialProfileRange: "1w",
+        initialProfileRange: rangeModule.presetRange("1w"),
       });
       await flushMicrotasks();
       const notFoundState = harness.renderOnce({
@@ -866,7 +1007,7 @@ test("useSearchProfile: canonical alias swap caches first without extra fetch or
       assert.equal(notFoundState.profileStatus, "not_found");
       assert.equal(notFoundState.profileData, null);
 
-      notFoundState.handleSelectProfileRange("1w");
+      notFoundState.handleSelectProfileRange(rangeModule.presetRange("1w"));
       assert.equal(harness.renderOnce({
         activeMode: 4,
         visitorTimezone: "UTC",
@@ -935,7 +1076,7 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   assert.equal(mode4Track.props.initialMode, 4);
   assert.deepEqual(mode4Track.props.initialRange, { kind: "preset", key: "1w" });
   assert.deepEqual(mode4Track.props.initialProfile, { kind: "track", key: "4clD00s1c0rVqP9Ld0vV48" });
-  assert.equal(mode4Track.props.initialProfileRange, "all");
+  assert.deepEqual(mode4Track.props.initialProfileRange, { kind: "preset", key: "all" });
 
   // Mode 4 artist deep link without prange
   const mode4Artist = await mod.exports.default({
@@ -949,7 +1090,23 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
     searchParams: Promise.resolve({ mode: "4", album: "radiohead::in rainbows", prange: "1y" }),
   });
   assert.deepEqual(mode4Album.props.initialProfile, { kind: "album", key: "radiohead::in rainbows" });
-  assert.equal(mode4Album.props.initialProfileRange, "1y");
+  assert.deepEqual(mode4Album.props.initialProfileRange, { kind: "preset", key: "1y" });
+
+  // Mode 4 window prange
+  const mode4Window = await mod.exports.default({
+    searchParams: Promise.resolve({ mode: "4", artist: "4Z8W4fKeB5YxbusRsdQVPb", prange: "2025-11-01..2025-11-30" }),
+  });
+  assert.deepEqual(mode4Window.props.initialProfileRange, {
+    kind: "window",
+    from: "2025-11-01",
+    to: "2025-11-30",
+  });
+
+  // Mode 4 invalid prange falls back to null
+  const mode4InvalidPrange = await mod.exports.default({
+    searchParams: Promise.resolve({ mode: "4", artist: "4Z8W4fKeB5YxbusRsdQVPb", prange: "invalid-range" }),
+  });
+  assert.equal(mode4InvalidPrange.props.initialProfileRange, null);
 
   // Non-4 mode ignores profile params
   const mode0 = await mod.exports.default({
@@ -1031,7 +1188,7 @@ test("useSearchProfile: clearProfileCache invalidates in-flight requests and ref
         activeMode: 4 as const,
         visitorTimezone: "UTC",
         initialProfile: { kind: "artist" as const, key: "radiohead" },
-        initialProfileRange: "1y" as const,
+        initialProfileRange: rangeModule.presetRange("1y"),
       };
 
       // Initial mount loads profile (plays = 12)
@@ -1046,7 +1203,7 @@ test("useSearchProfile: clearProfileCache invalidates in-flight requests and ref
       assert.equal(state.profileData?.plays, 12);
 
       // Start a range switch to 6m (in-flight pre-sync request)
-      state.handleSelectProfileRange("6m");
+      state.handleSelectProfileRange(rangeModule.presetRange("6m"));
       state = harness.renderOnce(args);
       assert.equal(requests.length, 2);
       assert.equal(state.profileStatus, "loading");
@@ -1118,7 +1275,7 @@ test("useSearchProfile: syncFromLocation restores exact bounded history stack wh
         makeProfile({
           ...target,
           name: `Name:${target.key}`,
-          range: searchUtils.parseRangeKey(params.get("prange")) ?? "1y",
+          range: rangeModule.formatRangeParam(rangeModule.parseRangeParam(params.get("prange")) ?? rangeModule.presetRange("1y")),
         })
       );
     }) as typeof fetch;
@@ -1129,8 +1286,8 @@ test("useSearchProfile: syncFromLocation restores exact bounded history stack wh
       const album: ProfileTarget = { kind: "album", key: "radiohead::in rainbows" };
       const track: ProfileTarget = { kind: "track", key: "weird-fishes" };
 
-      const artistEntry: ProfileHistoryEntry = { target: artist, range: "6m", name: "Name:radiohead" };
-      const albumEntry: ProfileHistoryEntry = { target: album, range: "1m", name: "Name:radiohead::in rainbows" };
+      const artistEntry: ProfileHistoryEntry = { target: artist, range: rangeModule.presetRange("6m"), name: "Name:radiohead" };
+      const albumEntry: ProfileHistoryEntry = { target: album, range: rangeModule.presetRange("1m"), name: "Name:radiohead::in rainbows" };
 
       // Start on Search (empty history)
       let state = harness.renderOnce(args);
@@ -1138,11 +1295,11 @@ test("useSearchProfile: syncFromLocation restores exact bounded history stack wh
       assert.equal(state.profileHistory.length, 0);
 
       // Native Forward from Search directly to Track with saved history stack
-      state.syncFromLocation(track, "1m", [artistEntry, albumEntry]);
+      state.syncFromLocation(track, rangeModule.presetRange("1m"), [artistEntry, albumEntry]);
       await flushMicrotasks();
       state = harness.renderOnce(args);
       assert.deepEqual(state.profileTarget, track);
-      assert.equal(state.profileRange, "1m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("1m"));
       assert.deepEqual(state.profileHistory, [artistEntry, albumEntry]);
       assert.equal(state.returnsTo, "album");
 
@@ -1151,20 +1308,20 @@ test("useSearchProfile: syncFromLocation restores exact bounded history stack wh
       state = harness.renderOnce(args);
       assert.equal(state.profileHistory.length, 0);
 
-      state.syncFromLocation(album, "6m", [artistEntry]);
+      state.syncFromLocation(album, rangeModule.presetRange("6m"), [artistEntry]);
       await flushMicrotasks();
       state = harness.renderOnce(args);
       assert.deepEqual(state.profileTarget, album);
-      assert.equal(state.profileRange, "6m");
+      assert.deepEqual(state.profileRange, rangeModule.presetRange("6m"));
       assert.deepEqual(state.profileHistory, [artistEntry]);
 
       // Provided history stack is bounded to 20 entries (keeps most recent 20)
       const oversized: ProfileHistoryEntry[] = Array.from({ length: 25 }, (_, i) => ({
         target: { kind: "artist", key: `artist-${i}` },
-        range: "1y",
+        range: rangeModule.presetRange("1y"),
         name: `Artist ${i}`,
       }));
-      state.syncFromLocation(track, "1y", oversized);
+      state.syncFromLocation(track, rangeModule.presetRange("1y"), oversized);
       await flushMicrotasks();
       state = harness.renderOnce(args);
       assert.equal(state.profileHistory.length, 20);
@@ -1172,11 +1329,169 @@ test("useSearchProfile: syncFromLocation restores exact bounded history stack wh
       assert.equal(state.profileHistory[19].target.key, "artist-24");
 
       // Two-argument fallback still pops top when landing on top of stack
-      state.syncFromLocation({ kind: "artist", key: "artist-24" }, "1y");
+      state.syncFromLocation({ kind: "artist", key: "artist-24" }, rangeModule.presetRange("1y"));
       await flushMicrotasks();
       state = harness.renderOnce(args);
       assert.equal(state.profileHistory.length, 19);
       assert.equal(state.profileHistory[18].target.key, "artist-23");
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test("useSearchProfile: canonical alias swap preserves window range in cache key and target", async () => {
+  const origFetch = globalThis.fetch;
+  const windowRange: rangeModule.RangeSelection = {
+    kind: "window",
+    from: "2025-11-01",
+    to: "2025-11-30",
+  };
+
+  try {
+    await withHookReact(async (harness) => {
+      const requests: Array<{ url: string; resolve: (res: Response) => void }> = [];
+
+      globalThis.fetch = ((input: RequestInfo | URL) => {
+        return new Promise<Response>((resolve) => {
+          requests.push({ url: String(input), resolve });
+        });
+      }) as typeof fetch;
+
+      const args = {
+        activeMode: 4 as const,
+        visitorTimezone: "UTC",
+        initialProfile: { kind: "artist" as const, key: "alias-artist" },
+        initialProfileRange: windowRange,
+      };
+
+      let state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "loading");
+      assert.equal(requests.length, 1);
+      assert.ok(requests[0].url.includes("prange=2025-11-01..2025-11-30"));
+
+      // Resolving alias returns canonical key
+      requests[0].resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          makeProfile({
+            kind: "artist",
+            key: "canonical-artist",
+            range: "2025-11-01..2025-11-30",
+            name: "Canonical Artist",
+          }),
+      } as unknown as Response);
+      await flushMicrotasks();
+
+      state = harness.renderOnce(args);
+      assert.deepEqual(state.profileTarget, { kind: "artist", key: "canonical-artist" });
+      assert.deepEqual(state.profileRange, windowRange);
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(requests.length, 1, "Canonical alias swap must not make second request");
+
+      // Opening canonical target at windowRange hits cache without fetching
+      state.handleOpenProfile({ kind: "artist", key: "canonical-artist" });
+      state = harness.renderOnce(args);
+      // When handleOpenProfile is called, it resets to DEFAULT_PROFILE_RANGE ("all")
+      assert.deepEqual(state.profileRange, { kind: "preset", key: "all" });
+
+      // Selecting window range again on canonical target hits canonicalCacheKey
+      state.handleSelectProfileRange(windowRange);
+      state = harness.renderOnce(args);
+      assert.deepEqual(state.profileRange, windowRange);
+      assert.equal(state.profileStatus, "ready");
+      assert.equal(requests.length, 2); // 1 for "all" fetch when handleOpenProfile was called, none for windowRange
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+  }
+});
+
+test("useSearchProfile: handleSelectProfileRange with push flag triggers onRequestPushHistory without polluting breadcrumb history", async () => {
+  const origFetch = globalThis.fetch;
+  const window1: rangeModule.RangeSelection = { kind: "window", from: "2025-11-01", to: "2025-11-30" };
+  const window2: rangeModule.RangeSelection = { kind: "window", from: "2025-12-01", to: "2025-12-31" };
+
+  try {
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const params = new URL(String(input), "http://127.0.0.1:8888").searchParams;
+      const targetKind = params.has("album") ? "album" : "artist";
+      const targetKey = params.get(targetKind) || "radiohead";
+      return Response.json(
+        makeProfile({
+          kind: targetKind as "artist" | "album",
+          key: targetKey,
+          range: params.get("prange") || "all",
+          name: targetKind === "album" ? "In Rainbows" : "Radiohead",
+        })
+      );
+    }) as typeof fetch;
+
+    await withHookReact(async (harness) => {
+      let pushRequestedCount = 0;
+      const args = {
+        activeMode: 4 as const,
+        visitorTimezone: "UTC",
+        initialProfile: { kind: "artist" as const, key: "radiohead" },
+        initialProfileRange: rangeModule.presetRange("all"),
+        onRequestPushHistory: () => {
+          pushRequestedCount++;
+        },
+      };
+
+      let state = harness.renderOnce(args);
+      assert.equal(state.profileStatus, "loading");
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0);
+
+      // Same range with push: true -> does NOT push history or trigger push request
+      state.handleSelectProfileRange(rangeModule.presetRange("all"), { push: true });
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0, "Push flag with unchanged range must not push breadcrumb history");
+      assert.equal(pushRequestedCount, 0, "Push flag with unchanged range must not request browser push");
+
+      // Different range with push: true -> requests browser push, but does NOT pollute breadcrumb history
+      state.handleSelectProfileRange(window1, { push: true });
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0, "Window drill must not add duplicate entity to breadcrumb history");
+      assert.equal(pushRequestedCount, 1, "Window drill must request browser history push");
+      assert.deepEqual(state.profileRange, window1);
+
+      // Selecting window1 again with push: true -> does NOT push history or request push
+      state.handleSelectProfileRange(window1, { push: true });
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0);
+      assert.equal(pushRequestedCount, 1);
+
+      // Selecting window2 with push: true -> requests browser push, still zero breadcrumbs
+      state.handleSelectProfileRange(window2, { push: true });
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 0);
+      assert.equal(pushRequestedCount, 2);
+      assert.deepEqual(state.profileRange, window2);
+
+      // Cross-entity navigation DOES push to breadcrumb history
+      state.handleOpenRelatedProfile({ kind: "album", key: "in-rainbows" });
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.equal(state.profileHistory.length, 1, "Cross-entity hop must push to breadcrumb history");
+      assert.deepEqual(state.profileHistory[0], {
+        target: { kind: "artist", key: "radiohead" },
+        range: window2,
+        name: "Radiohead",
+      });
+
+      // handleProfileBack restores ancestor from breadcrumb history
+      state.handleProfileBack();
+      await flushMicrotasks();
+      state = harness.renderOnce(args);
+      assert.deepEqual(state.profileRange, window2);
+      assert.deepEqual(state.profileTarget, { kind: "artist", key: "radiohead" });
+      assert.equal(state.profileHistory.length, 0);
     });
   } finally {
     globalThis.fetch = origFetch;

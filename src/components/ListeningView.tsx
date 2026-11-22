@@ -32,7 +32,6 @@ import type { Mode, RangeKey } from "@/lib/types";
 import {
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
-  type ProfileHistoryEntry,
   type ProfileTarget,
   type SearchFilter,
   type SearchSort,
@@ -40,7 +39,6 @@ import {
 import {
   checkSearchQuery,
   parseProfileTarget,
-  parseRangeKey,
   parseSearchFilter,
   parseSearchPage,
   parseSearchSort,
@@ -55,7 +53,6 @@ import {
   formatRangeParam,
   isSameRange,
   parseRangeParam,
-  presetRange,
   PRESET_GRANULARITY,
   type CadenceGranularity,
   type RangeSelection,
@@ -73,53 +70,17 @@ import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import { useSearchProfile } from "./listening-view/useSearchProfile";
 import {
+  buildHistoryState,
   buildListeningUrlSearch,
   computeLivePlayerMetrics,
   findSelectedSession,
   formatProfileRibbonMetrics,
+  readHistoryState,
   resolveActiveEntity,
   sanitizeActiveMode,
   EMPTY_OVERVIEW,
   EMPTY_STREAM_LOG,
 } from "./listening-view/listening-helpers";
-
-const HISTORY_STATE_KEY = "listeningIndex";
-
-interface ListeningHistoryState {
-  profileHistory?: ProfileHistoryEntry[];
-  search?: {
-    query: string;
-    filter: SearchFilter;
-    sort: SearchSort;
-    page: number;
-  };
-}
-
-function buildHistoryState(payload: ListeningHistoryState): Record<string, unknown> {
-  const current =
-    typeof window !== "undefined" &&
-    window.history.state &&
-    typeof window.history.state === "object"
-      ? (window.history.state as Record<string, unknown>)
-      : null;
-  const next: Record<string, unknown> = {};
-  if (current) {
-    for (const [key, value] of Object.entries(current)) {
-      if (key !== "__NA" && key !== HISTORY_STATE_KEY) {
-        next[key] = value;
-      }
-    }
-  }
-  next[HISTORY_STATE_KEY] = payload;
-  return next;
-}
-
-function readHistoryState(state: unknown): ListeningHistoryState | null {
-  if (!state || typeof state !== "object") return null;
-  const entry = (state as Record<string, unknown>)[HISTORY_STATE_KEY];
-  if (!entry || typeof entry !== "object") return null;
-  return entry as ListeningHistoryState;
-}
 
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
@@ -132,7 +93,7 @@ interface ListeningViewProps {
   initialMode?: Mode;
   initialRange?: RangeSelection;
   initialProfile?: ProfileTarget | null;
-  initialProfileRange?: RangeKey | null;
+  initialProfileRange?: RangeSelection | null;
   initialSearchQuery?: string;
   initialSearchFilter?: SearchFilter;
   initialSearchSort?: SearchSort;
@@ -322,6 +283,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     initialProfileRange,
     initialSearchQuery,
     isSyncing,
+    onRequestPushHistory: () => {
+      shouldPushHistoryRef.current = true;
+    },
   });
 
   const handleSyncWithCacheClear = useCallback(async () => {
@@ -461,7 +425,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
       if (parsedMode === 4) {
         const target = parseProfileTarget(params);
-        const range = parseRangeKey(params.get("prange"));
+        const range = parseRangeParam(params.get("prange"));
         if (target) {
           syncFromLocation(target, range, saved?.profileHistory);
           if (saved?.search) {
@@ -758,6 +722,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Footer status: whether the newest Session is still open, whichever Session is selected
   const isSystemLive = sessionData.sessions[0]?.isOpen || false;
 
+  const isProfileRangeLoading =
+    activeMode === 4 && profileStatus === "loading" && Boolean(profileData);
+  const isViewDimmed =
+    isSyncing || (activeMode === 0 && isRangeLoading) || isProfileRangeLoading;
+
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
       {/* Black veil holding the screen as long as needed until real data is ready */}
@@ -785,12 +754,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           {(activeMode !== 4 || profileTarget) && (
             <ControlRow
               mode={activeMode}
-              range={activeMode === 4 ? presetRange(profileRange) : activeRange}
+              range={activeMode === 4 ? profileRange : activeRange}
               onSelectRange={
                 activeMode === 4
-                  ? (sel) => {
-                      if (sel.kind === "preset") handleSelectProfileRange(sel.key);
-                    }
+                  ? handleSelectProfileRange
                   : handleSelectRange
               }
               logStartDate={currentOverview.logStartDate}
@@ -845,9 +812,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player and Search) */}
           <div
-            aria-busy={isSyncing || (activeMode === 0 && isRangeLoading)}
+            aria-busy={isViewDimmed}
             className={`h-auto ${activeMode === 3 || activeMode === 4 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
-              } transition-opacity duration-150 ${isSyncing || (activeMode === 0 && isRangeLoading)
+              } transition-opacity duration-150 ${isViewDimmed
                 ? "opacity-60 pointer-events-none"
                 : "opacity-100"
               }`}

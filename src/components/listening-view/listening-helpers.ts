@@ -1,16 +1,19 @@
-import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
+import { RANGE_KEYS, type Mode } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
 import {
   DEFAULT_OVERVIEW_RANGE,
   formatRangeParam,
   isSameRange,
+  parseRangeParam,
   presetRange,
   type RangeSelection,
 } from "@/lib/range";
 import {
+  DEFAULT_PROFILE_RANGE,
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
   type ProfileData,
+  type ProfileHistoryEntry,
   type ProfileTarget,
   type SearchFilter,
   type SearchSort,
@@ -248,10 +251,10 @@ export type ProfileStatus = "loading" | "ready" | "not_found" | "error";
 
 export function getProfileCacheKey(
   target: ProfileTarget,
-  range: RangeKey,
+  range: RangeSelection,
   visitorTimezone: string
 ): string {
-  return `${target.kind}:${range}:${visitorTimezone}:${target.key}`;
+  return `${target.kind}:${formatRangeParam(range)}:${visitorTimezone}:${target.key}`;
 }
 
 export function resolveDisplayedProfileData(
@@ -267,9 +270,9 @@ export function formatProfileRibbonMetrics(
   data: ProfileData | null,
   status: ProfileStatus,
   target: ProfileTarget | null,
-  range: RangeKey,
+  range: RangeSelection,
   visitorTimezone: string,
-  rankFormat: "rank" | "percentile" = "rank",
+  rankFormat: "rank" | "percentile" = "rank"
 ): [string, string, string, string] {
   if (
     (status !== "ready" && status !== "loading") ||
@@ -277,7 +280,7 @@ export function formatProfileRibbonMetrics(
     !target ||
     data.kind !== target.kind ||
     data.key !== target.key ||
-    (status === "ready" && data.range !== range)
+    (status === "ready" && data.range !== formatRangeParam(range))
   ) {
     return ["--", "--", "--", "--"];
   }
@@ -304,7 +307,7 @@ export function buildListeningUrlSearch(
     activeMode: Mode;
     overviewRange: RangeSelection;
     profileTarget: ProfileTarget | null;
-    profileRange: RangeKey;
+    profileRange: RangeSelection;
     preservePendingMode3?: boolean;
     search?: {
       query: string;
@@ -344,7 +347,7 @@ export function buildListeningUrlSearch(
 
   if (target) {
     params.set(target.kind, target.key);
-    params.set("prange", state.profileRange);
+    params.set("prange", formatRangeParam(state.profileRange));
   } else {
     params.delete("prange");
   }
@@ -380,4 +383,89 @@ export function buildListeningUrlSearch(
 
   const qs = params.toString();
   return qs ? `?${qs}` : "";
+}
+
+export const HISTORY_STATE_KEY = "listeningIndex";
+
+export interface ListeningHistoryState {
+  profileHistory?: ProfileHistoryEntry[];
+  search?: {
+    query: string;
+    filter: SearchFilter;
+    sort: SearchSort;
+    page: number;
+  };
+}
+
+export function buildHistoryState(payload: ListeningHistoryState): Record<string, unknown> {
+  const current =
+    typeof window !== "undefined" &&
+    window.history.state &&
+    typeof window.history.state === "object"
+      ? (window.history.state as Record<string, unknown>)
+      : null;
+  const next: Record<string, unknown> = {};
+  if (current) {
+    for (const [key, value] of Object.entries(current)) {
+      if (key !== "__NA" && key !== HISTORY_STATE_KEY) {
+        next[key] = value;
+      }
+    }
+  }
+  next[HISTORY_STATE_KEY] = {
+    ...payload,
+    profileHistory: payload.profileHistory?.map((entry) => ({
+      ...entry,
+      range: formatRangeParam(entry.range),
+    })),
+  };
+  return next;
+}
+
+export function readHistoryState(state: unknown): ListeningHistoryState | null {
+  if (!state || typeof state !== "object") return null;
+  const entry = (state as Record<string, unknown>)[HISTORY_STATE_KEY];
+  if (!entry || typeof entry !== "object") return null;
+  const raw = entry as Record<string, unknown>;
+  const rawHistory = raw.profileHistory;
+  let profileHistory: ProfileHistoryEntry[] | undefined;
+
+  if (Array.isArray(rawHistory)) {
+    const validEntries: ProfileHistoryEntry[] = [];
+    for (const item of rawHistory) {
+      if (!item || typeof item !== "object") continue;
+      const candidate = item as { target?: unknown; range?: unknown; name?: unknown };
+      const rawTarget = candidate.target;
+      if (!rawTarget || typeof rawTarget !== "object") continue;
+      const targetObj = rawTarget as { kind?: unknown; key?: unknown };
+      if (
+        targetObj.kind !== "track" &&
+        targetObj.kind !== "artist" &&
+        targetObj.kind !== "album"
+      ) {
+        continue;
+      }
+      if (typeof targetObj.key !== "string" || targetObj.key.trim().length === 0) {
+        continue;
+      }
+      const target: ProfileTarget = {
+        kind: targetObj.kind,
+        key: targetObj.key.trim(),
+      };
+
+      const range = typeof candidate.range === "string" ? parseRangeParam(candidate.range) : null;
+
+      validEntries.push({
+        target,
+        range: range ?? DEFAULT_PROFILE_RANGE,
+        ...(typeof candidate.name === "string" ? { name: candidate.name } : {}),
+      });
+    }
+    profileHistory = validEntries;
+  }
+
+  return {
+    ...(profileHistory !== undefined ? { profileHistory } : {}),
+    search: raw.search as ListeningHistoryState["search"],
+  };
 }

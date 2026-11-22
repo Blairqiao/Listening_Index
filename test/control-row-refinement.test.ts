@@ -101,8 +101,8 @@ test("LivePlayerView houses context selector inside playback controls without re
 
 test("ControlRow renders breadcrumb trail for multi-hop profile history with truncation and jump handlers", () => {
   const history: ProfileHistoryEntry[] = [
-    { target: { kind: "artist", key: "radiohead" }, range: "1y", name: "Radiohead" },
-    { target: { kind: "album", key: "in-rainbows" }, range: "1y", name: "In Rainbows" },
+    { target: { kind: "artist", key: "radiohead" }, range: presetRange("1y"), name: "Radiohead" },
+    { target: { kind: "album", key: "in-rainbows" }, range: presetRange("1y"), name: "In Rainbows" },
   ];
 
   let jumpedIndex: number | null = null;
@@ -193,9 +193,9 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
 
 test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () => {
   const history: ProfileHistoryEntry[] = [
-    { target: { kind: "artist", key: "artist-1" }, range: "1y", name: "First Artist" },
-    { target: { kind: "album", key: "album-1" }, range: "1y", name: "Middle Album" },
-    { target: { kind: "track", key: "track-1" }, range: "1y", name: "Parent Track" },
+    { target: { kind: "artist", key: "artist-1" }, range: presetRange("1y"), name: "First Artist" },
+    { target: { kind: "album", key: "album-1" }, range: presetRange("1y"), name: "Middle Album" },
+    { target: { kind: "track", key: "track-1" }, range: presetRange("1y"), name: "Parent Track" },
   ];
 
   const markup = renderToStaticMarkup(React.createElement(ControlRow, {

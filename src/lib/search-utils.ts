@@ -1,4 +1,3 @@
-import type { RangeKey } from "@/lib/types";
 import {
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
@@ -10,8 +9,6 @@ import {
   type SearchFilter,
   type SearchSort,
 } from "@/lib/search-types";
-
-export const RANGE_KEYS: RangeKey[] = ["1d", "1w", "1m", "6m", "1y", "all"];
 
 export type SearchQueryCheck =
   | { ok: true; query: string }
@@ -45,11 +42,6 @@ export function parseSearchPage(raw: string | null | undefined): number {
 
 export function normalizeForSearch(s: string): string {
   return s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
-export function parseRangeKey(v: string | null | undefined): RangeKey | null {
-  if (!v) return null;
-  return (RANGE_KEYS as readonly string[]).includes(v) ? (v as RangeKey) : null;
 }
 
 function extractTargetParam(
