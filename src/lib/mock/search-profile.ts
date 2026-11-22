@@ -1,4 +1,3 @@
-import type { RangeKey } from "@/lib/types";
 import {
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
@@ -40,8 +39,8 @@ import { computeSearchTotalPages, planSideColumn } from "@/lib/search-layout";
 import { SESSION_GAP_MS } from "@/lib/session-calculation";
 import { CATALOG } from "./catalog";
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from "./stream-log";
-import { buildProfileCadence } from "@/lib/db/queries/cadence";
-import { OVERVIEW_INTERVAL_CONFIG } from "@/lib/db/queries/overview";
+import { buildProfileCadence, cadenceBucketKey, cadenceRowGranularity, type CadenceRow } from "@/lib/cadence-buckets";
+import { formatRangeParam, rangeGranularity, resolveRangeWindow, type CadenceGranularity, type RangeSelection } from "@/lib/range";
 import { sanitizeTimezone } from "@/lib/db/queries/helpers";
 
 interface NormalizedMockPlay {
@@ -127,6 +126,8 @@ const NORMALIZED_PLAYS: NormalizedMockPlay[] = normalizeMockPlays();
 
 const GLOBAL_TIMESTAMPS = NORMALIZED_PLAYS.map((p) => new Date(p.playedAt).getTime());
 const GLOBAL_MAX_MS = Math.max(...GLOBAL_TIMESTAMPS);
+const GLOBAL_MIN_MS = Math.min(...GLOBAL_TIMESTAMPS);
+const GLOBAL_EARLIEST_PLAY = new Date(GLOBAL_MIN_MS).toISOString();
 
 // Anchor now at the newest mock playedAt + 1 minute.
 const ANCHOR_NOW = new Date(GLOBAL_MAX_MS + 60 * 1000);
@@ -461,88 +462,7 @@ export function getMockRandomProfileTarget(
   return null;
 }
 
-function getWindowCutoff(range: RangeKey, now: Date): number | null {
-  if (range === "all") return null;
-  const days = OVERVIEW_INTERVAL_CONFIG[range].elapsedDays;
-  return now.getTime() - days * 86400000;
-}
 
-function filterPlaysInRange(plays: NormalizedMockPlay[], cutoffMs: number | null): NormalizedMockPlay[] {
-  if (cutoffMs === null) return plays;
-  return plays.filter((p) => new Date(p.playedAt).getTime() >= cutoffMs);
-}
-
-function computeCadenceRows(
-  targetPlays: NormalizedMockPlay[],
-  range: RangeKey,
-  tz: string,
-  now: Date
-): Record<string, unknown>[] {
-  const nowMs = now.getTime();
-  let filtered = targetPlays;
-
-  if (range === "1d") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 24 * 3600000);
-  } else if (range === "1w") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 7 * 86400000);
-  } else if (range === "1m") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 30 * 86400000);
-  } else if (range === "6m") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 180 * 86400000);
-  } else if (range === "1y") {
-    filtered = targetPlays.filter((p) => new Date(p.playedAt).getTime() >= nowMs - 365 * 86400000);
-  }
-
-  const counts = new Map<string, number>();
-  const blockEntries = new Map<string, { day: string; block: number; count: number }>();
-
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-  });
-
-  for (const p of filtered) {
-    const parts = formatter.formatToParts(new Date(p.playedAt));
-    const m = Object.fromEntries(parts.map((pt) => [pt.type, pt.value]));
-
-    if (range === "1d") {
-      // Same UTC hour key as the SQL: 'YYYY-MM-DD"T"HH24:00:00"Z"'.
-      const key = new Date(p.playedAt).toISOString().slice(0, 13) + ":00:00Z";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    } else if (range === "1w") {
-      const day = `${m.year}-${m.month}-${m.day}`;
-      const block = Math.floor(Number(m.hour) / 6);
-      const key = `${day}_${block}`;
-      const existing = blockEntries.get(key);
-      if (existing) {
-        existing.count += 1;
-      } else {
-        blockEntries.set(key, { day, block, count: 1 });
-      }
-    } else if (range === "1m" || range === "6m") {
-      const day = `${m.year}-${m.month}-${m.day}`;
-      counts.set(day, (counts.get(day) ?? 0) + 1);
-    } else {
-      const ym = `${m.year}-${m.month}`;
-      counts.set(ym, (counts.get(ym) ?? 0) + 1);
-    }
-  }
-
-  if (range === "1d") {
-    return [...counts.entries()].map(([hour_key, count]) => ({ hour_key, count }));
-  }
-  if (range === "1w") {
-    return [...blockEntries.values()];
-  }
-  if (range === "1m" || range === "6m") {
-    return [...counts.entries()].map(([day, count]) => ({ day, count }));
-  }
-  return [...counts.entries()].map(([ym, count]) => ({ ym, count }));
-}
 
 const WEEKDAY_ISO_MAP: Record<string, number> = {
   Mon: 1,
@@ -693,6 +613,19 @@ function aggregateArtistAlbums(
   return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
 }
 
+function aggregateCadenceRows(
+  plays: NormalizedMockPlay[],
+  rowGranularity: CadenceGranularity,
+  tz: string,
+): CadenceRow[] {
+  const counts = new Map<string, number>();
+  for (const p of plays) {
+    const key = cadenceBucketKey(new Date(p.playedAt), rowGranularity, tz);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([bucket_key, count]) => ({ bucket_key, count }));
+}
+
 function computeMoreAlbums(
   currentAlbumKey: string,
   artistId: string | undefined,
@@ -703,22 +636,42 @@ function computeMoreAlbums(
   return aggregateArtistAlbums(artistPlays, currentAlbumKey, PROFILE_MORE_ALBUMS_LIMIT);
 }
 
-export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: string): ProfileData | null {
+export function getMockProfile(target: ProfileTarget, sel: RangeSelection, tz: string): ProfileData | null {
   if (!target || (target.kind !== "track" && target.kind !== "artist" && target.kind !== "album")) {
     return null;
   }
 
+  const selection = sel;
   const effectiveTz = sanitizeTimezone(tz);
   const now = ANCHOR_NOW;
-  const cutoffMs = getWindowCutoff(range, now);
-  const allInRangePlays = filterPlaysInRange(NORMALIZED_PLAYS, cutoffMs);
+  const globalWindow = resolveRangeWindow(selection, {
+    now,
+    tz: effectiveTz,
+    logStart: GLOBAL_EARLIEST_PLAY,
+  });
+  const fromMs = new Date(globalWindow.from).getTime();
+  const toMs = new Date(globalWindow.to).getTime();
+  const isWindow = selection.kind === "window";
+
+  const filterWindowPlays = (plays: NormalizedMockPlay[]) =>
+    plays.filter((p) => {
+      const t = new Date(p.playedAt).getTime();
+      if (t < fromMs) return false;
+      if (isWindow && t >= toMs) return false;
+      return true;
+    });
+
+  const allInRangePlays = filterWindowPlays(NORMALIZED_PLAYS);
+  const granularity = rangeGranularity(selection, globalWindow);
+  const rowGranularity =
+    granularity === "year" ? "month" : cadenceRowGranularity(granularity);
 
   if (target.kind === "track") {
     const track = UNIQUE_TRACKS.get(target.key);
     if (!track) return null;
 
     const targetLifetimePlays = NORMALIZED_PLAYS.filter((p) => p.trackId === target.key);
-    const targetInRangePlays = filterPlaysInRange(targetLifetimePlays, cutoffMs);
+    const targetInRangePlays = filterWindowPlays(targetLifetimePlays);
     const inRangePlayCount = targetInRangePlays.length;
 
     // Track ranking uses DENSE_RANK over in-range plays
@@ -735,13 +688,23 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       rank = denseRankIndex >= 0 ? denseRankIndex + 1 : null;
     }
 
-    const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
+    const cadenceRows: CadenceRow[] = aggregateCadenceRows(
+      targetInRangePlays,
+      rowGranularity,
+      effectiveTz
+    );
+
+    const displayWindow =
+      selection.kind === "preset" && selection.key === "all" && track.firstPlayedAt
+        ? resolveRangeWindow(selection, { now, tz: effectiveTz, logStart: track.firstPlayedAt })
+        : globalWindow;
+
     const cadence = buildProfileCadence({
-      range,
+      window: displayWindow,
+      granularity,
       tz: effectiveTz,
       now,
       cadenceRows,
-      minDateRow: { log_start_date: track.firstPlayedAt },
     });
 
     const recentPlays: ProfilePlay[] = targetInRangePlays
@@ -800,7 +763,8 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       artistName: track.artist,
       albumName: track.album,
       imageUrl: track.albumImageUrl,
-      range,
+      range: formatRangeParam(selection),
+      granularity,
       firstPlayedAt: track.firstPlayedAt,
       lastPlayedAt: track.lastPlayedAt,
       plays: inRangePlayCount,
@@ -839,7 +803,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
 
     const albumLifetimePlays = NORMALIZED_PLAYS.filter((p) => getMockAlbumKey(p) === target.key);
 
-    const albumInRangePlays = filterPlaysInRange(albumLifetimePlays, cutoffMs);
+    const albumInRangePlays = filterWindowPlays(albumLifetimePlays);
     const albumInRangePlayCount = albumInRangePlays.length;
 
     // Album ranking uses row order (plays DESC, name ASC, key ASC) over in-range plays
@@ -865,13 +829,23 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       albumRank = albumIndex >= 0 ? albumIndex + 1 : null;
     }
 
-    const albumCadenceRows = computeCadenceRows(albumLifetimePlays, range, effectiveTz, now);
+    const albumCadenceRows: CadenceRow[] = aggregateCadenceRows(
+      albumInRangePlays,
+      rowGranularity,
+      effectiveTz
+    );
+
+    const displayWindow =
+      selection.kind === "preset" && selection.key === "all" && album.firstPlayedAt
+        ? resolveRangeWindow(selection, { now, tz: effectiveTz, logStart: album.firstPlayedAt })
+        : globalWindow;
+
     const albumCadence = buildProfileCadence({
-      range,
+      window: displayWindow,
+      granularity,
       tz: effectiveTz,
       now,
       cadenceRows: albumCadenceRows,
-      minDateRow: { log_start_date: album.firstPlayedAt },
     });
 
     const albumRecentPlays: ProfilePlay[] = albumInRangePlays
@@ -948,7 +922,8 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
       artistName: album.artist,
       albumName: null,
       imageUrl: album.imageUrl,
-      range,
+      range: formatRangeParam(selection),
+      granularity,
       firstPlayedAt: album.firstPlayedAt,
       lastPlayedAt: album.lastPlayedAt,
       plays: albumInRangePlayCount,
@@ -978,7 +953,7 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
   if (!artist) return null;
 
   const targetLifetimePlays = NORMALIZED_PLAYS.filter((p) => p.artistId === target.key);
-  const targetInRangePlays = filterPlaysInRange(targetLifetimePlays, cutoffMs);
+  const targetInRangePlays = filterWindowPlays(targetLifetimePlays);
   const inRangePlayCount = targetInRangePlays.length;
 
   // Artist ranking uses row order (plays DESC, name ASC) over in-range plays
@@ -1003,13 +978,23 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     rank = artistIndex >= 0 ? artistIndex + 1 : null;
   }
 
-  const cadenceRows = computeCadenceRows(targetLifetimePlays, range, effectiveTz, now);
+  const cadenceRows: CadenceRow[] = aggregateCadenceRows(
+    targetInRangePlays,
+    rowGranularity,
+    effectiveTz
+  );
+
+  const displayWindow =
+    selection.kind === "preset" && selection.key === "all" && artist.firstPlayedAt
+      ? resolveRangeWindow(selection, { now, tz: effectiveTz, logStart: artist.firstPlayedAt })
+      : globalWindow;
+
   const cadence = buildProfileCadence({
-    range,
+    window: displayWindow,
+    granularity,
     tz: effectiveTz,
     now,
     cadenceRows,
-    minDateRow: { log_start_date: artist.firstPlayedAt },
   });
 
   const recentPlays: ProfilePlay[] = targetInRangePlays
@@ -1068,7 +1053,8 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     artistName: null,
     albumName: null,
     imageUrl: artist.imageUrl,
-    range,
+    range: formatRangeParam(selection),
+    granularity,
     firstPlayedAt: artist.firstPlayedAt,
     lastPlayedAt: artist.lastPlayedAt,
     plays: inRangePlayCount,

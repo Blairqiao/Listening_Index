@@ -21,23 +21,14 @@ import {
   type CadenceRow,
 } from "./cadence";
 import { buildTimeFilter, resolveServerRange } from "./range-filter";
-import type { OverviewData, RangeKey } from "./types";
+import type { OverviewData } from "./types";
 import type {
   TrackSummary,
   ArtistSummary,
   AlbumSummary,
 } from "@/lib/types";
 
-export const OVERVIEW_INTERVAL_CONFIG: Record<
-  Exclude<RangeKey, "all">,
-  { cur: string; prev: string; elapsedDays: number }
-> = {
-  "1d": { cur: "24 hours", prev: "48 hours", elapsedDays: 1 },
-  "1w": { cur: "7 days", prev: "14 days", elapsedDays: 7 },
-  "1m": { cur: "30 days", prev: "60 days", elapsedDays: 30 },
-  "6m": { cur: "180 days", prev: "360 days", elapsedDays: 180 },
-  "1y": { cur: "365 days", prev: "730 days", elapsedDays: 365 },
-};
+
 
 /**
  * Computes Overview statistics and rankings for a preset or fixed date window.

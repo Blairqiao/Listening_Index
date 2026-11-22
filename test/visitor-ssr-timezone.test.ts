@@ -4,15 +4,17 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as timezoneUtils from '../src/lib/timezone-utils';
 import * as searchUtils from '../src/lib/search-utils';
+import * as range from '../src/lib/range';
 
 test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all initial queries', async () => {
   for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'UTC'], ['', 'UTC']]) {
     const calls: unknown[][] = [];
     const deps: Record<string, unknown> = {
       'next/headers': { cookies: async () => ({ get: (key: string) => key === 'listening_timezone' && cookie ? { value: encodeURIComponent(cookie) } : undefined }) },
-      '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock/overview-data': {},
+      '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock/overview-data': { getMockOverview: () => ({}) },
       '@/lib/config-utils': { DEFAULT_SITE_CONFIG: {} },
       '@/lib/types': { RANGE_KEYS: ['1d', '1w', '1m', '6m', '1y', 'all'] },
+      '@/lib/range': range,
       '@/lib/db/queries': { getActiveSiteConfig: async () => ({}), getInitialMusicData: async (...args: unknown[]) => { calls.push(args); return {}; } },
       '@/lib/db': { isDbConfigured: () => true }, '@/lib/admin-auth': { ADMIN_COOKIE_NAME: 'admin_session', verifySessionToken: () => false },
       '@/lib/timezone-utils': timezoneUtils,
@@ -25,4 +27,70 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
     assert.equal(calls[0][1], expected);
     assert.equal(rendered.props.initialVisitorTimezone, expected);
   }
+});
+
+test('SSR passes full fixed selection to queries and forwards fixed overview to ListeningView with preset compatibility', async () => {
+  const queryCalls: unknown[][] = [];
+  const mockOverviewCalls: unknown[][] = [];
+  const fakeOverview = {
+    range: '2025-11-01..2025-11-30',
+    granularity: 'day',
+    activityCadence: [],
+  };
+
+  const makeDeps = (configured: boolean): Record<string, unknown> => ({
+    'next/headers': { cookies: async () => ({ get: () => undefined }) },
+    '@/components/ListeningView': { ListeningView: 'view' },
+    '@/lib/mock/overview-data': {
+      MOCK_DATA: { streamLog: [], session: {} },
+      getMockOverview: (...args: unknown[]) => {
+        mockOverviewCalls.push(args);
+        return fakeOverview;
+      },
+    },
+    '@/lib/config-utils': { DEFAULT_SITE_CONFIG: {} },
+    '@/lib/types': { RANGE_KEYS: ['1d', '1w', '1m', '6m', '1y', 'all'] },
+    '@/lib/range': range,
+    '@/lib/db/queries': {
+      getActiveSiteConfig: async () => ({}),
+      getInitialMusicData: async (...args: unknown[]) => {
+        queryCalls.push(args);
+        return { overview: fakeOverview, streamLog: [], session: {} };
+      },
+    },
+    '@/lib/db': { isDbConfigured: () => configured },
+    '@/lib/admin-auth': { ADMIN_COOKIE_NAME: 'admin_session', verifySessionToken: () => false },
+    '@/lib/timezone-utils': timezoneUtils,
+    '@/lib/search-utils': searchUtils,
+  });
+
+  const js = ts.transpileModule(readFileSync('src/app/page.tsx', 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React },
+  }).outputText;
+
+  // 1. Configured DB branch
+  const modDb = { exports: {} as { default: (props: object) => Promise<{ props: Record<string, unknown> }> } };
+  new Function('require', 'module', 'exports', 'React', js)(
+    (id: string) => makeDeps(true)[id],
+    modDb,
+    modDb.exports,
+    { createElement: (_type: unknown, props: object) => ({ props }) }
+  );
+  const renderedDb = await modDb.exports.default({ searchParams: Promise.resolve({ range: '2025-11-01..2025-11-30' }) });
+  assert.deepEqual(queryCalls[0][0], { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
+  assert.equal(renderedDb.props.initialRange, '1w');
+  assert.deepEqual(renderedDb.props.initialOverview, fakeOverview);
+
+  // 2. Unconfigured / mock branch
+  const modMock = { exports: {} as { default: (props: object) => Promise<{ props: Record<string, unknown> }> } };
+  new Function('require', 'module', 'exports', 'React', js)(
+    (id: string) => makeDeps(false)[id],
+    modMock,
+    modMock.exports,
+    { createElement: (_type: unknown, props: object) => ({ props }) }
+  );
+  const renderedMock = await modMock.exports.default({ searchParams: Promise.resolve({ range: '2025-11-01..2025-11-30' }) });
+  assert.deepEqual(mockOverviewCalls[0][0], { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
+  assert.equal(renderedMock.props.initialRange, '1w');
+  assert.deepEqual(renderedMock.props.initialOverview, fakeOverview);
 });

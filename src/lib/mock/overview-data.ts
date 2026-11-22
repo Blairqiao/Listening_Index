@@ -1,5 +1,14 @@
-import type { TrackSummary, MockListeningData, ActivityBucket } from "@/lib/types";
+import type { TrackSummary, MockListeningData, ActivityBucket, OverviewData } from "@/lib/types";
 import { CATALOG } from "./catalog";
+import {
+  formatRangeParam,
+  localWallClockToInstant,
+  PRESET_GRANULARITY,
+  rangeGranularity,
+  resolveRangeWindow,
+  type RangeSelection,
+} from "@/lib/range";
+import { buildActivityCadence, cadenceBucketKey } from "@/lib/cadence-buckets";
 
 // ---------------------------------------------------------------------------
 // Top 10 Ranked Tracks Across Ranges (Showcasing all 6 drift types: ·, +1, +2, -1, -2, NEW)
@@ -90,6 +99,8 @@ const TOP_TRACKS_ALL: TrackSummary[] = [
 export const MOCK_DATA: MockListeningData = {
   overview: {
     "1d": {
+      range: "1d",
+      granularity: "hour",
       logStartDate: "08 SEP 2026",
       rawMetrics: {
         totalMs: 12900000,
@@ -132,6 +143,8 @@ export const MOCK_DATA: MockListeningData = {
       })(),
     },
     "1w": {
+      range: "1w",
+      granularity: "block6h",
       logStartDate: "02 SEP 2026",
       rawMetrics: {
         totalMs: 91200000,
@@ -182,6 +195,8 @@ export const MOCK_DATA: MockListeningData = {
       })(),
     },
     "1m": {
+      range: "1m",
+      granularity: "day",
       logStartDate: "09 AUG 2026",
       rawMetrics: {
         totalMs: 416400000,
@@ -222,6 +237,8 @@ export const MOCK_DATA: MockListeningData = {
       }),
     },
     "6m": {
+      range: "6m",
+      granularity: "week",
       logStartDate: "09 Mar 2026",
       rawMetrics: {
         totalMs: 2526000000,
@@ -274,6 +291,8 @@ export const MOCK_DATA: MockListeningData = {
       })(),
     },
     "1y": {
+      range: "1y",
+      granularity: "month",
       logStartDate: "09 SEP 2025",
       rawMetrics: {
         totalMs: 6912000000,
@@ -318,6 +337,8 @@ export const MOCK_DATA: MockListeningData = {
       })),
     },
     all: {
+      range: "all",
+      granularity: "year",
       logStartDate: "14 AUG 2024",
       rawMetrics: {
         totalMs: 13104000000,
@@ -4291,3 +4312,96 @@ export const MOCK_DATA: MockListeningData = {
   ]
 }
 };
+
+function convertMockInstant(iso: string, tz: string, isEnd: boolean): string {
+  if (isEnd) {
+    if (iso.endsWith(".999Z")) {
+      const nextD = new Date(new Date(iso).getTime() + 1);
+      const instant = localWallClockToInstant(
+        nextD.toISOString().slice(0, 10),
+        nextD.getUTCHours(),
+        tz
+      );
+      return new Date(instant.getTime() - 1).toISOString();
+    }
+    const instant = localWallClockToInstant(
+      iso.slice(0, 10),
+      Number(iso.slice(11, 13)),
+      tz
+    );
+    return new Date(instant.getTime() - 1).toISOString();
+  }
+  return localWallClockToInstant(
+    iso.slice(0, 10),
+    Number(iso.slice(11, 13)),
+    tz
+  ).toISOString();
+}
+
+function hashBucketKey(key: string): number {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash % 40);
+}
+
+export function getMockOverview(
+  sel: RangeSelection,
+  tz: string,
+  now = new Date()
+): OverviewData {
+  if (sel.kind === "preset") {
+    const staticData = MOCK_DATA.overview[sel.key];
+    if (sel.key === "1d") {
+      return {
+        ...staticData,
+        range: "1d",
+        granularity: "hour",
+      };
+    }
+    return {
+      ...staticData,
+      range: sel.key,
+      granularity: PRESET_GRANULARITY[sel.key],
+      activityCadence: staticData.activityCadence.map((bucket) => ({
+        ...bucket,
+        startTime: convertMockInstant(bucket.startTime, tz, false),
+        endTime: convertMockInstant(bucket.endTime, tz, true),
+      })),
+    };
+  }
+
+  const window = resolveRangeWindow(sel, { now, tz, logStart: null });
+  const granularity = rangeGranularity(sel, window);
+
+  const { activityCadence: emptyCadence } = buildActivityCadence({
+    window,
+    granularity,
+    tz,
+    now,
+    cadenceRows: [],
+  });
+
+  const activityCadence = emptyCadence.map((bucket) => {
+    const key = cadenceBucketKey(new Date(bucket.startTime), granularity, tz);
+    return {
+      ...bucket,
+      count: hashBucketKey(key),
+    };
+  });
+
+  const allStatic = MOCK_DATA.overview.all;
+  return {
+    logStartDate: allStatic.logStartDate,
+    rawMetrics: { ...allStatic.rawMetrics },
+    metrics: [...allStatic.metrics],
+    topTracks: [...allStatic.topTracks],
+    topArtists: [...allStatic.topArtists],
+    topAlbums: [...allStatic.topAlbums],
+    lastSyncedAt: allStatic.lastSyncedAt,
+    range: formatRangeParam(sel),
+    granularity,
+    activityCadence,
+  };
+}

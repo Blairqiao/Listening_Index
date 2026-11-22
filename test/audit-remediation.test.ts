@@ -157,7 +157,7 @@ test("TASK-3: Ribbon artist queries align with isCatalogFullyEnriched() (F5)", a
   if (hasTestDb) {
     await useTestDatabase();
     const { getOverviewData } = await import("../src/lib/db/queries/overview");
-    const overviewData = await getOverviewData("1d");
+    const overviewData = await getOverviewData({ kind: "preset", key: "1d" });
     assert.ok(overviewData.metrics, "overviewData must return metrics");
     assert.equal(overviewData.metrics.length, 4, "overview metrics must contain 4 items");
   }

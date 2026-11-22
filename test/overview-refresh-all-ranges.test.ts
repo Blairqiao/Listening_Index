@@ -33,6 +33,7 @@ function harness(activeRange: string) {
     activeRangeRef: { current: activeRange },
     requestGenerationRef: { current: 0 },
     overviewRefreshOrder: helpers().overviewRefreshOrder,
+    STREAM_LOG_PAGE_SIZE: 50,
     fetchOverview: async (range: string) => { fetched.push(range); return { metrics: [] }; },
     fetchStreamLog: async () => undefined,
     fetchSession: async () => undefined,
