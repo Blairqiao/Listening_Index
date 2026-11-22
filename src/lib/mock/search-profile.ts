@@ -5,7 +5,6 @@ import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_MORE_ALBUMS_LIMIT,
-  PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_RELATED_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
@@ -748,7 +747,6 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     const recentPlays: ProfilePlay[] = targetInRangePlays
       .slice()
       .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime() || b.id.localeCompare(a.id))
-      .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
       .map((p) => ({
         id: p.id,
         trackId: p.trackId,
@@ -879,7 +877,6 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
     const albumRecentPlays: ProfilePlay[] = albumInRangePlays
       .slice()
       .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime() || b.id.localeCompare(a.id))
-      .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
       .map((p) => ({
         id: p.id,
         trackId: p.trackId,
@@ -1018,7 +1015,6 @@ export function getMockProfile(target: ProfileTarget, range: RangeKey, tz: strin
   const recentPlays: ProfilePlay[] = targetInRangePlays
     .slice()
     .sort((a, b) => new Date(b.playedAt).getTime() - new Date(a.playedAt).getTime() || b.id.localeCompare(a.id))
-    .slice(0, PROFILE_RECENT_PLAYS_LIMIT)
     .map((p) => ({
       id: p.id,
       trackId: p.trackId,

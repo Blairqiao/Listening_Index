@@ -14,7 +14,6 @@ import {
 import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_MORE_ALBUMS_LIMIT,
-  PROFILE_RECENT_PLAYS_LIMIT,
 } from "../src/lib/search-types";
 import { loadTs } from "./helpers/load-ts";
 
@@ -187,7 +186,8 @@ test("album profile DB queries", dbTest, async (t) => {
     }
 
     const albumTrackIds = new Set(albumTracks.map((r) => String(r.id)));
-    assert.ok(byIdAll.recentPlays.length > 0 && byIdAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
+    assert.ok(byIdAll.recentPlays.length > 0);
+    assert.equal(byIdAll.recentPlays.length, byIdAll.plays, "recentPlays lists every Play in range");
     for (const play of byIdAll.recentPlays) assert.ok(albumTrackIds.has(play.trackId));
     for (let i = 1; i < byIdAll.recentPlays.length; i++) {
       const [prev, curr] = [byIdAll.recentPlays[i - 1], byIdAll.recentPlays[i]];

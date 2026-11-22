@@ -25,7 +25,6 @@ export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
 
 export const SEARCH_MAX_CHARS = 100;
 export const DEFAULT_PROFILE_RANGE: RangeKey = "all";
-export const PROFILE_RECENT_PLAYS_LIMIT = 20;
 export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
 export const PROFILE_ALBUM_PROFILE_TRACKS_LIMIT = 50;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
@@ -169,5 +168,5 @@ export interface ProfileData {
   albumTracks?: ProfileAlbumTrack[]; // track profiles only, ranked in range
   topTracks: ProfileTopTrack[]; // Ranked in range. Up to 10 for Artist profiles and 50 for Album profiles.
   topAlbums: ProfileTopAlbum[]; // Artist profiles only, up to 5 in range.
-  recentPlays: ProfilePlay[];   // in range, newest first, ≤ 20
+  recentPlays: ProfilePlay[];   // every Play in range, newest first
 }

@@ -15,7 +15,6 @@ import {
 import { getProfile } from "../src/lib/db/queries/profile";
 import {
   PROFILE_ALBUM_TRACKS_LIMIT,
-  PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_RELATED_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
@@ -288,7 +287,7 @@ test("search and profile DB queries", dbTest, async (t) => {
       "scoped 1d cadence counts only this track's plays in range"
     );
     assert.ok(trackAll.recentPlays.length > 0);
-    assert.ok(trackAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
+    assert.equal(trackAll.recentPlays.length, trackAll.plays, "recentPlays lists every Play in range");
 
     for (let i = 1; i < trackAll.recentPlays.length; i++) {
       const prev = trackAll.recentPlays[i - 1];
@@ -312,7 +311,7 @@ test("search and profile DB queries", dbTest, async (t) => {
     assert.ok(artistAll.topTracks.length <= PROFILE_TOP_TRACKS_LIMIT);
     assert.ok(artistAll.topAlbums.length > 0);
     assert.ok(artistAll.topAlbums.length <= PROFILE_TOP_ALBUMS_LIMIT);
-    assert.ok(artistAll.recentPlays.length <= PROFILE_RECENT_PLAYS_LIMIT);
+    assert.equal(artistAll.recentPlays.length, artistAll.plays, "recentPlays lists every Play in range");
     assert.ok([24, 25].includes(artist1d.activityCadence.length));
     assert.equal(
       artist1d.activityCadence.reduce((sum, b) => sum + b.count, 0),

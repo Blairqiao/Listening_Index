@@ -9,7 +9,6 @@ import {
   PROFILE_ALBUM_PROFILE_TRACKS_LIMIT,
   PROFILE_ALBUM_TRACKS_LIMIT,
   PROFILE_MORE_ALBUMS_LIMIT,
-  PROFILE_RECENT_PLAYS_LIMIT,
   PROFILE_RELATED_TRACKS_LIMIT,
   PROFILE_TOP_ALBUMS_LIMIT,
   PROFILE_TOP_TRACKS_LIMIT,
@@ -167,8 +166,7 @@ export async function getProfile(
           LEFT JOIN albums al ON t.album_id = al.id
           LEFT JOIN artists ar ON t.artist_id = ar.id
           WHERE p.track_id = ${trackId} AND ${timeFilter}
-          ORDER BY p.played_at DESC, p.id DESC
-          LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
+          ORDER BY p.played_at DESC, p.id DESC;
         `,
         sql`
           SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays
@@ -480,8 +478,7 @@ export async function getProfile(
       LEFT JOIN albums al ON t.album_id = al.id
       LEFT JOIN artists ar ON t.artist_id = ar.id
       WHERE ${timeFilter} AND ${artistFilter}
-      ORDER BY p.played_at DESC, p.id DESC
-      LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
+      ORDER BY p.played_at DESC, p.id DESC;
     `,
     sql`
       SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays
@@ -728,8 +725,7 @@ async function getAlbumProfile(
       LEFT JOIN albums al ON t.album_id = al.id
       LEFT JOIN artists ar ON t.artist_id = ar.id
       WHERE ${timeFilter} AND ${albumFilter}
-      ORDER BY p.played_at DESC, p.id DESC
-      LIMIT ${PROFILE_RECENT_PLAYS_LIMIT};
+      ORDER BY p.played_at DESC, p.id DESC;
     `,
     sql`
       SELECT EXTRACT(HOUR FROM p.played_at AT TIME ZONE ${safeTz})::int AS hour, COUNT(*)::int AS plays

@@ -74,7 +74,7 @@ test('getMockProfile for track provides all-time counts, lifetime bounds, and re
   assert.ok(allProfile.rank !== null && allProfile.rank >= 1);
 
   // Recent plays in range, newest first, bounded by limit
-  assert.ok(allProfile.recentPlays.length > 0 && allProfile.recentPlays.length <= 20);
+  assert.ok(allProfile.recentPlays.length > 0);
   assert.equal(allProfile.recentPlays.length, expectedTotalPlays);
   for (let i = 1; i < allProfile.recentPlays.length; i++) {
     const prev = new Date(allProfile.recentPlays[i - 1].playedAt).getTime();
@@ -700,4 +700,11 @@ test('getMockProfile fills streak dates for Track and Artist and Artist summary 
   assert.equal(zeroPlaysArtist.stats.tracksHeardInRange, 0);
   assert.ok(zeroPlaysArtist.stats.tracksHeardLifetime! > 0);
   assert.equal(zeroPlaysArtist.stats.completionRate, null);
+});
+
+test("Recent plays list every Play in range without a row cap", () => {
+  const artist = getMockProfile({ kind: "artist", key: "4Z8W4fKeB5YxbusRsdQVPb" }, "all", "UTC");
+  assert.ok(artist);
+  assert.ok(artist.plays > 20, "fixture artist must have more than 20 Plays");
+  assert.equal(artist.recentPlays.length, artist.plays);
 });
