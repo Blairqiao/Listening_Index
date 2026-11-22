@@ -812,8 +812,8 @@ test("search and profile DB queries", dbTest, async (t) => {
     const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
 
     try {
-      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
-      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO artists (id, name) VALUES (${artistId}, ${artistName}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name) VALUES (${albumId}, ${albumName}) ON CONFLICT (id) DO NOTHING`;
       for (const [id, name] of [
         [trackBeforeId, `Before ${suffix}`],
         [trackInId, `Inside ${suffix}`],
@@ -892,8 +892,8 @@ test("search and profile DB queries", dbTest, async (t) => {
     const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
 
     try {
-      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
-      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO artists (id, name) VALUES (${artistId}, ${artistName}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name) VALUES (${albumId}, ${albumName}) ON CONFLICT (id) DO NOTHING`;
       for (const [id, name] of [
         [trackPrevOnly, `Prev Only ${suffix}`],
         [trackBoth, `Both Windows ${suffix}`],
@@ -947,8 +947,8 @@ test("search and profile DB queries", dbTest, async (t) => {
     const albumGroupKey = `${artistGroupKey}::${albumName.toLowerCase()}`;
 
     try {
-      await sql`INSERT INTO artists (id, name, name_search) VALUES (${artistId}, ${artistName}, ${artistGroupKey}) ON CONFLICT (id) DO NOTHING`;
-      await sql`INSERT INTO albums (id, name, name_search) VALUES (${albumId}, ${albumName}, ${albumName.toLowerCase()}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO artists (id, name) VALUES (${artistId}, ${artistName}) ON CONFLICT (id) DO NOTHING`;
+      await sql`INSERT INTO albums (id, name) VALUES (${albumId}, ${albumName}) ON CONFLICT (id) DO NOTHING`;
       await sql`
         INSERT INTO tracks (id, name, artist_name, album_name, artist_id, album_id, artist_group_key, album_group_key, duration_ms, enrichment_status)
         VALUES (${trackId}, ${`Track ${suffix}`}, ${artistName}, ${albumName}, ${artistId}, ${albumId}, ${artistGroupKey}, ${albumGroupKey}, 180000, 'enriched')
