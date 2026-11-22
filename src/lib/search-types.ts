@@ -24,7 +24,7 @@ export type SearchSort = (typeof SEARCH_SORT_OPTIONS)[number]["value"];
 export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
 
 export const SEARCH_MAX_CHARS = 100;
-export const DEFAULT_PROFILE_RANGE: RangeKey = "1y";
+export const DEFAULT_PROFILE_RANGE: RangeKey = "all";
 export const PROFILE_RECENT_PLAYS_LIMIT = 20;
 export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
 export const PROFILE_ALBUM_PROFILE_TRACKS_LIMIT = 50;

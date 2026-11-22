@@ -643,13 +643,13 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
       });
       assert.equal(state.searchQuery, "radio");
 
-      // 3. Opening from search starts at 1Y
+      // 3. Opening from search starts at All
       state.handleOpenProfile({ kind: "artist", key: "artist-radio" });
       state = harness.renderOnce({
         activeMode: 4,
         visitorTimezone: "UTC",
       });
-      assert.equal(state.profileRange, "1y");
+      assert.equal(state.profileRange, "all");
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData, null);
       await flushMicrotasks();
@@ -660,7 +660,7 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
       });
       assert.equal(state.profileStatus, "ready");
       assert.equal(state.profileData?.key, "artist-radio");
-      assert.equal(state.profileData?.range, "1y");
+      assert.equal(state.profileData?.range, "all");
 
       // 4. Range switch retains same-target data dimmed during loading
       state.handleSelectProfileRange("6m");
@@ -671,7 +671,7 @@ test("useSearchProfile: query persistence, default All, reload prange, dimmed ra
       assert.equal(state.profileRange, "6m");
       assert.equal(state.profileStatus, "loading");
       assert.equal(state.profileData?.key, "artist-radio");
-      assert.equal(state.profileData?.range, "1y");
+      assert.equal(state.profileData?.range, "all");
       await flushMicrotasks();
       state = harness.renderOnce({
         activeMode: 4,
