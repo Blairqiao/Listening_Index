@@ -189,6 +189,8 @@ export function setCachedStreamLogDepth(count: number) {
 }
 
 export const EMPTY_OVERVIEW: OverviewData = {
+  range: "1w",
+  granularity: "block6h",
   logStartDate: "--",
   rawMetrics: {
     totalMs: 0,

@@ -2,12 +2,15 @@
 
 import React from "react";
 import { TrackSummary, ArtistSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
+import type { CadenceGranularity } from "@/lib/range";
 import type { ProfileKind, ProfileTarget } from "@/lib/search-types";
 import { Artwork } from "../Artwork";
 import { ActivityChart } from "./ActivityChart";
 
-interface OverviewViewProps {
-  range: RangeKey;
+export interface OverviewViewProps {
+  granularity: CadenceGranularity;
+  rangeKey?: RangeKey | null;
+  rangeLabel?: string;
   topTracks: TrackSummary[];
   topArtists: ArtistSummary[];
   topAlbums: AlbumSummary[];
@@ -45,7 +48,9 @@ function profileLinkProps(
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
-  range,
+  granularity,
+  rangeKey = null,
+  rangeLabel,
   topTracks,
   topArtists,
   topAlbums,
@@ -334,7 +339,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* Activity Tracker */}
         <ActivityChart
-          range={range}
+          granularity={granularity}
+          rangeKey={rangeKey}
+          rangeLabel={rangeLabel}
           activityCadence={activityCadence}
           isLoading={isLoading}
         />

@@ -5,6 +5,7 @@ import React from "react";
 import ts from "typescript";
 import * as timezoneUtils from "../src/lib/timezone-utils";
 import * as searchUtils from "../src/lib/search-utils";
+import * as rangeModule from "../src/lib/range";
 import type { ProfileData, ProfileHistoryEntry, ProfileTarget } from "../src/lib/search-types";
 import type { Mode, RangeKey } from "../src/lib/types";
 import {
@@ -24,6 +25,7 @@ function makeProfile(overrides: Partial<ProfileData> = {}): ProfileData {
     albumName: null,
     imageUrl: null,
     range: "1w",
+    granularity: "block6h",
     firstPlayedAt: "2024-01-15T12:00:00.000Z",
     lastPlayedAt: "2024-11-18T18:30:00.000Z",
     plays: 12,
@@ -864,9 +866,13 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   const deps: Record<string, unknown> = {
     "next/headers": { cookies: async () => ({ get: () => undefined }) },
     "@/components/ListeningView": { ListeningView: "view" },
-    "@/lib/mock/overview-data": { MOCK_DATA: { overview: { "1w": {}, all: {} }, streamLog: {}, session: {} } },
+    "@/lib/mock/overview-data": {
+      MOCK_DATA: { overview: { "1w": {}, all: {} }, streamLog: {}, session: {} },
+      getMockOverview: () => ({ range: "1w", granularity: "block6h" }),
+    },
     "@/lib/config-utils": { DEFAULT_SITE_CONFIG: {} },
     "@/lib/types": { RANGE_KEYS: ["1d", "1w", "1m", "6m", "1y", "all"] },
+    "@/lib/range": rangeModule,
     "@/lib/db/queries": {
       getActiveSiteConfig: async () => ({}),
       getInitialMusicData: async () => ({ overview: {}, streamLog: {}, session: {} }),

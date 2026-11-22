@@ -11,6 +11,8 @@ import type { RangeKey } from "../src/lib/types";
 test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without mutating unchanged items", () => {
   const initialCache: Partial<Record<RangeKey, OverviewData>> = {
     "1d": {
+      range: "1d",
+      granularity: "hour",
       logStartDate: "2026-10-01",
       rawMetrics: { totalMs: 1000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
       metrics: ["16m", "1", "1", "16m"],
@@ -45,6 +47,8 @@ test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without
       activityCadence: [],
     },
     "1w": {
+      range: "1w",
+      granularity: "block6h",
       logStartDate: "2026-09-24",
       rawMetrics: { totalMs: 5000, trackCount: 2, artistCount: 2, elapsedDays: 7 },
       metrics: ["1h", "2", "2", "10m"],
@@ -94,6 +98,8 @@ test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without
 test("patchOverviewCacheWithEnrichment - returns unchanged cache reference if no matching tracks", () => {
   const initialCache: Partial<Record<RangeKey, OverviewData>> = {
     "1d": {
+      range: "1d",
+      granularity: "hour",
       logStartDate: "2026-10-01",
       rawMetrics: { totalMs: 1000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
       metrics: ["16m", "1", "1", "16m"],

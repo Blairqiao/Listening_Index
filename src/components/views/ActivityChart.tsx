@@ -2,11 +2,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
-import { formatCadenceTooltip } from "@/lib/format-utils";
+import type { CadenceGranularity } from "@/lib/range";
+import { formatBucketTooltip } from "@/lib/format-utils";
 import { useConfig } from "@/context/ConfigContext";
 
 export interface ActivityChartProps {
-  range: RangeKey;
+  granularity: CadenceGranularity;
+  rangeKey?: RangeKey | null;
+  rangeLabel?: string;
   activityCadence: ActivityBucket[];
   monthlyCadence?: ActivityBucket[];
   isLoading?: boolean;
@@ -27,7 +30,9 @@ const EMPTY_CADENCE_BAR_COUNTS: Record<RangeKey, number> = {
 };
 
 export const ActivityChart: React.FC<ActivityChartProps> = ({
-  range,
+  granularity,
+  rangeKey = null,
+  rangeLabel,
   activityCadence: yearlyOrRangeCadence = [],
   monthlyCadence,
   isLoading = false,
@@ -37,6 +42,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   visitorTimezone: propTimezone,
   heading: headingProp,
 }) => {
+
   let contextTimezone = "UTC";
   try {
     contextTimezone = useConfig().visitorTimezone || "UTC";
@@ -47,7 +53,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
   const chartRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
-  const monthCount = range === "all" ? monthlyCadence?.length ?? 0 : 0;
+  const monthCount = granularity === "year" ? monthlyCadence?.length ?? 0 : 0;
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -77,7 +83,10 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       : "";
 
   const headingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
-  const defaultHeadingText = showRange ? `${label} / ${range === "all" ? "all" : range}` : label;
+  const headingSuffix = rangeLabel ?? rangeKey ?? "";
+  const defaultHeadingText = showRange
+    ? headingSuffix ? `${label} / ${headingSuffix}` : label
+    : label;
 
   return (
     <div>
@@ -115,7 +124,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
               />
             ))
           ) : activityCadence.length === 0 ? (
-            Array.from({ length: EMPTY_CADENCE_BAR_COUNTS[range] ?? 24 }).map((_, i) => (
+            Array.from({ length: rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0 }).map((_, i) => (
               <div
                 key={i}
                 className="flex-1 rounded-none select-none transition-none cursor-default bg-[#1C1C1A]"
@@ -131,13 +140,13 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
               const isMarkerBar =
                 !isZero &&
-                (range === "1w"
+                (granularity === "block6h"
                   ? (item.isMarker !== undefined ? item.isMarker : i % 4 === 0)
                   : Boolean(item.isMarker));
 
               const tooltipText =
                 item.startTime && item.endTime
-                  ? formatCadenceTooltip(item, showMonths ? "1y" : range, tz)
+                  ? formatBucketTooltip(item, showMonths ? "month" : granularity, tz)
                   : `${item.date} — ${item.count} plays`;
 
               return (
@@ -160,23 +169,35 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           )}
         </div>
 
-        {/* Contextual markers according to range */}
-        {range === "1d" && (
+        {/* Contextual markers according to granularity */}
+        {granularity === "hour" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
-            <span>-24h</span>
-            <span>-12h</span>
-            <span>Now</span>
+            {rangeKey ? (
+              <>
+                <span>-24h</span>
+                <span>-12h</span>
+                <span>Now</span>
+              </>
+            ) : activityCadence.length > 0 ? (
+              <>
+                <span>{activityCadence[0].date}</span>
+                <span>{activityCadence[Math.floor(activityCadence.length / 2)]?.date || ""}</span>
+                <span>{activityCadence[activityCadence.length - 1].date}</span>
+              </>
+            ) : null}
           </div>
         )}
 
-        {range === "1w" && (
+        {granularity === "block6h" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              ["-7d", "-6d", "-5d", "-4d", "-3d", "-2d", "Now"].map((m, i) => (
-                <span key={i} className="text-center flex-1 truncate">
-                  {m}
-                </span>
-              ))
+              rangeKey ? (
+                ["-7d", "-6d", "-5d", "-4d", "-3d", "-2d", "Now"].map((m, i) => (
+                  <span key={i} className="text-center flex-1 truncate">
+                    {m}
+                  </span>
+                ))
+              ) : null
             ) : (
               activityCadence
                 .filter((item, idx) =>
@@ -191,16 +212,18 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           </div>
         )}
 
-        {range === "1m" && (
+        {granularity === "day" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              <>
-                <span>-30d</span>
-                <span>-22d</span>
-                <span>-15d</span>
-                <span>-7d</span>
-                <span>Now</span>
-              </>
+              rangeKey ? (
+                <>
+                  <span>-30d</span>
+                  <span>-22d</span>
+                  <span>-15d</span>
+                  <span>-7d</span>
+                  <span>Now</span>
+                </>
+              ) : null
             ) : activityCadence.some((item) => item.markerLabel) ? (
               activityCadence
                 .filter((item) => item.markerLabel)
@@ -217,16 +240,18 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           </div>
         )}
 
-        {range === "6m" && (
+        {granularity === "week" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              <>
-                <span>-6m</span>
-                <span>-5m</span>
-                <span>-4m</span>
-                <span>-3m</span>
-                <span>Now</span>
-              </>
+              rangeKey ? (
+                <>
+                  <span>-6m</span>
+                  <span>-5m</span>
+                  <span>-4m</span>
+                  <span>-3m</span>
+                  <span>Now</span>
+                </>
+              ) : null
             ) : (
               (activityCadence.some((item) => item.markerLabel)
                 ? activityCadence.filter((item) => item.markerLabel)
@@ -238,16 +263,18 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           </div>
         )}
 
-        {range === "1y" && (
+        {granularity === "month" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              <>
-                <span>-12m</span>
-                <span>-9m</span>
-                <span>-6m</span>
-                <span>-3m</span>
-                <span>Now</span>
-              </>
+              rangeKey ? (
+                <>
+                  <span>-12m</span>
+                  <span>-9m</span>
+                  <span>-6m</span>
+                  <span>-3m</span>
+                  <span>Now</span>
+                </>
+              ) : null
             ) : activityCadence.length <= 12 ? (
               activityCadence.map((item, i) => (
                 <span key={i} className="text-center flex-1">
@@ -266,13 +293,15 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
           </div>
         )}
 
-        {range === "all" && (
+        {granularity === "year" && (
           <div className="flex justify-between mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]">
             {activityCadence.length === 0 ? (
-              <>
-                <span>All-time</span>
-                <span>Now</span>
-              </>
+              rangeKey ? (
+                <>
+                  <span>All-time</span>
+                  <span>Now</span>
+                </>
+              ) : null
             ) : (
               axisLabels.map((item, i) => {
                 return (

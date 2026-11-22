@@ -50,6 +50,12 @@ import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries"
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
+  parseRangeParam,
+  formatRangeLabel,
+  PRESET_GRANULARITY,
+  type CadenceGranularity,
+} from "@/lib/range";
+import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
   formatStreamLogDateSpan,
@@ -566,7 +572,22 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   );
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
-  const currentOverview: OverviewData = overviewCache[displayedRange] || EMPTY_OVERVIEW;
+  const overviewPayload = overviewCache[displayedRange];
+  const currentOverview: OverviewData = overviewPayload || {
+    ...EMPTY_OVERVIEW,
+    range: displayedRange,
+    granularity: PRESET_GRANULARITY[displayedRange],
+  };
+  const parsedOverviewRange = overviewPayload ? parseRangeParam(overviewPayload.range) : null;
+  const overviewGranularity: CadenceGranularity = overviewPayload
+    ? overviewPayload.granularity
+    : PRESET_GRANULARITY[displayedRange];
+  const overviewRangeKey: RangeKey | null = parsedOverviewRange
+    ? (parsedOverviewRange.kind === "preset" ? parsedOverviewRange.key : null)
+    : displayedRange;
+  const overviewRangeLabel: string | undefined = parsedOverviewRange
+    ? (parsedOverviewRange.kind === "window" ? formatRangeLabel(parsedOverviewRange) : undefined)
+    : undefined;
   const streamLogData: StreamLogData = streamLogState || EMPTY_STREAM_LOG;
 
   const sessionData: SessionData = sessionState || { sessions: [] };
@@ -667,7 +688,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active metrics per mode
   const overviewMetrics: [string, string, string, string] =
     currentOverview.rawMetrics
-      ? formatOverviewMetrics(currentOverview.rawMetrics, overviewTimeUnit, displayedRange)
+      ? formatOverviewMetrics(currentOverview.rawMetrics, overviewTimeUnit, overviewGranularity)
       : currentOverview.metrics;
 
   const streamMetrics: [string, string, string, string] =
@@ -796,7 +817,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           >
             {activeMode === 0 && (
               <OverviewView
-                range={displayedRange}
+                granularity={overviewGranularity}
+                rangeKey={overviewRangeKey}
+                rangeLabel={overviewRangeLabel}
                 topTracks={currentOverview.topTracks}
                 topArtists={currentOverview.topArtists}
                 topAlbums={currentOverview.topAlbums}

@@ -5,6 +5,7 @@ import type { ProfileData, ProfileKind, ProfileTarget } from "@/lib/search-types
 import { formatHHmmTz, formatDayGroupTz } from "@/lib/db/queries/helpers";
 import { formatDurationMs } from "@/lib/format-utils";
 import { artistShare, buildShareSegments, formatShare, segmentIdForTrack } from "@/lib/profile-stats";
+import { formatRangeLabel, parseRangeParam } from "@/lib/range";
 import { ProfileBox, PROFILE_ROW_HEIGHT_CLASS, type ProfileRowSize } from "./ProfileBox";
 import { ProfileChart } from "./ProfileChart";
 import { ProfileHeader } from "./ProfileHeader";
@@ -120,7 +121,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <div className="md:col-span-full">
           <ActivityChart
-            range="1m"
+            granularity="day"
+            rangeKey="1m"
             activityCadence={[]}
             isLoading={true}
             label="Plays"
@@ -216,6 +218,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const hours = data.plays > 0 ? data.hourOfDay : undefined;
   const dayOfWeek = data.plays > 0 ? data.dayOfWeek : undefined;
 
+  const parsedRange = parseRangeParam(data.range);
+  const chartRangeKey = parsedRange?.kind === "preset" ? parsedRange.key : null;
+  const chartRangeLabel = parsedRange ? formatRangeLabel(parsedRange) : undefined;
+
   const renderTopTrack = (
     track: ProfileData["topTracks"][number],
     idx: number,
@@ -300,7 +306,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Chart */}
       <div className="min-w-0 md:col-span-full">
         <ProfileChart
-          range={data.range}
+          granularity={data.granularity}
+          rangeKey={chartRangeKey}
+          rangeLabel={chartRangeLabel}
           activityCadence={data.activityCadence}
           monthlyCadence={data.monthlyCadence}
           isLoading={status === "loading"}
