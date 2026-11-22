@@ -1,7 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildActivityCadence } from '../src/lib/db/queries/cadence';
-import { formatCadenceTooltip } from '../src/lib/format-utils';
+import { formatBucketTooltip } from '../src/lib/format-utils';
+import {
+  PRESET_GRANULARITY,
+  localDateKey,
+  localDateToInstant,
+  presetRange,
+  resolveRangeWindow,
+} from '../src/lib/range';
+import type { RangeKey } from '../src/lib/types';
+
+function presetCadence(
+  range: RangeKey,
+  tz: string,
+  now: Date,
+  cadenceRows: { bucket_key: string; count: number }[],
+  logStart: string | null = null,
+) {
+  const window = resolveRangeWindow(presetRange(range), { now, tz, logStart });
+  return buildActivityCadence({
+    window,
+    granularity: PRESET_GRANULARITY[range],
+    tz,
+    now,
+    cadenceRows,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // N007: Repeated fall-back hour counted twice
@@ -15,16 +40,11 @@ test('N007: hourly cadence does not double count during DST fall-back transition
   // 07:10 UTC is 01:10 CST (UTC-6)
   // Each hour contains 1 play. When grouped by absolute hour:
   const cadenceRows = [
-    { hour_key: '2026-11-01T06:00:00Z', count: 1 },
-    { hour_key: '2026-11-01T07:00:00Z', count: 1 },
+    { bucket_key: '2026-11-01T06:00:00Z', count: 1 },
+    { bucket_key: '2026-11-01T07:00:00Z', count: 1 },
   ];
 
-  const { activityCadence } = buildActivityCadence({
-    range: '1d',
-    tz,
-    now,
-    cadenceRows,
-  });
+  const { activityCadence } = presetCadence('1d', tz, now, cadenceRows);
 
   const totalPlays = activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(totalPlays, 2, 'Total plays across 24 hours must be 2, not inflated to 4');
@@ -43,20 +63,20 @@ test('N008: spring-forward does not skip local calendar dates in 1w, 1m, and 6m'
   const tz = 'America/Chicago';
 
   // 1w test
-  const wRows = [{ day: '2026-03-08', block: 0, count: 1 }];
-  const wResult = buildActivityCadence({ range: '1w', tz, now, cadenceRows: wRows });
+  const wRows = [{ bucket_key: '2026-03-08#0', count: 1 }];
+  const wResult = presetCadence('1w', tz, now, wRows);
   const wTotal = wResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(wTotal, 1, '1w cadence must include March 8 play across spring-forward');
 
   // 1m test
-  const mRows = [{ day: '2026-03-08', count: 1 }];
-  const mResult = buildActivityCadence({ range: '1m', tz, now, cadenceRows: mRows });
+  const mRows = [{ bucket_key: '2026-03-08', count: 1 }];
+  const mResult = presetCadence('1m', tz, now, mRows);
   const mTotal = mResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(mTotal, 1, '1m cadence must include March 8 play across spring-forward');
 
   // 6m test
-  const sRows = [{ day: '2026-03-08', count: 1 }];
-  const sResult = buildActivityCadence({ range: '6m', tz, now, cadenceRows: sRows });
+  const sRows = [{ bucket_key: '2026-03-08', count: 1 }];
+  const sResult = presetCadence('6m', tz, now, sRows);
   const sTotal = sResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(sTotal, 1, '6m cadence must include March 8 play across spring-forward');
 });
@@ -66,20 +86,20 @@ test('N008: fall-back does not repeat local calendar dates in 1w, 1m, and 6m', (
   const tz = 'America/Chicago';
 
   // 1w test
-  const wRows = [{ day: '2026-11-01', block: 0, count: 1 }];
-  const wResult = buildActivityCadence({ range: '1w', tz, now, cadenceRows: wRows });
+  const wRows = [{ bucket_key: '2026-11-01#0', count: 1 }];
+  const wResult = presetCadence('1w', tz, now, wRows);
   const wTotal = wResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(wTotal, 1, '1w cadence must count Nov 1 exactly once');
 
   // 1m test
-  const mRows = [{ day: '2026-11-01', count: 1 }];
-  const mResult = buildActivityCadence({ range: '1m', tz, now, cadenceRows: mRows });
+  const mRows = [{ bucket_key: '2026-11-01', count: 1 }];
+  const mResult = presetCadence('1m', tz, now, mRows);
   const mTotal = mResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(mTotal, 1, '1m cadence must count Nov 1 exactly once');
 
   // 6m test
-  const sRows = [{ day: '2026-11-01', count: 1 }];
-  const sResult = buildActivityCadence({ range: '6m', tz, now, cadenceRows: sRows });
+  const sRows = [{ bucket_key: '2026-11-01', count: 1 }];
+  const sResult = presetCadence('6m', tz, now, sRows);
   const sTotal = sResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(sTotal, 1, '6m cadence must count Nov 1 exactly once');
 });
@@ -92,40 +112,49 @@ test('N009: cadence buckets include plays in earliest partial bucket of rolling 
   const tz = 'UTC';
 
   // 1d: play at 2026-11-01T12:45:00Z (23h45m ago, in 24h window)
-  const dRows = [{ hour_key: '2026-11-01T12:00:00Z', count: 1 }];
-  const dResult = buildActivityCadence({ range: '1d', tz, now, cadenceRows: dRows });
+  const dRows = [{ bucket_key: '2026-11-01T12:00:00Z', count: 1 }];
+  const dResult = presetCadence('1d', tz, now, dRows);
   const dTotal = dResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(dTotal, 1, '1d cadence must include play in earliest partial hour (yesterday 12:45)');
 
   // 1w: play at 2026-10-26T19:00:00Z (6d17h30m ago, in 7d window)
-  const wRows = [{ day: '2026-10-26', block: 3, count: 1 }];
-  const wResult = buildActivityCadence({ range: '1w', tz, now, cadenceRows: wRows });
+  const wRows = [{ bucket_key: '2026-10-26#3', count: 1 }];
+  const wResult = presetCadence('1w', tz, now, wRows);
   const wTotal = wResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(wTotal, 1, '1w cadence must include play in earliest partial day block (Oct 26 block 3)');
 
   // 1m: play at 2026-10-03T15:00:00Z (29d21h30m ago, in 30d window)
-  const mRows = [{ day: '2026-10-03', count: 1 }];
-  const mResult = buildActivityCadence({ range: '1m', tz, now, cadenceRows: mRows });
+  const mRows = [{ bucket_key: '2026-10-03', count: 1 }];
+  const mResult = presetCadence('1m', tz, now, mRows);
   const mTotal = mResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(mTotal, 1, '1m cadence must include play in earliest partial day (Oct 3)');
 
   // 1y: play at 2025-11-15T12:00:00Z (352d ago, in 365d window)
-  const yRows = [{ ym: '2025-11', count: 1 }];
-  const yResult = buildActivityCadence({ range: '1y', tz, now, cadenceRows: yRows });
+  const yRows = [{ bucket_key: '2025-11', count: 1 }];
+  const yResult = presetCadence('1y', tz, now, yRows);
   const yTotal = yResult.activityCadence.reduce((sum, b) => sum + b.count, 0);
   assert.equal(yTotal, 1, '1y cadence must include play in earliest partial month (Nov 2025)');
 
-  // 6m: SQL query builder must query 180 days (aligning with Overview), not 182 days
+  // 6m: SQL query builder filters by the half-open window [from, to) (180 days from resolveRangeWindow)
   const { loadTs } = await import('./helpers/load-ts');
   const cadenceModule = loadTs('src/lib/db/queries/cadence.ts', {
     '../index': {
-      getDb: () => (strings: TemplateStringsArray, ..._vals: unknown[]) => ({ strings: Array.from(strings) }),
+      getDb: () => (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        strings: Array.from(strings),
+        values,
+      }),
     },
   });
-  const sqlQuery6m = cadenceModule.buildCadenceQuery('6m', 'UTC');
-  const queryText = (sqlQuery6m as unknown as { strings: string[] }).strings.join(' ');
-  assert.ok(queryText.includes("180 days"), "6m query must use 180 days interval");
-  assert.ok(!queryText.includes("182 days"), "6m query must not use 182 days interval");
+  const window6m = resolveRangeWindow(presetRange('6m'), { now, tz: 'UTC', logStart: null });
+  const sqlQuery6m = cadenceModule.buildCadenceQuery(window6m, 'day', 'UTC') as unknown as {
+    strings: string[];
+    values: unknown[];
+  };
+  const queryText = sqlQuery6m.strings.join(' ');
+  assert.ok(queryText.includes('p.played_at >='), 'query must filter lower window bound');
+  assert.ok(queryText.includes('p.played_at <'), 'query must filter upper half-open window bound');
+  assert.ok(sqlQuery6m.values.includes(window6m.from), 'query must bind window.from');
+  assert.ok(sqlQuery6m.values.includes(window6m.to), 'query must bind window.to');
 });
 
 // ---------------------------------------------------------------------------
@@ -134,39 +163,40 @@ test('N009: cadence buckets include plays in earliest partial bucket of rolling 
 test('N013: 1d cadence bar label and tooltip agree in a non-UTC visitor timezone and other ranges unchanged', () => {
   const now = new Date('2026-11-03T15:20:00Z');
   const tz = 'America/New_York';
-  const cadenceRows = [{ hour_key: '2026-11-03T14:00:00Z', count: 3 }];
+  const cadenceRows = [{ bucket_key: '2026-11-03T14:00:00Z', count: 3 }];
 
-  const { activityCadence } = buildActivityCadence({
-    range: '1d',
-    tz,
-    now,
-    cadenceRows,
-  });
+  const { activityCadence } = presetCadence('1d', tz, now, cadenceRows);
 
   const bucket = activityCadence.find((b) => b.count === 3);
   assert.ok(bucket, 'Target bucket with 3 plays must exist');
   assert.equal(bucket.date, '09:00', 'Bar label hour must be 09:00 in America/New_York');
 
-  const tooltip1d = formatCadenceTooltip(bucket, '1d', tz);
+  const tooltip1d = formatBucketTooltip(bucket, 'hour', tz);
   const tooltipHour = tooltip1d.slice(0, 5);
   assert.equal(tooltipHour, bucket.date, 'Tooltip hour must match bar label hour (09:00) in visitor timezone');
 
-  // Verify other ranges format consistently without timezone shift
-  const bucket1w = {
-    startTime: '2026-11-02T00:00:00.000Z',
-    endTime: '2026-11-02T06:00:00.000Z',
+  // Verify other granularities format real instants consistently in visitor timezone
+  const bucketBlock6h = {
+    startTime: localDateToInstant('2026-11-02', tz).toISOString(),
+    endTime: new Date(localDateToInstant('2026-11-02', tz).getTime() + 6 * 3600000 - 1).toISOString(),
     count: 5,
   };
-  const tooltip1w = formatCadenceTooltip(bucket1w, '1w', tz);
-  assert.ok(tooltip1w.startsWith('Nov 02, 00:00–06:00'), `1w tooltip must preserve date and hours, got: ${tooltip1w}`);
+  const tooltipBlock6h = formatBucketTooltip(bucketBlock6h, 'block6h', tz);
+  assert.ok(
+    tooltipBlock6h.startsWith('Nov 02, 00:00–06:00'),
+    `block6h tooltip must preserve date and hours, got: ${tooltipBlock6h}`,
+  );
 
-  const bucket1m = {
-    startTime: '2026-11-02T00:00:00.000Z',
-    endTime: '2026-11-02T23:59:59.999Z',
+  const bucketDay = {
+    startTime: localDateToInstant('2026-11-02', tz).toISOString(),
+    endTime: new Date(localDateToInstant('2026-11-03', tz).getTime() - 1).toISOString(),
     count: 2,
   };
-  const tooltip1m = formatCadenceTooltip(bucket1m, '1m', tz);
-  assert.ok(tooltip1m.startsWith('Nov 02, 2026'), `1m tooltip must preserve calendar date, got: ${tooltip1m}`);
+  const tooltipDay = formatBucketTooltip(bucketDay, 'day', tz);
+  assert.ok(
+    tooltipDay.startsWith('Nov 02, 2026'),
+    `day tooltip must preserve calendar date, got: ${tooltipDay}`,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -176,14 +206,9 @@ test('N019: 1y cadence includes 13th month when time has elapsed past 00:00:00 o
   // 2026-11-01 00:30:00 CDT (UTC-5) is 2026-11-01T05:30:00Z
   const now = new Date('2026-11-01T05:30:00Z');
   const tz = 'America/Chicago';
-  const cadenceRows = [{ ym: '2025-11', count: 1 }];
+  const cadenceRows = [{ bucket_key: '2025-11', count: 1 }];
 
-  const { activityCadence } = buildActivityCadence({
-    range: '1y',
-    tz,
-    now,
-    cadenceRows,
-  });
+  const { activityCadence } = presetCadence('1y', tz, now, cadenceRows);
 
   assert.equal(activityCadence.length, 13, 'Must contain 13 month buckets when after 00:00:00 on the 1st');
   const earliest = activityCadence[0];
@@ -195,31 +220,50 @@ test('N019: all range uses visitor timezone year instead of server-local year', 
   // At 2026-01-01T07:00:00Z, server in UTC or US/Central is 2026, but in Pacific/Honolulu (UTC-10) it is 2025-12-31 21:00:00
   const now = new Date('2026-01-01T07:00:00Z');
   const tz = 'Pacific/Honolulu';
-  const cadenceRows = [{ play_year: 2025, count: 5 }];
+  const cadenceRows = [{ bucket_key: '2025', count: 5 }];
 
-  const { activityCadence } = buildActivityCadence({
-    range: 'all',
-    tz,
-    now,
-    cadenceRows,
-  });
+  const { activityCadence } = presetCadence('all', tz, now, cadenceRows);
 
   const years = activityCadence.map((b) => b.date);
   assert.equal(years[years.length - 1], '2025', 'End year must be 2025 according to visitor timezone');
 });
 
-test('N019: 1d SQL query uses DATE_TRUNC with AT TIME ZONE UTC', async () => {
+test('N019: hour SQL query uses DATE_TRUNC with AT TIME ZONE UTC and block6h uses # separator', async () => {
+  type SqlNode = { strings: string[]; values: unknown[] };
+  const flattenSql = (node: SqlNode): string =>
+    node.strings.reduce((acc, part, i) => {
+      const val = node.values[i];
+      const rendered =
+        val && typeof val === 'object' && 'strings' in val && 'values' in val
+          ? flattenSql(val as SqlNode)
+          : '';
+      return acc + part + rendered;
+    }, '');
+
   const { loadTs } = await import('./helpers/load-ts');
   const cadenceModule = loadTs('src/lib/db/queries/cadence.ts', {
     '../index': {
-      getDb: () => (strings: TemplateStringsArray, ..._vals: unknown[]) => ({ strings: Array.from(strings) }),
+      getDb: () => (strings: TemplateStringsArray, ...values: unknown[]): SqlNode => ({
+        strings: Array.from(strings),
+        values,
+      }),
     },
   });
-  const sqlQuery1d = cadenceModule.buildCadenceQuery('1d', 'America/New_York');
-  const queryText = (sqlQuery1d as unknown as { strings: string[] }).strings.join(' ');
+  const now = new Date('2026-11-03T15:20:00Z');
+  const window1d = resolveRangeWindow(presetRange('1d'), { now, tz: 'America/New_York', logStart: null });
+  const sqlQuery1d = cadenceModule.buildCadenceQuery(window1d, 'hour', 'America/New_York');
+  const queryText1d = flattenSql(sqlQuery1d as unknown as SqlNode);
   assert.ok(
-    queryText.includes("DATE_TRUNC('hour', p.played_at AT TIME ZONE 'UTC')"),
-    "1d query must truncate using AT TIME ZONE 'UTC'"
+    queryText1d.includes("DATE_TRUNC('hour', p.played_at AT TIME ZONE 'UTC')"),
+    "hour query must truncate using AT TIME ZONE 'UTC'",
+  );
+
+  const window1w = resolveRangeWindow(presetRange('1w'), { now, tz: 'America/New_York', logStart: null });
+  const sqlQuery1w = cadenceModule.buildCadenceQuery(window1w, 'block6h', 'America/New_York');
+  const queryText1w = flattenSql(sqlQuery1w as unknown as SqlNode);
+  assert.ok(
+    queryText1w.includes("|| '#' ||"),
+    "block6h query must concatenate local day and block with '#'",
   );
 });
 
@@ -237,10 +281,14 @@ function withServerTimezone<T>(serverTz: string, run: () => T): T {
   }
 }
 
-// Bucket startTime is UTC midnight of the visitor's calendar day key.
-function expectedDayLabel(startTime: string): string {
-  const month = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short' }).format(new Date(startTime));
-  return `${startTime.slice(8, 10)} ${month}`;
+// Bucket startTime is a real UTC instant corresponding to midnight in the visitor's timezone.
+function expectedDayLabel(startTime: string, tz: string): string {
+  const dayKey = localDateKey(new Date(startTime), tz);
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const monthAbbr = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short' }).format(
+    new Date(Date.UTC(year, month - 1, day, 12)),
+  );
+  return `${dayKey.slice(8, 10)} ${monthAbbr}`;
 }
 
 for (const { tz, serverTz } of [
@@ -251,23 +299,25 @@ for (const { tz, serverTz } of [
     withServerTimezone(serverTz, () => {
       const now = new Date('2026-07-20T12:00:00Z');
 
-      const month = buildActivityCadence({ range: '1m', tz, now, cadenceRows: [{ day: '2026-07-15', count: 4 }] }).activityCadence;
+      const month = presetCadence('1m', tz, now, [{ bucket_key: '2026-07-15', count: 4 }]).activityCadence;
       const july15 = month.find((b) => b.count === 4);
       assert.ok(july15, 'the 15 July bucket must exist');
       assert.equal(july15.date, '15 Jul');
-      for (const bucket of month) assert.equal(bucket.date, expectedDayLabel(bucket.startTime));
+      for (const bucket of month) assert.equal(bucket.date, expectedDayLabel(bucket.startTime, tz));
 
-      const week = buildActivityCadence({ range: '1w', tz, now, cadenceRows: [{ day: '2026-07-15', block: 0, count: 2 }] }).activityCadence;
+      const week = presetCadence('1w', tz, now, [{ bucket_key: '2026-07-15#0', count: 2 }]).activityCadence;
       const weekJuly15 = week.find((b) => b.count === 2);
       assert.ok(weekJuly15, 'the 15 July block must exist');
       assert.equal(weekJuly15.date, '15 Jul 00:00–06:00');
       assert.equal(weekJuly15.markerLabel, '15');
-      for (const bucket of week) assert.ok(bucket.date.startsWith(expectedDayLabel(bucket.startTime)), bucket.date);
+      for (const bucket of week) {
+        assert.ok(bucket.date.startsWith(expectedDayLabel(bucket.startTime, tz)), bucket.date);
+      }
 
       // Week buckets starting on the 1st must carry that month's marker, not the neighbour's.
-      const sixMonths = buildActivityCadence({ range: '6m', tz, now: new Date('2026-07-07T12:00:00Z'), cadenceRows: [] }).activityCadence;
+      const sixMonths = presetCadence('6m', tz, new Date('2026-07-07T12:00:00Z'), []).activityCadence;
       for (const bucket of sixMonths.filter((b) => b.isMarker)) {
-        assert.equal(bucket.markerLabel, expectedDayLabel(bucket.startTime).slice(3), bucket.startTime);
+        assert.equal(bucket.markerLabel, expectedDayLabel(bucket.startTime, tz).slice(3), bucket.startTime);
       }
     });
   });

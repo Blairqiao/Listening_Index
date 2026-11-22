@@ -63,13 +63,30 @@ function utcMs(
   return d.getTime();
 }
 
-function compareCalendarDateParts(
-  a: { year: number; month: number; day: number },
-  b: { year: number; month: number; day: number },
+function compareLocalDateTime(
+  a: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  },
+  b: {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    second: number;
+  },
 ): number {
   if (a.year !== b.year) return a.year - b.year;
   if (a.month !== b.month) return a.month - b.month;
-  return a.day - b.day;
+  if (a.day !== b.day) return a.day - b.day;
+  if (a.hour !== b.hour) return a.hour - b.hour;
+  if (a.minute !== b.minute) return a.minute - b.minute;
+  return a.second - b.second;
 }
 
 function parseCalendarDate(
@@ -206,10 +223,14 @@ export function localDateKey(instant: Date, tz: string): string {
   return formatCalendarDate(p.year, p.month, p.day);
 }
 
-export function localDateToInstant(dateKey: string, tz: string): Date {
+export function localWallClockToInstant(
+  dateKey: string,
+  hour: number,
+  tz: string,
+): Date {
   const [y, m, d] = dateKey.split("-").map(Number);
-  const targetParts = { year: y, month: m, day: d };
-  const target = utcMs(y, m - 1, d);
+  const targetParts = { year: y, month: m, day: d, hour, minute: 0, second: 0 };
+  const target = utcMs(y, m - 1, d, hour);
   let guess = target;
   for (let i = 0; i < 4; i++) {
     const p = getLocalCalendarParts(new Date(guess), tz);
@@ -221,7 +242,7 @@ export function localDateToInstant(dateKey: string, tz: string): Date {
   }
 
   const isBeforeTarget = (ms: number): boolean =>
-    compareCalendarDateParts(
+    compareLocalDateTime(
       getLocalCalendarParts(new Date(ms), tz),
       targetParts,
     ) < 0;
@@ -258,6 +279,10 @@ export function localDateToInstant(dateKey: string, tz: string): Date {
   }
 
   return new Date(hi);
+}
+
+export function localDateToInstant(dateKey: string, tz: string): Date {
+  return localWallClockToInstant(dateKey, 0, tz);
 }
 
 export function resolveRangeWindow(

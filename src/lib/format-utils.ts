@@ -1,4 +1,5 @@
 import type { RangeKey } from "./types";
+import type { CadenceGranularity } from "./range";
 
 export interface OverviewMetricsRaw {
   totalMs: number;
@@ -160,6 +161,117 @@ export function formatCadenceTooltip(
     hour12: false,
   }).format(startDate);
   return `${hour} — ${playsLabel}`;
+}
+
+export function formatBucketTooltip(
+  bucket: { startTime: string; endTime: string; count: number },
+  granularity: CadenceGranularity,
+  tz = "UTC"
+): string {
+  const startDate = new Date(bucket.startTime);
+  const endDate = new Date(bucket.endTime);
+  const playsLabel = `${bucket.count.toLocaleString()} ${bucket.count === 1 ? "play" : "plays"}`;
+
+  if (granularity === "year") {
+    const year = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+    }).format(startDate);
+    return `${year} — ${playsLabel}`;
+  }
+
+  if (granularity === "month") {
+    const month = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+    }).format(startDate);
+    const year = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+    }).format(startDate);
+    return `${month} ${year} — ${playsLabel}`;
+  }
+
+  if (granularity === "week") {
+    const startParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).formatToParts(startDate);
+
+    const endParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).formatToParts(endDate);
+
+    const sMonth = startParts.find((p) => p.type === "month")?.value || "";
+    const sDay = startParts.find((p) => p.type === "day")?.value || "";
+    const sYear = startParts.find((p) => p.type === "year")?.value || "";
+
+    const eMonth = endParts.find((p) => p.type === "month")?.value || "";
+    const eDay = endParts.find((p) => p.type === "day")?.value || "";
+    const eYear = endParts.find((p) => p.type === "year")?.value || "";
+
+    if (sYear === eYear) {
+      return `${sMonth} ${sDay} – ${eMonth} ${eDay}, ${sYear} — ${playsLabel}`;
+    }
+    return `${sMonth} ${sDay}, ${sYear} – ${eMonth} ${eDay}, ${eYear} — ${playsLabel}`;
+  }
+
+  if (granularity === "day") {
+    const month = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+    }).format(startDate);
+    const day = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      day: "2-digit",
+    }).format(startDate);
+    const year = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+    }).format(startDate);
+    return `${month} ${day}, ${year} — ${playsLabel}`;
+  }
+
+  if (granularity === "block6h") {
+    const month = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      month: "short",
+    }).format(startDate);
+    const day = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      day: "2-digit",
+    }).format(startDate);
+    // Use the scheduled 6-hour block bounds even when DST skips the nominal boundary hour.
+    const localStartHour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(startDate)
+        .find((p) => p.type === "hour")?.value || "0",
+    );
+    const blockStart = Math.floor(localStartHour / 6) * 6;
+    const startHour = String(blockStart).padStart(2, "0");
+    const endHour = String(blockStart + 6).padStart(2, "0");
+    return `${month} ${day}, ${startHour}:00–${endHour}:00 — ${playsLabel}`;
+  }
+
+  // hour
+  const hourParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(startDate);
+  const hh = hourParts.find((p) => p.type === "hour")?.value || "00";
+  const mm = hourParts.find((p) => p.type === "minute")?.value || "00";
+  return `${hh}:${mm} — ${playsLabel}`;
 }
 
 export function formatCatalogPercentile(
