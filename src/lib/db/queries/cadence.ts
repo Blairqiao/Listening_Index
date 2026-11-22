@@ -1,6 +1,9 @@
 import { getDb } from "../index";
 import { formatDayGroupTz } from "./helpers";
+import { getLocalCalendarParts } from "@/lib/range";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
+
+export { getLocalCalendarParts };
 
 export type CadenceScope =
   | { kind: "track"; trackId: string }
@@ -106,28 +109,6 @@ export function buildCadenceQuery(range: RangeKey, tz: string, scope?: CadenceSc
     GROUP BY play_year
     ORDER BY play_year ASC;
   `;
-}
-
-function getLocalCalendarParts(date: Date, tz: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const m = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return {
-    year: Number(m.year),
-    month: Number(m.month),
-    day: Number(m.day),
-    hour: Number(m.hour),
-    minute: Number(m.minute),
-    second: Number(m.second),
-  };
 }
 
 function offsetCalendarDay(base: { year: number; month: number; day: number }, daysAgo: number) {
