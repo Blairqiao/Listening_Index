@@ -4,6 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compactDate } from '../src/lib/format-utils';
 import { ControlRow } from '../src/components/listening-view/ControlRow';
+import { presetRange } from '../src/lib/range';
 
 test('compactDate returns the placeholder for an unparseable date', () => {
   assert.equal(compactDate('--'), '--');
@@ -25,7 +26,7 @@ test('ControlRow shows the placeholder scope label while the Overview has no sta
   const markup = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 0,
-      range: '1w',
+      range: presetRange('1w'),
       onSelectRange: () => {},
       logStartDate: '--',
       isSessionOpen: false,

@@ -175,10 +175,13 @@ function withHookReact<T>(fn: (harness: ReturnType<typeof createProfileHookHarne
 }
 
 test("buildListeningUrlSearch manages mode=4 profile params and preserves unrelated params and mode=3", () => {
+  const defaultOverview = rangeModule.DEFAULT_OVERVIEW_RANGE;
+
   // Mode 4 search (no target) clears track/artist/prange and keeps unrelated params
   assert.equal(
     buildListeningUrlSearch("?range=1w&foo=bar&track=t1&prange=all", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1w",
     }),
@@ -189,6 +192,7 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
   assert.equal(
     buildListeningUrlSearch("?mode=4&artist=a1&range=1w&foo=bar", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: { kind: "track", key: "t1" },
       profileRange: "all",
     }),
@@ -199,36 +203,40 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
   assert.equal(
     buildListeningUrlSearch("?mode=4&track=t1&prange=1w", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: { kind: "artist", key: "a1" },
       profileRange: "6m",
     }),
     "?mode=4&prange=6m&artist=a1"
   );
 
-  // Leaving mode 4 to Overview removes mode=4, track, artist, prange while keeping range & custom params
+  // Leaving mode 4 to Overview removes mode=4, track, artist, prange; omits default 1w range while keeping custom params
   assert.equal(
     buildListeningUrlSearch("?mode=4&track=t1&prange=all&range=1w&foo=bar", {
       activeMode: 0,
+      overviewRange: defaultOverview,
       profileTarget: { kind: "track", key: "t1" },
       profileRange: "all",
     }),
-    "?range=1w&foo=bar"
+    "?foo=bar"
   );
 
   // Leaving mode 4 with nothing else left yields empty search (bare pathname)
   assert.equal(
     buildListeningUrlSearch("?mode=4", {
       activeMode: 0,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1w",
     }),
     ""
   );
 
-  // Preserves existing mode=3 and non-4 modes
+  // Preserves existing mode=3 when active or pending admin login intent, and clears stale mode=3 otherwise
   assert.equal(
     buildListeningUrlSearch("?mode=3&session=s1", {
       activeMode: 3,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1w",
     }),
@@ -237,17 +245,30 @@ test("buildListeningUrlSearch manages mode=4 profile params and preserves unrela
   assert.equal(
     buildListeningUrlSearch("?mode=3", {
       activeMode: 0,
+      overviewRange: defaultOverview,
+      profileTarget: null,
+      profileRange: "1w",
+      preservePendingMode3: true,
+    }),
+    "?mode=3"
+  );
+  assert.equal(
+    buildListeningUrlSearch("?mode=3", {
+      activeMode: 0,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1w",
     }),
-    "?mode=3"
+    ""
   );
 });
 
 test("buildListeningUrlSearch keeps only the active profile key, including Album keys", () => {
+  const defaultOverview = rangeModule.DEFAULT_OVERVIEW_RANGE;
   const currentSearch = "?mode=4&track=t1&artist=a1&album=old";
   assert.equal(buildListeningUrlSearch(currentSearch, {
     activeMode: 4,
+    overviewRange: defaultOverview,
     profileTarget: { kind: "album", key: "k" },
     profileRange: "1y",
   }), "?mode=4&album=k&prange=1y");
@@ -255,24 +276,28 @@ test("buildListeningUrlSearch keeps only the active profile key, including Album
   for (const kind of ["track", "artist"] as const) {
     assert.equal(buildListeningUrlSearch(currentSearch, {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: { kind, key: "k" },
       profileRange: "1y",
     }), `?mode=4&${kind}=k&prange=1y`);
   }
 
   assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
-    activeMode: 4, profileTarget: null, profileRange: "1y",
+    activeMode: 4, overviewRange: defaultOverview, profileTarget: null, profileRange: "1y",
   }), "?mode=4");
   assert.equal(buildListeningUrlSearch(`${currentSearch}&prange=1y`, {
-    activeMode: 0, profileTarget: { kind: "album", key: "k" }, profileRange: "1y",
+    activeMode: 0, overviewRange: defaultOverview, profileTarget: { kind: "album", key: "k" }, profileRange: "1y",
   }), "");
 });
 
 test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse and clears them on profile or mode change", () => {
+  const defaultOverview = rangeModule.DEFAULT_OVERVIEW_RANGE;
+
   // Mode 4 browse writes non-default q, type, sort, page
   assert.equal(
     buildListeningUrlSearch("?mode=4", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1y",
       search: { query: "  radiohead  ", filter: "albums", sort: "recent", page: 2 },
@@ -284,6 +309,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
   assert.equal(
     buildListeningUrlSearch("?mode=4&q=old&type=tracks&sort=oldest&page=3", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1y",
       search: { query: "   ", filter: "all", sort: "most-plays", page: 1 },
@@ -295,6 +321,7 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
   assert.equal(
     buildListeningUrlSearch("?mode=4&q=radiohead&type=albums&sort=recent&page=2", {
       activeMode: 4,
+      overviewRange: defaultOverview,
       profileTarget: { kind: "artist", key: "a1" },
       profileRange: "1y",
       search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
@@ -302,15 +329,16 @@ test("buildListeningUrlSearch syncs non-default search params in Mode 4 browse a
     "?mode=4&artist=a1&prange=1y"
   );
 
-  // Leaving Mode 4 clears q, type, sort, page
+  // Leaving Mode 4 clears q, type, sort, page and omits default 1w overview range
   assert.equal(
     buildListeningUrlSearch("?mode=4&q=radiohead&type=albums&sort=recent&page=2&range=1w", {
       activeMode: 0,
+      overviewRange: defaultOverview,
       profileTarget: null,
       profileRange: "1y",
       search: { query: "radiohead", filter: "albums", sort: "recent", page: 2 },
     }),
-    "?range=1w"
+    ""
   );
 });
 
@@ -905,7 +933,7 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
     searchParams: Promise.resolve({ mode: "4", track: "4clD00s1c0rVqP9Ld0vV48", prange: "all", range: "1w" }),
   });
   assert.equal(mode4Track.props.initialMode, 4);
-  assert.equal(mode4Track.props.initialRange, "1w");
+  assert.deepEqual(mode4Track.props.initialRange, { kind: "preset", key: "1w" });
   assert.deepEqual(mode4Track.props.initialProfile, { kind: "track", key: "4clD00s1c0rVqP9Ld0vV48" });
   assert.equal(mode4Track.props.initialProfileRange, "all");
 

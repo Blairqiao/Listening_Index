@@ -2,13 +2,14 @@
 
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
+import { presetRange, type RangeSelection } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
-  range: RangeKey;
-  onSelectRange: (range: RangeKey) => void;
+  range: RangeSelection;
+  onSelectRange: (sel: RangeSelection) => void;
   logStartDate: string;
   isSessionOpen: boolean;
   sessionTagTime: string;
@@ -147,7 +148,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       aria-label="Time range filters"
     >
       {RANGES.map((r) => {
-        const isActive = range === r.key;
+        const isActive = range.kind === "preset" && range.key === r.key;
         return (
           <button
             key={r.key}
@@ -156,7 +157,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.currentTarget.blur();
-              if (!isSyncing) onSelectRange(r.key);
+              if (!isSyncing) onSelectRange(presetRange(r.key));
             }}
             className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
               isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"

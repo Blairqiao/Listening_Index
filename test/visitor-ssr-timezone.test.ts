@@ -29,7 +29,7 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
   }
 });
 
-test('SSR passes full fixed selection to queries and forwards fixed overview to ListeningView with preset compatibility', async () => {
+test('SSR passes full fixed selection to queries and forwards fixed selection and overview to ListeningView', async () => {
   const queryCalls: unknown[][] = [];
   const mockOverviewCalls: unknown[][] = [];
   const fakeOverview = {
@@ -78,7 +78,7 @@ test('SSR passes full fixed selection to queries and forwards fixed overview to 
   );
   const renderedDb = await modDb.exports.default({ searchParams: Promise.resolve({ range: '2025-11-01..2025-11-30' }) });
   assert.deepEqual(queryCalls[0][0], { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
-  assert.equal(renderedDb.props.initialRange, '1w');
+  assert.deepEqual(renderedDb.props.initialRange, { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
   assert.deepEqual(renderedDb.props.initialOverview, fakeOverview);
 
   // 2. Unconfigured / mock branch
@@ -91,6 +91,6 @@ test('SSR passes full fixed selection to queries and forwards fixed overview to 
   );
   const renderedMock = await modMock.exports.default({ searchParams: Promise.resolve({ range: '2025-11-01..2025-11-30' }) });
   assert.deepEqual(mockOverviewCalls[0][0], { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
-  assert.equal(renderedMock.props.initialRange, '1w');
+  assert.deepEqual(renderedMock.props.initialRange, { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
   assert.deepEqual(renderedMock.props.initialOverview, fakeOverview);
 });

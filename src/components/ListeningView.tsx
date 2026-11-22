@@ -28,7 +28,7 @@ const AdminSpotifyModal = dynamic(
 import { AdminLoginModal } from "@/components/modals/admin-login-modal/AdminLoginModal";
 import { ConfigProvider, useConfig, SiteConfigState } from "@/context/ConfigContext";
 import { PlayerProvider, usePlayer } from "@/context/PlayerContext";
-import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
+import type { Mode, RangeKey } from "@/lib/types";
 import {
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
@@ -50,10 +50,15 @@ import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries"
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
-  parseRangeParam,
+  DEFAULT_OVERVIEW_RANGE,
   formatRangeLabel,
+  formatRangeParam,
+  isSameRange,
+  parseRangeParam,
+  presetRange,
   PRESET_GRANULARITY,
   type CadenceGranularity,
+  type RangeSelection,
 } from "@/lib/range";
 import {
   formatOverviewMetrics,
@@ -125,7 +130,7 @@ interface ListeningViewProps {
   isDbConfigured?: boolean;
   initialIsAuthenticated?: boolean;
   initialMode?: Mode;
-  initialRange?: RangeKey;
+  initialRange?: RangeSelection;
   initialProfile?: ProfileTarget | null;
   initialProfileRange?: RangeKey | null;
   initialSearchQuery?: string;
@@ -140,7 +145,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   initialSession,
   isDbConfigured = true,
   initialMode = 0,
-  initialRange = "1w",
+  initialRange = DEFAULT_OVERVIEW_RANGE,
   initialProfile = null,
   initialProfileRange = null,
   initialSearchQuery,
@@ -241,11 +246,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     setActiveRange,
     displayedRange,
     setDisplayedRange,
+    displayedOverview,
     isRangeLoading,
     selectRange,
     activeRangeRef,
     requestGenerationRef,
-    overviewCache,
+    setOverviewCache,
     overviewCacheRef,
     streamLogState,
     loadedPlaysCount,
@@ -270,6 +276,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     isAuthenticated,
     activeRangeRef,
     requestGenerationRef,
+    setOverviewCache,
     fetchOverview,
     fetchStreamLog,
     fetchSession,
@@ -285,7 +292,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const trackStats = useTrackStats(activeEntity);
 
   // Track whether real overview data is ready
-  const isDataReady = Boolean(overviewCache[displayedRange] || initialOverview);
+  const isDataReady = Boolean(displayedOverview || initialOverview);
 
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
@@ -357,9 +364,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   }, [searchFilter, handleOpenProfile]);
 
   // Support query params for direct URL inspection of all modes and states
-  useListeningUrlSync({
+  const {
+    isPendingLivePlayer,
+    pendingLivePlayerRef,
+    clearPendingLivePlayer,
+    skipNextUrlSyncRef,
+  } = useListeningUrlSync({
     isAuthenticated,
-    rangeKeys: RANGE_KEYS,
+    activeMode,
     openModal,
     setActiveMode,
     setActiveRange,
@@ -373,11 +385,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (skipNextUrlSyncRef.current) {
+      skipNextUrlSyncRef.current = false;
+      return;
+    }
     const currentUrl = new URL(window.location.href);
     const nextSearch = buildListeningUrlSearch(currentUrl.search, {
       activeMode,
+      overviewRange: activeRange,
       profileTarget,
       profileRange,
+      preservePendingMode3: pendingLivePlayerRef.current,
       search: {
         query: searchQuery,
         filter: searchFilter,
@@ -408,6 +426,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     }
   }, [
     activeMode,
+    activeRange,
     profileTarget,
     profileRange,
     profileHistory,
@@ -415,6 +434,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     searchFilter,
     searchSort,
     searchPage,
+    isPendingLivePlayer,
+    pendingLivePlayerRef,
+    skipNextUrlSyncRef,
   ]);
 
   // Restore mode, profile target/history, and search state on browser Back/Forward
@@ -422,6 +444,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     if (typeof window === "undefined") return;
     const handlePopState = (event: PopStateEvent) => {
       shouldPushHistoryRef.current = false;
+      clearPendingLivePlayer();
       const params = new URL(window.location.href).searchParams;
       const modeParam = params.get("mode");
       const parsedMode: Mode =
@@ -456,16 +479,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           setSearchPage(parseSearchPage(params.get("page")));
         }
       } else {
-        const r = params.get("range");
-        if (r && (RANGE_KEYS as readonly string[]).includes(r)) {
-          const rangeKey = r as RangeKey;
-          setActiveRange(rangeKey);
-          activeRangeRef.current = rangeKey;
-          if (overviewCacheRef.current[rangeKey]) {
-            setDisplayedRange(rangeKey);
-          } else {
-            void fetchOverview(rangeKey);
-          }
+        const parsedRange = parseRangeParam(params.get("range"));
+        if (parsedRange || parsedMode === 0) {
+          const nextRange = parsedRange ?? DEFAULT_OVERVIEW_RANGE;
+          selectRange(nextRange);
         }
         const sess = params.get("session");
         if (sess) {
@@ -480,11 +497,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     isAuthenticated,
     syncFromLocation,
     setSearchQuery,
-    setActiveRange,
-    activeRangeRef,
-    overviewCacheRef,
-    setDisplayedRange,
-    fetchOverview,
+    selectRange,
+    clearPendingLivePlayer,
   ]);
 
   // Global keyboard shortcuts: '/' focuses Search, 'Escape' steps back from a profile
@@ -518,6 +532,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
       if (event.key === "/") {
         event.preventDefault();
+        clearPendingLivePlayer();
         setActiveMode(4);
         if (profileTarget) {
           shouldPushHistoryRef.current = true;
@@ -543,11 +558,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     isAdminSpotifyModalOpen,
     handleReturnToSearch,
     handleProfileBack,
+    clearPendingLivePlayer,
   ]);
 
   const handleSelectMode = useCallback(
     (mode: Mode) => {
       if (isSyncing) return;
+      clearPendingLivePlayer();
       if (mode === 4 && activeMode === 4 && profileTarget) {
         shouldPushHistoryRef.current = true;
         handleReturnToSearch();
@@ -560,34 +577,47 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         void checkTokenStatus();
       }
     },
-    [isSyncing, activeMode, profileTarget, handleReturnToSearch, isAuthenticated, checkTokenStatus]
+    [
+      isSyncing,
+      activeMode,
+      profileTarget,
+      handleReturnToSearch,
+      isAuthenticated,
+      checkTokenStatus,
+      clearPendingLivePlayer,
+    ]
   );
 
   const handleSelectRange = useCallback(
-    (range: RangeKey) => {
+    (range: RangeSelection, opts?: { push?: boolean }) => {
       if (isSyncing) return;
+      clearPendingLivePlayer();
+      if (isSameRange(activeRangeRef.current, range)) {
+        if (!overviewCacheRef.current[formatRangeParam(range)]) {
+          selectRange(range);
+        }
+        return;
+      }
+      shouldPushHistoryRef.current = Boolean(opts?.push);
       selectRange(range);
     },
-    [isSyncing, selectRange]
+    [isSyncing, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
   );
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
-  const overviewPayload = overviewCache[displayedRange];
+  const displayedRangeKey = formatRangeParam(displayedRange);
+  const overviewPayload = displayedOverview;
+  const fallbackGranularity: CadenceGranularity =
+    displayedRange.kind === "preset" ? PRESET_GRANULARITY[displayedRange.key] : "day";
   const currentOverview: OverviewData = overviewPayload || {
     ...EMPTY_OVERVIEW,
-    range: displayedRange,
-    granularity: PRESET_GRANULARITY[displayedRange],
+    range: displayedRangeKey,
+    granularity: fallbackGranularity,
   };
-  const parsedOverviewRange = overviewPayload ? parseRangeParam(overviewPayload.range) : null;
-  const overviewGranularity: CadenceGranularity = overviewPayload
-    ? overviewPayload.granularity
-    : PRESET_GRANULARITY[displayedRange];
-  const overviewRangeKey: RangeKey | null = parsedOverviewRange
-    ? (parsedOverviewRange.kind === "preset" ? parsedOverviewRange.key : null)
-    : displayedRange;
-  const overviewRangeLabel: string | undefined = parsedOverviewRange
-    ? (parsedOverviewRange.kind === "window" ? formatRangeLabel(parsedOverviewRange) : undefined)
-    : undefined;
+  const overviewGranularity: CadenceGranularity = currentOverview.granularity;
+  const overviewRangeKey: RangeKey | null =
+    displayedRange.kind === "preset" ? displayedRange.key : null;
+  const overviewRangeLabel: string = formatRangeLabel(displayedRange);
   const streamLogData: StreamLogData = streamLogState || EMPTY_STREAM_LOG;
 
   const sessionData: SessionData = sessionState || { sessions: [] };
@@ -688,7 +718,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active metrics per mode
   const overviewMetrics: [string, string, string, string] =
     currentOverview.rawMetrics
-      ? formatOverviewMetrics(currentOverview.rawMetrics, overviewTimeUnit, overviewGranularity)
+      ? formatOverviewMetrics(currentOverview.rawMetrics, overviewTimeUnit, currentOverview.granularity)
       : currentOverview.metrics;
 
   const streamMetrics: [string, string, string, string] =
@@ -755,8 +785,14 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           {(activeMode !== 4 || profileTarget) && (
             <ControlRow
               mode={activeMode}
-              range={activeMode === 4 ? profileRange : activeRange}
-              onSelectRange={activeMode === 4 ? handleSelectProfileRange : handleSelectRange}
+              range={activeMode === 4 ? presetRange(profileRange) : activeRange}
+              onSelectRange={
+                activeMode === 4
+                  ? (sel) => {
+                      if (sel.kind === "preset") handleSelectProfileRange(sel.key);
+                    }
+                  : handleSelectRange
+              }
               logStartDate={currentOverview.logStartDate}
               isSessionOpen={activeSession?.isOpen || false}
               sessionTagTime={sessionTagTime}
@@ -809,9 +845,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player and Search) */}
           <div
+            aria-busy={isSyncing || (activeMode === 0 && isRangeLoading)}
             className={`h-auto ${activeMode === 3 || activeMode === 4 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
               } transition-opacity duration-150 ${isSyncing || (activeMode === 0 && isRangeLoading)
-                ? "opacity-40 pointer-events-none"
+                ? "opacity-60 pointer-events-none"
                 : "opacity-100"
               }`}
           >
@@ -824,7 +861,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 topArtists={currentOverview.topArtists}
                 topAlbums={currentOverview.topAlbums}
                 activityCadence={currentOverview.activityCadence}
-                isLoading={!overviewCache[displayedRange] && isDbConfigured}
+                isLoading={!displayedOverview && isDbConfigured}
                 onOpenProfile={(target) => {
                   shouldPushHistoryRef.current = true;
                   setActiveMode(4);

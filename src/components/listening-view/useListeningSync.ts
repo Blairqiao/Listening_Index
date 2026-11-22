@@ -1,12 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { RangeKey } from "@/lib/types";
-import { computeSyncedAgo, overviewRefreshOrder, STREAM_LOG_PAGE_SIZE } from "./listening-helpers";
+import type { RangeSelection } from "@/lib/range";
+import type { OverviewData } from "@/lib/db/queries";
+import {
+  computeSyncedAgo,
+  overviewRefreshOrder,
+  pruneOverviewCacheWindows,
+  STREAM_LOG_PAGE_SIZE,
+} from "./listening-helpers";
 
 export interface UseListeningSyncParams {
   isAuthenticated: boolean;
-  activeRangeRef: React.MutableRefObject<RangeKey>;
+  activeRangeRef: React.MutableRefObject<RangeSelection>;
   requestGenerationRef: React.MutableRefObject<number>;
-  fetchOverview: (range: RangeKey) => Promise<unknown>;
+  setOverviewCache: React.Dispatch<React.SetStateAction<Record<string, OverviewData>>>;
+  fetchOverview: (range: RangeSelection) => Promise<unknown>;
   fetchStreamLog: (countToFetch?: number) => Promise<void>;
   fetchSession: () => Promise<void>;
   lastSyncedAt: Date | null;
@@ -21,6 +28,7 @@ export function useListeningSync({
   isAuthenticated,
   activeRangeRef,
   requestGenerationRef,
+  setOverviewCache,
   fetchOverview,
   fetchStreamLog,
   fetchSession,
@@ -43,7 +51,6 @@ export function useListeningSync({
   // Manual sync trigger: runs ingestion, which purges the server cache, then refetches every view
   const handleTriggerSync = useCallback(async () => {
     if (!isAuthenticated || isSyncing) return;
-    requestGenerationRef.current++;
     setIsSyncing(true);
     setSyncError(null);
     try {
@@ -53,14 +60,17 @@ export function useListeningSync({
       });
       const syncData = await res.json().catch(() => ({}));
       if (res.ok && syncData?.success === true) {
+        requestGenerationRef.current++;
         setSyncError(null);
         setLastSyncedAt(syncData.syncedAt ? new Date(syncData.syncedAt) : new Date());
         setSyncedAgoStr("Just now");
 
         // Existing views stay visible (dimmed) until each range's fresh,
-        // enrichment-patched response replaces it.
+        // enrichment-patched response replaces it. Non-active cached windows are dropped.
+        const active = activeRangeRef.current;
+        setOverviewCache((prev) => pruneOverviewCacheWindows(prev, active));
         await Promise.all([
-          ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
+          ...overviewRefreshOrder(active).map((range) => fetchOverview(range)),
           fetchStreamLog(),
           fetchSession(),
         ]);
@@ -78,35 +88,50 @@ export function useListeningSync({
     } finally {
       setIsSyncing(false);
     }
-  }, [isSyncing, isAuthenticated, activeRangeRef, requestGenerationRef, setLastSyncedAt, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [
+    isSyncing,
+    isAuthenticated,
+    activeRangeRef,
+    requestGenerationRef,
+    setOverviewCache,
+    setLastSyncedAt,
+    fetchOverview,
+    fetchStreamLog,
+    fetchSession,
+  ]);
 
   // Background silent refetch (auto-sync schedule and focus revalidation) of every range
   const refetchActiveData = useCallback(async () => {
+    requestGenerationRef.current++;
+    const active = activeRangeRef.current;
+    setOverviewCache((prev) => pruneOverviewCacheWindows(prev, active));
     try {
       await Promise.all([
-        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
+        ...overviewRefreshOrder(active).map((range) => fetchOverview(range)),
         fetchStreamLog(),
         fetchSession(),
       ]);
     } catch (err) {
       console.error("[AUTO REFETCH] Error updating telemetry:", err);
     }
-  }, [activeRangeRef, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [activeRangeRef, requestGenerationRef, setOverviewCache, fetchOverview, fetchStreamLog, fetchSession]);
 
   // When an upload batch completes, refetch every range so all of them include the imported Plays.
   // An import can add older Plays inside the loaded Stream Log window, so that list is replaced, not merged.
   const handleUploadComplete = useCallback(async () => {
     requestGenerationRef.current++;
+    const active = activeRangeRef.current;
+    setOverviewCache((prev) => pruneOverviewCacheWindows(prev, active));
     try {
       await Promise.all([
-        ...overviewRefreshOrder(activeRangeRef.current).map((range) => fetchOverview(range)),
+        ...overviewRefreshOrder(active).map((range) => fetchOverview(range)),
         fetchStreamLog(STREAM_LOG_PAGE_SIZE),
         fetchSession(),
       ]);
     } catch (err) {
       console.error("[UPLOAD COMPLETE] Error refreshing listening data:", err);
     }
-  }, [activeRangeRef, requestGenerationRef, fetchOverview, fetchStreamLog, fetchSession]);
+  }, [activeRangeRef, requestGenerationRef, setOverviewCache, fetchOverview, fetchStreamLog, fetchSession]);
 
   // Wall-clock auto-refresh: 30s after every :00 and :30 cron window
   useEffect(() => {

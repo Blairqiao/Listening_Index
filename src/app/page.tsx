@@ -108,7 +108,7 @@ export default async function Page({ searchParams }: PageProps) {
       isDbConfigured={isDbConfigured()}
       initialIsAuthenticated={initialIsAuthenticated}
       initialMode={initialMode}
-      initialRange={initialRange.kind === "preset" ? initialRange.key : "1w"}
+      initialRange={initialRange}
       initialProfile={initialProfile}
       initialProfileRange={initialProfileRange}
       initialSearchQuery={initialSearchQuery}

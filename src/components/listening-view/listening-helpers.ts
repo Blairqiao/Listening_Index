@@ -1,6 +1,13 @@
 import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
 import {
+  DEFAULT_OVERVIEW_RANGE,
+  formatRangeParam,
+  isSameRange,
+  presetRange,
+  type RangeSelection,
+} from "@/lib/range";
+import {
   DEFAULT_SEARCH_FILTER,
   DEFAULT_SEARCH_SORT,
   type ProfileData,
@@ -11,9 +18,30 @@ import {
 import { formatLogStartDate } from "@/lib/db/queries/helpers";
 import { formatRankDisplay, formatPlaysDisplay } from "@/lib/format-utils";
 
-/** Every Overview range, active first so the visible view refreshes before the rest. */
-export function overviewRefreshOrder(activeRange: RangeKey): RangeKey[] {
-  return [activeRange, ...RANGE_KEYS.filter((range) => range !== activeRange)];
+const PRESET_KEY_SET = new Set<string>(RANGE_KEYS);
+
+/** Active selection first, then every preset with no duplicates. */
+export function overviewRefreshOrder(active: RangeSelection): RangeSelection[] {
+  const presets = RANGE_KEYS.map(presetRange).filter((preset) => !isSameRange(preset, active));
+  return [active, ...presets];
+}
+
+/** Drop cached window entries other than the active selection so stale windows cannot show after a refresh. */
+export function pruneOverviewCacheWindows(
+  cache: Record<string, OverviewData>,
+  active: RangeSelection
+): Record<string, OverviewData> {
+  const activeKey = formatRangeParam(active);
+  let dropped = false;
+  const next: Record<string, OverviewData> = {};
+  for (const [key, value] of Object.entries(cache)) {
+    if (PRESET_KEY_SET.has(key) || key === activeKey) {
+      next[key] = value;
+    } else {
+      dropped = true;
+    }
+  }
+  return dropped ? next : cache;
 }
 
 export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
@@ -274,8 +302,10 @@ export function buildListeningUrlSearch(
   currentSearch: string,
   state: {
     activeMode: Mode;
+    overviewRange: RangeSelection;
     profileTarget: ProfileTarget | null;
     profileRange: RangeKey;
+    preservePendingMode3?: boolean;
     search?: {
       query: string;
       filter: SearchFilter;
@@ -292,10 +322,24 @@ export function buildListeningUrlSearch(
     if (kind !== target?.kind) params.delete(kind);
   }
 
+  if (state.activeMode === 0) {
+    if (isSameRange(state.overviewRange, DEFAULT_OVERVIEW_RANGE)) {
+      params.delete("range");
+    } else {
+      params.set("range", formatRangeParam(state.overviewRange));
+    }
+  }
+
   if (state.activeMode === 4) {
     params.set("mode", "4");
-  } else if (params.get("mode") === "4") {
-    params.delete("mode");
+  } else if (state.activeMode === 0) {
+    if (state.preservePendingMode3 && params.get("mode") === "3") {
+      params.set("mode", "3");
+    } else {
+      params.delete("mode");
+    }
+  } else if (params.has("mode")) {
+    params.set("mode", String(state.activeMode));
   }
 
   if (target) {

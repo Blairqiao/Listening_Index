@@ -1,23 +1,24 @@
-import { useEffect, useRef } from "react";
-import type { Mode, RangeKey } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Mode } from "@/lib/types";
+import { formatRangeParam, isSameRange, parseRangeParam, type RangeSelection } from "@/lib/range";
 
 export interface UseListeningUrlSyncParams {
   isAuthenticated: boolean;
-  rangeKeys: readonly RangeKey[];
+  activeMode?: Mode;
   openModal: () => void;
   setActiveMode: (mode: Mode) => void;
-  setActiveRange: (range: RangeKey) => void;
-  activeRangeRef: React.MutableRefObject<RangeKey>;
+  setActiveRange: (range: RangeSelection) => void;
+  activeRangeRef: React.MutableRefObject<RangeSelection>;
   overviewCacheRef: React.MutableRefObject<Record<string, unknown>>;
-  setDisplayedRange: (range: RangeKey) => void;
-  fetchOverview: (range: RangeKey) => Promise<unknown>;
+  setDisplayedRange: (range: RangeSelection) => void;
+  fetchOverview: (range: RangeSelection) => Promise<unknown>;
   setSelectedSessionId?: (id: string) => void;
   sanitizeActiveMode: (mode: Mode, isAuthenticated: boolean) => Mode;
 }
 
 export function useListeningUrlSync({
   isAuthenticated,
-  rangeKeys,
+  activeMode,
   openModal,
   setActiveMode,
   setActiveRange,
@@ -31,6 +32,16 @@ export function useListeningUrlSync({
   const appliedRef = useRef(false);
   // ?mode=3 (admin-only Live Player) requested before the visitor was authenticated
   const pendingLivePlayerRef = useRef(false);
+  const [isPendingLivePlayer, setIsPendingLivePlayer] = useState(false);
+  // Set when an URL-driven state update is queued so the URL-writing effect waits for the next render
+  const skipNextUrlSyncRef = useRef(false);
+
+  const clearPendingLivePlayer = useCallback(() => {
+    if (pendingLivePlayerRef.current) {
+      pendingLivePlayerRef.current = false;
+      setIsPendingLivePlayer(false);
+    }
+  }, []);
 
   // Apply the URL once. Login and lock must not replay it over what the visitor chose since.
   useEffect(() => {
@@ -38,22 +49,34 @@ export function useListeningUrlSync({
     appliedRef.current = true;
 
     const params = new URLSearchParams(window.location.search);
+    let willUpdateState = false;
     const m = params.get("mode");
     if (m === "0" || m === "1" || m === "2" || m === "3" || m === "4") {
       const requested = parseInt(m, 10) as Mode;
-      pendingLivePlayerRef.current = requested === 3 && !isAuthenticated;
-      setActiveMode(sanitizeActiveMode(requested, isAuthenticated));
-    }
-    const r = params.get("range");
-    if (r && rangeKeys.includes(r as RangeKey)) {
-      const rangeKey = r as RangeKey;
-      setActiveRange(rangeKey);
-      activeRangeRef.current = rangeKey;
-      if (overviewCacheRef.current[rangeKey]) {
-        setDisplayedRange(rangeKey);
-      } else {
-        fetchOverview(rangeKey);
+      const pending = requested === 3 && !isAuthenticated;
+      pendingLivePlayerRef.current = pending;
+      if (pending) setIsPendingLivePlayer(true);
+      const nextMode = sanitizeActiveMode(requested, isAuthenticated);
+      if (activeMode !== undefined && nextMode !== activeMode) {
+        willUpdateState = true;
       }
+      setActiveMode(nextMode);
+    }
+    const parsedRange = parseRangeParam(params.get("range"));
+    if (parsedRange) {
+      if (!isSameRange(parsedRange, activeRangeRef.current)) {
+        willUpdateState = true;
+      }
+      setActiveRange(parsedRange);
+      activeRangeRef.current = parsedRange;
+      if (overviewCacheRef.current[formatRangeParam(parsedRange)]) {
+        setDisplayedRange(parsedRange);
+      } else {
+        fetchOverview(parsedRange);
+      }
+    }
+    if (willUpdateState) {
+      skipNextUrlSyncRef.current = true;
     }
     const sess = params.get("session");
     if (sess) {
@@ -66,8 +89,8 @@ export function useListeningUrlSync({
   }, [
     openModal,
     isAuthenticated,
+    activeMode,
     fetchOverview,
-    rangeKeys,
     setActiveMode,
     setActiveRange,
     activeRangeRef,
@@ -80,7 +103,16 @@ export function useListeningUrlSync({
   useEffect(() => {
     if (isAuthenticated && pendingLivePlayerRef.current) {
       pendingLivePlayerRef.current = false;
+      setIsPendingLivePlayer(false);
+      skipNextUrlSyncRef.current = true;
       setActiveMode(3);
     }
   }, [isAuthenticated, setActiveMode]);
+
+  return {
+    isPendingLivePlayer,
+    pendingLivePlayerRef,
+    clearPendingLivePlayer,
+    skipNextUrlSyncRef,
+  };
 }

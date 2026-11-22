@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { RangeKey } from "@/lib/types";
+import { formatRangeParam, type RangeSelection } from "@/lib/range";
 import type {
   OverviewData,
   StreamLogData,
@@ -22,10 +23,10 @@ import {
 } from "./listening-helpers";
 
 export interface UseListeningDataParams {
-  initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
+  initialOverview?: OverviewData | Record<RangeKey, OverviewData> | Record<string, OverviewData> | null;
   initialStreamLog?: StreamLogData | null;
   initialSession?: SessionData | null;
-  initialRange: RangeKey;
+  initialRange: RangeSelection;
   visitorTimezone: string;
 }
 
@@ -33,8 +34,8 @@ export interface UseListeningDataParams {
  * Client-side data layer for the listening page: per-range Overview cache, Stream Log
  * pages, Sessions, and the enrichment overlay applied to all three.
  *
- * Every fetch captures the request generation and timezone before it starts and drops
- * its response if either changed, so a stale response never lands in the current view.
+ * Every fetch captures the request generation, per-range sequence, and timezone before it starts
+ * and drops its response if any changed, so a stale response never lands in the current view.
  */
 export function useListeningData({
   initialOverview,
@@ -45,34 +46,70 @@ export function useListeningData({
 }: UseListeningDataParams) {
   const tzRef = useRef<string>(visitorTimezone);
   const requestGenerationRef = useRef(0);
+  const overviewFetchSeqRef = useRef<Map<string, number>>(new Map());
 
   // Range state. The displayed range stays frozen until the new range's data has arrived.
-  const [activeRange, setActiveRange] = useState<RangeKey>(initialRange);
-  const [displayedRange, setDisplayedRange] = useState<RangeKey>(initialRange);
+  const [activeRange, setActiveRange] = useState<RangeSelection>(initialRange);
+  const [displayedRange, setDisplayedRange] = useState<RangeSelection>(initialRange);
   const [isRangeLoading, setIsRangeLoading] = useState<boolean>(false);
 
-  // In-memory cache per range key so switching ranges has no flash
-  const [overviewCache, setOverviewCache] = useState<Partial<Record<RangeKey, OverviewData>>>(() => {
-    const initial: Partial<Record<RangeKey, OverviewData>> = {};
+  // In-memory cache keyed by formatRangeParam so switching ranges has no flash
+  const [overviewCache, setOverviewCacheState] = useState<Record<string, OverviewData>>(() => {
+    const initial: Record<string, OverviewData> = {};
     if (initialOverview) {
       if ("1d" in initialOverview || "1w" in initialOverview) {
-        return { ...(initialOverview as Record<RangeKey, OverviewData>) };
+        return { ...(initialOverview as Record<string, OverviewData>) };
       }
-      initial[initialRange] = initialOverview as OverviewData;
+      initial[formatRangeParam(initialRange)] = initialOverview as OverviewData;
     }
     return initial;
   });
 
+  // Retains the last rendered Overview payload for displayedRange even if a sync prunes it from cache
+  const [retainedOverview, setRetainedOverview] = useState<{
+    rangeKey: string;
+    data: OverviewData;
+  } | null>(() => {
+    const initialKey = formatRangeParam(initialRange);
+    const initialData = overviewCache[initialKey];
+    return initialData ? { rangeKey: initialKey, data: initialData } : null;
+  });
+
   // Active range ref guards against races when switching ranges quickly
-  const activeRangeRef = React.useRef<RangeKey>(activeRange);
+  const activeRangeRef = React.useRef<RangeSelection>(activeRange);
   useEffect(() => {
     activeRangeRef.current = activeRange;
   }, [activeRange]);
 
-  const overviewCacheRef = React.useRef(overviewCache);
+  const overviewCacheRef = React.useRef<Record<string, OverviewData>>(overviewCache);
   useEffect(() => {
     overviewCacheRef.current = overviewCache;
   }, [overviewCache]);
+
+  const setOverviewCache = useCallback(
+    (updater: React.SetStateAction<Record<string, OverviewData>>) => {
+      overviewCacheRef.current =
+        typeof updater === "function" ? updater(overviewCacheRef.current) : updater;
+      setOverviewCacheState(updater);
+    },
+    []
+  );
+
+  const displayedRangeKey = formatRangeParam(displayedRange);
+  const cachedDisplayedOverview = overviewCache[displayedRangeKey];
+  const displayedOverview: OverviewData | null =
+    cachedDisplayedOverview ??
+    (retainedOverview?.rangeKey === displayedRangeKey ? retainedOverview.data : null);
+
+  useEffect(() => {
+    if (cachedDisplayedOverview) {
+      setRetainedOverview((prev) =>
+        prev && prev.rangeKey === displayedRangeKey && prev.data === cachedDisplayedOverview
+          ? prev
+          : { rangeKey: displayedRangeKey, data: cachedDisplayedOverview }
+      );
+    }
+  }, [displayedRangeKey, cachedDisplayedOverview]);
 
   const [streamLogState, setStreamLogState] = useState<StreamLogData | null>(() => {
     return initialStreamLog || null;
@@ -140,26 +177,35 @@ export function useListeningData({
         patchSessionWithEnrichment(prev, enrichmentOverlayRef.current, delistedSetRef.current)
       );
     },
-    []
+    [setOverviewCache]
   );
 
   // Fetch Overview data from server (cached on server, reset on sync)
-  const fetchOverview = useCallback(async (rangeToFetch: RangeKey) => {
+  const fetchOverview = useCallback(async (rangeToFetch: RangeSelection) => {
+    const rangeParam = formatRangeParam(rangeToFetch);
     const timezone = tzRef.current;
     const generation = requestGenerationRef.current;
+    const seq = (overviewFetchSeqRef.current.get(rangeParam) ?? 0) + 1;
+    overviewFetchSeqRef.current.set(rangeParam, seq);
     try {
       const tzQuery = timezone ? `&tz=${encodeURIComponent(timezone)}` : "";
-      const url = `/api/listening/overview?range=${rangeToFetch}${tzQuery}`;
+      const url = `/api/listening/overview?range=${encodeURIComponent(rangeParam)}${tzQuery}`;
       const res = await fetch(url, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
       });
       if (res.ok) {
         const data = (await res.json()) as OverviewData;
-        if (generation !== requestGenerationRef.current || timezone !== tzRef.current) return null;
+        if (
+          generation !== requestGenerationRef.current ||
+          timezone !== tzRef.current ||
+          overviewFetchSeqRef.current.get(rangeParam) !== seq
+        ) {
+          return null;
+        }
         if (data && data.metrics) {
           setOverviewCache((prev) => {
-            const next = { ...prev, [rangeToFetch]: data };
+            const next = { ...prev, [rangeParam]: data };
             if (enrichmentOverlayRef.current.size > 0 || delistedSetRef.current.size > 0) {
               return patchOverviewCacheWithEnrichment(
                 next,
@@ -169,8 +215,9 @@ export function useListeningData({
             }
             return next;
           });
-          if (activeRangeRef.current === rangeToFetch) {
+          if (formatRangeParam(activeRangeRef.current) === rangeParam) {
             setDisplayedRange(rangeToFetch);
+            setIsRangeLoading(false);
           }
           if (data.lastSyncedAt) {
             const syncDate = new Date(data.lastSyncedAt);
@@ -183,11 +230,17 @@ export function useListeningData({
       console.error("[API FETCH] Overview query error:", err);
     }
     // Fallback if fetch returned error: unfreeze to requested range
-    if (generation === requestGenerationRef.current && timezone === tzRef.current && activeRangeRef.current === rangeToFetch) {
+    if (
+      generation === requestGenerationRef.current &&
+      timezone === tzRef.current &&
+      overviewFetchSeqRef.current.get(rangeParam) === seq &&
+      formatRangeParam(activeRangeRef.current) === rangeParam
+    ) {
       setDisplayedRange(rangeToFetch);
+      setIsRangeLoading(false);
     }
     return null;
-  }, []);
+  }, [setOverviewCache]);
 
   // Fetch Stream Log from server (cached on server, reset on sync)
   const fetchStreamLog = useCallback(async (countToFetch?: number, aggregatesOnly = false) => {
@@ -337,6 +390,7 @@ export function useListeningData({
   // including the initial ones, so anything not loaded yet is fetched in full here.
   const refetchAfterTimezoneChange = useCallback(() => {
     requestGenerationRef.current++;
+    overviewCacheRef.current = {};
     setOverviewCache({});
     void fetchOverview(activeRangeRef.current);
     if (streamLogStateRef.current) {
@@ -345,7 +399,7 @@ export function useListeningData({
       void fetchStreamLog();
     }
     if (!sessionStateRef.current) void fetchSession();
-  }, [fetchOverview, fetchStreamLog, fetchSession]);
+  }, [fetchOverview, fetchStreamLog, fetchSession, setOverviewCache]);
 
   useEffect(() => {
     if (tzRef.current !== visitorTimezone) {
@@ -357,7 +411,7 @@ export function useListeningData({
   // Initial load: fetch whatever the server did not provide
   useEffect(() => {
     async function init() {
-      const hasOverview = Boolean(overviewCache[activeRange]);
+      const hasOverview = Boolean(overviewCache[formatRangeParam(activeRange)]);
       const hasStreamLog = Boolean(streamLogState);
       const hasSession = Boolean(sessionState);
 
@@ -379,19 +433,19 @@ export function useListeningData({
 
   // Switch the Overview range. A cached range shows immediately; otherwise the current view stays until the fetch lands.
   const selectRange = useCallback(
-    (range: RangeKey) => {
+    (range: RangeSelection) => {
+      const rangeParam = formatRangeParam(range);
       setActiveRange(range);
       activeRangeRef.current = range;
-      if (overviewCache[range]) {
+      if (overviewCacheRef.current[rangeParam]) {
         setDisplayedRange(range);
+        setIsRangeLoading(false);
         return;
       }
       setIsRangeLoading(true);
-      fetchOverview(range).finally(() => {
-        setIsRangeLoading(false);
-      });
+      void fetchOverview(range);
     },
-    [overviewCache, fetchOverview]
+    [fetchOverview]
   );
 
   return {
@@ -399,11 +453,13 @@ export function useListeningData({
     setActiveRange,
     displayedRange,
     setDisplayedRange,
+    displayedOverview,
     isRangeLoading,
     selectRange,
     activeRangeRef,
     requestGenerationRef,
     overviewCache,
+    setOverviewCache,
     overviewCacheRef,
     streamLogState,
     loadedPlaysCount,
