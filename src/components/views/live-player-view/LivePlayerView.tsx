@@ -4,12 +4,18 @@ import React, { useCallback, useState } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";
+import type { ProfileTarget } from "@/lib/search-types";
 import { SpectrumCanvas, gradientStops } from "./SpectrumCanvas";
+import { PlayerTrackMeta } from "./PlayerTrackMeta";
+import { resolvePlayerProfileLinks } from "./player-profile-links";
 
 export { gradientStops };
 
 export interface LivePlayerProps {
   latestPlay?: {
+    trackId?: string;
+    artistId?: string;
+    albumId?: string;
     title: string;
     artist: string;
     album: string;
@@ -26,6 +32,7 @@ export interface LivePlayerProps {
   };
   sourceMode?: "synthetic" | "live";
   onToggleSourceMode?: () => void;
+  onOpenProfile?: (target: ProfileTarget) => void;
 }
 
 import { DEFAULT_FALLBACK_TRACK } from "@/lib/fallback-track";
@@ -111,6 +118,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
   initialTrack,
   sourceMode: externalSourceMode,
   onToggleSourceMode,
+  onOpenProfile,
 }) => {
   const config = useConfig().config;
   const {
@@ -152,12 +160,16 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     initialTrack,
   });
 
+  const resolvedLinks = resolvePlayerProfileLinks({ currentTrack, latestPlay });
+  const profileLinks = resolvedLinks.artists.length
+    ? resolvedLinks
+    : { ...resolvedLinks, artists: [{ name: displayTrack.artist, target: null }] };
+
   const repeatLabel =
     repeatMode === 2 ? "Repeat 1" : repeatMode === 1 ? "Repeat All" : "Repeat Off";
 
-  // Shared Player Deck Component
-  const renderDeck = (isStacked = false) => (
-    <div className={`flex flex-col justify-between space-y-4 ${isStacked ? "" : "md:border-r md:border-[#1C1C1A] md:pr-5"}`}>
+  const renderDeck = () => (
+    <div className="flex flex-col justify-between space-y-4">
       {/* Top Deck Info */}
       <div className="flex items-center gap-4">
         <div className="w-[100px] sm:w-[120px] aspect-square shrink-0 border border-[#1C1C1A] bg-[#121210] overflow-hidden">
@@ -180,15 +192,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               {isPlaying ? "Now streaming" : isLinked ? "Paused" : "Offline"}
             </span>
           </div>
-          <div className="text-[16px] sm:text-[18px] text-[#EDEDE8] truncate font-bold mt-0.5">
-            {displayTrack.name}
-          </div>
-          <div className="text-[13px] text-[#8A8A82] truncate mt-0.5">
-            {displayTrack.artist}
-          </div>
-          <div className="text-[12px] text-[#5A5A55] truncate mt-0.5">
-            {displayTrack.album}
-          </div>
+          <PlayerTrackMeta
+            name={displayTrack.name}
+            album={displayTrack.album}
+            links={profileLinks}
+            onOpenProfile={onOpenProfile}
+          />
         </div>
       </div>
 
@@ -384,44 +393,8 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     </div>
   );
 
-  // Layout 1: Variant B (Split Console)
-  if (config.livePlayerLayout === "split") {
-    return (
-      <section aria-label="Variant B: Split Console" className="font-mono">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 border border-[#1C1C1A] bg-[#080808] p-4 sm:p-5 select-none font-mono">
-          {/* Left Side: Deck & Track Info (5 cols) */}
-          <div className="md:col-span-5">{renderDeck(false)}</div>
-
-          {/* Right Side: Spectrum Tower (7 cols) - Hidden on mobile (< 768px) */}
-          <div className="hidden md:flex md:col-span-7 flex-col justify-between">
-            <div className="flex items-center justify-between text-[11px] text-[#5A5A55] mb-2">
-              <span>Spectrum visualizer · 32 bands</span>
-              <button
-                type="button"
-                onClick={toggleSourceMode}
-                className="font-mono text-[11px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors"
-                title="Click to toggle visualizer audio source (synthetic oscillator vs live hardware audio)"
-              >
-                {sourceMode === "live" ? "Live audio" : "Synthetic"}
-              </button>
-            </div>
-            <SpectrumCanvas
-              trackKey={displayTrack.name}
-              isLive={isPlaying}
-              accentColor={config.accentColor}
-              sourceMode={sourceMode}
-              onToggleSource={toggleSourceMode}
-              heightClass="h-[200px] sm:h-[240px] md:h-[260px]"
-            />
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // Layout 2: Variant A (Stacked Stage)
   return (
-    <section aria-label="Variant A: Stacked Stage" className="space-y-3 font-mono">
+    <section aria-label="Live player" className="space-y-3 font-mono">
       {/* Top Section: Spectrum Stage - Hidden on mobile (< 768px) */}
       <div className="hidden md:block border border-[#1C1C1A] bg-[#080808] p-3 sm:p-4 select-none">
         <div className="flex items-center justify-between text-[11px] text-[#5A5A55] mb-2">
@@ -447,7 +420,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
 
       {/* Bottom Section: Deck & Transport Console */}
       <div className="border border-[#1C1C1A] bg-[#080808] p-4 sm:p-5 select-none font-mono">
-        {renderDeck(true)}
+        {renderDeck()}
       </div>
     </section>
   );

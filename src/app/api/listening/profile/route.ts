@@ -2,10 +2,9 @@ import { NextRequest } from "next/server";
 import { isDbConfigured } from "@/lib/db";
 import { getProfile } from "@/lib/db/queries";
 import { getMockProfile } from "@/lib/mock/search-profile";
+import { parseRangeParam, type RangeSelection } from "@/lib/range";
 import { jsonNoCache, effectiveRequestTimezone, handleApiError } from "@/lib/route-utils";
-import { parseProfileTarget, parseRangeKey } from "@/lib/search-utils";
-import { DEFAULT_PROFILE_RANGE } from "@/lib/search-types";
-import type { RangeKey } from "@/lib/types";
+import { parseProfileTarget } from "@/lib/search-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +17,11 @@ export async function GET(request: NextRequest) {
     }
 
     const rawRange = searchParams.get("prange");
-    let range: RangeKey;
+    let range: RangeSelection;
     if (rawRange === null) {
-      range = DEFAULT_PROFILE_RANGE;
+      range = { kind: "preset", key: "all" };
     } else {
-      const parsedRange = parseRangeKey(rawRange);
+      const parsedRange = parseRangeParam(rawRange);
       if (parsedRange === null) {
         return jsonNoCache({ error: "Invalid prange." }, 400);
       }

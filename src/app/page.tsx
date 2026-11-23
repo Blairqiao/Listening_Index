@@ -2,16 +2,16 @@ import { isValidIanaTimezone, parseTimezoneCookie } from "@/lib/timezone-utils";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { ListeningView } from "@/components/ListeningView";
-import { MOCK_DATA } from "@/lib/mock/overview-data";
+import { getMockOverview, MOCK_DATA } from "@/lib/mock/overview-data";
 import { getInitialMusicData, getActiveSiteConfig } from "@/lib/db/queries";
 import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
-import { RANGE_KEYS, type Mode, type RangeKey } from "@/lib/types";
+import type { Mode } from "@/lib/types";
+import { DEFAULT_OVERVIEW_RANGE, parseRangeParam, type RangeSelection } from "@/lib/range";
 import {
   checkSearchQuery,
   parseProfileTarget,
-  parseRangeKey,
   parseSearchFilter,
   parseSearchPage,
   parseSearchSort,
@@ -58,11 +58,8 @@ export default async function Page({ searchParams }: PageProps) {
   
   const resolvedParams = searchParams ? await searchParams : {};
 
-  const rangeParam = resolvedParams?.range;
-  const initialRange: RangeKey =
-    rangeParam && (RANGE_KEYS as readonly string[]).includes(rangeParam)
-      ? (rangeParam as RangeKey)
-      : "1w";
+  const initialRange: RangeSelection =
+    parseRangeParam(resolvedParams?.range) ?? DEFAULT_OVERVIEW_RANGE;
 
   const modeParam = resolvedParams?.mode;
   const initialMode: Mode =
@@ -72,9 +69,8 @@ export default async function Page({ searchParams }: PageProps) {
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;
-  const rawPrange = firstParam(resolvedParams?.prange);
-  const initialProfileRange =
-    initialMode === 4 ? parseRangeKey(rawPrange) : null;
+  const initialProfileRange: RangeSelection | null =
+    initialMode === 4 ? parseRangeParam(firstParam(resolvedParams?.prange)) : null;
 
   const isInitialSearch = initialMode === 4 && !initialProfile;
   const checkedQuery = checkSearchQuery(firstParam(resolvedParams?.q) ?? "");
@@ -97,7 +93,7 @@ export default async function Page({ searchParams }: PageProps) {
   const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
   const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
   const initialData = isConfigured ? await getInitialMusicData(initialRange, initialVisitorTimezone) : {
-    overview: MOCK_DATA.overview[initialRange], streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session,
+    overview: getMockOverview(initialRange, initialVisitorTimezone), streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session,
   };
 
   return (

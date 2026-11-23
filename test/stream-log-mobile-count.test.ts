@@ -5,6 +5,7 @@ import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
+import { presetRange } from "../src/lib/range";
 import { readModuleSource } from "./helpers/module-source";
 
 test("ControlRow: renders exact count and handles 0 tracks without defaulting to 50", () => {
@@ -12,7 +13,7 @@ test("ControlRow: renders exact count and handles 0 tracks without defaulting to
   const markup25 = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 1,
-      range: "all",
+      range: presetRange("all"),
       onSelectRange: () => { },
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
@@ -38,7 +39,7 @@ test("ControlRow: renders exact count and handles 0 tracks without defaulting to
   const markup0 = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 1,
-      range: "all",
+      range: presetRange("all"),
       onSelectRange: () => { },
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,

@@ -1,5 +1,5 @@
 import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries/types";
-import type { RangeKey, SessionItem } from "@/lib/types";
+import type { SessionItem } from "@/lib/types";
 
 export interface EnrichmentPatchData {
   albumImageUrl?: string | null;
@@ -12,18 +12,18 @@ export interface EnrichmentPatchData {
  * Retains unchanged references to prevent unnecessary component re-renders.
  */
 export function patchOverviewCacheWithEnrichment(
-  cache: Partial<Record<RangeKey, OverviewData>>,
+  cache: Record<string, OverviewData>,
   enrichedMap: Map<string, EnrichmentPatchData>,
   delistedSet?: Set<string>
-): { updatedCache: Partial<Record<RangeKey, OverviewData>>; changed: boolean } {
+): { updatedCache: Record<string, OverviewData>; changed: boolean } {
   if (enrichedMap.size === 0 && (!delistedSet || delistedSet.size === 0)) {
     return { updatedCache: cache, changed: false };
   }
 
   let cacheChanged = false;
-  const nextCache: Partial<Record<RangeKey, OverviewData>> = {};
+  const nextCache: Record<string, OverviewData> = {};
 
-  for (const [key, data] of Object.entries(cache) as [RangeKey, OverviewData][]) {
+  for (const [key, data] of Object.entries(cache)) {
     if (!data || !data.topTracks) {
       nextCache[key] = data;
       continue;

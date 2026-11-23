@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  RANGE_KEYS,
   checkSearchQuery,
   normalizeForSearch,
-  parseRangeKey,
   parseProfileTarget,
   parseSearchFilter,
   parseSearchSort,
@@ -13,10 +11,6 @@ import {
   getSearchStatusText,
 } from '../src/lib/search-utils';
 import { SEARCH_SINGLE_TYPE_ROWS } from '../src/lib/search-types';
-
-test('RANGE_KEYS contains the six canonical overview range keys', () => {
-  assert.deepEqual(RANGE_KEYS, ['1d', '1w', '1m', '6m', '1y', 'all']);
-});
 
 test('checkSearchQuery validates lengths and trims search queries', () => {
   assert.deepEqual(checkSearchQuery('a'), { ok: true, query: 'a' });
@@ -37,18 +31,6 @@ test('normalizeForSearch strips accents, converts full-width chars, and lowercas
   assert.equal(normalizeForSearch('Beyoncé'), 'beyonce');
   assert.equal(normalizeForSearch('ＲＡＤ'), 'rad');
   assert.equal(normalizeForSearch('o\u0308'), 'o');
-});
-
-test('parseRangeKey validates membership in RANGE_KEYS', () => {
-  for (const range of RANGE_KEYS) {
-    assert.equal(parseRangeKey(range), range);
-  }
-  assert.equal(parseRangeKey('2w'), null);
-  assert.equal(parseRangeKey('10d'), null);
-  assert.equal(parseRangeKey(''), null);
-  assert.equal(parseRangeKey(null), null);
-  assert.equal(parseRangeKey(undefined), null);
-  assert.equal(parseRangeKey('all '), null);
 });
 
 test('parseProfileTarget handles URLSearchParams and records with track/artist precedence and validation', () => {

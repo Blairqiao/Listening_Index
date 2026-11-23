@@ -5,7 +5,12 @@ import {
   type ProfileHistoryEntry,
   type ProfileTarget,
 } from "@/lib/search-types";
-import type { Mode, RangeKey } from "@/lib/types";
+import type { Mode } from "@/lib/types";
+import {
+  formatRangeParam,
+  isSameRange,
+  type RangeSelection,
+} from "@/lib/range";
 import {
   getProfileCacheKey,
   resolveDisplayedProfileData,
@@ -18,9 +23,10 @@ export interface UseSearchProfileParams {
   activeMode: Mode;
   visitorTimezone: string;
   initialProfile?: ProfileTarget | null;
-  initialProfileRange?: RangeKey | null;
+  initialProfileRange?: RangeSelection | null;
   initialSearchQuery?: string;
   isSyncing?: boolean;
+  onRequestPushHistory?: () => void;
 }
 
 export function useSearchProfile({
@@ -30,14 +36,15 @@ export function useSearchProfile({
   initialProfileRange,
   initialSearchQuery,
   isSyncing = false,
+  onRequestPushHistory,
 }: UseSearchProfileParams) {
   const [searchQuery, setSearchQuery] = useState<string>(() => initialSearchQuery ?? "");
   const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(
     () => initialProfile ?? null
   );
-  const [profileRange, setProfileRange] = useState<RangeKey>(
-    () => initialProfileRange ?? DEFAULT_PROFILE_RANGE
-  );
+  const [profileRange, setProfileRange] = useState<RangeSelection>(() => {
+    return initialProfileRange ?? DEFAULT_PROFILE_RANGE;
+  });
   const [profileHistory, setProfileHistory] = useState<ProfileHistoryEntry[]>([]);
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
@@ -49,7 +56,7 @@ export function useSearchProfile({
   const profileData = resolveDisplayedProfileData(rawProfileData, profileTarget);
 
   const openProfileAt = useCallback(
-    (target: ProfileTarget, nextRange: RangeKey) => {
+    (target: ProfileTarget, nextRange: RangeSelection) => {
       const cacheKey = getProfileCacheKey(target, nextRange, visitorTimezone);
       const cached = profileCacheRef.current.get(cacheKey);
 
@@ -149,7 +156,7 @@ export function useSearchProfile({
   const syncFromLocation = useCallback(
     (
       target: ProfileTarget | null,
-      range: RangeKey | null,
+      range: RangeSelection | null,
       history?: ProfileHistoryEntry[]
     ) => {
       if (!target) {
@@ -183,8 +190,11 @@ export function useSearchProfile({
   }, []);
 
   const handleSelectProfileRange = useCallback(
-    (range: RangeKey) => {
-      if (isSyncing || range === profileRange) return;
+    (range: RangeSelection, opts?: { push?: boolean }) => {
+      if (isSyncing || isSameRange(range, profileRange)) return;
+      if (opts?.push) {
+        onRequestPushHistory?.();
+      }
       setProfileRange(range);
       if (!profileTarget) return;
 
@@ -212,7 +222,7 @@ export function useSearchProfile({
       setRawProfileData((prev) => resolveDisplayedProfileData(prev, profileTarget));
       setProfileStatus("loading");
     },
-    [isSyncing, profileRange, profileTarget, visitorTimezone]
+    [isSyncing, onRequestPushHistory, profileRange, profileTarget, visitorTimezone]
   );
 
   useEffect(() => {
@@ -254,7 +264,7 @@ export function useSearchProfile({
 
     const params = new URLSearchParams();
     params.set(requestedTarget.kind, requestedTarget.key);
-    params.set("prange", requestedRange);
+    params.set("prange", formatRangeParam(requestedRange));
     params.set("tz", requestedTz);
 
     fetch(`/api/listening/profile?${params.toString()}`, {

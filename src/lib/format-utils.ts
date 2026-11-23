@@ -1,4 +1,4 @@
-import type { RangeKey } from "./types";
+import type { CadenceGranularity } from "./range";
 
 export interface OverviewMetricsRaw {
   totalMs: number;
@@ -17,12 +17,12 @@ export interface StreamLogMetricsRaw {
 export function formatOverviewMetrics(
   raw: OverviewMetricsRaw,
   unit: "minutes" | "hours",
-  range: RangeKey
+  granularity: CadenceGranularity
 ): [string, string, string, string] {
   let timeStr: string;
   if (unit === "hours") {
     const hours = raw.totalMs / 3600000.0;
-    if (range === "1d" || range === "1w") {
+    if (granularity === "hour" || granularity === "block6h") {
       timeStr = hours.toFixed(1);
     } else {
       timeStr = Math.round(hours).toLocaleString();
@@ -52,46 +52,45 @@ export function formatStreamLogMetrics(
   return [playsStr, tracksStr, artistsStr, streakStr];
 }
 
-export function formatCadenceTooltip(
+export function formatBucketTooltip(
   bucket: { startTime: string; endTime: string; count: number },
-  range: RangeKey,
+  granularity: CadenceGranularity,
   tz = "UTC"
 ): string {
   const startDate = new Date(bucket.startTime);
   const endDate = new Date(bucket.endTime);
   const playsLabel = `${bucket.count.toLocaleString()} ${bucket.count === 1 ? "play" : "plays"}`;
-  const formatTz = range === "1d" ? tz : "UTC";
 
-  if (range === "all") {
+  if (granularity === "year") {
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       year: "numeric",
     }).format(startDate);
     return `${year} — ${playsLabel}`;
   }
 
-  if (range === "1y") {
+  if (granularity === "month") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       month: "short",
     }).format(startDate);
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       year: "numeric",
     }).format(startDate);
     return `${month} ${year} — ${playsLabel}`;
   }
 
-  if (range === "6m") {
+  if (granularity === "week") {
     const startParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       month: "short",
       day: "2-digit",
       year: "numeric",
     }).formatToParts(startDate);
 
     const endParts = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       month: "short",
       day: "2-digit",
       year: "numeric",
@@ -111,55 +110,57 @@ export function formatCadenceTooltip(
     return `${sMonth} ${sDay}, ${sYear} – ${eMonth} ${eDay}, ${eYear} — ${playsLabel}`;
   }
 
-  if (range === "1m") {
+  if (granularity === "day") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       month: "short",
     }).format(startDate);
     const day = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       day: "2-digit",
     }).format(startDate);
     const year = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       year: "numeric",
     }).format(startDate);
     return `${month} ${day}, ${year} — ${playsLabel}`;
   }
 
-  if (range === "1w") {
+  if (granularity === "block6h") {
     const month = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       month: "short",
     }).format(startDate);
     const day = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
+      timeZone: tz,
       day: "2-digit",
     }).format(startDate);
-    const startHour = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
-      hour: "2-digit",
-      hour12: false,
-    }).format(startDate);
-    let endHour = new Intl.DateTimeFormat("en-US", {
-      timeZone: formatTz,
-      hour: "2-digit",
-      hour12: false,
-    }).format(endDate);
-    if (startHour === "18" && (endHour === "23" || endHour === "00" || endHour === "24")) {
-      endHour = "24";
-    }
+    // Use the scheduled 6-hour block bounds even when DST skips the nominal boundary hour.
+    const localStartHour = Number(
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "2-digit",
+        hourCycle: "h23",
+      })
+        .formatToParts(startDate)
+        .find((p) => p.type === "hour")?.value || "0",
+    );
+    const blockStart = Math.floor(localStartHour / 6) * 6;
+    const startHour = String(blockStart).padStart(2, "0");
+    const endHour = String(blockStart + 6).padStart(2, "0");
     return `${month} ${day}, ${startHour}:00–${endHour}:00 — ${playsLabel}`;
   }
 
-  // 1d
-  const hour = new Intl.DateTimeFormat("en-US", {
-    timeZone: formatTz,
+  // hour
+  const hourParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
-  }).format(startDate);
-  return `${hour} — ${playsLabel}`;
+    hourCycle: "h23",
+  }).formatToParts(startDate);
+  const hh = hourParts.find((p) => p.type === "hour")?.value || "00";
+  const mm = hourParts.find((p) => p.type === "minute")?.value || "00";
+  return `${hh}:${mm} — ${playsLabel}`;
 }
 
 export function formatCatalogPercentile(

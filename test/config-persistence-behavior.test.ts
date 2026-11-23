@@ -55,11 +55,11 @@ test('config reset clears deprecated client ID while preserving Owner Token colu
   const statements: string[] = [];
   const config = evaluate(readFileSync('src/lib/db/queries/config.ts', 'utf8'), {
     'node:crypto': {}, '../index': { isDbConfigured: () => true, getDb: () => async (strings: TemplateStringsArray) => { statements.push(strings.join('?')); return []; } },
-    '@/config': { siteConfig: { ...configUtils.DEFAULT_SITE_CONFIG, livePlayerLayout: 'stacked' } },
-    '@/lib/config-utils': { ...configUtils, DEFAULT_SITE_CONFIG: { ...configUtils.DEFAULT_SITE_CONFIG, livePlayerLayout: 'stacked' } }, './cache': { siteConfigCache: { invalidate: () => {} } },
+    '@/config': { siteConfig: { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Deployed title' } },
+    '@/lib/config-utils': { ...configUtils, DEFAULT_SITE_CONFIG: { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Deployed title' } }, './cache': { siteConfigCache: { invalidate: () => {} } },
   });
   const result = await config.resetActiveSiteConfig() as configUtils.SiteConfigState;
-  assert.equal(result.livePlayerLayout, 'stacked');
+  assert.equal(result.title, 'Deployed title');
   assert.doesNotMatch(statements.join(''), /spotify_client_id/);
   assert.doesNotMatch(statements.join(''), /owner_playback_token\s*=/);
 });
@@ -73,7 +73,6 @@ test('POST /api/config preserves existing database Site Config fields on partial
     accentColor: "#ff0077",
     siteUrl: "https://custom.example.com",
     githubUrl: "https://github.com/custom/repo",
-    livePlayerLayout: "split",
   };
 
   const routes = evaluate(readFileSync('src/app/api/config/route.ts', 'utf8'), {
@@ -96,16 +95,15 @@ test('POST /api/config preserves existing database Site Config fields on partial
 
   const response = await routes.POST(new NextRequest('http://localhost:8888/api/config', {
     method: 'POST',
-    body: JSON.stringify({ livePlayerLayout: 'stacked' }),
+    body: JSON.stringify({ siteUrl: 'https://patched.example.com' }),
   })) as Response;
 
   assert.equal(response.status, 200);
   assert.ok(savedConfig, "saveActiveSiteConfig must be called");
   const finalConfig: configUtils.SiteConfigState = savedConfig;
-  assert.equal(finalConfig.livePlayerLayout, 'stacked');
+  assert.equal(finalConfig.siteUrl, 'https://patched.example.com');
   assert.equal(finalConfig.title, "Custom Title From DB");
   assert.equal(finalConfig.ownerName, "Custom Owner From DB");
   assert.equal(finalConfig.accentColor, "#ff0077");
-  assert.equal(finalConfig.siteUrl, "https://custom.example.com");
   assert.equal(finalConfig.githubUrl, "https://github.com/custom/repo");
 });

@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import type { ActivityBucket, RangeKey } from "@/lib/types";
-import { ActivityChart } from "../ActivityChart";
+import type { CadenceGranularity } from "@/lib/range";
+import { ActivityChart, type ActivityBucketSelectHandler } from "../ActivityChart";
 import { peakDayOfWeek, peakHour } from "@/lib/profile-stats";
 import { HourChart } from "./HourChart";
 import { DayOfWeekChart } from "./DayOfWeekChart";
@@ -17,7 +18,9 @@ const toggleHeadingClass =
 const staticHeadingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {
-  range: RangeKey;
+  granularity: CadenceGranularity;
+  rangeKey?: RangeKey | null;
+  rangeLabel?: string;
   activityCadence: ActivityBucket[];
   monthlyCadence?: ActivityBucket[];
   isLoading: boolean;
@@ -25,6 +28,7 @@ export interface ProfileChartProps {
   hourOfDay?: number[];
   dayOfWeek?: number[];
   streakDays?: number;
+  onSelectBucket?: ActivityBucketSelectHandler;
 }
 
 function readout(
@@ -46,7 +50,9 @@ function readout(
 }
 
 export function ProfileChart({
-  range,
+  granularity,
+  rangeKey = null,
+  rangeLabel,
   activityCadence,
   monthlyCadence,
   isLoading,
@@ -54,6 +60,7 @@ export function ProfileChart({
   hourOfDay,
   dayOfWeek,
   streakDays = 0,
+  onSelectBucket,
 }: ProfileChartProps) {
   const [view, setView] = useState<ChartView>("time");
 
@@ -120,13 +127,16 @@ export function ProfileChart({
       ) : (
         <ActivityChart
           label="Plays"
-          range={range}
+          granularity={granularity}
+          rangeKey={rangeKey}
+          rangeLabel={rangeLabel}
           activityCadence={activityCadence}
           monthlyCadence={monthlyCadence}
           isLoading={isLoading}
           visitorTimezone={visitorTimezone}
           heading={heading}
           showRange={false}
+          onSelectBucket={onSelectBucket}
         />
       )}
       {(hasHour || hasDay) && (

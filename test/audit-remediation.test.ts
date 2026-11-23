@@ -80,7 +80,8 @@ test("TASK-2: POST /api/upload/enrich does not require admin authorization (F8)"
 
 test("TASK-2: Manual sync UI button is admin-locked in ListeningView, ListeningFooter, and ControlRow (F11)", () => {
   const listeningView = readModuleSource(path.join(root, "src/components/ListeningView.tsx"));
-  const listeningFooter = fs.readFileSync(path.join(root, "src/components/listening-view/ListeningFooter.tsx"), "utf-8");
+  // The footer and the mini-player share the sync control in SyncStatus.tsx.
+  const listeningFooter = fs.readFileSync(path.join(root, "src/components/listening-view/SyncStatus.tsx"), "utf-8");
   const controlRow = fs.readFileSync(path.join(root, "src/components/listening-view/ControlRow.tsx"), "utf-8");
 
   // ListeningView passes isAuthenticated to ControlRow and ListeningFooter
@@ -157,7 +158,7 @@ test("TASK-3: Ribbon artist queries align with isCatalogFullyEnriched() (F5)", a
   if (hasTestDb) {
     await useTestDatabase();
     const { getOverviewData } = await import("../src/lib/db/queries/overview");
-    const overviewData = await getOverviewData("1d");
+    const overviewData = await getOverviewData({ kind: "preset", key: "1d" });
     assert.ok(overviewData.metrics, "overviewData must return metrics");
     assert.equal(overviewData.metrics.length, 4, "overview metrics must contain 4 items");
   }

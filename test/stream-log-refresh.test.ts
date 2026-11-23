@@ -92,9 +92,11 @@ test('head refresh onto an empty Stream Log takes the fresh response', async () 
 test('upload completion replaces the Stream Log instead of merging the head', async () => {
   const calls: unknown[][] = [];
   const base = {
-    activeRangeRef: { current: '1w' },
+    activeRangeRef: { current: { kind: 'preset', key: '1w' } },
     requestGenerationRef: { current: 0 },
-    overviewRefreshOrder: (active: string) => [active],
+    overviewRefreshOrder: (active: unknown) => [active],
+    pruneOverviewCacheWindows: (prev: unknown) => prev,
+    setOverviewCache: () => {},
     fetchOverview: async () => undefined,
     fetchStreamLog: async (...args: unknown[]) => { calls.push(args); },
     fetchSession: async () => undefined,
@@ -143,6 +145,7 @@ function timezoneRefetch(streamLog: Log | null, session: object | null) {
   const refetch = callback(DATA, 'refetchAfterTimezoneChange', {
     requestGenerationRef: { current: 0 },
     activeRangeRef: { current: '1w' },
+    overviewCacheRef: { current: {} },
     streamLogStateRef: { current: streamLog },
     sessionStateRef: { current: session },
     setOverviewCache: () => {},

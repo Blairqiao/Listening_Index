@@ -2,18 +2,22 @@
 
 import React from "react";
 import { TrackSummary, ArtistSummary, AlbumSummary, RangeKey, ActivityDay } from "@/lib/types";
+import type { CadenceGranularity } from "@/lib/range";
 import type { ProfileKind, ProfileTarget } from "@/lib/search-types";
 import { Artwork } from "../Artwork";
-import { ActivityChart } from "./ActivityChart";
+import { ActivityChart, type ActivityBucketSelectHandler } from "./ActivityChart";
 
-interface OverviewViewProps {
-  range: RangeKey;
+export interface OverviewViewProps {
+  granularity: CadenceGranularity;
+  rangeKey?: RangeKey | null;
+  rangeLabel?: string;
   topTracks: TrackSummary[];
   topArtists: ArtistSummary[];
   topAlbums: AlbumSummary[];
   activityCadence?: ActivityDay[];
   isLoading?: boolean;
   onOpenProfile?: (target: ProfileTarget) => void;
+  onSelectBucket?: ActivityBucketSelectHandler;
 }
 
 const KIND_LABEL: Record<ProfileKind, string> = { track: "Track", artist: "Artist", album: "Album" };
@@ -45,13 +49,16 @@ function profileLinkProps(
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
-  range,
+  granularity,
+  rangeKey = null,
+  rangeLabel,
   topTracks,
   topArtists,
   topAlbums,
   activityCadence = [],
   isLoading = false,
   onOpenProfile,
+  onSelectBucket,
 }) => {
   const displayTracks = topTracks;
 
@@ -334,9 +341,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* Activity Tracker */}
         <ActivityChart
-          range={range}
+          granularity={granularity}
+          rangeKey={rangeKey}
+          rangeLabel={rangeLabel}
           activityCadence={activityCadence}
           isLoading={isLoading}
+          onSelectBucket={onSelectBucket}
         />
       </div>
     </div>

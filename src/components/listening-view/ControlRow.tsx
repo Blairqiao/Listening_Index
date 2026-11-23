@@ -2,13 +2,17 @@
 
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
+import { formatRangeLabel, presetRange, type RangeSelection } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
-  range: RangeKey;
-  onSelectRange: (range: RangeKey) => void;
+  range: RangeSelection;
+  rangeLabel?: string | null;
+  onSelectRange: (sel: RangeSelection) => void;
+  /** Drill-up target shown beside the window chip. */
+  rangeBack?: { target: RangeSelection; onBack: () => void } | null;
   logStartDate: string;
   isSessionOpen: boolean;
   sessionTagTime: string;
@@ -26,9 +30,6 @@ interface ControlRowProps {
   profileHistory?: ProfileHistoryEntry[];
   onJumpToHistory?: (index: number) => void;
   onReturnToSearch?: () => void;
-  // Mode 3: Live Player page-level controls
-  layout?: "split" | "stacked";
-  onToggleLayout?: () => void;
   isAuthenticated?: boolean;
   activeDevice?: { name?: string; isThisBrowser?: boolean } | null;
   playerStatus?: "idle" | "checking" | "unlinked" | "connecting" | "ready" | "error";
@@ -49,7 +50,9 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
 export const ControlRow: React.FC<ControlRowProps> = ({
   mode,
   range,
+  rangeLabel,
   onSelectRange,
+  rangeBack,
   logStartDate,
   isSessionOpen,
   sessionTagTime,
@@ -67,8 +70,6 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   profileHistory,
   onJumpToHistory,
   onReturnToSearch,
-  layout = "split",
-  onToggleLayout,
   isAuthenticated = false,
   activeDevice,
   playerStatus,
@@ -140,38 +141,73 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     }
   };
 
-  const renderRangeButtons = () => (
-    <div
-      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
-      role="group"
-      aria-label="Time range filters"
-    >
-      {RANGES.map((r) => {
-        const isActive = range === r.key;
-        return (
+  const renderRangeButtons = () => {
+    const chipText =
+      range.kind === "window" ? rangeLabel || formatRangeLabel(range) : null;
+    const back = range.kind === "window" && chipText ? rangeBack : null;
+    const backLabel = back
+      ? back.target.kind === "preset" && back.target.key === "all"
+        ? "All"
+        : formatRangeLabel(back.target)
+      : "";
+    return (
+      <div
+        className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
+        role="group"
+        aria-label="Time range filters"
+      >
+        {back && (
           <button
-            key={r.key}
             type="button"
             disabled={isSyncing}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.currentTarget.blur();
-              if (!isSyncing) onSelectRange(r.key);
+              if (!isSyncing) back.onBack();
             }}
-            className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
+            aria-label={`Back to ${backLabel}`}
+            title={`Back to ${backLabel}`}
+            className={`col-span-2 font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-[#26261F] text-[#A0A099] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32] focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 truncate ${
               isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-            } ${
-              isActive
-                ? "text-music-accent border-music-accent bg-transparent"
-                : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
             }`}
           >
-            {r.label}
+            {`← ${backLabel}`}
           </button>
-        );
-      })}
-    </div>
-  );
+        )}
+        {range.kind === "window" && chipText && (
+          <span
+            className={`${back ? "col-span-4" : "col-span-6"} font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0`}
+          >
+            {chipText}
+          </span>
+        )}
+        {RANGES.map((r) => {
+          const isActive = range.kind === "preset" && range.key === r.key;
+          return (
+            <button
+              key={r.key}
+              type="button"
+              disabled={isSyncing}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                if (!isSyncing) onSelectRange(presetRange(r.key));
+              }}
+              className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
+                isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
+              } ${
+                isActive
+                  ? "text-music-accent border-music-accent bg-transparent"
+                  : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+              }`}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderControls = () => {
     switch (mode) {
@@ -243,19 +279,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         );
       }
       case 3:
-        return (
-          <div className="hidden md:flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={onToggleLayout}
-              aria-label="Toggle player layout between split and stacked"
-              className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
-              title="Toggle between Split Console and Stacked Stage"
-            >
-              <span>{layout === "stacked" ? "Layout: stacked" : "Layout: split"}</span>
-            </button>
-          </div>
-        );
+        return null;
       case 4:
         return profileKind ? renderRangeButtons() : null;
     }

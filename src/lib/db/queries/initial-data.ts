@@ -8,13 +8,17 @@ import {
 import { getOverviewData } from "./overview";
 import { getStreamLog } from "./stream-log";
 import { getCurrentSession } from "./session";
-import type { OverviewData, StreamLogData, SessionData, RangeKey } from "./types";
+import type { OverviewData, StreamLogData, SessionData } from "./types";
+import { DEFAULT_OVERVIEW_RANGE, type RangeSelection } from "@/lib/range";
 
 /**
  * Concurrently orchestrates initial listening data queries for server-side hydration.
  * Returns null placeholders gracefully if database is unconfigured or unreachable.
  */
-export async function getInitialMusicData(initialRange: RangeKey = "1w", timezone?: string): Promise<{
+export async function getInitialMusicData(
+  initialRange: RangeSelection = DEFAULT_OVERVIEW_RANGE,
+  timezone?: string
+): Promise<{
   overview: OverviewData | null;
   streamLog: StreamLogData | null;
   session: SessionData | null;

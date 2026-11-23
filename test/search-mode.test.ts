@@ -10,6 +10,7 @@ import {
   getAvailableModes,
 } from "../src/components/listening-view/ModeTabs";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
+import { presetRange } from "../src/lib/range";
 import {
   MetricRibbon,
   getRibbonLabels,
@@ -128,7 +129,7 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   const searchMarkup = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 4,
-      range: "1w",
+      range: presetRange("1w"),
       onSelectRange: () => {},
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
@@ -149,7 +150,7 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   const trackProfileMarkup = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 4,
-      range: "1w",
+      range: presetRange("1w"),
       onSelectRange: () => {},
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
@@ -174,7 +175,7 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   const artistProfileMarkup = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 4,
-      range: "1w",
+      range: presetRange("1w"),
       onSelectRange: () => {},
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,

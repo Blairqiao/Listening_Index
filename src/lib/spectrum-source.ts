@@ -10,8 +10,8 @@
  *   - `LiveAudioSpectrumSource` runs a real FFT over audio the viewer shares
  *     via getDisplayMedia. It is genuine, but needs a click and a picker.
  *
- * The band layout, dB window, treble tilt and attack/release constants mirror
- * `spectrum.py` in the `sound` project so both renderers feel the same.
+ * The band layout, dB window and attack/release constants mirror `spectrum.py`
+ * in the `sound` project. The treble tilt and auto gain are tuned here.
  */
 
 export const BAND_COUNT = 32;
@@ -25,6 +25,23 @@ const FLOOR_DB = -75;
 const CEIL_DB = -10;
 const ATTACK = 0.55; // how fast a band jumps up (0..1 per frame at 60fps)
 const RELEASE = 0.16; // how fast it falls back
+// Each band averages per-bin dB, and a log-spaced band holds more bins as it
+// climbs. Per-bin energy in a mix falls 3 dB per octave (pink) in the low end
+// and about 5 dB per octave above 1 kHz, so the top of the display would sit
+// 30+ dB under the bass. 4 dB per octave over the 9 octaves shown evens it out.
+const TILT_DB_PER_OCTAVE = 4;
+const OCTAVES = Math.log2(HIGH_HZ / LOW_HZ);
+// The tilt fades in over this many dB above the floor, so silence rests at zero.
+const TILT_FADE_DB = 12;
+// Auto gain scales the loudest band toward this height. Mixes differ by 20+ dB
+// in loudness, so a fixed dB window leaves quiet tracks short and hot ones pinned.
+const GAIN_TARGET_PEAK = 0.9;
+const GAIN_MIN = 0.6;
+const GAIN_MAX = 3;
+// Below this loudest-band level the input counts as silence and the gain holds.
+const GAIN_GATE = 0.12;
+const GAIN_DOWN_PER_SEC = 4; // fast, so a loud section does not pin for long
+const GAIN_UP_PER_SEC = 0.6; // slow, so the display does not pump between beats
 
 export interface SpectrumSource {
   /** Fills `out` with the current band levels. Called once per frame. */
@@ -48,22 +65,37 @@ export function bandEdges(binCount: number, sampleRate: number): Int32Array {
   return edges;
 }
 
+/** Auto gain state, kept by the caller between frames. */
+export interface SpectrumGain {
+  value: number;
+}
+
+export function createSpectrumGain(): SpectrumGain {
+  return { value: 1 };
+}
+
+const targets = new Float32Array(BAND_COUNT);
+
 /**
  * Transforms raw FFT frequency data into 32 normalized band levels (0..1).
  * Applies decibel tilt, multi-bin energy aggregation, and frame-rate scaled ballistics.
+ * With `gain`, it also scales levels so the loudest band sits near the top.
  */
 export function calculateSpectrumBands(
   fft: Float32Array,
   edges: Int32Array,
   smoothed: Float32Array,
   out: Float32Array,
-  dt = 1 / 60
+  dt = 1 / 60,
+  gain?: SpectrumGain
 ): void {
   // Frame-rate independent ballistics matching ATTACK=0.55, RELEASE=0.16 at 60fps
   // A negative dt would give a negative rate and push bands below zero.
-  const frames = Math.max(0, dt) * 60;
+  const seconds = Math.max(0, dt);
+  const frames = seconds * 60;
   const attackRate = 1 - Math.pow(1 - ATTACK, frames);
   const releaseRate = 1 - Math.pow(1 - RELEASE, frames);
+  let loudest = 0;
 
   for (let i = 0; i < BAND_COUNT; i++) {
     let peak = -Infinity;
@@ -81,14 +113,25 @@ export function calculateSpectrumBands(
     // Blend average and peak for multi-bin bands to preserve transient punch
     // without letting single-bin noise spikes in wide upper bands saturate the bar.
     const rawDb = count > 1 ? 0.6 * (sum / count) + 0.4 * peak : peak;
-    // Treble tilt in the decibel domain (~ +1.8 dB/octave, +16 dB total at 16kHz)
-    // to compensate for natural acoustic roll-off without collapsing treble headroom.
-    // It fades in over the first 20 dB above the floor, so silence rests at zero and
-    // a band crossing the floor does not jump.
+    // Treble tilt in the decibel domain. It fades in just above the floor, so
+    // silence rests at zero and a band crossing the floor does not jump.
     const aboveFloor = Number.isFinite(rawDb) ? Math.max(0, rawDb - FLOOR_DB) : 0;
-    const tiltDb = (i / (BAND_COUNT - 1)) * 16 * Math.min(1, aboveFloor / 20);
-    const target = Math.max(0, Math.min(1, (aboveFloor + tiltDb) / (CEIL_DB - FLOOR_DB)));
+    const tiltDb =
+      (i / (BAND_COUNT - 1)) * OCTAVES * TILT_DB_PER_OCTAVE * Math.min(1, aboveFloor / TILT_FADE_DB);
+    const level = Math.max(0, (aboveFloor + tiltDb) / (CEIL_DB - FLOOR_DB));
+    targets[i] = level;
+    if (level > loudest) loudest = level;
+  }
 
+  if (gain && loudest > GAIN_GATE) {
+    const desired = Math.max(GAIN_MIN, Math.min(GAIN_MAX, GAIN_TARGET_PEAK / loudest));
+    const perSec = desired < gain.value ? GAIN_DOWN_PER_SEC : GAIN_UP_PER_SEC;
+    gain.value += (desired - gain.value) * (1 - Math.exp(-perSec * seconds));
+  }
+  const g = gain ? gain.value : 1;
+
+  for (let i = 0; i < BAND_COUNT; i++) {
+    const target = Math.min(1, targets[i] * g);
     const rate = target > smoothed[i] ? attackRate : releaseRate;
     smoothed[i] += (target - smoothed[i]) * rate;
     out[i] = smoothed[i];
@@ -173,6 +216,7 @@ export class SyntheticSpectrumSource implements SpectrumSource {
  */
 export class LiveAudioSpectrumSource implements SpectrumSource {
   private smoothed = new Float32Array(BAND_COUNT);
+  private gain = createSpectrumGain();
   private edges: Int32Array;
   // Explicitly backed by a plain ArrayBuffer: getFloatFrequencyData rejects a
   // SharedArrayBuffer-backed view, which is what a bare Float32Array widens to.
@@ -217,7 +261,7 @@ export class LiveAudioSpectrumSource implements SpectrumSource {
 
   read(out: Float32Array, dt = 1 / 60) {
     this.analyser.getFloatFrequencyData(this.fft);
-    calculateSpectrumBands(this.fft, this.edges, this.smoothed, out, dt);
+    calculateSpectrumBands(this.fft, this.edges, this.smoothed, out, dt, this.gain);
   }
 
   stop() {

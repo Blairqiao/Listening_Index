@@ -104,3 +104,83 @@ test("a level exactly at the floor rests at zero in every band", () => {
     assert.ok(out[i] < 1e-6, `band ${i} rests at ${out[i]}`);
   }
 });
+
+/**
+ * Closer to a real mix than `musicSpectrum`: -3 dB per octave up to 1 kHz,
+ * then -5 dB per octave, as cymbals and air sit well below the kick and bass.
+ */
+function realisticSpectrum(offsetDb = 0): Float32Array {
+  const fft = new Float32Array(BIN_COUNT);
+  for (let b = 0; b < BIN_COUNT; b++) {
+    const hz = Math.max(30, (b / BIN_COUNT) * (SAMPLE_RATE / 2));
+    const oct = Math.log2(hz / 30);
+    const knee = Math.log2(1000 / 30);
+    const db = oct <= knee ? -28 - 3 * oct : -28 - 3 * knee - 5 * (oct - knee);
+    fft[b] = db + offsetDb;
+  }
+  return fft;
+}
+
+function quarterMeans(out: Float32Array): { bass: number; treble: number } {
+  const q = BAND_COUNT / 4;
+  let bass = 0;
+  let treble = 0;
+  for (let i = 0; i < q; i++) {
+    bass += out[i];
+    treble += out[BAND_COUNT - q + i];
+  }
+  return { bass: bass / q, treble: treble / q };
+}
+
+type Gain = { value: number };
+function createGain(): Gain {
+  return (spectrum as unknown as { createSpectrumGain: () => Gain }).createSpectrumGain();
+}
+
+function settleWithGain(fft: Float32Array, gain: Gain, frames = 600, smoothed?: Float32Array): Float32Array {
+  const state = smoothed ?? new Float32Array(BAND_COUNT);
+  const out = new Float32Array(BAND_COUNT);
+  const bandEdges = edges();
+  const calc = (spectrum as unknown as {
+    calculateSpectrumBands: (...a: [Float32Array, Int32Array, Float32Array, Float32Array, number, Gain]) => void;
+  }).calculateSpectrumBands;
+  for (let i = 0; i < frames; i++) calc(fft, bandEdges, state, out, 1 / 60, gain);
+  return out;
+}
+
+test("a realistic mix lights treble about as much as bass", () => {
+  const { bass, treble } = quarterMeans(settle(realisticSpectrum()));
+  const ratio = treble / bass;
+  assert.ok(ratio > 0.8 && ratio < 1.25, `treble/bass = ${ratio.toFixed(2)} (bass ${bass.toFixed(2)}, treble ${treble.toFixed(2)})`);
+});
+
+test("a pink-like spectrum stays balanced too", () => {
+  const { bass, treble } = quarterMeans(settle(musicSpectrum()));
+  const ratio = treble / bass;
+  assert.ok(ratio > 0.8 && ratio < 1.3, `treble/bass = ${ratio.toFixed(2)}`);
+});
+
+test("auto gain lifts a quiet track to use most of the height", () => {
+  const out = settleWithGain(realisticSpectrum(-25), createGain());
+  const max = Math.max(...out);
+  assert.ok(max > 0.75, `loudest band only reaches ${max.toFixed(2)}`);
+});
+
+test("auto gain keeps a hot master from pinning every band", () => {
+  const out = settleWithGain(realisticSpectrum(15), createGain());
+  for (let i = 0; i < BAND_COUNT; i++) {
+    assert.ok(out[i] < 0.98, `band ${i} is pinned at ${out[i]}`);
+  }
+});
+
+test("auto gain leaves silence at zero and does not run away while silent", () => {
+  const gain = createGain();
+  const smoothed = new Float32Array(BAND_COUNT);
+  settleWithGain(realisticSpectrum(), gain, 300, smoothed);
+  const before = gain.value;
+  const out = settleWithGain(flatSpectrum(-Infinity), gain, 600, smoothed);
+  for (let i = 0; i < BAND_COUNT; i++) {
+    assert.ok(out[i] < 1e-6, `band ${i} rests at ${out[i]}`);
+  }
+  assert.ok(gain.value <= before + 1e-6, `gain climbed from ${before} to ${gain.value} in silence`);
+});

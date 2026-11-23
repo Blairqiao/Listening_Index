@@ -50,7 +50,8 @@ test("DayOfWeekChart supports a custom heading", () => {
 
 test("ProfileChart renders Over time by default and reserves readout height", () => {
   const baseProps = {
-    range: "1d" as const,
+    granularity: "hour" as const,
+    rangeKey: "1d" as const,
     activityCadence: [],
     isLoading: false,
     visitorTimezone: "UTC",
@@ -148,7 +149,7 @@ test("SegmentedShareBar supports click toggle on segments", () => {
 });
 
 test("ActivityChart retains the default heading and supports an aside", () => {
-  const activity = { range: "1d", activityCadence: [] } as const;
+  const activity = { granularity: "hour", rangeKey: "1d", activityCadence: [] } as const;
   const props = { ...activity, activityCadence: [] };
   const markup = renderToStaticMarkup(React.createElement(ActivityChart, props));
   assert.match(markup, /<div class="font-mono text-\[12px\] text-\[#5A5A55\] mb-2 select-none">Activity \/ 1d<\/div>/);

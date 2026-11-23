@@ -1,4 +1,5 @@
 import type { OverviewMetricsRaw, StreamLogMetricsRaw } from "./format-utils";
+import type { CadenceGranularity } from "./range";
 
 export type Mode = 0 | 1 | 2 | 3 | 4; // 0 = Overview, 1 = Stream Log, 2 = Session, 3 = Live Player, 4 = Search
 export const RANGE_KEYS = ["1d", "1w", "1m", "6m", "1y", "all"] as const;
@@ -141,6 +142,8 @@ export interface ActivityBucket {
 export type ActivityDay = ActivityBucket;
 
 export interface OverviewData {
+  range: string;
+  granularity: CadenceGranularity;
   logStartDate: string;
   rawMetrics: OverviewMetricsRaw;
   metrics: [string, string, string, string]; // Minutes, Tracks, Artists, Daily Avg

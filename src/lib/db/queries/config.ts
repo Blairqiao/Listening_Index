@@ -9,7 +9,7 @@ import type { SiteConfigState } from "./types";
  */
 async function ensureActiveSettingsRow(sql = getDb()): Promise<void> {
   await sql`
-    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, live_player_layout, updated_at)
+    INSERT INTO site_settings (id, title, owner_name, accent_color, site_url, github_url, updated_at)
     VALUES (
       'active',
       ${DEFAULT_SITE_CONFIG.title},
@@ -17,7 +17,6 @@ async function ensureActiveSettingsRow(sql = getDb()): Promise<void> {
       ${DEFAULT_SITE_CONFIG.accentColor},
       ${DEFAULT_SITE_CONFIG.siteUrl},
       ${DEFAULT_SITE_CONFIG.githubUrl},
-      ${DEFAULT_SITE_CONFIG.livePlayerLayout},
       NOW()
     )
     ON CONFLICT (id) DO NOTHING;
@@ -40,7 +39,7 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
     try {
       const sql = getDb();
       const rows = ((await sql`
-        SELECT title, owner_name, accent_color, site_url, github_url, live_player_layout
+        SELECT title, owner_name, accent_color, site_url, github_url
         FROM site_settings
         WHERE id = 'active'
         LIMIT 1;
@@ -54,10 +53,6 @@ export async function getActiveSiteConfig(): Promise<SiteConfigState> {
           accentColor: row.accent_color || DEFAULT_SITE_CONFIG.accentColor,
           siteUrl: row.site_url || DEFAULT_SITE_CONFIG.siteUrl,
           githubUrl: row.github_url || DEFAULT_SITE_CONFIG.githubUrl,
-          livePlayerLayout:
-            row.live_player_layout === "stacked" || row.live_player_layout === "split"
-              ? row.live_player_layout
-              : DEFAULT_SITE_CONFIG.livePlayerLayout,
         };
       }
 
@@ -89,7 +84,6 @@ export async function saveActiveSiteConfig(config: SiteConfigState): Promise<boo
         accent_color = ${config.accentColor},
         site_url = ${config.siteUrl},
         github_url = ${config.githubUrl},
-        live_player_layout = ${config.livePlayerLayout || "split"},
         updated_at = NOW()
       WHERE id = 'active';
     `;
@@ -116,7 +110,6 @@ export async function resetActiveSiteConfig(): Promise<SiteConfigState> {
         accent_color = ${DEFAULT_SITE_CONFIG.accentColor},
         site_url = ${DEFAULT_SITE_CONFIG.siteUrl},
         github_url = ${DEFAULT_SITE_CONFIG.githubUrl},
-        live_player_layout = ${DEFAULT_SITE_CONFIG.livePlayerLayout},
         updated_at = NOW()
       WHERE id = 'active';
     `;

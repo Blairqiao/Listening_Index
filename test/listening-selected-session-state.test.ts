@@ -4,6 +4,7 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ControlRow } from '../src/components/listening-view/ControlRow';
+import { presetRange } from '../src/lib/range';
 import { loadTs } from './helpers/load-ts';
 import { readModuleSource } from './helpers/module-source';
 
@@ -38,7 +39,7 @@ function controlRowMarkup(selectedSessionId?: string) {
   return renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 2,
-      range: '1w',
+      range: presetRange('1w'),
       onSelectRange: () => {},
       logStartDate: '--',
       isSessionOpen: selected?.isOpen || false,

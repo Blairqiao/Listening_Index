@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { getDb } from "../src/lib/db";
 import { dbTest, useTestDatabase } from "./helpers/test-db";
 import { isCatalogFullyEnriched } from "../src/lib/db/queries/enrichment";
-import { OVERVIEW_INTERVAL_CONFIG } from "../src/lib/db/queries/overview";
 import { getProfile } from "../src/lib/db/queries/profile";
+import { PRESET_SPAN_MS, presetRange } from "../src/lib/range";
 import {
   computePeakDay,
   countFullAlbumSessions,
@@ -77,15 +77,16 @@ test("album profile DB queries", dbTest, async (t) => {
       const albumCol = isEnriched ? sql`t.album_id` : sql`t.album_group_key`;
       const albumFilter = isEnriched ? sql`t.album_id = ${expectedKey}` : sql`t.album_group_key = ${expectedKey}`;
       const tz = "America/Chicago";
-      const time1m = sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG["1m"].cur})::interval`;
+      const since1m = new Date(Date.now() - PRESET_SPAN_MS["1m"]).toISOString();
+      const time1m = sql`p.played_at >= ${since1m}::timestamptz`;
 
       const artistKey = isEnriched ? fixture.artistId : fixture.artistGroupKey;
       const artistFilter = isEnriched ? sql`t.artist_id = ${artistKey}` : sql`t.artist_group_key = ${artistKey}`;
       const [byIdAll, byGroupAll, byId1m, artistAll, rawAll, raw1m, artistRawAll, albumTracks, [totalAll], [total1m], multiArtistRow] = await Promise.all([
-        getProfile({ kind: "album", key: fixture.albumId }, "all", tz),
-        getProfile({ kind: "album", key: fixture.albumGroupKey }, "all", tz),
-        getProfile({ kind: "album", key: fixture.albumId }, "1m", tz),
-        getProfile({ kind: "artist", key: artistKey }, "all", tz),
+        getProfile({ kind: "album", key: fixture.albumId }, presetRange("all"), tz),
+        getProfile({ kind: "album", key: fixture.albumGroupKey }, presetRange("all"), tz),
+        getProfile({ kind: "album", key: fixture.albumId }, presetRange("1m"), tz),
+        getProfile({ kind: "artist", key: artistKey }, presetRange("all"), tz),
         sql`SELECT p.id::text, p.played_at, p.ms_played, p.track_id, t.artist_id, t.artist_group_key FROM plays p JOIN tracks t ON t.id = p.track_id WHERE ${albumFilter}`,
         sql`SELECT p.id::text, p.played_at, p.ms_played, p.track_id, t.artist_id, t.artist_group_key FROM plays p JOIN tracks t ON t.id = p.track_id WHERE ${albumFilter} AND ${time1m}`,
         sql`
@@ -116,7 +117,7 @@ test("album profile DB queries", dbTest, async (t) => {
         artistPlays: number;
       } | null = null;
       if (multiArtistKey) {
-        const maProfile = await getProfile({ kind: "album", key: multiArtistKey }, "all", tz);
+        const maProfile = await getProfile({ kind: "album", key: multiArtistKey }, presetRange("all"), tz);
         if (maProfile && maProfile.artistKey) {
           const maAlbumFilter = isEnriched ? sql`t.album_id = ${maProfile.key}` : sql`t.album_group_key = ${maProfile.key}`;
           const maArtistFilter = isEnriched ? sql`t.artist_id = ${maProfile.artistKey}` : sql`t.artist_group_key = ${maProfile.artistKey}`;
@@ -308,9 +309,9 @@ test("album profile DB queries", dbTest, async (t) => {
       const fixture = await pickAlbumFixture(sql);
       const artistKey = isEnriched ? fixture.artistId : fixture.artistGroupKey;
       const [track, artist, unknown] = await Promise.all([
-        getProfile({ kind: "track", key: fixture.sampleTrackId }, "all", "UTC"),
-        getProfile({ kind: "artist", key: artistKey }, "all", "UTC"),
-        getProfile({ kind: "album", key: "unknown-album-000000000000" }, "all", "UTC"),
+        getProfile({ kind: "track", key: fixture.sampleTrackId }, presetRange("all"), "UTC"),
+        getProfile({ kind: "artist", key: artistKey }, presetRange("all"), "UTC"),
+        getProfile({ kind: "album", key: "unknown-album-000000000000" }, presetRange("all"), "UTC"),
       ]);
       return { isEnriched, fixture, track, artist, unknown };
     });
@@ -336,13 +337,13 @@ test("album profile DB queries", dbTest, async (t) => {
       async () => {
         const fixture = await pickAlbumFixture(sql);
         const [byId, byGroup, [rawCount], [totalAlbums], track, artist, unknown] = await Promise.all([
-          getGroupKeyProfile({ kind: "album", key: fixture.albumId }, "all", "UTC"),
-          getGroupKeyProfile({ kind: "album", key: fixture.albumGroupKey }, "all", "UTC"),
+          getGroupKeyProfile({ kind: "album", key: fixture.albumId }, presetRange("all"), "UTC"),
+          getGroupKeyProfile({ kind: "album", key: fixture.albumGroupKey }, presetRange("all"), "UTC"),
           sql`SELECT COUNT(*)::int AS plays FROM plays p JOIN tracks t ON t.id = p.track_id WHERE t.album_group_key = ${fixture.albumGroupKey}`,
           sql`SELECT COUNT(DISTINCT t.album_group_key)::int AS total FROM plays p JOIN tracks t ON t.id = p.track_id WHERE t.album_group_key IS NOT NULL`,
-          getGroupKeyProfile({ kind: "track", key: fixture.sampleTrackId }, "all", "UTC"),
-          getGroupKeyProfile({ kind: "artist", key: fixture.artistGroupKey }, "all", "UTC"),
-          getGroupKeyProfile({ kind: "album", key: "unknown-album-000000000000" }, "all", "UTC"),
+          getGroupKeyProfile({ kind: "track", key: fixture.sampleTrackId }, presetRange("all"), "UTC"),
+          getGroupKeyProfile({ kind: "artist", key: fixture.artistGroupKey }, presetRange("all"), "UTC"),
+          getGroupKeyProfile({ kind: "album", key: "unknown-album-000000000000" }, presetRange("all"), "UTC"),
         ]);
         return { fixture, byId, byGroup, rawCount, totalAlbums, track, artist, unknown };
       },

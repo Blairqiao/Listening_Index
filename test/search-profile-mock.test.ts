@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { CATALOG } from '../src/lib/mock/catalog';
 import { ALL_MOCK_STREAM_LOG_ENTRIES } from '../src/lib/mock/stream-log';
 import { getMockSearch, getMockProfile, getMockRandomProfileTarget } from '../src/lib/mock/search-profile';
+import { getMockOverview } from '../src/lib/mock/overview-data';
+import { presetRange } from '../src/lib/range';
 import {
   SEARCH_TRACK_ROWS,
   SEARCH_SIDE_ROWS,
@@ -59,7 +61,7 @@ test('getMockProfile for track provides all-time counts, lifetime bounds, and re
 
   const allProfile = getMockProfile(
     { kind: 'track', key: weirdFishesId },
-    'all',
+    presetRange('all'),
     'UTC'
   );
   assert.ok(allProfile);
@@ -85,7 +87,7 @@ test('getMockProfile for track provides all-time counts, lifetime bounds, and re
   // Lifetime bounds remain unchanged regardless of active range window
   const oneDayProfile = getMockProfile(
     { kind: 'track', key: weirdFishesId },
-    '1d',
+    presetRange('1d'),
     'UTC'
   );
   assert.ok(oneDayProfile);
@@ -102,7 +104,7 @@ test('getMockProfile activityCadence matches buildActivityCadence buckets and ra
   const expectedLengths: Record<string, number> = { '1d': 25, '1w': 32, '1m': 31 };
   for (const range of ['1d', '1w', '1m', '6m', '1y', 'all'] as const) {
     for (const tz of ['UTC', 'Asia/Tokyo', 'America/Los_Angeles']) {
-      const profile = getMockProfile({ kind: 'artist', key: radioheadId }, range, tz);
+      const profile = getMockProfile({ kind: 'artist', key: radioheadId }, presetRange(range), tz);
       assert.ok(profile);
       if (expectedLengths[range]) {
         assert.equal(profile.activityCadence.length, expectedLengths[range], `${range} ${tz} length`);
@@ -119,7 +121,7 @@ test('getMockProfile separates artist top lists from track profiles', () => {
 
   const artistProfile = getMockProfile(
     { kind: 'artist', key: artistId },
-    'all',
+    presetRange('all'),
     'UTC'
   );
   assert.ok(artistProfile);
@@ -133,7 +135,7 @@ test('getMockProfile separates artist top lists from track profiles', () => {
 
   const trackProfile = getMockProfile(
     { kind: 'track', key: trackId },
-    'all',
+    presetRange('all'),
     'UTC'
   );
   assert.ok(trackProfile);
@@ -143,11 +145,11 @@ test('getMockProfile separates artist top lists from track profiles', () => {
 
 test('getMockProfile returns null for unknown targets', () => {
   assert.equal(
-    getMockProfile({ kind: 'track', key: 'nonexistent_track_id' }, 'all', 'UTC'),
+    getMockProfile({ kind: 'track', key: 'nonexistent_track_id' }, presetRange('all'), 'UTC'),
     null
   );
   assert.equal(
-    getMockProfile({ kind: 'artist', key: 'nonexistent_artist_id' }, 'all', 'UTC'),
+    getMockProfile({ kind: 'artist', key: 'nonexistent_artist_id' }, presetRange('all'), 'UTC'),
     null
   );
 });
@@ -170,7 +172,7 @@ test('empty search pages through the catalog with global sort order', () => {
           : kind === 'artist'
             ? data.artists.map((row) => row.key)
             : data.albums.map((row) => row.key);
-      const dates = keys.map((key) => Date.parse(getMockProfile({ kind, key }, 'all', 'UTC')!.lastPlayedAt!));
+      const dates = keys.map((key) => Date.parse(getMockProfile({ kind, key }, presetRange('all'), 'UTC')!.lastPlayedAt!));
       assert.ok(dates.length > 1);
       assert.ok(dates.every((date, index) => index === 0 ||
         (sort === 'recent' ? date <= dates[index - 1] : date >= dates[index - 1])));
@@ -180,7 +182,7 @@ test('empty search pages through the catalog with global sort order', () => {
 
 test("All profile cadence includes monthly counts", () => {
   const track = getMockSearch("").tracks[0];
-  const profile = getMockProfile({ kind: "track", key: track.id }, "all", "America/Chicago")!;
+  const profile = getMockProfile({ kind: "track", key: track.id }, presetRange("all"), "America/Chicago")!;
   assert.ok(profile.artistKey);
   assert.equal(profile.monthlyCadence?.reduce((sum, month) => sum + month.count, 0), profile.plays);
   assert.equal(profile.activityCadence.reduce((sum, year) => sum + year.count, 0), profile.plays);
@@ -189,8 +191,8 @@ test("All profile cadence includes monthly counts", () => {
 test("Track stats and album siblings follow the profile range and timezone", () => {
   const track = getMockSearch("").tracks[0];
   const target = { kind: "track", key: track.id } as const;
-  const utc = getMockProfile(target, "all", "UTC")!;
-  const tokyo = getMockProfile(target, "all", "Asia/Tokyo")!;
+  const utc = getMockProfile(target, presetRange("all"), "UTC")!;
+  const tokyo = getMockProfile(target, presetRange("all"), "Asia/Tokyo")!;
   assert.ok(utc.trackStats);
   assert.ok(utc.hourOfDay && tokyo.hourOfDay);
   assert.equal(utc.hourOfDay.length, 24);
@@ -208,7 +210,7 @@ test("Track stats and album siblings follow the profile range and timezone", () 
     b.plays - a.plays || a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
   ));
 
-  const day = getMockProfile(target, "1d", "UTC")!;
+  const day = getMockProfile(target, presetRange("1d"), "UTC")!;
   assert.ok(day.plays < utc.plays);
   assert.equal(day.hourOfDay?.reduce((sum, count) => sum + count, 0), day.plays);
 });
@@ -216,8 +218,8 @@ test("Track stats and album siblings follow the profile range and timezone", () 
 test("Artist hours follow the timezone and match the Track share denominator", () => {
   const key = getMockSearch("").artists[0].key;
   const target = { kind: "artist", key } as const;
-  const utc = getMockProfile(target, "all", "UTC")!;
-  const tokyo = getMockProfile(target, "all", "Asia/Tokyo")!;
+  const utc = getMockProfile(target, presetRange("all"), "UTC")!;
+  const tokyo = getMockProfile(target, presetRange("all"), "Asia/Tokyo")!;
   assert.ok(utc.plays > 0);
   assert.ok(utc.hourOfDay && tokyo.hourOfDay);
   for (const counts of [utc.hourOfDay, tokyo.hourOfDay]) {
@@ -226,13 +228,13 @@ test("Artist hours follow the timezone and match the Track share denominator", (
   }
   assert.notDeepEqual(utc.hourOfDay, tokyo.hourOfDay);
 
-  const track = getMockProfile({ kind: "track", key: utc.topTracks[0].id }, "all", "UTC");
+  const track = getMockProfile({ kind: "track", key: utc.topTracks[0].id }, presetRange("all"), "UTC");
   assert.equal(track?.trackStats?.artistPlays, utc.plays);
 });
 
 test("Artist hours are zero when the range has no Plays", () => {
   const artist = Object.values(CATALOG)
-    .map(({ artistId: key }) => getMockProfile({ kind: "artist", key }, "1d", "UTC"))
+    .map(({ artistId: key }) => getMockProfile({ kind: "artist", key }, presetRange("1d"), "UTC"))
     .find((profile) => profile?.plays === 0);
   assert.ok(artist);
   assert.deepEqual(artist.hourOfDay, Array(24).fill(0));
@@ -275,7 +277,7 @@ test('getMockSearch album paging without duplicates and sort orders', () => {
   assert.equal(hasMore, false);
   assert.ok(albumKeys.size > SEARCH_SIDE_ROWS);
   const firstAlbumKey = [...albumKeys][0];
-  const firstAlbum = getMockProfile({ kind: 'album', key: firstAlbumKey }, 'all', 'UTC');
+  const firstAlbum = getMockProfile({ kind: 'album', key: firstAlbumKey }, presetRange('all'), 'UTC');
   assert.equal(albumKeys.size, firstAlbum?.rankedTotal);
 
   for (const sort of ['most-plays', 'least-plays'] as const) {
@@ -295,7 +297,7 @@ test('getMockProfile for album round-trip from search, totals and topTracks sum'
   assert.ok(searchRes.albums.length > 0);
 
   for (const albumItem of searchRes.albums) {
-    const profile = getMockProfile({ kind: 'album', key: albumItem.key }, 'all', 'UTC');
+    const profile = getMockProfile({ kind: 'album', key: albumItem.key }, presetRange('all'), 'UTC');
     assert.ok(profile, `Profile should exist for album key ${albumItem.key}`);
     assert.equal(profile.kind, 'album');
     assert.equal(profile.key, albumItem.key);
@@ -329,12 +331,12 @@ test('getMockProfile for album round-trip from search, totals and topTracks sum'
 
 test('Track profile gains albumKey and Artist topAlbums gain key preserving id', () => {
   const weirdFishesId = CATALOG.radiohead_weird_fishes.id;
-  const trackProfile = getMockProfile({ kind: 'track', key: weirdFishesId }, 'all', 'UTC');
+  const trackProfile = getMockProfile({ kind: 'track', key: weirdFishesId }, presetRange('all'), 'UTC');
   assert.ok(trackProfile);
   assert.equal(trackProfile.albumKey, CATALOG.radiohead_weird_fishes.albumId);
 
   const artistId = CATALOG.radiohead_weird_fishes.artistId;
-  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, 'all', 'UTC');
+  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, presetRange('all'), 'UTC');
   assert.ok(artistProfile);
   assert.ok(artistProfile.topAlbums.length > 0);
   for (const topAlbum of artistProfile.topAlbums) {
@@ -345,7 +347,7 @@ test('Track profile gains albumKey and Artist topAlbums gain key preserving id',
 
 test('getMockProfile returns null for unknown album target', () => {
   assert.equal(
-    getMockProfile({ kind: 'album', key: 'nonexistent_album_key' }, 'all', 'UTC'),
+    getMockProfile({ kind: 'album', key: 'nonexistent_album_key' }, presetRange('all'), 'UTC'),
     null
   );
 });
@@ -474,23 +476,23 @@ test('getMockRandomProfileTarget selects valid played target for each filter', (
     const allTarget = getMockRandomProfileTarget('all');
     assert.ok(allTarget);
     assert.ok(['track', 'artist', 'album'].includes(allTarget.kind));
-    const allProfile = getMockProfile(allTarget, 'all', 'UTC');
+    const allProfile = getMockProfile(allTarget, presetRange('all'), 'UTC');
     assert.ok(allProfile, 'Random target must be resolvable via getMockProfile');
   }
 
   const trackTarget = getMockRandomProfileTarget('tracks');
   assert.ok(trackTarget && trackTarget.kind === 'track');
-  const trackProfile = getMockProfile(trackTarget, 'all', 'UTC');
+  const trackProfile = getMockProfile(trackTarget, presetRange('all'), 'UTC');
   assert.ok(trackProfile && trackProfile.kind === 'track');
 
   const artistTarget = getMockRandomProfileTarget('artists');
   assert.ok(artistTarget && artistTarget.kind === 'artist');
-  const artistProfile = getMockProfile(artistTarget, 'all', 'UTC');
+  const artistProfile = getMockProfile(artistTarget, presetRange('all'), 'UTC');
   assert.ok(artistProfile && artistProfile.kind === 'artist');
 
   const albumTarget = getMockRandomProfileTarget('albums');
   assert.ok(albumTarget && albumTarget.kind === 'album');
-  const albumProfile = getMockProfile(albumTarget, 'all', 'UTC');
+  const albumProfile = getMockProfile(albumTarget, presetRange('all'), 'UTC');
   assert.ok(albumProfile && albumProfile.kind === 'album');
 });
 
@@ -500,7 +502,7 @@ test('getMockProfile provides dayOfWeek and stats for Track, Artist, and Album',
   const albumId = CATALOG.radiohead_weird_fishes.albumId!;
 
   // 1. Track Profile
-  const trackProfile = getMockProfile({ kind: 'track', key: trackId }, 'all', 'UTC')!;
+  const trackProfile = getMockProfile({ kind: 'track', key: trackId }, presetRange('all'), 'UTC')!;
   assert.ok(trackProfile);
   assert.ok(trackProfile.dayOfWeek);
   assert.equal(trackProfile.dayOfWeek.length, 7);
@@ -527,7 +529,7 @@ test('getMockProfile provides dayOfWeek and stats for Track, Artist, and Album',
   }
 
   // 2. Artist Profile
-  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, 'all', 'UTC')!;
+  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, presetRange('all'), 'UTC')!;
   assert.ok(artistProfile);
   assert.ok(artistProfile.dayOfWeek);
   assert.equal(artistProfile.dayOfWeek.length, 7);
@@ -545,7 +547,7 @@ test('getMockProfile provides dayOfWeek and stats for Track, Artist, and Album',
   }
 
   // 3. Album Profile
-  const albumProfile = getMockProfile({ kind: 'album', key: albumId }, 'all', 'UTC')!;
+  const albumProfile = getMockProfile({ kind: 'album', key: albumId }, presetRange('all'), 'UTC')!;
   assert.ok(albumProfile);
   assert.ok(albumProfile.dayOfWeek);
   assert.equal(albumProfile.dayOfWeek.length, 7);
@@ -570,8 +572,8 @@ test('getMockProfile provides dayOfWeek and stats for Track, Artist, and Album',
 
 test('Album artistShare divides current album plays by selected artist by that artist total plays', () => {
   const albumId = CATALOG.radiohead_weird_fishes.albumId!;
-  const albumProfile = getMockProfile({ kind: 'album', key: albumId }, 'all', 'UTC')!;
-  const artistProfile = getMockProfile({ kind: 'artist', key: albumProfile.artistKey! }, 'all', 'UTC')!;
+  const albumProfile = getMockProfile({ kind: 'album', key: albumId }, presetRange('all'), 'UTC')!;
+  const artistProfile = getMockProfile({ kind: 'artist', key: albumProfile.artistKey! }, presetRange('all'), 'UTC')!;
 
   assert.ok(albumProfile.stats?.artistShare);
   assert.equal(albumProfile.stats.artistPlays, artistProfile.plays);
@@ -581,7 +583,7 @@ test('Album artistShare divides current album plays by selected artist by that a
 
 test('Track relatedTracks returns up to 4 adjacent tracks within <= 30 mins excluding self', () => {
   const trackId = CATALOG.radiohead_weird_fishes.id;
-  const profile = getMockProfile({ kind: 'track', key: trackId }, 'all', 'UTC')!;
+  const profile = getMockProfile({ kind: 'track', key: trackId }, presetRange('all'), 'UTC')!;
   assert.ok(profile.relatedTracks);
   assert.ok(profile.relatedTracks.length > 0 && profile.relatedTracks.length <= PROFILE_RELATED_TRACKS_LIMIT);
   assert.ok(profile.relatedTracks.every((r) => r.id !== trackId));
@@ -606,7 +608,7 @@ test('Track relatedTracks returns up to 4 adjacent tracks within <= 30 mins excl
 
 test('Album moreAlbums returns sibling albums by same artist in range excluding current', () => {
   const albumId = CATALOG.radiohead_weird_fishes.albumId!;
-  const profile = getMockProfile({ kind: 'album', key: albumId }, 'all', 'UTC')!;
+  const profile = getMockProfile({ kind: 'album', key: albumId }, presetRange('all'), 'UTC')!;
   assert.ok(profile.moreAlbums);
   assert.ok(profile.moreAlbums.length > 0 && profile.moreAlbums.length <= PROFILE_MORE_ALBUMS_LIMIT);
   assert.ok(profile.moreAlbums.every((a) => a.key !== albumId));
@@ -624,7 +626,7 @@ test('Album moreAlbums returns sibling albums by same artist in range excluding 
 
 test('Album fullAlbumSessions matches countFullAlbumSessions', () => {
   const albumId = CATALOG.radiohead_weird_fishes.albumId!;
-  const profile = getMockProfile({ kind: 'album', key: albumId }, 'all', 'UTC')!;
+  const profile = getMockProfile({ kind: 'album', key: albumId }, presetRange('all'), 'UTC')!;
   assert.ok(profile.stats);
   assert.ok(profile.stats.fullAlbumSessions !== undefined);
 
@@ -668,12 +670,12 @@ test('getMockProfile fills streak dates for Track and Artist and Artist summary 
   const trackId = CATALOG.radiohead_weird_fishes.id;
   const artistId = CATALOG.radiohead_weird_fishes.artistId;
 
-  const trackProfile = getMockProfile({ kind: 'track', key: trackId }, 'all', 'UTC')!;
+  const trackProfile = getMockProfile({ kind: 'track', key: trackId }, presetRange('all'), 'UTC')!;
   assert.ok(trackProfile?.stats);
   assert.ok(trackProfile.stats.longestStreakDays > 0);
   assertStreakDatesConsistent(trackProfile.stats);
 
-  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, 'all', 'UTC')!;
+  const artistProfile = getMockProfile({ kind: 'artist', key: artistId }, presetRange('all'), 'UTC')!;
   assert.ok(artistProfile?.stats);
   assert.ok(artistProfile.plays > 0);
   assertStreakDatesConsistent(artistProfile.stats);
@@ -691,7 +693,7 @@ test('getMockProfile fills streak dates for Track and Artist and Artist summary 
   );
 
   const zeroPlaysArtist = Object.values(CATALOG)
-    .map(({ artistId: key }) => getMockProfile({ kind: 'artist', key }, '1d', 'UTC'))
+    .map(({ artistId: key }) => getMockProfile({ kind: 'artist', key }, presetRange('1d'), 'UTC'))
     .find((profile) => profile?.plays === 0);
   assert.ok(zeroPlaysArtist?.stats);
   assert.equal(zeroPlaysArtist.stats.longestStreakDays, 0);
@@ -703,8 +705,74 @@ test('getMockProfile fills streak dates for Track and Artist and Artist summary 
 });
 
 test("Recent plays list every Play in range without a row cap", () => {
-  const artist = getMockProfile({ kind: "artist", key: "4Z8W4fKeB5YxbusRsdQVPb" }, "all", "UTC");
+  const artist = getMockProfile({ kind: "artist", key: "4Z8W4fKeB5YxbusRsdQVPb" }, presetRange("all"), "UTC");
   assert.ok(artist);
   assert.ok(artist.plays > 20, "fixture artist must have more than 20 Plays");
   assert.equal(artist.recentPlays.length, artist.plays);
+});
+
+test('mock profile window filters out plays outside the window', () => {
+  const radioheadId = CATALOG.radiohead_weird_fishes.artistId;
+  const allProfile = getMockProfile({ kind: 'artist', key: radioheadId }, presetRange('all'), 'UTC');
+  assert.ok(allProfile);
+
+  const win = { kind: 'window' as const, from: '2026-09-01', to: '2026-09-05' };
+  const winProfile = getMockProfile({ kind: 'artist', key: radioheadId }, win, 'UTC');
+  assert.ok(winProfile);
+  assert.equal(winProfile.range, '2026-09-01..2026-09-05');
+  assert.ok(winProfile.plays < allProfile.plays, 'window plays must be a subset of all plays');
+
+  const fromMs = new Date('2026-09-01T00:00:00.000Z').getTime();
+  const toMs = new Date('2026-09-06T00:00:00.000Z').getTime();
+  for (const play of winProfile.recentPlays) {
+    const t = new Date(play.playedAt).getTime();
+    assert.ok(t >= fromMs && t < toMs, `play at ${play.playedAt} must be strictly inside window`);
+  }
+});
+
+test('getMockOverview for a window returns only buckets inside it', () => {
+  const win = { kind: 'window' as const, from: '2025-11-01', to: '2025-11-30' };
+  const overview = getMockOverview(win, 'UTC');
+  assert.equal(overview.range, '2025-11-01..2025-11-30');
+  assert.equal(overview.granularity, 'day');
+  assert.ok(overview.activityCadence.length > 0);
+
+  const fromMs = new Date('2025-11-01T00:00:00.000Z').getTime();
+  const toMs = new Date('2025-12-01T00:00:00.000Z').getTime();
+  for (const bucket of overview.activityCadence) {
+    const start = new Date(bucket.startTime).getTime();
+    const end = new Date(bucket.endTime).getTime();
+    assert.ok(start >= fromMs, `bucket start ${bucket.startTime} must be >= window from`);
+    assert.ok(end < toMs, `bucket end ${bucket.endTime} must be < window to`);
+  }
+});
+
+test('getMockOverview clips future multi-year window to now', () => {
+  const win = { kind: 'window' as const, from: '2025-01-01', to: '2030-12-31' };
+  const fixedNow = new Date('2026-11-22T12:00:00.000Z');
+  const overview = getMockOverview(win, 'UTC', fixedNow);
+  assert.equal(overview.range, '2025-01-01..2030-12-31');
+  assert.equal(overview.granularity, 'year');
+  const years = overview.activityCadence.map((b) => b.date);
+  assert.deepEqual(years, ['2025', '2026']);
+});
+
+test('getMockOverview returns empty activityCadence for wholly future window', () => {
+  const win = { kind: 'window' as const, from: '2027-01-01', to: '2027-12-31' };
+  const fixedNow = new Date('2026-11-22T12:00:00.000Z');
+  const overview = getMockOverview(win, 'UTC', fixedNow);
+  assert.deepEqual(overview.activityCadence, []);
+});
+
+test('getMockOverview produces deterministic older date counts without 1900 remapping', () => {
+  const win = { kind: 'window' as const, from: '0099-11-01', to: '0099-11-30' };
+  const overview = getMockOverview(win, 'UTC');
+  assert.equal(overview.activityCadence.length, 30);
+  assert.equal(overview.activityCadence[0].date, '01 Nov');
+  assert.equal(overview.activityCadence[29].date, '30 Nov');
+  for (const bucket of overview.activityCadence) {
+    assert.equal(typeof bucket.count, 'number');
+    assert.ok(bucket.count >= 0 && bucket.count < 40);
+  }
+  assert.ok(overview.activityCadence[1].count > 0, 'day 2 must have a deterministic count, not 0');
 });

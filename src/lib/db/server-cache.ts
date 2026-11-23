@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache";
 import type { OverviewData, StreamLogData, SessionData } from "./queries/types";
-import type { RangeKey } from "@/lib/types";
+import { formatRangeParam, type RangeSelection } from "@/lib/range";
 import { KeyedAsyncCache } from "@/lib/async-utils";
 import { sanitizeTimezone } from "./queries/helpers";
 
@@ -39,11 +39,15 @@ export function clearServerCache(): void {
 }
 
 export function getOrFetchOverview<T extends OverviewData = OverviewData>(
-  range: RangeKey,
+  sel: RangeSelection,
   timezone: string,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  return cacheStore.getOrFetch(JSON.stringify([cacheEpoch, "overview", range, timezoneIdentity(timezone)]), fetcher, () => cacheEpoch) as Promise<T>;
+  return cacheStore.getOrFetch(
+    JSON.stringify([cacheEpoch, "overview", formatRangeParam(sel), timezoneIdentity(timezone)]),
+    fetcher,
+    () => cacheEpoch
+  ) as Promise<T>;
 }
 
 export interface StreamLogPageIdentity {

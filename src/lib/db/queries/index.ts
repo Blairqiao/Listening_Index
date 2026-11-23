@@ -64,7 +64,7 @@ export {
 } from "./config";
 
 // Analytical Dashboard Queries (Modes 1, 2, 3)
-export { getOverviewData, OVERVIEW_INTERVAL_CONFIG } from "./overview";
+export { getOverviewData } from "./overview";
 export { getStreamLog, getLatestPlay, type LatestPlayRow } from "./stream-log";
 export { getCurrentSession } from "./session";
 

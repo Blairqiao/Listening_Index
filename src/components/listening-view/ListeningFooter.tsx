@@ -1,70 +1,17 @@
 "use client";
 
 import React from "react";
+import { SyncStatus, type SyncStatusProps } from "./SyncStatus";
 
-interface ListeningFooterProps {
-  isLive: boolean;
-  syncedAgo: string;
-  isSyncing?: boolean;
-  isAuthenticated?: boolean;
-  onTriggerSync?: () => void;
-}
+type ListeningFooterProps = Omit<SyncStatusProps, "compact">;
 
-export const ListeningFooter: React.FC<ListeningFooterProps> = ({
-  isLive,
-  syncedAgo,
-  isSyncing = false,
-  isAuthenticated = false,
-  onTriggerSync,
-}) => {
+/** System status line. The mini-player carries the same status while it shows. */
+export const ListeningFooter: React.FC<ListeningFooterProps> = (props) => {
   return (
     <footer className="h-10 sm:h-11 md:h-12 flex items-center justify-between border-t border-[#1C1C1A] bg-[#080808] select-none mt-4 md:mt-3">
       <div />
-
-      {/* System Telemetry Status (click "Synced X ago" to sync manually) */}
       <div className="flex items-center font-mono text-[12px]">
-        {isAuthenticated ? (
-          <button
-            type="button"
-            onClick={onTriggerSync}
-            disabled={isSyncing}
-            title="Click to trigger manual Spotify sync"
-            onMouseDown={(e) => e.preventDefault()}
-            className={`bg-transparent border-0 p-0 transition-none focus:outline-none focus-visible:outline-none hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
-              isSyncing
-                ? "text-music-accent cursor-wait"
-                : isLive
-                ? "text-music-accent cursor-pointer"
-                : "text-[#5A5A55] cursor-pointer"
-            }`}
-          >
-            {isSyncing ? (
-              <span className="">Syncing...</span>
-            ) : isLive ? (
-              <>
-                <span className="sm:hidden">▪ Live</span>
-                <span className="hidden sm:inline">▪ Live · synced {syncedAgo}</span>
-              </>
-            ) : (
-              <span className="">Synced {syncedAgo}</span>
-            )}
-          </button>
-        ) : (
-          <span
-            className={`shrink-0 whitespace-nowrap ${
-              isLive ? "text-music-accent" : "text-[#5A5A55]"
-            }`}
-          >
-            {isLive ? (
-              <>
-                <span className="sm:hidden">▪ Live</span>
-                <span className="hidden sm:inline">▪ Live · synced {syncedAgo}</span>
-              </>
-            ) : (
-              <span className="">Synced {syncedAgo}</span>
-            )}
-          </span>
-        )}
+        <SyncStatus {...props} />
       </div>
     </footer>
   );

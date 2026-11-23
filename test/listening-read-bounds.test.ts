@@ -10,6 +10,7 @@ import * as routeUtils from '../src/lib/route-utils';
 import * as asyncUtils from '../src/lib/async-utils';
 import { sanitizeTimezone } from '../src/lib/db/queries/helpers';
 import type { OverviewData, StreamLogData, SessionData } from '../src/lib/db/queries/types';
+import type { RangeSelection } from '../src/lib/range';
 import { KeyedAsyncCache } from '../src/lib/async-utils';
 import { clearServerCache, getOrFetchOverview, getOrFetchStreamLog, getOrFetchSession } from '../src/lib/db/server-cache';
 
@@ -69,7 +70,7 @@ test('Stream Log rejects malformed pagination before querying', async () => {
 test('listening cache separates effective timezone for every query and normalizes aliases', async () => {
   clearServerCache();
   for (const get of [
-    (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchOverview('1w', tz, fetcher),
+    (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchOverview({ kind: 'preset', key: '1w' }, tz, fetcher),
     (tz: string, fetcher: () => Promise<OverviewData & StreamLogData & SessionData & { marker: number }>) => getOrFetchStreamLog(50, tz, fetcher),
   ]) {
     let calls = 0;
@@ -87,6 +88,38 @@ test('listening cache separates effective timezone for every query and normalize
   assert.equal(((await getOrFetchSession(sessionFetcher)) as unknown as { marker: number }).marker, 1);
   assert.equal(((await getOrFetchSession(sessionFetcher)) as unknown as { marker: number }).marker, 1);
   assert.equal(sessionCalls, 1);
+});
+
+test('overview cache keys by range selection and reuses entries for repeating windows', async () => {
+  clearServerCache();
+  const winA: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-30' };
+  const winB: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-15' };
+  const preset1w: RangeSelection = { kind: 'preset', key: '1w' };
+  const preset1m: RangeSelection = { kind: 'preset', key: '1m' };
+
+  let calls = 0;
+  const fetcher = async () => ({ marker: ++calls } as unknown as OverviewData);
+
+  // Repeating winA reuses entry
+  const resA1 = await getOrFetchOverview(winA, 'UTC', fetcher);
+  assert.equal((resA1 as unknown as { marker: number }).marker, 1);
+  const resA2 = await getOrFetchOverview(winA, 'UTC', fetcher);
+  assert.equal((resA2 as unknown as { marker: number }).marker, 1);
+  assert.equal(calls, 1);
+
+  // Different fixed window has distinct entry
+  const resB = await getOrFetchOverview(winB, 'UTC', fetcher);
+  assert.equal((resB as unknown as { marker: number }).marker, 2);
+  assert.equal(calls, 2);
+
+  // Presets have distinct entries from windows and from each other
+  const res1w = await getOrFetchOverview(preset1w, 'UTC', fetcher);
+  assert.equal((res1w as unknown as { marker: number }).marker, 3);
+  assert.equal(calls, 3);
+
+  const res1m = await getOrFetchOverview(preset1m, 'UTC', fetcher);
+  assert.equal((res1m as unknown as { marker: number }).marker, 4);
+  assert.equal(calls, 4);
 });
 
 test('completed cache evicts LRU at 128 entries and removes expired entries', () => {
@@ -130,11 +163,11 @@ test('demo cursor IDs remain usable without accepting them as database cursors',
 test('cache invalidation starts fresh work and ignores stale completion', async () => {
   clearServerCache();
   let resolve!: (value: OverviewData) => void;
-  const pending = getOrFetchOverview('1d', 'UTC', () => new Promise<OverviewData>(r => { resolve = r; }));
+  const pending = getOrFetchOverview({ kind: 'preset', key: '1d' }, 'UTC', () => new Promise<OverviewData>(r => { resolve = r; }));
   await Promise.resolve();
   clearServerCache();
   let freshCalls = 0;
-  const fresh = getOrFetchOverview('1d', 'UTC', async () => { freshCalls++; return { marker: 'fresh' } as unknown as OverviewData; });
+  const fresh = getOrFetchOverview({ kind: 'preset', key: '1d' }, 'UTC', async () => { freshCalls++; return { marker: 'fresh' } as unknown as OverviewData; });
   resolve({ marker: 'stale' } as unknown as OverviewData);
   await pending;
   assert.equal(freshCalls, 1);

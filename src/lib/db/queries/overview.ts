@@ -8,42 +8,48 @@ import {
 } from "./helpers";
 import { getSwatchColor } from "@/lib/color-utils";
 import { formatOverviewMetrics } from "@/lib/format-utils";
-import { buildCadenceQuery, buildActivityCadence } from "./cadence";
-import type { OverviewData, RangeKey } from "./types";
+import {
+  elapsedWindowDays,
+  formatRangeParam,
+  previousWindow,
+  type RangeSelection,
+} from "@/lib/range";
+import {
+  buildCadenceQuery,
+  buildActivityCadence,
+  cadenceRowGranularity,
+  type CadenceRow,
+} from "./cadence";
+import { buildTimeFilter, resolveServerRange } from "./range-filter";
+import type { OverviewData } from "./types";
 import type {
   TrackSummary,
   ArtistSummary,
   AlbumSummary,
 } from "@/lib/types";
 
-export const OVERVIEW_INTERVAL_CONFIG: Record<
-  Exclude<RangeKey, "all">,
-  { cur: string; prev: string; elapsedDays: number }
-> = {
-  "1d": { cur: "24 hours", prev: "48 hours", elapsedDays: 1 },
-  "1w": { cur: "7 days", prev: "14 days", elapsedDays: 7 },
-  "1m": { cur: "30 days", prev: "60 days", elapsedDays: 30 },
-  "6m": { cur: "180 days", prev: "360 days", elapsedDays: 180 },
-  "1y": { cur: "365 days", prev: "730 days", elapsedDays: 365 },
-};
+
 
 /**
- * Mode 1: Computes Overview statistics and rankings for a given range.
- * Executes all component queries concurrently via Promise.all for sub-150ms responses.
+ * Computes Overview statistics and rankings for a preset or fixed date window.
+ * Runs component queries concurrently via Promise.all.
  */
-export async function getOverviewData(range: RangeKey, tzOverride?: string): Promise<OverviewData> {
+export async function getOverviewData(sel: RangeSelection, tzOverride?: string): Promise<OverviewData> {
   const sql = getDb();
   const tz = sanitizeTimezone(tzOverride);
+  const now = new Date();
+  const { window, granularity, logStart } = await resolveServerRange(sel, tz, now);
   const isEnrichedPromise = isCatalogFullyEnriched();
-  const isAll = range === "all";
-  const timeFilter = isAll
-    ? sql`TRUE`
-    : sql`p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval`;
+  const isAll = sel.kind === "preset" && sel.key === "all";
+  const timeFilter = buildTimeFilter(sel, window);
+  const prev = isAll ? null : previousWindow(window);
 
-  // 1. Min Date (Log Start Date)
-  const minDatePromise = sql`
-    SELECT MIN(played_at) AS log_start_date FROM plays;
-  `;
+  // 1. Min Date (Log Start Date); reuse resolveServerRange result for the all preset
+  const minDatePromise = isAll
+    ? Promise.resolve([{ log_start_date: logStart }])
+    : sql`
+        SELECT MIN(played_at) AS log_start_date FROM plays;
+      `;
 
   // 2. Metrics Ribbon
   const metricPromise = isEnrichedPromise.then((isEnriched) => {
@@ -97,15 +103,15 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
             SELECT p.track_id, COUNT(*) AS plays,
                    DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
             FROM plays p
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
+            WHERE ${timeFilter}
             GROUP BY p.track_id
         ),
         previous_window AS (
             SELECT p.track_id,
                    DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS prev_rank
             FROM plays p
-            WHERE p.played_at >= NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].prev})::interval
-              AND p.played_at < NOW() - (${OVERVIEW_INTERVAL_CONFIG[range].cur})::interval
+            WHERE p.played_at >= ${prev!.from}::timestamptz
+              AND p.played_at < ${prev!.to}::timestamptz
             GROUP BY p.track_id
         )
         SELECT 
@@ -181,7 +187,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   });
 
   // 6. Activity cadence query
-  const cadenceQueryPromise = buildCadenceQuery(range, tz);
+  const cadenceQueryPromise = buildCadenceQuery(window, cadenceRowGranularity(granularity), tz);
 
   // 7. Last sync
   const lastSyncPromise = getLastSync();
@@ -214,13 +220,13 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
   let elapsedDays: number;
   if (isAll) {
     if (metricRow?.window_min_date) {
-      const ms = Date.now() - new Date(metricRow.window_min_date).getTime();
+      const ms = now.getTime() - new Date(metricRow.window_min_date).getTime();
       elapsedDays = Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
     } else {
       elapsedDays = 1;
     }
   } else {
-    elapsedDays = OVERVIEW_INTERVAL_CONFIG[range].elapsedDays;
+    elapsedDays = elapsedWindowDays(window, now);
   }
 
   const totalMs = Number(metricRow?.total_ms || 0);
@@ -234,7 +240,7 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
     elapsedDays,
   };
 
-  const metrics = formatOverviewMetrics(rawMetrics, "minutes", range);
+  const metrics = formatOverviewMetrics(rawMetrics, "minutes", granularity);
 
   // Process top tracks
   const topTracks: TrackSummary[] = rawTopTracks.map((row) => ({
@@ -277,13 +283,16 @@ export async function getOverviewData(range: RangeKey, tzOverride?: string): Pro
 
   // Process activity cadence
   const { activityCadence } = buildActivityCadence({
-    range,
+    window,
+    granularity,
     tz,
-    cadenceRows,
-    minDateRow,
+    now,
+    cadenceRows: cadenceRows as CadenceRow[],
   });
 
   return {
+    range: formatRangeParam(sel),
+    granularity,
     logStartDate,
     rawMetrics,
     metrics,

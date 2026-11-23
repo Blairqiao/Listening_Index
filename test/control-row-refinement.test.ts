@@ -6,6 +6,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
 import { formatStreamLogDateSpan } from "../src/lib/format-utils";
+import { presetRange } from "../src/lib/range";
 import type { ProfileHistoryEntry } from "../src/lib/search-types";
 
 test("formatStreamLogDateSpan formats date ranges correctly", () => {
@@ -51,23 +52,18 @@ test("ControlRow component supports dynamic scope labels for Stream Log, Session
     "ControlRow must accept activeDevice or deviceName prop for Mode 3"
   );
 
-  // Mode 3 layout button hidden on mobile (< md)
-  assert.ok(
-    content.includes("hidden md:flex"),
-    "ControlRow must hide layout controls on mobile viewports"
-  );
 });
 
 test("ControlRow shows the Album profile label and the profile back destination", () => {
   const props = {
-    mode: 4,
-    range: "1y",
+    mode: 4 as const,
+    range: presetRange("1y"),
     onSelectRange: () => {},
     logStartDate: "",
     isSessionOpen: false,
     sessionTagTime: "",
-    profileKind: "album",
-  } as const;
+    profileKind: "album" as const,
+  };
   assert.match(renderToStaticMarkup(React.createElement(ControlRow, props)), />Album profile</);
 
   for (const [returnsTo, label] of [["album", "album"], ["artist", "artist"], [null, "search"]] as const) {
@@ -100,8 +96,8 @@ test("LivePlayerView houses context selector inside playback controls without re
 
 test("ControlRow renders breadcrumb trail for multi-hop profile history with truncation and jump handlers", () => {
   const history: ProfileHistoryEntry[] = [
-    { target: { kind: "artist", key: "radiohead" }, range: "1y", name: "Radiohead" },
-    { target: { kind: "album", key: "in-rainbows" }, range: "1y", name: "In Rainbows" },
+    { target: { kind: "artist", key: "radiohead" }, range: presetRange("1y"), name: "Radiohead" },
+    { target: { kind: "album", key: "in-rainbows" }, range: presetRange("1y"), name: "In Rainbows" },
   ];
 
   let jumpedIndex: number | null = null;
@@ -109,7 +105,7 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
 
   const props = {
     mode: 4 as const,
-    range: "1y" as const,
+    range: presetRange("1y"),
     onSelectRange: () => {},
     logStartDate: "",
     isSessionOpen: false,
@@ -192,14 +188,14 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
 
 test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () => {
   const history: ProfileHistoryEntry[] = [
-    { target: { kind: "artist", key: "artist-1" }, range: "1y", name: "First Artist" },
-    { target: { kind: "album", key: "album-1" }, range: "1y", name: "Middle Album" },
-    { target: { kind: "track", key: "track-1" }, range: "1y", name: "Parent Track" },
+    { target: { kind: "artist", key: "artist-1" }, range: presetRange("1y"), name: "First Artist" },
+    { target: { kind: "album", key: "album-1" }, range: presetRange("1y"), name: "Middle Album" },
+    { target: { kind: "track", key: "track-1" }, range: presetRange("1y"), name: "Parent Track" },
   ];
 
   const markup = renderToStaticMarkup(React.createElement(ControlRow, {
     mode: 4,
-    range: "1y",
+    range: presetRange("1y"),
     onSelectRange: () => {},
     logStartDate: "",
     isSessionOpen: false,
@@ -216,4 +212,47 @@ test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () 
   assert.ok(!markup.includes("First Artist"), "First ancestor beyond last 2 should be collapsed");
   assert.ok(markup.includes("Middle Album"), "Second ancestor should be visible");
   assert.ok(markup.includes("Parent Track"), "Direct parent should be visible");
+});
+
+test("ControlRow renders non-interactive window chip and highlights no preset when range is a window", () => {
+  const props = {
+    mode: 0 as const,
+    range: { kind: "window" as const, from: "2026-11-01", to: "2026-11-30" },
+    rangeLabel: "Nov 2026",
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+
+  // Renders non-interactive chip with rangeLabel
+  assert.ok(markup.includes("Nov 2026"), "Must render rangeLabel text");
+  assert.ok(
+    markup.includes("<span") && markup.includes("col-span-6") && markup.includes("Nov 2026"),
+    "Chip must be a span with col-span-6 on mobile and active-button styling"
+  );
+
+  // No preset is highlighted while a window is active
+  const buttonMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>/g);
+  assert.equal(buttonMatches, null, "No preset button must be highlighted when range is a window");
+});
+
+test("ControlRow renders no chip when range is a preset", () => {
+  const props = {
+    mode: 0 as const,
+    range: presetRange("1w"),
+    rangeLabel: null,
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+
+  assert.ok(!markup.includes("col-span-6"), "Must not render window chip when range is a preset");
+  const activePresetMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>1w<\/button>/g);
+  assert.ok(activePresetMatches?.length === 1, "Must highlight the active preset 1w");
 });

@@ -6,11 +6,12 @@ import {
   patchSessionWithEnrichment,
 } from "../src/lib/enrichment-patch";
 import type { OverviewData, StreamLogData, SessionData } from "../src/lib/db/queries/types";
-import type { RangeKey } from "../src/lib/types";
 
 test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without mutating unchanged items", () => {
-  const initialCache: Partial<Record<RangeKey, OverviewData>> = {
+  const initialCache: Record<string, OverviewData> = {
     "1d": {
+      range: "1d",
+      granularity: "hour",
       logStartDate: "2026-10-01",
       rawMetrics: { totalMs: 1000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
       metrics: ["16m", "1", "1", "16m"],
@@ -45,6 +46,8 @@ test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without
       activityCadence: [],
     },
     "1w": {
+      range: "1w",
+      granularity: "block6h",
       logStartDate: "2026-09-24",
       rawMetrics: { totalMs: 5000, trackCount: 2, artistCount: 2, elapsedDays: 7 },
       metrics: ["1h", "2", "2", "10m"],
@@ -92,8 +95,10 @@ test("patchOverviewCacheWithEnrichment - patches topTracks across ranges without
 });
 
 test("patchOverviewCacheWithEnrichment - returns unchanged cache reference if no matching tracks", () => {
-  const initialCache: Partial<Record<RangeKey, OverviewData>> = {
+  const initialCache: Record<string, OverviewData> = {
     "1d": {
+      range: "1d",
+      granularity: "hour",
       logStartDate: "2026-10-01",
       rawMetrics: { totalMs: 1000, trackCount: 1, artistCount: 1, elapsedDays: 1 },
       metrics: ["16m", "1", "1", "16m"],
@@ -130,6 +135,54 @@ test("patchOverviewCacheWithEnrichment - returns unchanged cache reference if no
 
   assert.equal(changed, false);
   assert.equal(updatedCache, initialCache);
+});
+
+test("patchOverviewCacheWithEnrichment - patches a cache containing a window range key", () => {
+  const windowKey = "2025-11-01..2025-11-30";
+  const initialCache: Record<string, OverviewData> = {
+    [windowKey]: {
+      range: windowKey,
+      granularity: "day",
+      logStartDate: "2025-01-01",
+      rawMetrics: { totalMs: 3600000, trackCount: 1, artistCount: 1, elapsedDays: 30 },
+      metrics: ["1h", "1", "1", "2m"],
+      topTracks: [
+        {
+          id: "track-win",
+          rank: "01",
+          drift: "·",
+          name: "Window Track",
+          artist: "Window Artist",
+          album: "Window Album",
+          duration: "4:00",
+          plays: 9,
+          swatchColor: "#444444",
+          albumImageUrl: null,
+        },
+      ],
+      topArtists: [],
+      topAlbums: [],
+      activityCadence: [],
+    },
+  };
+
+  const enrichmentMap = new Map([
+    [
+      "track-win",
+      {
+        albumImageUrl: "https://example.com/win.jpg",
+        artistId: "artist-win",
+        albumId: "album-win",
+      },
+    ],
+  ]);
+
+  const { updatedCache, changed } = patchOverviewCacheWithEnrichment(initialCache, enrichmentMap);
+
+  assert.equal(changed, true);
+  assert.equal(updatedCache[windowKey]?.topTracks[0].albumImageUrl, "https://example.com/win.jpg");
+  assert.equal(updatedCache[windowKey]?.topTracks[0].artistId, "artist-win");
+  assert.equal(updatedCache[windowKey]?.topTracks[0].albumId, "album-win");
 });
 
 test("patchStreamLogWithEnrichment - patches entries and marks delisted items", () => {

@@ -7,6 +7,8 @@
   --font-mono: var(--font-spline-sans-mono), "Spline Sans Mono", "PingFang SC", "Noto Sans SC", monospace;
 
   --color-music-accent: var(--music-accent);
+  /* Lighter accent for hovered highlighted bars, as grey bars lighten on hover. */
+  --color-music-accent-hover: color-mix(in srgb, var(--music-accent) 65%, white);
 }
 
 :root {

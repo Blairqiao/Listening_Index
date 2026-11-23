@@ -1,4 +1,5 @@
-import type { ActivityBucket, RangeKey } from "@/lib/types";
+import type { ActivityBucket } from "@/lib/types";
+import type { CadenceGranularity, RangeSelection } from "@/lib/range";
 
 export const SEARCH_RESULT_LIMIT = 8;
 export const SEARCH_TRACK_ROWS = SEARCH_RESULT_LIMIT;
@@ -24,7 +25,7 @@ export type SearchSort = (typeof SEARCH_SORT_OPTIONS)[number]["value"];
 export const DEFAULT_SEARCH_SORT: SearchSort = "most-plays";
 
 export const SEARCH_MAX_CHARS = 100;
-export const DEFAULT_PROFILE_RANGE: RangeKey = "all";
+export const DEFAULT_PROFILE_RANGE: RangeSelection = { kind: "preset", key: "all" };
 export const PROFILE_ALBUM_TRACKS_LIMIT = 10;
 export const PROFILE_ALBUM_PROFILE_TRACKS_LIMIT = 50;
 export const PROFILE_TOP_TRACKS_LIMIT = 10;
@@ -111,7 +112,7 @@ export interface ProfileSummaryStats {
 
 export interface ProfileHistoryEntry {
   target: ProfileTarget;
-  range: RangeKey;
+  range: RangeSelection;
   name?: string;
 }
 
@@ -149,7 +150,8 @@ export interface ProfileData {
   artistName: string | null;   // The Artist on a Track or Album profile. Null for Artist profiles.
   albumName: string | null;    // Track profiles only
   imageUrl: string | null;
-  range: RangeKey;
+  range: string;
+  granularity: CadenceGranularity;
   firstPlayedAt: string | null; // lifetime, ISO
   lastPlayedAt: string | null;  // lifetime, ISO
   plays: number;               // in range

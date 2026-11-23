@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { formatRangeParam, presetRange, type RangeSelection } from '../src/lib/range';
+import { pruneOverviewCacheWindows } from '../src/components/listening-view/listening-helpers';
 
 function callback(file: string, name: string, scope: Record<string, unknown>) {
   const source = readFileSync(file, 'utf8');
@@ -14,20 +16,22 @@ function callback(file: string, name: string, scope: Record<string, unknown>) {
 }
 
 test('background response is stored only under the range captured before its request', async () => {
-  const activeRangeRef = { current: '1w' };
+  const activeRangeRef = { current: presetRange('1w') };
   let resolve!: (value: object) => void;
   const pending = new Promise<object>(r => { resolve = r; });
   const writes: Record<string, unknown>[] = [];
   const refetch = callback('src/components/listening-view/useListeningSync.ts', 'refetchActiveData', {
     activeRangeRef,
-    overviewRefreshOrder: (active: string) => [active],
+    requestGenerationRef: { current: 0 },
+    overviewRefreshOrder: (active: RangeSelection) => [active],
+    pruneOverviewCacheWindows,
     fetchOverview: () => pending,
     fetchStreamLog: async () => undefined,
     fetchSession: async () => undefined,
-    setOverviewCache: (update: (prev: object) => Record<string, unknown>) => writes.push(update({})),
+    setOverviewCache: (update: (prev: Record<string, never>) => Record<string, unknown>) => writes.push(update({})),
   });
   const work = refetch();
-  activeRangeRef.current = '1m';
+  activeRangeRef.current = presetRange('1m');
   resolve({ marker: 'weekly' });
   await work;
   assert.ok(writes.every(write => !('1m' in write)), 'weekly response must never populate monthly range');
@@ -40,13 +44,15 @@ test('a response from a previous timezone generation cannot update current cache
   const requestGenerationRef = { current: 0 };
   const writes: unknown[] = [];
   const fetchOverview = callback('src/components/listening-view/useListeningData.ts', 'fetchOverview', {
+    formatRangeParam,
     fetch: () => pending, tzRef, requestGenerationRef,
-    activeRangeRef: { current: '1w' },
+    overviewFetchSeqRef: { current: new Map<string, number>() },
+    activeRangeRef: { current: presetRange('1w') },
     enrichmentOverlayRef: { current: new Map() }, delistedSetRef: { current: new Set() },
     setOverviewCache: (update: (prev: object) => object) => writes.push(update({})),
-    setDisplayedRange: () => {}, setLastSyncedAt: () => {},
+    setDisplayedRange: () => {}, setIsRangeLoading: () => {}, setLastSyncedAt: () => {},
   });
-  const work = fetchOverview('1w');
+  const work = fetchOverview(presetRange('1w'));
   tzRef.current = 'America/Chicago';
   requestGenerationRef.current++;
   resolve(Response.json({ metrics: ['1', '2', '3', '4'] }));

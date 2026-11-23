@@ -14,6 +14,7 @@ const mockArtistProfile: ProfileData = {
   albumName: null,
   imageUrl: "https://example.com/radiohead.jpg",
   range: "1m",
+  granularity: "day",
   firstPlayedAt: "2024-01-15T12:00:00.000Z",
   lastPlayedAt: "2024-11-18T18:30:00.000Z",
   plays: 50,
@@ -91,6 +92,7 @@ const mockTrackProfile: ProfileData = {
   albumName: "In Rainbows",
   imageUrl: "https://example.com/in-rainbows.jpg",
   range: "1m",
+  granularity: "day",
   firstPlayedAt: "2024-01-15T12:00:00.000Z",
   lastPlayedAt: "2024-11-18T18:30:00.000Z",
   plays: 25,
@@ -499,7 +501,8 @@ test("ProfileView: SSR error and not_found states", () => {
 test("ActivityChart: default label is ACTIVITY and accessible semantics preserved", () => {
   const defaultMarkup = renderToStaticMarkup(
     React.createElement(ActivityChart, {
-      range: "1d",
+      granularity: "hour",
+      rangeKey: "1d",
       activityCadence: [
         {
           startTime: "2024-11-18T10:00:00.000Z",
@@ -520,6 +523,46 @@ test("ActivityChart: default label is ACTIVITY and accessible semantics preserve
   );
   assert.ok(defaultMarkup.includes("-24h"), "1d range must render -24h marker");
   assert.ok(defaultMarkup.includes("Now"), "1d range must render Now marker");
+});
+
+test("ActivityChart: window payload uses rangeLabel and bucket dates without relative ticks", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ActivityChart, {
+      granularity: "hour",
+      rangeLabel: "Nov 3, 2025",
+      activityCadence: [
+        {
+          startTime: "2025-11-03T00:00:00.000Z",
+          endTime: "2025-11-03T00:59:59.999Z",
+          count: 2,
+          date: "00:00",
+        },
+        {
+          startTime: "2025-11-03T12:00:00.000Z",
+          endTime: "2025-11-03T12:59:59.999Z",
+          count: 5,
+          date: "12:00",
+        },
+        {
+          startTime: "2025-11-03T23:00:00.000Z",
+          endTime: "2025-11-03T23:59:59.999Z",
+          count: 1,
+          date: "23:00",
+        },
+      ],
+      isLoading: false,
+    })
+  );
+
+  assert.ok(markup.includes(">Activity / Nov 3, 2025<"), "Heading must include rangeLabel");
+  assert.ok(markup.includes("<span>00:00</span>"), "Window axis must include start date span");
+  assert.ok(markup.includes("<span>12:00</span>"), "Window axis must include middle date span");
+  assert.ok(markup.includes("<span>23:00</span>"), "Window axis must include end date span");
+  assert.ok(markup.includes("00:00"), "Window axis must include start date");
+  assert.ok(markup.includes("12:00"), "Window axis must include middle date");
+  assert.ok(markup.includes("23:00"), "Window axis must include end date");
+  assert.ok(!markup.includes("-24h"), "Window axis must not include relative ticks");
+  assert.ok(!markup.includes("Now"), "Window axis must not include Now");
 });
 
 test("ProfileView always renders From this album for a single ranked Track with placeholder rows", () => {

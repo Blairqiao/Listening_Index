@@ -59,7 +59,8 @@ function collect(node: unknown, out: VNode[] = []): VNode[] {
 
 function render(onOpenProfile: (target: ProfileTarget) => void) {
   const props = {
-    range: "all" as const,
+    granularity: "year" as const,
+    rangeKey: "all" as const,
     topTracks: tracks,
     topArtists: artists,
     topAlbums: albums,
