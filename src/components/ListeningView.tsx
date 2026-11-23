@@ -13,6 +13,8 @@ import { SessionView } from "@/components/views/session-view/SessionView";
 import { SearchView } from "@/components/views/search-view/SearchView";
 import { ProfileView } from "@/components/views/search-view/ProfileView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
+import { MiniPlayerBar } from "@/components/listening-view/MiniPlayerBar";
+import { shouldShowMiniPlayer, miniPlayerProgress } from "@/components/listening-view/mini-player";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
@@ -136,6 +138,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     activeDevice,
     playerStatus,
     handleTransferPlayback,
+    isPlaying,
+    position,
+    duration,
+    handleTogglePlay,
+    handlePrevious,
+    handleNext,
   } = usePlayer();
 
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only), 4 = Search
@@ -728,6 +736,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const isViewDimmed =
     isSyncing || (activeMode === 0 && isRangeLoading) || isProfileRangeLoading;
 
+  const showMiniPlayer = shouldShowMiniPlayer({
+    isAuthenticated,
+    activeMode,
+    hasTrack: Boolean(currentTrack),
+  });
+
   return (
     <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
       {/* Black veil holding the screen as long as needed until real data is ready */}
@@ -736,7 +750,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-300 ease-in-out ${isDataReady ? "opacity-0" : "opacity-100"
           }`}
       />
-      <main className="max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] flex flex-col justify-between ">
+      <main
+        className={`max-w-[1240px] w-full mx-auto px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 min-h-[100dvh] flex flex-col justify-between ${
+          showMiniPlayer ? "pb-[72px] sm:pb-[76px] md:pb-[76px]" : ""
+        }`}
+      >
         <div className="flex-1">
           {/* 1. Header Row */}
           <ListeningHeader syncError={syncError} />
@@ -947,6 +965,24 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           onTriggerSync={handleSyncWithCacheClear}
         />
       </main>
+
+      {showMiniPlayer && currentTrack && (
+        <MiniPlayerBar
+          track={{
+            name: currentTrack.name,
+            artist: currentTrack.artists.map((a) => a.name).join(", "),
+            imageUrl: currentTrack.album.images?.[0]?.url ?? null,
+            id: currentTrack.id,
+          }}
+          isPlaying={isPlaying}
+          progress={miniPlayerProgress(position, duration)}
+          controlsDisabled={playerStatus !== "ready"}
+          onTogglePlay={() => void handleTogglePlay()}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          onOpenPlayer={() => handleSelectMode(3)}
+        />
+      )}
 
       {/* 7. In-App Customization Settings Modal */}
       <CustomizationModal />
