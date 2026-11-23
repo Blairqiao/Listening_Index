@@ -869,6 +869,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 latestPlay={latestPlay}
                 sourceMode={sourceMode}
                 onToggleSourceMode={handleToggleSourceMode}
+                onOpenProfile={(target) => {
+                  shouldPushHistoryRef.current = true;
+                  setActiveMode(4);
+                  handleOpenProfile(target);
+                  window.scrollTo(0, 0);
+                }}
               />
             )}
 

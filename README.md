@@ -36,7 +36,7 @@ Search Tracks, Artists, and Albums with entity type filters, play-count and rece
 
 ### Live player
 
-Controls Spotify playback with a 32-band frequency visualizer above the player deck, and device switching. Shows total plays and archive rank for the current track and artist.
+Controls Spotify playback with a 32-band frequency visualizer above the player deck, and device switching. The Track, Artist, and Album names on the deck open their profiles. Shows total plays and archive rank for the current track and artist.
 
 Unlocked with `ADMIN_PASSWORD` via the dedicated admin login modal. Public visitors see Overview, Stream Log, Sessions, and Search; Live Player requires admin login.
 

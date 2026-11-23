@@ -4,12 +4,18 @@ import React, { useCallback, useState } from "react";
 import { useConfig } from "@/context/ConfigContext";
 import { usePlayer } from "@/context/PlayerContext";
 import { formatDurationMs } from "@/lib/format-utils";
+import type { ProfileTarget } from "@/lib/search-types";
 import { SpectrumCanvas, gradientStops } from "./SpectrumCanvas";
+import { PlayerTrackMeta } from "./PlayerTrackMeta";
+import { resolvePlayerProfileLinks } from "./player-profile-links";
 
 export { gradientStops };
 
 export interface LivePlayerProps {
   latestPlay?: {
+    trackId?: string;
+    artistId?: string;
+    albumId?: string;
     title: string;
     artist: string;
     album: string;
@@ -26,6 +32,7 @@ export interface LivePlayerProps {
   };
   sourceMode?: "synthetic" | "live";
   onToggleSourceMode?: () => void;
+  onOpenProfile?: (target: ProfileTarget) => void;
 }
 
 import { DEFAULT_FALLBACK_TRACK } from "@/lib/fallback-track";
@@ -111,6 +118,7 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
   initialTrack,
   sourceMode: externalSourceMode,
   onToggleSourceMode,
+  onOpenProfile,
 }) => {
   const config = useConfig().config;
   const {
@@ -152,6 +160,11 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
     initialTrack,
   });
 
+  const resolvedLinks = resolvePlayerProfileLinks({ currentTrack, latestPlay });
+  const profileLinks = resolvedLinks.artists.length
+    ? resolvedLinks
+    : { ...resolvedLinks, artists: [{ name: displayTrack.artist, target: null }] };
+
   const repeatLabel =
     repeatMode === 2 ? "Repeat 1" : repeatMode === 1 ? "Repeat All" : "Repeat Off";
 
@@ -179,15 +192,12 @@ export const LivePlayerView: React.FC<LivePlayerProps> = ({
               {isPlaying ? "Now streaming" : isLinked ? "Paused" : "Offline"}
             </span>
           </div>
-          <div className="text-[16px] sm:text-[18px] text-[#EDEDE8] truncate font-bold mt-0.5">
-            {displayTrack.name}
-          </div>
-          <div className="text-[13px] text-[#8A8A82] truncate mt-0.5">
-            {displayTrack.artist}
-          </div>
-          <div className="text-[12px] text-[#5A5A55] truncate mt-0.5">
-            {displayTrack.album}
-          </div>
+          <PlayerTrackMeta
+            name={displayTrack.name}
+            album={displayTrack.album}
+            links={profileLinks}
+            onOpenProfile={onOpenProfile}
+          />
         </div>
       </div>
 
