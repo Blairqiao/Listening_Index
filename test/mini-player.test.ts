@@ -133,3 +133,45 @@ test("MiniPlayerBar renders without context, shows Play/Pause based on isPlaying
 
   assert.equal(markupDisabled.match(/ disabled=""/g)?.length, 3, "All three transport buttons must be disabled");
 });
+
+const mergedProps = {
+  track: { name: "Anytime Anywhere", artist: "milet", imageUrl: null, id: "t1" },
+  isPlaying: true,
+  progress: 0.5,
+  controlsDisabled: false,
+  onTogglePlay: () => {},
+  onPrevious: () => {},
+  onNext: () => {},
+  onOpenPlayer: () => {},
+  sync: { isLive: true, syncedAgo: "3m ago", isSyncing: false, isAuthenticated: true, onTriggerSync: () => {} },
+};
+
+test("the merged bar centers the transport in a three-column grid from sm up", () => {
+  const html = renderToStaticMarkup(React.createElement(MiniPlayerBar, mergedProps));
+  assert.match(html, /sm:grid-cols-\[1fr_auto_1fr\]/);
+});
+
+test("the merged bar carries the footer's sync status: full on the right, short in the artist line on phones", () => {
+  const html = renderToStaticMarkup(React.createElement(MiniPlayerBar, mergedProps));
+  assert.match(html, /hidden sm:flex[^"]*justify-end/, "desktop status zone must hide on phones and align right");
+  assert.ok(html.includes("▪ Live · synced 3m ago"), "desktop status shows the full label");
+  const syncButtons = html.match(/title="Click to trigger manual Spotify sync"/g) ?? [];
+  assert.equal(syncButtons.length, 2, "one sync control per breakpoint");
+  assert.match(html, /sm:hidden[^>]*>[\s\S]*?▪ Live</, "phone status shows the short label");
+});
+
+test("the merged bar keeps the transport enabled while a sync runs", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(MiniPlayerBar, { ...mergedProps, sync: { ...mergedProps.sync, isSyncing: true } })
+  );
+  assert.ok(html.includes("Syncing..."));
+  assert.equal(html.match(/aria-label="(Previous|Pause|Next)"[^>]*disabled=""/g), null);
+});
+
+test("ListeningView drops the footer while the mini-player shows", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const source = fs.readFileSync(path.resolve(__dirname, "../src/components/ListeningView.tsx"), "utf-8");
+  assert.match(source, /!showMiniPlayer && \(\s*<ListeningFooter/);
+  assert.match(source, /<MiniPlayerBar[\s\S]*?sync=\{/);
+});

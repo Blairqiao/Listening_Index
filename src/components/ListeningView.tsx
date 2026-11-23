@@ -955,13 +955,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         </div>
 
         {/* 6. Footer (System status only, fixed to bottom) */}
-        <ListeningFooter
-          isLive={isSystemLive}
-          syncedAgo={syncedAgoStr}
-          isSyncing={isSyncing}
-          isAuthenticated={isAuthenticated}
-          onTriggerSync={handleSyncWithCacheClear}
-        />
+        {!showMiniPlayer && (
+          <ListeningFooter
+            isLive={isSystemLive}
+            syncedAgo={syncedAgoStr}
+            isSyncing={isSyncing}
+            isAuthenticated={isAuthenticated}
+            onTriggerSync={handleSyncWithCacheClear}
+          />
+        )}
       </main>
 
       {showMiniPlayer && currentTrack && (
@@ -979,6 +981,13 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           onPrevious={handlePrevious}
           onNext={handleNext}
           onOpenPlayer={() => handleSelectMode(3)}
+          sync={{
+            isLive: isSystemLive,
+            syncedAgo: syncedAgoStr,
+            isSyncing,
+            isAuthenticated,
+            onTriggerSync: handleSyncWithCacheClear,
+          }}
         />
       )}
 

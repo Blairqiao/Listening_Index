@@ -128,7 +128,7 @@ test("getSpotifyTabState gates ModeTabs trigger strictly behind isAuthenticated 
 test("ListeningFooter maintains clean system telemetry without prompt notification buttons", () => {
   const root = path.resolve(__dirname, "..");
   const footerSource = fs.readFileSync(
-    path.join(root, "src/components/listening-view/ListeningFooter.tsx"),
+    path.join(root, "src/components/listening-view/SyncStatus.tsx"),
     "utf-8"
   );
 
