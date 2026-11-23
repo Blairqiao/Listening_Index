@@ -28,9 +28,6 @@ interface ControlRowProps {
   profileHistory?: ProfileHistoryEntry[];
   onJumpToHistory?: (index: number) => void;
   onReturnToSearch?: () => void;
-  // Mode 3: Live Player page-level controls
-  layout?: "split" | "stacked";
-  onToggleLayout?: () => void;
   isAuthenticated?: boolean;
   activeDevice?: { name?: string; isThisBrowser?: boolean } | null;
   playerStatus?: "idle" | "checking" | "unlinked" | "connecting" | "ready" | "error";
@@ -70,8 +67,6 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   profileHistory,
   onJumpToHistory,
   onReturnToSearch,
-  layout = "split",
-  onToggleLayout,
   isAuthenticated = false,
   activeDevice,
   playerStatus,
@@ -257,19 +252,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         );
       }
       case 3:
-        return (
-          <div className="hidden md:flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={onToggleLayout}
-              aria-label="Toggle player layout between split and stacked"
-              className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-none"
-              title="Toggle between Split Console and Stacked Stage"
-            >
-              <span>{layout === "stacked" ? "Layout: stacked" : "Layout: split"}</span>
-            </button>
-          </div>
-        );
+        return null;
       case 4:
         return profileKind ? renderRangeButtons() : null;
     }

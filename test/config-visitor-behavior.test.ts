@@ -64,12 +64,12 @@ function configHarness(initial = configUtils.DEFAULT_SITE_CONFIG, stored?: objec
 }
 
 test('legacy visitor preference retains only accent while deployed owner fields stay current', () => {
-  const initial = { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Current title', livePlayerLayout: 'stacked' as const };
-  const harness = configHarness(initial, { ...initial, title: 'Old title', livePlayerLayout: 'split', accentColor: '#ff00aa' });
+  const initial = { ...configUtils.DEFAULT_SITE_CONFIG, title: 'Current title', ownerName: 'Current owner' };
+  const harness = configHarness(initial, { ...initial, title: 'Old title', ownerName: 'Old owner', accentColor: '#ff00aa' });
   const state = harness.flush();
   assert.equal(state.config.title, 'Current title');
   assert.equal('timezone' in state.config, false, 'timezone must not be present in state.config');
-  assert.equal(state.config.livePlayerLayout, 'stacked');
+  assert.equal(state.config.ownerName, 'Current owner');
   assert.equal(state.config.accentColor, '#FF00AA');
   const record = JSON.parse(harness.storage.get('listening_index_config')!);
   assert.deepEqual(record, { version: 1, accentColor: '#FF00AA' });

@@ -120,10 +120,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const {
-    config,
     visitorTimezone,
-    updateConfig,
-    markAsDeployed,
     openModal,
     isAuthenticated,
     isAdminSpotifyModalOpen,
@@ -149,33 +146,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Mode state: 0 = Overview, 1 = Stream Log, 2 = Current Session, 3 = Live Player (Admin Only), 4 = Search
   const [activeMode, setActiveMode] = useState<Mode>(() => sanitizeActiveMode(initialMode, isAuthenticated));
 
-  // Mode 3 page-level controls (layout toggle & spectrum visualizer audio source mode)
+  // Mode 3 spectrum visualizer audio source mode
   const [sourceMode, setSourceMode] = useState<"synthetic" | "live">("synthetic");
   const handleToggleSourceMode = useCallback(() => {
     setSourceMode((m) => (m === "synthetic" ? "live" : "synthetic"));
   }, []);
-
-  const handleToggleLayout = useCallback(() => {
-    const prevLayout = config.livePlayerLayout;
-    const next: "split" | "stacked" = prevLayout === "stacked" ? "split" : "stacked";
-    updateConfig({ livePlayerLayout: next });
-    void fetch("/api/config", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ livePlayerLayout: next }),
-    })
-      .then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          markAsDeployed(data?.config ?? { ...config, livePlayerLayout: next });
-        } else {
-          updateConfig({ livePlayerLayout: prevLayout });
-        }
-      })
-      .catch(() => {
-        updateConfig({ livePlayerLayout: prevLayout });
-      });
-  }, [config, updateConfig, markAsDeployed]);
 
   // Safeguard: mode 3 is strictly restricted to authenticated admin, and reset upload modal on logout
   useEffect(() => {
@@ -813,8 +788,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 handleReturnToSearch();
                 window.scrollTo(0, 0);
               }}
-              layout={config.livePlayerLayout}
-              onToggleLayout={handleToggleLayout}
               activeDevice={activeDevice}
               playerStatus={playerStatus}
               onTransferPlayback={handleTransferPlayback}

@@ -1,15 +1,12 @@
 import { siteConfig } from "@/config";
 import { normalizeHex } from "@/lib/color-utils";
 
-export type LivePlayerLayout = "split" | "stacked";
-
 export interface SiteConfigState {
   title: string;
   ownerName: string;
   accentColor: string;
   siteUrl: string;
   githubUrl: string;
-  livePlayerLayout: LivePlayerLayout;
 }
 
 export const DEFAULT_SITE_CONFIG: SiteConfigState = {
@@ -18,7 +15,6 @@ export const DEFAULT_SITE_CONFIG: SiteConfigState = {
   accentColor: normalizeHex(siteConfig?.accentColor, "#76FF49"),
   siteUrl: siteConfig?.siteUrl || "",
   githubUrl: siteConfig?.githubUrl || "",
-  livePlayerLayout: (siteConfig?.livePlayerLayout as string | undefined) === "stacked" ? "stacked" : "split",
 };
 
 /**
@@ -31,17 +27,12 @@ export function normalizeSiteConfig(
 ): SiteConfigState {
   if (!patch) return { ...base };
 
-  const layout = patch.livePlayerLayout;
-  const validLayout: LivePlayerLayout =
-    layout === "stacked" || layout === "split" ? layout : base.livePlayerLayout || "split";
-
   return {
     title: patch.title !== undefined ? String(patch.title).trim() : base.title,
     ownerName: patch.ownerName !== undefined ? String(patch.ownerName).trim() : base.ownerName,
     accentColor: patch.accentColor ? normalizeHex(patch.accentColor, base.accentColor) : base.accentColor,
     siteUrl: patch.siteUrl !== undefined ? String(patch.siteUrl).trim() : base.siteUrl,
     githubUrl: patch.githubUrl !== undefined ? String(patch.githubUrl).trim() : base.githubUrl,
-    livePlayerLayout: validLayout,
   };
 }
 
@@ -54,8 +45,7 @@ export function areSiteConfigsEqual(a: SiteConfigState, b: SiteConfigState): boo
     a.ownerName === b.ownerName &&
     normalizeHex(a.accentColor) === normalizeHex(b.accentColor) &&
     a.siteUrl === b.siteUrl &&
-    a.githubUrl === b.githubUrl &&
-    a.livePlayerLayout === b.livePlayerLayout
+    a.githubUrl === b.githubUrl
   );
 }
 
@@ -69,7 +59,6 @@ export function generateConfigTsCode(config: SiteConfigState): string {
   accentColor: ${JSON.stringify(normalizeHex(config.accentColor))},
   siteUrl: ${JSON.stringify(config.siteUrl)},
   githubUrl: ${JSON.stringify(config.githubUrl)},
-  livePlayerLayout: ${JSON.stringify(config.livePlayerLayout)} as const,
 };
 `;
 }

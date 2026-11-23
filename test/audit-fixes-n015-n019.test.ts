@@ -298,29 +298,6 @@ test("PlayerContext: device_id is encoded with encodeURIComponent in play calls"
 });
 
 // ---------------------------------------------------------------------------
-// Fix 3 (N018): handleToggleLayout rollback on failure
-// ---------------------------------------------------------------------------
-
-test("N018: handleToggleLayout marks as deployed only after POST succeeds and rolls back on failure", () => {
-  const source = readModuleSource(path.resolve(__dirname, "../src/components/ListeningView.tsx"));
-
-  // Extract handleToggleLayout block
-  const layoutIdx = source.indexOf("const handleToggleLayout =");
-  assert.ok(layoutIdx > 0, "handleToggleLayout must exist in ListeningView.tsx");
-  const layoutFn = source.slice(layoutIdx, layoutIdx + 800);
-
-  // markAsDeployed must only be called inside then(res => if (res.ok))
-  assert.ok(
-    !layoutFn.includes("updateConfig({ livePlayerLayout: next });\n    markAsDeployed("),
-    "markAsDeployed must not be called synchronously before POST completes"
-  );
-  assert.ok(
-    layoutFn.includes("updateConfig({ livePlayerLayout: prevLayout })"),
-    "handleToggleLayout must roll back layout on failure or network error"
-  );
-});
-
-// ---------------------------------------------------------------------------
 // Fix 1 & 2 (N015): handleTriggerSync ok && success checks and active range overview preservation
 // ---------------------------------------------------------------------------
 

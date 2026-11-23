@@ -52,11 +52,6 @@ test("ControlRow component supports dynamic scope labels for Stream Log, Session
     "ControlRow must accept activeDevice or deviceName prop for Mode 3"
   );
 
-  // Mode 3 layout button hidden on mobile (< md)
-  assert.ok(
-    content.includes("hidden md:flex"),
-    "ControlRow must hide layout controls on mobile viewports"
-  );
 });
 
 test("ControlRow shows the Album profile label and the profile back destination", () => {
