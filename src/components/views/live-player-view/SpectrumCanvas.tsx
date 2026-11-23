@@ -10,7 +10,7 @@ import { hexToHsv, hsvToHex, normalizeHex } from "@/lib/color-utils";
 export function gradientStops(accent: string): [string, string, string] {
   const { h, s, v } = hexToHsv(normalizeHex(accent));
   return [
-    hsvToHex(h, Math.min(100, s + 10), Math.max(30, v - 45)),
+    hsvToHex(h, Math.min(100, s + 10), Math.max(40, v - 25)),
     hsvToHex(h, s, v),
     hsvToHex((h + 18) % 360, Math.max(0, s - 35), Math.min(100, v + 12)),
   ];
