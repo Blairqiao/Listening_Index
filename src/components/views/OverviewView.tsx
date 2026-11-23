@@ -5,7 +5,7 @@ import { TrackSummary, ArtistSummary, AlbumSummary, RangeKey, ActivityDay } from
 import type { CadenceGranularity } from "@/lib/range";
 import type { ProfileKind, ProfileTarget } from "@/lib/search-types";
 import { Artwork } from "../Artwork";
-import { ActivityChart } from "./ActivityChart";
+import { ActivityChart, type ActivityBucketSelectHandler } from "./ActivityChart";
 
 export interface OverviewViewProps {
   granularity: CadenceGranularity;
@@ -17,6 +17,7 @@ export interface OverviewViewProps {
   activityCadence?: ActivityDay[];
   isLoading?: boolean;
   onOpenProfile?: (target: ProfileTarget) => void;
+  onSelectBucket?: ActivityBucketSelectHandler;
 }
 
 const KIND_LABEL: Record<ProfileKind, string> = { track: "Track", artist: "Artist", album: "Album" };
@@ -57,6 +58,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   activityCadence = [],
   isLoading = false,
   onOpenProfile,
+  onSelectBucket,
 }) => {
   const displayTracks = topTracks;
 
@@ -344,6 +346,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           rangeLabel={rangeLabel}
           activityCadence={activityCadence}
           isLoading={isLoading}
+          onSelectBucket={onSelectBucket}
         />
       </div>
     </div>

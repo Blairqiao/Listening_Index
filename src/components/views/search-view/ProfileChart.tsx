@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import type { ActivityBucket, RangeKey } from "@/lib/types";
 import type { CadenceGranularity } from "@/lib/range";
-import { ActivityChart } from "../ActivityChart";
+import { ActivityChart, type ActivityBucketSelectHandler } from "../ActivityChart";
 import { peakDayOfWeek, peakHour } from "@/lib/profile-stats";
 import { HourChart } from "./HourChart";
 import { DayOfWeekChart } from "./DayOfWeekChart";
@@ -28,6 +28,7 @@ export interface ProfileChartProps {
   hourOfDay?: number[];
   dayOfWeek?: number[];
   streakDays?: number;
+  onSelectBucket?: ActivityBucketSelectHandler;
 }
 
 function readout(
@@ -59,6 +60,7 @@ export function ProfileChart({
   hourOfDay,
   dayOfWeek,
   streakDays = 0,
+  onSelectBucket,
 }: ProfileChartProps) {
   const [view, setView] = useState<ChartView>("time");
 
@@ -134,6 +136,7 @@ export function ProfileChart({
           visitorTimezone={visitorTimezone}
           heading={heading}
           showRange={false}
+          onSelectBucket={onSelectBucket}
         />
       )}
       {(hasHour || hasDay) && (

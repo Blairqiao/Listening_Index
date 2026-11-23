@@ -49,6 +49,7 @@ import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
 import {
   DEFAULT_OVERVIEW_RANGE,
+  drillSelection,
   formatRangeLabel,
   formatRangeParam,
   isSameRange,
@@ -755,6 +756,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             <ControlRow
               mode={activeMode}
               range={activeMode === 4 ? profileRange : activeRange}
+              rangeLabel={
+                (activeMode === 4 ? profileRange : activeRange).kind === "window"
+                  ? formatRangeLabel(activeMode === 4 ? profileRange : activeRange)
+                  : null
+              }
               onSelectRange={
                 activeMode === 4
                   ? handleSelectProfileRange
@@ -835,6 +841,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   handleOpenProfile(target);
                   window.scrollTo(0, 0);
                 }}
+                onSelectBucket={
+                  isSyncing
+                    ? undefined
+                    : (bucket, granularity) => {
+                        if (isViewDimmed) return;
+                        const next = drillSelection(bucket, granularity, visitorTimezone);
+                        if (next) handleSelectRange(next, { push: true });
+                      }
+                }
               />
             )}
 
@@ -880,6 +895,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                     handleOpenRelatedProfile(target);
                     window.scrollTo(0, 0);
                   }}
+                  onSelectBucket={
+                    isSyncing
+                      ? undefined
+                      : (bucket, granularity) => {
+                          if (isViewDimmed || !profileData) return;
+                          const next = drillSelection(bucket, granularity, visitorTimezone);
+                          if (next) handleSelectProfileRange(next, { push: true });
+                        }
+                  }
                 />
               ) : (
                 <SearchView

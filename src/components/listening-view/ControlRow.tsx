@@ -2,13 +2,14 @@
 
 import React from "react";
 import { Mode, RangeKey } from "@/lib/types";
-import { presetRange, type RangeSelection } from "@/lib/range";
+import { formatRangeLabel, presetRange, type RangeSelection } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 
 interface ControlRowProps {
   mode: Mode;
   range: RangeSelection;
+  rangeLabel?: string | null;
   onSelectRange: (sel: RangeSelection) => void;
   logStartDate: string;
   isSessionOpen: boolean;
@@ -50,6 +51,7 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
 export const ControlRow: React.FC<ControlRowProps> = ({
   mode,
   range,
+  rangeLabel,
   onSelectRange,
   logStartDate,
   isSessionOpen,
@@ -141,38 +143,49 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     }
   };
 
-  const renderRangeButtons = () => (
-    <div
-      className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
-      role="group"
-      aria-label="Time range filters"
-    >
-      {RANGES.map((r) => {
-        const isActive = range.kind === "preset" && range.key === r.key;
-        return (
-          <button
-            key={r.key}
-            type="button"
-            disabled={isSyncing}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              if (!isSyncing) onSelectRange(presetRange(r.key));
-            }}
-            className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
-              isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-            } ${
-              isActive
-                ? "text-music-accent border-music-accent bg-transparent"
-                : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-            }`}
+  const renderRangeButtons = () => {
+    const chipText =
+      range.kind === "window" ? rangeLabel || formatRangeLabel(range) : null;
+    return (
+      <div
+        className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
+        role="group"
+        aria-label="Time range filters"
+      >
+        {range.kind === "window" && chipText && (
+          <span
+            className="col-span-6 font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0"
           >
-            {r.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+            {chipText}
+          </span>
+        )}
+        {RANGES.map((r) => {
+          const isActive = range.kind === "preset" && range.key === r.key;
+          return (
+            <button
+              key={r.key}
+              type="button"
+              disabled={isSyncing}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.currentTarget.blur();
+                if (!isSyncing) onSelectRange(presetRange(r.key));
+              }}
+              className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
+                isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
+              } ${
+                isActive
+                  ? "text-music-accent border-music-accent bg-transparent"
+                  : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
+              }`}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderControls = () => {
     switch (mode) {

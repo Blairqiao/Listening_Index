@@ -218,3 +218,46 @@ test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () 
   assert.ok(markup.includes("Middle Album"), "Second ancestor should be visible");
   assert.ok(markup.includes("Parent Track"), "Direct parent should be visible");
 });
+
+test("ControlRow renders non-interactive window chip and highlights no preset when range is a window", () => {
+  const props = {
+    mode: 0 as const,
+    range: { kind: "window" as const, from: "2026-11-01", to: "2026-11-30" },
+    rangeLabel: "Nov 2026",
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+
+  // Renders non-interactive chip with rangeLabel
+  assert.ok(markup.includes("Nov 2026"), "Must render rangeLabel text");
+  assert.ok(
+    markup.includes("<span") && markup.includes("col-span-6") && markup.includes("Nov 2026"),
+    "Chip must be a span with col-span-6 on mobile and active-button styling"
+  );
+
+  // No preset is highlighted while a window is active
+  const buttonMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>/g);
+  assert.equal(buttonMatches, null, "No preset button must be highlighted when range is a window");
+});
+
+test("ControlRow renders no chip when range is a preset", () => {
+  const props = {
+    mode: 0 as const,
+    range: presetRange("1w"),
+    rangeLabel: null,
+    onSelectRange: () => {},
+    logStartDate: "",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+
+  assert.ok(!markup.includes("col-span-6"), "Must not render window chip when range is a preset");
+  const activePresetMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>1w<\/button>/g);
+  assert.ok(activePresetMatches?.length === 1, "Must highlight the active preset 1w");
+});

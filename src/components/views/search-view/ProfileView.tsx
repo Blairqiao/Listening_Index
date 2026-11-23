@@ -11,7 +11,7 @@ import { ProfileChart } from "./ProfileChart";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProportionShareBar, SegmentedShareBar } from "./ShareBar";
 import { Artwork } from "../../Artwork";
-import { ActivityChart } from "../ActivityChart";
+import { ActivityChart, type ActivityBucketSelectHandler } from "../ActivityChart";
 
 export interface ProfileViewProps {
   data: ProfileData | null;
@@ -21,6 +21,7 @@ export interface ProfileViewProps {
   pendingKind?: ProfileKind;
   rankFormat?: "rank" | "percentile";
   onToggleRankFormat?: () => void;
+  onSelectBucket?: ActivityBucketSelectHandler;
 }
 
 // Desktop row budgets per profile kind so both columns match height:
@@ -53,6 +54,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   pendingKind = "track",
   rankFormat,
   onToggleRankFormat,
+  onSelectBucket,
 }) => {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const profileIdentity = data ? JSON.stringify([data.kind, data.key, data.range]) : null;
@@ -315,6 +317,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           visitorTimezone={visitorTimezone}
           hourOfDay={hours}
           dayOfWeek={dayOfWeek}
+          onSelectBucket={onSelectBucket}
         />
       </div>
 
