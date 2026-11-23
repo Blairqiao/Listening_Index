@@ -89,7 +89,7 @@ export const SessionHistogram: React.FC<SessionHistogramProps> = ({
                 style={{ height: `${heightPct}%` }}
                 className={`w-full rounded-none transition-none ${
                   isSelected
-                    ? "bg-music-accent"
+                    ? "bg-music-accent group-hover:bg-music-accent-hover"
                     : isHovered
                     ? "bg-[#2E2E2A]"
                     : "bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"

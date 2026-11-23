@@ -160,7 +160,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
               const barHeight = `${heightPercent}%`;
               const barColor = isHot
-                ? "bg-music-accent"
+                ? "bg-music-accent hover:bg-music-accent-hover"
                 : isMarkerBar
                   ? "bg-[#2A2A26] hover:bg-[#3E3E38]"
                   : "bg-[#1C1C1A] hover:bg-[#2E2E2A]";
