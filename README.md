@@ -14,7 +14,7 @@ See the [live demo](https://listening-index.vercel.app/) or [run it locally](#lo
 
 ### Overview
 
-Shows listening time, track count, daily averages, rank changes, top tracks and artists, and a listening activity graph across rolling presets (`1d`, `1w`, `1m`, `6m`, `1y`, `All`). Clicking any histogram bar above hour granularity drills down into that bar's calendar span, updating the URL to an inclusive local-date window (`?range=YYYY-MM-DD..YYYY-MM-DD` resolving in the visitor's timezone) and showing an active range chip in the control row. Browser Back returns to the parent span.
+Shows listening time, track count, daily averages, rank changes, top tracks and artists, and a listening activity graph across rolling presets (`1d`, `1w`, `1m`, `6m`, `1y`, `All`). Clicking any histogram bar above hour granularity drills down into that bar's calendar span, updating the URL to an inclusive local-date window (`?range=YYYY-MM-DD..YYYY-MM-DD` resolving in the visitor's timezone) and showing an active range chip in the control row. The back button beside the chip returns to the range you drilled from, or one calendar unit up when you opened a window link directly.
 
 ![Overview](public/screenshots/overview.png)
 
@@ -32,7 +32,7 @@ Groups continuous listening into sessions, marks first-time plays, and tracks se
 
 ### Search & profiles
 
-Search Tracks, Artists, and Albums with entity type filters, play-count and recency sorting, and a random profile picker. Every Track, Artist, and Album opens a dedicated profile page with rolling presets (`1d` to `All`), histogram drill-down to inclusive local-date windows (`prange=YYYY-MM-DD..YYYY-MM-DD` resolving in the visitor's timezone), browser Back navigation, play cadence charts, share breakdowns, and breadcrumb navigation.
+Search Tracks, Artists, and Albums with entity type filters, play-count and recency sorting, and a random profile picker. Every Track, Artist, and Album opens a dedicated profile page with rolling presets (`1d` to `All`), histogram drill-down to inclusive local-date windows (`prange=YYYY-MM-DD..YYYY-MM-DD` resolving in the visitor's timezone) with a drill-up back button, play cadence charts, share breakdowns, and breadcrumb navigation.
 
 ### Live player
 

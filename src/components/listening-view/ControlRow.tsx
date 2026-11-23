@@ -11,6 +11,8 @@ interface ControlRowProps {
   range: RangeSelection;
   rangeLabel?: string | null;
   onSelectRange: (sel: RangeSelection) => void;
+  /** Drill-up target shown beside the window chip. */
+  rangeBack?: { target: RangeSelection; onBack: () => void } | null;
   logStartDate: string;
   isSessionOpen: boolean;
   sessionTagTime: string;
@@ -50,6 +52,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   range,
   rangeLabel,
   onSelectRange,
+  rangeBack,
   logStartDate,
   isSessionOpen,
   sessionTagTime,
@@ -141,15 +144,39 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   const renderRangeButtons = () => {
     const chipText =
       range.kind === "window" ? rangeLabel || formatRangeLabel(range) : null;
+    const back = range.kind === "window" && chipText ? rangeBack : null;
+    const backLabel = back
+      ? back.target.kind === "preset" && back.target.key === "all"
+        ? "All"
+        : formatRangeLabel(back.target)
+      : "";
     return (
       <div
         className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
         role="group"
         aria-label="Time range filters"
       >
+        {back && (
+          <button
+            type="button"
+            disabled={isSyncing}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.currentTarget.blur();
+              if (!isSyncing) back.onBack();
+            }}
+            aria-label={`Back to ${backLabel}`}
+            title={`Back to ${backLabel}`}
+            className={`col-span-2 font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-[#26261F] text-[#A0A099] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32] focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 truncate ${
+              isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
+            }`}
+          >
+            {`← ${backLabel}`}
+          </button>
+        )}
         {range.kind === "window" && chipText && (
           <span
-            className="col-span-6 font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0"
+            className={`${back ? "col-span-4" : "col-span-6"} font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0`}
           >
             {chipText}
           </span>

@@ -14,6 +14,7 @@ import { SearchView } from "@/components/views/search-view/SearchView";
 import { ProfileView } from "@/components/views/search-view/ProfileView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 import { MiniPlayerBar } from "@/components/listening-view/MiniPlayerBar";
+import { useRangeDrillStack } from "@/components/listening-view/useRangeDrillStack";
 import { shouldShowMiniPlayer, miniPlayerProgress } from "@/components/listening-view/mini-player";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -552,6 +553,19 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     [isSyncing, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
   );
 
+  // Histogram drill-up: Overview and profiles each remember where a drill came from
+  const overviewDrill = useRangeDrillStack(activeRange);
+  const profileDrill = useRangeDrillStack(
+    profileRange,
+    profileTarget ? `${profileTarget.kind}:${profileTarget.key}` : ""
+  );
+  const drill = activeMode === 4 ? profileDrill : overviewDrill;
+  const selectDrillRange = activeMode === 4 ? handleSelectProfileRange : handleSelectRange;
+  const drillBackTarget = drill.backTarget;
+  const rangeBack = drillBackTarget
+    ? { target: drillBackTarget, onBack: () => selectDrillRange(drillBackTarget, { push: true }) }
+    : null;
+
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const displayedRangeKey = formatRangeParam(displayedRange);
   const overviewPayload = displayedOverview;
@@ -759,6 +773,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   ? handleSelectProfileRange
                   : handleSelectRange
               }
+              rangeBack={rangeBack}
               logStartDate={currentOverview.logStartDate}
               isSessionOpen={activeSession?.isOpen || false}
               sessionTagTime={sessionTagTime}
@@ -838,7 +853,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                     : (bucket, granularity) => {
                         if (isViewDimmed) return;
                         const next = drillSelection(bucket, granularity, visitorTimezone);
-                        if (next) handleSelectRange(next, { push: true });
+                        if (!next || isSameRange(next, activeRange)) return;
+                        overviewDrill.recordDrill(activeRange);
+                        handleSelectRange(next, { push: true });
                       }
                 }
               />
@@ -898,7 +915,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                       : (bucket, granularity) => {
                           if (isViewDimmed || !profileData) return;
                           const next = drillSelection(bucket, granularity, visitorTimezone);
-                          if (next) handleSelectProfileRange(next, { push: true });
+                          if (!next || isSameRange(next, profileRange)) return;
+                          profileDrill.recordDrill(profileRange);
+                          handleSelectProfileRange(next, { push: true });
                         }
                   }
                 />
