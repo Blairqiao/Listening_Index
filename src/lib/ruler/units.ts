@@ -211,10 +211,18 @@ export function placementForRange(
 
   const normalized = normalizeLegacyRange(sel, todayKey);
   const exact = exactUnitOf(normalized);
-  if (exact) {
+  if (exact && normalized.kind === "window") {
+    // The anchor decides which unit a zoom lands on, so it sits where the
+    // reticle would after a pan: today inside the current unit, else the
+    // unit's middle day. Anchoring on `from` made + open the wrong child unit.
+    const { from, to } = normalized;
+    const anchor =
+      from <= todayKey && todayKey <= to
+        ? todayKey
+        : addCalendarDays(from, Math.floor(daysBetween(from, to) / 2));
     return {
       level: exact.unit,
-      anchorKey: clampDateKey(exact.from, firstKey, todayKey),
+      anchorKey: clampDateKey(anchor, firstKey, todayKey),
       exact: true,
       label: null,
     };

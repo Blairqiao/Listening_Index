@@ -149,7 +149,7 @@ describe("placementForRange", () => {
       ),
       {
         level: "month",
-        anchorKey: "2026-10-01",
+        anchorKey: "2026-10-16",
         exact: true,
         label: null,
       },
@@ -159,7 +159,7 @@ describe("placementForRange", () => {
       placementForRange(presetRange("1w"), FIRST_KEY, TODAY_KEY),
       {
         level: "week",
-        anchorKey: "2026-11-16",
+        anchorKey: TODAY_KEY,
         exact: true,
         label: null,
       },
@@ -190,10 +190,39 @@ describe("placementForRange", () => {
     );
   });
 
+  it("anchors an exact unit on today when it holds today, else on its middle day", () => {
+    // Zooming in from the current year must open today's month, not January.
+    assert.equal(
+      placementForRange(
+        { kind: "window", from: "2026-01-01", to: "2026-12-31" },
+        FIRST_KEY,
+        TODAY_KEY,
+      ).anchorKey,
+      TODAY_KEY,
+    );
+    // Zooming in from October must open a week inside October, not Sep 28..Oct 4.
+    assert.equal(
+      placementForRange(
+        { kind: "window", from: "2026-10-01", to: "2026-10-31" },
+        FIRST_KEY,
+        TODAY_KEY,
+      ).anchorKey,
+      "2026-10-16",
+    );
+    assert.equal(
+      placementForRange(
+        { kind: "window", from: "2025-01-01", to: "2025-12-31" },
+        FIRST_KEY,
+        TODAY_KEY,
+      ).anchorKey,
+      "2025-07-02",
+    );
+  });
+
   it("clamps anchorKey to firstKey..todayKey", () => {
     assert.deepEqual(
       placementForRange(
-        { kind: "window", from: "2019-01-01", to: "2019-12-31" },
+        { kind: "window", from: "2018-01-01", to: "2018-12-31" },
         FIRST_KEY,
         TODAY_KEY,
       ),
