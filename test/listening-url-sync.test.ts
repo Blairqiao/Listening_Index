@@ -86,6 +86,12 @@ test('URL parameters are applied once and not again on login or lock', () => {
   assert.equal(calls.modalOpens, 1);
 });
 
+test('URL parameter mode=5 applies Calendar mode', () => {
+  const { render, calls } = mount('?mode=5');
+  render(false);
+  assert.deepEqual(calls.modes, [5]);
+});
+
 test('URL window range parameter parses into a window RangeSelection and fetches it', () => {
   const { render, calls } = mount('?range=2025-11-01..2025-11-30');
   render(false);

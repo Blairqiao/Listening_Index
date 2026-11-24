@@ -47,6 +47,16 @@ export function pruneOverviewCacheWindows(
   return dropped ? next : cache;
 }
 
+export function parseModeParam(raw: string | null | undefined): Mode | null {
+  if (raw === "0") return 0;
+  if (raw === "1") return 1;
+  if (raw === "2") return 2;
+  if (raw === "3") return 3;
+  if (raw === "4") return 4;
+  if (raw === "5") return 5;
+  return null;
+}
+
 export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
   return mode === 3 && !isAuthenticated ? 0 : mode;
 }
@@ -335,6 +345,8 @@ export function buildListeningUrlSearch(
 
   if (state.activeMode === 4) {
     params.set("mode", "4");
+  } else if (state.activeMode === 5) {
+    params.set("mode", "5");
   } else if (state.activeMode === 0) {
     if (state.preservePendingMode3 && params.get("mode") === "3") {
       params.set("mode", "3");

@@ -5,6 +5,7 @@ import ts from 'typescript';
 import * as timezoneUtils from '../src/lib/timezone-utils';
 import * as searchUtils from '../src/lib/search-utils';
 import * as range from '../src/lib/range';
+import { parseModeParam } from '../src/components/listening-view/listening-helpers';
 
 test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all initial queries', async () => {
   for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'UTC'], ['', 'UTC']]) {
@@ -12,6 +13,7 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
     const deps: Record<string, unknown> = {
       'next/headers': { cookies: async () => ({ get: (key: string) => key === 'listening_timezone' && cookie ? { value: encodeURIComponent(cookie) } : undefined }) },
       '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock/overview-data': { getMockOverview: () => ({}) },
+      '@/components/listening-view/listening-helpers': { parseModeParam },
       '@/lib/config-utils': { DEFAULT_SITE_CONFIG: {} },
       '@/lib/types': { RANGE_KEYS: ['1d', '1w', '1m', '6m', '1y', 'all'] },
       '@/lib/range': range,
@@ -41,6 +43,7 @@ test('SSR passes full fixed selection to queries and forwards fixed selection an
   const makeDeps = (configured: boolean): Record<string, unknown> => ({
     'next/headers': { cookies: async () => ({ get: () => undefined }) },
     '@/components/ListeningView': { ListeningView: 'view' },
+    '@/components/listening-view/listening-helpers': { parseModeParam },
     '@/lib/mock/overview-data': {
       MOCK_DATA: { streamLog: [], session: {} },
       getMockOverview: (...args: unknown[]) => {
@@ -93,4 +96,10 @@ test('SSR passes full fixed selection to queries and forwards fixed selection an
   assert.deepEqual(mockOverviewCalls[0][0], { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
   assert.deepEqual(renderedMock.props.initialRange, { kind: 'window', from: '2025-11-01', to: '2025-11-30' });
   assert.deepEqual(renderedMock.props.initialOverview, fakeOverview);
+
+  // SSR initialMode accepts mode 5 and excludes mode 3 (falling back to 0)
+  const renderedMode5 = await modMock.exports.default({ searchParams: Promise.resolve({ mode: '5' }) });
+  assert.equal(renderedMode5.props.initialMode, 5);
+  const renderedMode3 = await modMock.exports.default({ searchParams: Promise.resolve({ mode: '3' }) });
+  assert.equal(renderedMode3.props.initialMode, 0);
 });

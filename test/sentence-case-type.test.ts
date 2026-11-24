@@ -60,11 +60,11 @@ test("no source file uses uppercase, wide tracking or bracketed labels", () => {
 test("mode tabs render sentence-case labels without brackets", () => {
   assert.deepEqual(
     ADMIN_MODES.map((m) => m.label),
-    ["Overview", "Stream log", "Sessions", "Search", "Live player"]
+    ["Overview", "Stream log", "Sessions", "Calendar", "Search", "Live player"]
   );
   assert.deepEqual(
     ADMIN_MODES.map((m) => m.abbrev),
-    ["Overview", "Log", "Sessions", "Search", "Live"],
+    ["Overview", "Log", "Sessions", "Cal", "Search", "Live"],
     "mobile tab labels stay readable words, not clipped abbreviations"
   );
   const markup = renderToStaticMarkup(

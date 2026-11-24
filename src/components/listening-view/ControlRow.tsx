@@ -5,6 +5,7 @@ import { Mode, RangeKey } from "@/lib/types";
 import { formatRangeLabel, presetRange, type RangeSelection } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
+import { CalendarLegend } from "@/components/views/CalendarView";
 
 interface ControlRowProps {
   mode: Mode;
@@ -78,6 +79,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
+      case 5:
         return `Since ${compactDate(logStartDate)}`;
       case 1:
         return streamLogDateSpan || "Stream log";
@@ -282,6 +284,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
         return null;
       case 4:
         return profileKind ? renderRangeButtons() : null;
+      case 5:
+        return <CalendarLegend />;
     }
   };
 

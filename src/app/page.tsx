@@ -16,6 +16,7 @@ import {
   parseSearchPage,
   parseSearchSort,
 } from "@/lib/search-utils";
+import { parseModeParam } from "@/components/listening-view/listening-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +62,8 @@ export default async function Page({ searchParams }: PageProps) {
   const initialRange: RangeSelection =
     parseRangeParam(resolvedParams?.range) ?? DEFAULT_OVERVIEW_RANGE;
 
-  const modeParam = resolvedParams?.mode;
-  const initialMode: Mode =
-    modeParam === "0" || modeParam === "1" || modeParam === "2" || modeParam === "4"
-      ? (parseInt(modeParam, 10) as Mode)
-      : 0;
+  const parsed = parseModeParam(firstParam(resolvedParams?.mode));
+  const initialMode: Mode = parsed !== null && parsed !== 3 ? parsed : 0;
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;

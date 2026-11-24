@@ -13,6 +13,7 @@ import {
   buildListeningUrlSearch,
   formatProfileRibbonMetrics,
   getProfileCacheKey,
+  parseModeParam,
   readHistoryState,
   resolveDisplayedProfileData,
 } from "../src/components/listening-view/listening-helpers";
@@ -1035,6 +1036,7 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   const deps: Record<string, unknown> = {
     "next/headers": { cookies: async () => ({ get: () => undefined }) },
     "@/components/ListeningView": { ListeningView: "view" },
+    "@/components/listening-view/listening-helpers": { parseModeParam },
     "@/lib/mock/overview-data": {
       MOCK_DATA: { overview: { "1w": {}, all: {} }, streamLog: {}, session: {} },
       getMockOverview: () => ({ range: "1w", granularity: "block6h" }),
@@ -1123,6 +1125,12 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   assert.equal(mode3.props.initialMode, 0);
   assert.equal(mode3.props.initialProfile, null);
   assert.equal(mode3.props.initialProfileRange, null);
+
+  // Mode 5 (Calendar) is accepted at SSR
+  const mode5 = await mod.exports.default({
+    searchParams: Promise.resolve({ mode: "5" }),
+  });
+  assert.equal(mode5.props.initialMode, 5);
 
   // Mode 4 browse (no profile target) passes parsed search params
   const mode4Search = await mod.exports.default({
