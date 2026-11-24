@@ -18,6 +18,8 @@ export type CadenceGranularity =
   | "month"
   | "year";
 
+export type CalendarUnit = "day" | "week" | "month" | "year";
+
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const RANGE_KEY_SET = new Set<string>(RANGE_KEYS);
@@ -121,7 +123,7 @@ function formatCalendarDate(year: number, month: number, day: number): string {
   return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function addCalendarDays(dateKey: string, days: number): string {
+export function addCalendarDays(dateKey: string, days: number): string {
   const [year, month, day] = dateKey.split("-").map(Number);
   const d = new Date(utcMs(year, month - 1, day + days));
   return formatCalendarDate(
@@ -443,4 +445,112 @@ export function zoomOutRange(sel: RangeSelection): RangeSelection | null {
     from: formatCalendarDate(fy, 1, 1),
     to: formatCalendarDate(fy, 12, 31),
   };
+}
+
+/** toKey - fromKey in whole days. */
+export function daysBetween(fromKey: string, toKey: string): number {
+  const [fy, fm, fd] = fromKey.split("-").map(Number);
+  const [ty, tm, td] = toKey.split("-").map(Number);
+  return Math.round((utcMs(ty, tm - 1, td) - utcMs(fy, fm - 1, fd)) / DAY_MS);
+}
+
+/** localDateKey(now, tz). */
+export function todayDateKey(tz: string, now: Date = new Date()): string {
+  return localDateKey(now, tz);
+}
+
+/**
+ * Full calendar unit holding dateKey. Weeks run Monday..Sunday (matches
+ * /src/lib/calendar.ts weekColumns). Never clamped.
+ */
+export function unitBounds(
+  dateKey: string,
+  unit: CalendarUnit,
+): { from: string; to: string } {
+  if (unit === "day") {
+    return { from: dateKey, to: dateKey };
+  }
+
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  if (unit === "week") {
+    const dow = (new Date(utcMs(year, month - 1, day)).getUTCDay() + 6) % 7;
+    const from = addCalendarDays(dateKey, -dow);
+    return { from, to: addCalendarDays(from, 6) };
+  }
+
+  if (unit === "month") {
+    return {
+      from: formatCalendarDate(year, month, 1),
+      to: formatCalendarDate(year, month, daysInMonth(year, month)),
+    };
+  }
+
+  return {
+    from: formatCalendarDate(year, 1, 1),
+    to: formatCalendarDate(year, 12, 31),
+  };
+}
+
+/** { kind: "window", ...unitBounds(dateKey, unit) } */
+export function unitWindow(
+  dateKey: string,
+  unit: CalendarUnit,
+): RangeSelection {
+  return { kind: "window", ...unitBounds(dateKey, unit) };
+}
+
+/**
+ * The unit a selection is exactly equal to, or null (presets other than "all"
+ * are null; "all" is null too).
+ */
+export function exactUnitOf(
+  sel: RangeSelection,
+): { unit: CalendarUnit; from: string } | null {
+  if (sel.kind === "preset") return null;
+
+  const { from, to } = sel;
+  if (from === to) {
+    return { unit: "day", from };
+  }
+
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const dow = (new Date(utcMs(fy, fm - 1, fd)).getUTCDay() + 6) % 7;
+  if (dow === 0 && to === addCalendarDays(from, 6)) {
+    return { unit: "week", from };
+  }
+
+  const month = unitBounds(from, "month");
+  if (from === month.from && to === month.to) {
+    return { unit: "month", from };
+  }
+
+  const year = unitBounds(from, "year");
+  if (from === year.from && to === year.to) {
+    return { unit: "year", from };
+  }
+
+  return null;
+}
+
+/**
+ * 1d->today's day, 1w->today's week, 1m->today's month, 6m and 1y->today's year,
+ * all and every window unchanged.
+ */
+export function normalizeLegacyRange(
+  sel: RangeSelection,
+  todayKey: string,
+): RangeSelection {
+  if (sel.kind === "window" || sel.key === "all") return sel;
+  switch (sel.key) {
+    case "1d":
+      return unitWindow(todayKey, "day");
+    case "1w":
+      return unitWindow(todayKey, "week");
+    case "1m":
+      return unitWindow(todayKey, "month");
+    case "6m":
+    case "1y":
+      return unitWindow(todayKey, "year");
+  }
 }
