@@ -4,7 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compactDate } from '../src/lib/format-utils';
 import { ControlRow } from '../src/components/listening-view/ControlRow';
-import { presetRange } from '../src/lib/range';
+import { logStartDateKey, presetRange } from '../src/lib/range';
 
 test('compactDate returns the placeholder for an unparseable date', () => {
   assert.equal(compactDate('--'), '--');
@@ -28,6 +28,8 @@ test('ControlRow shows the placeholder scope label while the Overview has no sta
       mode: 0,
       range: presetRange('1w'),
       onSelectRange: () => {},
+      firstKey: '2026-11-24',
+      todayKey: '2026-11-24',
       logStartDate: '--',
       isSessionOpen: false,
       sessionTagTime: '--',
@@ -35,4 +37,16 @@ test('ControlRow shows the placeholder scope label while the Overview has no sta
   );
   assert.ok(markup.includes('Since --'));
   assert.ok(!markup.includes('Invalid Date') && !markup.includes('NaN'));
+});
+
+test('logStartDateKey parses DD MMM YYYY and ISO date-only without timezone day shift', () => {
+  assert.equal(logStartDateKey('14 AUG 2024', '2026-11-24'), '2024-08-14');
+  assert.equal(logStartDateKey('2024-08-14', '2026-11-24'), '2024-08-14');
+  assert.equal(logStartDateKey('--', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('2024-02-30', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('2024-13-01', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('31 FEB 2024', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('14 XYZ 2024', '2026-11-24'), '2026-11-24');
+  assert.equal(logStartDateKey('not-a-date', '2026-11-24'), '2026-11-24');
 });

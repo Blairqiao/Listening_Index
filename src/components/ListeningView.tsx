@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { ListeningHeader } from "@/components/listening-view/ListeningHeader";
 import { ModeTabs } from "@/components/listening-view/ModeTabs";
@@ -15,7 +15,6 @@ import { ProfileView } from "@/components/views/search-view/ProfileView";
 import { CalendarView } from "@/components/views/CalendarView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 import { MiniPlayerBar } from "@/components/listening-view/MiniPlayerBar";
-import { useRangeDrillStack } from "@/components/listening-view/useRangeDrillStack";
 import { shouldShowMiniPlayer, miniPlayerProgress } from "@/components/listening-view/mini-player";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -57,6 +56,7 @@ import {
   formatRangeLabel,
   formatRangeParam,
   isSameRange,
+  logStartDateKey,
   normalizeLegacyRange,
   parseRangeParam,
   PRESET_GRANULARITY,
@@ -593,18 +593,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     [isSyncing, handleSelectRange]
   );
 
-  // Histogram drill-up: Overview and profiles each remember where a drill came from
-  const overviewDrill = useRangeDrillStack(activeRange);
-  const profileDrill = useRangeDrillStack(
-    profileRange,
-    profileTarget ? `${profileTarget.kind}:${profileTarget.key}` : ""
+  const handleRulerSelectRange = useCallback(
+    (next: RangeSelection) => {
+      if (activeMode === 4) {
+        handleSelectProfileRange(next, { push: true });
+      } else {
+        handleSelectRange(next, { push: true });
+      }
+    },
+    [activeMode, handleSelectProfileRange, handleSelectRange]
   );
-  const drill = activeMode === 4 ? profileDrill : overviewDrill;
-  const selectDrillRange = activeMode === 4 ? handleSelectProfileRange : handleSelectRange;
-  const drillBackTarget = drill.backTarget;
-  const rangeBack = drillBackTarget
-    ? { target: drillBackTarget, onBack: () => selectDrillRange(drillBackTarget, { push: true }) }
-    : null;
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const displayedRangeKey = formatRangeParam(displayedRange);
@@ -616,6 +614,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     range: displayedRangeKey,
     granularity: fallbackGranularity,
   };
+  const todayKey = useMemo(() => todayDateKey(visitorTimezone), [visitorTimezone]);
+  const firstKey = useMemo(
+    () => logStartDateKey(currentOverview.logStartDate, todayKey),
+    [currentOverview.logStartDate, todayKey]
+  );
   const overviewGranularity: CadenceGranularity = currentOverview.granularity;
   const overviewRangeKey: RangeKey | null =
     displayedRange.kind === "preset" ? displayedRange.key : null;
@@ -825,17 +828,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             <ControlRow
               mode={activeMode}
               range={activeMode === 4 ? profileRange : activeRange}
-              rangeLabel={
-                (activeMode === 4 ? profileRange : activeRange).kind === "window"
-                  ? formatRangeLabel(activeMode === 4 ? profileRange : activeRange)
-                  : null
-              }
-              onSelectRange={
-                activeMode === 4
-                  ? handleSelectProfileRange
-                  : handleSelectRange
-              }
-              rangeBack={rangeBack}
+              onSelectRange={handleRulerSelectRange}
+              firstKey={firstKey}
+              todayKey={todayKey}
               logStartDate={currentOverview.logStartDate}
               isSessionOpen={activeSession?.isOpen || false}
               sessionTagTime={sessionTagTime}
@@ -916,7 +911,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                         if (isViewDimmed) return;
                         const next = drillSelection(bucket, granularity, visitorTimezone);
                         if (!next || isSameRange(next, activeRange)) return;
-                        overviewDrill.recordDrill(activeRange);
                         handleSelectRange(next, { push: true });
                       }
                 }
@@ -978,7 +972,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                           if (isViewDimmed || !profileData) return;
                           const next = drillSelection(bucket, granularity, visitorTimezone);
                           if (!next || isSameRange(next, profileRange)) return;
-                          profileDrill.recordDrill(profileRange);
                           handleSelectProfileRange(next, { push: true });
                         }
                   }

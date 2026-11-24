@@ -131,6 +131,8 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
       mode: 4,
       range: presetRange("1w"),
       onSelectRange: () => {},
+      firstKey: "2024-08-14",
+      todayKey: "2026-11-24",
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
       sessionTagTime: "",
@@ -139,7 +141,7 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   assert.ok(searchMarkup.includes("Search"), "ControlRow mode 4 without profile must display Search");
   assert.ok(
     !searchMarkup.includes("Time range filters"),
-    "ControlRow mode 4 without profile must NOT render range buttons"
+    "ControlRow mode 4 without profile must NOT render range ruler"
   );
   assert.ok(
     searchMarkup.includes("flex justify-between items-center h-[28px]"),
@@ -152,6 +154,8 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
       mode: 4,
       range: presetRange("1w"),
       onSelectRange: () => {},
+      firstKey: "2024-08-14",
+      todayKey: "2026-11-24",
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
       sessionTagTime: "",
@@ -164,7 +168,15 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   );
   assert.ok(
     trackProfileMarkup.includes("Time range filters"),
-    "ControlRow mode 4 track profile must render range buttons"
+    "ControlRow mode 4 track profile must render range ruler"
+  );
+  assert.ok(
+    trackProfileMarkup.includes("Zoom out"),
+    "ControlRow mode 4 track profile must render Zoom out"
+  );
+  assert.ok(
+    !trackProfileMarkup.includes(">1w</button>"),
+    "ControlRow mode 4 track profile must NOT render preset buttons"
   );
   assert.ok(
     trackProfileMarkup.includes("flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center sm:h-[28px]"),
@@ -177,6 +189,8 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
       mode: 4,
       range: presetRange("1w"),
       onSelectRange: () => {},
+      firstKey: "2024-08-14",
+      todayKey: "2026-11-24",
       logStartDate: "2026-09-04T00:00:00.000Z",
       isSessionOpen: false,
       sessionTagTime: "",
@@ -189,7 +203,15 @@ test("ControlRow: Mode 4 scope label and profile range controls", () => {
   );
   assert.ok(
     artistProfileMarkup.includes("Time range filters"),
-    "ControlRow mode 4 artist profile must render range buttons"
+    "ControlRow mode 4 artist profile must render range ruler"
+  );
+  assert.ok(
+    artistProfileMarkup.includes("Zoom out"),
+    "ControlRow mode 4 artist profile must render Zoom out"
+  );
+  assert.ok(
+    !artistProfileMarkup.includes(">1w</button>"),
+    "ControlRow mode 4 artist profile must NOT render preset buttons"
   );
   assert.ok(
     artistProfileMarkup.includes("flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center sm:h-[28px]"),

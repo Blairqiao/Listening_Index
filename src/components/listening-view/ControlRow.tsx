@@ -1,19 +1,19 @@
 "use client";
 
 import React from "react";
-import { Mode, RangeKey } from "@/lib/types";
-import { formatRangeLabel, presetRange, type RangeSelection } from "@/lib/range";
+import { Mode } from "@/lib/types";
+import type { RangeSelection } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 import { CalendarLegend } from "@/components/views/CalendarView";
+import { ZoomRuler } from "@/components/listening-view/zoom-ruler/ZoomRuler";
 
 interface ControlRowProps {
   mode: Mode;
   range: RangeSelection;
-  rangeLabel?: string | null;
   onSelectRange: (sel: RangeSelection) => void;
-  /** Drill-up target shown beside the window chip. */
-  rangeBack?: { target: RangeSelection; onBack: () => void } | null;
+  firstKey: string;
+  todayKey: string;
   logStartDate: string;
   isSessionOpen: boolean;
   sessionTagTime: string;
@@ -39,21 +39,12 @@ interface ControlRowProps {
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-const RANGES: Array<{ key: RangeKey; label: string }> = [
-  { key: "1d", label: "1d" },
-  { key: "1w", label: "1w" },
-  { key: "1m", label: "1m" },
-  { key: "6m", label: "6m" },
-  { key: "1y", label: "1y" },
-  { key: "all", label: "All" },
-];
-
 export const ControlRow: React.FC<ControlRowProps> = ({
   mode,
   range,
-  rangeLabel,
   onSelectRange,
-  rangeBack,
+  firstKey,
+  todayKey,
   logStartDate,
   isSessionOpen,
   sessionTagTime,
@@ -143,78 +134,18 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     }
   };
 
-  const renderRangeButtons = () => {
-    const chipText =
-      range.kind === "window" ? rangeLabel || formatRangeLabel(range) : null;
-    const back = range.kind === "window" && chipText ? rangeBack : null;
-    const backLabel = back
-      ? back.target.kind === "preset" && back.target.key === "all"
-        ? "All"
-        : formatRangeLabel(back.target)
-      : "";
-    return (
-      <div
-        className="grid grid-cols-6 gap-1.5 w-full sm:flex sm:w-auto sm:gap-1.5 shrink-0"
-        role="group"
-        aria-label="Time range filters"
-      >
-        {back && (
-          <button
-            type="button"
-            disabled={isSyncing}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.currentTarget.blur();
-              if (!isSyncing) back.onBack();
-            }}
-            aria-label={`Back to ${backLabel}`}
-            title={`Back to ${backLabel}`}
-            className={`col-span-2 font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-[#26261F] text-[#A0A099] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32] focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 truncate ${
-              isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-            }`}
-          >
-            {`← ${backLabel}`}
-          </button>
-        )}
-        {range.kind === "window" && chipText && (
-          <span
-            className={`${back ? "col-span-4" : "col-span-6"} font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0`}
-          >
-            {chipText}
-          </span>
-        )}
-        {RANGES.map((r) => {
-          const isActive = range.kind === "preset" && range.key === r.key;
-          return (
-            <button
-              key={r.key}
-              type="button"
-              disabled={isSyncing}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.currentTarget.blur();
-                if (!isSyncing) onSelectRange(presetRange(r.key));
-              }}
-              className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-none flex items-center justify-center text-center shrink-0 ${
-                isSyncing ? "cursor-wait opacity-60" : "cursor-pointer"
-              } ${
-                isActive
-                  ? "text-music-accent border-music-accent bg-transparent"
-                  : "text-[#6A6A64] border-[#26261F] bg-transparent hover:text-[#EDEDE8] hover:border-[#3A3A32]"
-              }`}
-            >
-              {r.label}
-            </button>
-          );
-        })}
-      </div>
-    );
-  };
-
   const renderControls = () => {
     switch (mode) {
       case 0:
-        return renderRangeButtons();
+        return (
+          <ZoomRuler
+            range={range}
+            onSelectRange={onSelectRange}
+            firstKey={firstKey}
+            todayKey={todayKey}
+            disabled={isSyncing}
+          />
+        );
       case 1: {
         const count = streamLogCount ?? 50;
         if (count === 0) {
@@ -283,7 +214,15 @@ export const ControlRow: React.FC<ControlRowProps> = ({
       case 3:
         return null;
       case 4:
-        return profileKind ? renderRangeButtons() : null;
+        return profileKind ? (
+          <ZoomRuler
+            range={range}
+            onSelectRange={onSelectRange}
+            firstKey={firstKey}
+            todayKey={todayKey}
+            disabled={isSyncing}
+          />
+        ) : null;
       case 5:
         return <CalendarLegend />;
     }

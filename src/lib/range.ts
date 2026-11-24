@@ -418,33 +418,27 @@ export function formatRangeLabel(sel: RangeSelection): string {
 }
 
 /**
- * The next calendar unit up from a fixed window: a day or a week inside one
- * month opens that month, a month or any span inside one year opens the year,
- * and a full year or a span across years opens `all`. Presets have no parent.
+ * Converts a localized overview `logStartDate` ("DD MMM YYYY" or "YYYY-MM-DD")
+ * into a calendar date key without shifting across timezones.
  */
-export function zoomOutRange(sel: RangeSelection): RangeSelection | null {
-  if (sel.kind === "preset") return null;
-
-  const [fy, fm, fd] = sel.from.split("-").map(Number);
-  const [ty, tm, td] = sel.to.split("-").map(Number);
-  if (fy !== ty) return presetRange("all");
-
-  const isFullMonth = fm === tm && fd === 1 && td === daysInMonth(fy, fm);
-  if (fm === tm && !isFullMonth) {
-    return {
-      kind: "window",
-      from: formatCalendarDate(fy, fm, 1),
-      to: formatCalendarDate(fy, fm, daysInMonth(fy, fm)),
-    };
+export function logStartDateKey(logStartDate: string, fallbackKey: string): string {
+  const raw = logStartDate.trim();
+  if (!raw || raw === "--") return fallbackKey;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return parseCalendarDate(raw) ? raw : fallbackKey;
   }
-
-  const isFullYear = fm === 1 && fd === 1 && tm === 12 && td === 31;
-  if (isFullYear) return presetRange("all");
-  return {
-    kind: "window",
-    from: formatCalendarDate(fy, 1, 1),
-    to: formatCalendarDate(fy, 12, 31),
-  };
+  const match = /^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/.exec(raw);
+  if (!match) return fallbackKey;
+  const monthIdx = SHORT_MONTHS.findIndex(
+    (m) => m.toUpperCase() === match[2].toUpperCase(),
+  );
+  if (monthIdx === -1) return fallbackKey;
+  const candidate = formatCalendarDate(
+    Number(match[3]),
+    monthIdx + 1,
+    Number(match[1]),
+  );
+  return parseCalendarDate(candidate) ? candidate : fallbackKey;
 }
 
 /** toKey - fromKey in whole days. */
