@@ -77,3 +77,6 @@ export { getTrackTelemetryStats, type TrackTelemetryStats } from "./track-stats"
 // Search & Profiles
 export { searchCatalog, getRandomProfileTarget } from "./search";
 export { getProfile } from "./profile";
+
+// Calendar
+export { getCalendarData } from "./calendar";
