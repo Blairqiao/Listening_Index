@@ -57,8 +57,10 @@ import {
   formatRangeLabel,
   formatRangeParam,
   isSameRange,
+  normalizeLegacyRange,
   parseRangeParam,
   PRESET_GRANULARITY,
+  todayDateKey,
   type CadenceGranularity,
   type RangeSelection,
 } from "@/lib/range";
@@ -339,6 +341,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     skipNextUrlSyncRef,
   } = useListeningUrlSync({
     isAuthenticated,
+    visitorTimezone,
     activeMode,
     openModal,
     setActiveMode,
@@ -421,9 +424,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
       const saved = readHistoryState(event.state);
 
+      const todayKey = todayDateKey(visitorTimezone);
+
       if (parsedMode === 4) {
         const target = parseProfileTarget(params);
-        const range = parseRangeParam(params.get("prange"));
+        const parsedProfileRange = parseRangeParam(params.get("prange"));
+        const range = parsedProfileRange ? normalizeLegacyRange(parsedProfileRange, todayKey) : null;
         if (target) {
           syncFromLocation(target, range, saved?.profileHistory);
           if (saved?.search) {
@@ -443,7 +449,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       } else {
         const parsedRange = parseRangeParam(params.get("range"));
         if (parsedRange || parsedMode === 0) {
-          const nextRange = parsedRange ?? DEFAULT_OVERVIEW_RANGE;
+          const nextRange = normalizeLegacyRange(
+            parsedRange ?? DEFAULT_OVERVIEW_RANGE,
+            todayKey
+          );
           selectRange(nextRange);
         }
         const sess = params.get("session");
@@ -457,6 +466,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [
     isAuthenticated,
+    visitorTimezone,
     syncFromLocation,
     setSearchQuery,
     selectRange,
@@ -559,16 +569,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     (range: RangeSelection, opts?: { push?: boolean }) => {
       if (isSyncing) return;
       clearPendingLivePlayer();
-      if (isSameRange(activeRangeRef.current, range)) {
-        if (!overviewCacheRef.current[formatRangeParam(range)]) {
-          selectRange(range);
+      const normalized = normalizeLegacyRange(range, todayDateKey(visitorTimezone));
+      if (isSameRange(activeRangeRef.current, normalized)) {
+        if (!overviewCacheRef.current[formatRangeParam(normalized)]) {
+          selectRange(normalized);
         }
         return;
       }
       shouldPushHistoryRef.current = Boolean(opts?.push);
-      selectRange(range);
+      selectRange(normalized);
     },
-    [isSyncing, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
+    [isSyncing, visitorTimezone, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
   );
 
   const handleOpenCalendarSelection = useCallback(

@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Mode } from "@/lib/types";
-import { formatRangeParam, isSameRange, parseRangeParam, type RangeSelection } from "@/lib/range";
+import {
+  formatRangeParam,
+  isSameRange,
+  normalizeLegacyRange,
+  parseRangeParam,
+  todayDateKey,
+  type RangeSelection,
+} from "@/lib/range";
 import { parseModeParam } from "./listening-helpers";
 
 export interface UseListeningUrlSyncParams {
   isAuthenticated: boolean;
+  visitorTimezone: string;
   activeMode?: Mode;
   openModal: () => void;
   setActiveMode: (mode: Mode) => void;
@@ -19,6 +27,7 @@ export interface UseListeningUrlSyncParams {
 
 export function useListeningUrlSync({
   isAuthenticated,
+  visitorTimezone,
   activeMode,
   openModal,
   setActiveMode,
@@ -63,7 +72,10 @@ export function useListeningUrlSync({
       }
       setActiveMode(nextMode);
     }
-    const parsedRange = parseRangeParam(params.get("range"));
+    const rawRange = parseRangeParam(params.get("range"));
+    const parsedRange = rawRange
+      ? normalizeLegacyRange(rawRange, todayDateKey(visitorTimezone))
+      : null;
     if (parsedRange) {
       if (!isSameRange(parsedRange, activeRangeRef.current)) {
         willUpdateState = true;
@@ -90,6 +102,7 @@ export function useListeningUrlSync({
   }, [
     openModal,
     isAuthenticated,
+    visitorTimezone,
     activeMode,
     fetchOverview,
     setActiveMode,

@@ -6,6 +6,8 @@ import {
   DEFAULT_OVERVIEW_RANGE,
   formatRangeParam,
   presetRange,
+  todayDateKey,
+  unitWindow,
   type RangeSelection,
 } from '../src/lib/range';
 
@@ -47,6 +49,7 @@ function mount(search: string, initialActiveMode?: number) {
   };
   const props = {
     activeMode: initialActiveMode,
+    visitorTimezone: 'UTC',
     openModal: () => { calls.modalOpens++; },
     setActiveMode: (mode: number) => { calls.modes.push(mode); },
     setActiveRange: (range: RangeSelection) => { calls.ranges.push(range); },
@@ -74,16 +77,42 @@ function mount(search: string, initialActiveMode?: number) {
   return { render, calls };
 }
 
+function withFixedClock(fixedIso: string, fn: () => void) {
+  const RealDate = globalThis.Date;
+  const fixedTime = new RealDate(fixedIso).getTime();
+  class FixedDate extends RealDate {
+    constructor(...args: unknown[]) {
+      if (args.length === 0) {
+        super(fixedTime);
+      } else {
+        super(...(args as [number | string | Date]));
+      }
+    }
+    static now() {
+      return fixedTime;
+    }
+  }
+  (globalThis as unknown as { Date: unknown }).Date = FixedDate;
+  try {
+    fn();
+  } finally {
+    (globalThis as unknown as { Date: unknown }).Date = RealDate;
+  }
+}
+
 test('URL parameters are applied once and not again on login or lock', () => {
-  const { render, calls } = mount('?mode=1&range=1m&session=session-2&config=1');
-  render(false);
-  render(true);
-  render(false);
-  assert.deepEqual(calls.modes, [1]);
-  assert.deepEqual(calls.ranges, [presetRange('1m')]);
-  assert.deepEqual(calls.fetched, [presetRange('1m')]);
-  assert.deepEqual(calls.sessions, ['session-2']);
-  assert.equal(calls.modalOpens, 1);
+  withFixedClock('2026-11-24T12:00:00.000Z', () => {
+    const { render, calls } = mount('?mode=1&range=1m&session=session-2&config=1');
+    const expectedMonth = unitWindow(todayDateKey('UTC'), 'month');
+    render(false);
+    render(true);
+    render(false);
+    assert.deepEqual(calls.modes, [1]);
+    assert.deepEqual(calls.ranges, [expectedMonth]);
+    assert.deepEqual(calls.fetched, [expectedMonth]);
+    assert.deepEqual(calls.sessions, ['session-2']);
+    assert.equal(calls.modalOpens, 1);
+  });
 });
 
 test('URL parameter mode=5 applies Calendar mode', () => {
@@ -101,15 +130,18 @@ test('URL window range parameter parses into a window RangeSelection and fetches
 });
 
 test('a Live Player request made before login is applied once the visitor is authenticated', () => {
-  const { render, calls } = mount('?mode=3&range=6m');
-  render(false);
-  assert.deepEqual(calls.modes, [0]);
-  render(true);
-  assert.deepEqual(calls.modes, [0, 3]);
-  render(false);
-  render(true);
-  assert.deepEqual(calls.modes, [0, 3], 'the pending request is used up by the first login');
-  assert.deepEqual(calls.ranges, [presetRange('6m')]);
+  withFixedClock('2026-11-24T12:00:00.000Z', () => {
+    const { render, calls } = mount('?mode=3&range=6m');
+    const expectedYear = unitWindow(todayDateKey('UTC'), 'year');
+    render(false);
+    assert.deepEqual(calls.modes, [0]);
+    render(true);
+    assert.deepEqual(calls.modes, [0, 3]);
+    render(false);
+    render(true);
+    assert.deepEqual(calls.modes, [0, 3], 'the pending request is used up by the first login');
+    assert.deepEqual(calls.ranges, [expectedYear]);
+  });
 });
 
 test('a Live Player request from an authenticated visitor is applied once and defers initial URL sync', () => {
@@ -281,7 +313,7 @@ test('ListeningView restores DEFAULT_OVERVIEW_RANGE on mode 0 popstate without r
     'ListeningView must reference DEFAULT_OVERVIEW_RANGE for mode 0 popstate fallback',
   );
   assert.ok(
-    source.includes('isSameRange(activeRangeRef.current, range)'),
+    source.includes('isSameRange(activeRangeRef.current, normalized)'),
     'handleSelectRange must guard same-range selection before setting shouldPushHistoryRef',
   );
 });
