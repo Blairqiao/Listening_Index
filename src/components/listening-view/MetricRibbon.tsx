@@ -41,6 +41,8 @@ export const getRibbonLabels = (
       ];
     case 4:
       return ["Plays", "Rank", "First played", "Last played"];
+    case 5:
+      return ["Plays", "Active days", "Daily avg", "Peak day"];
   }
 };
 

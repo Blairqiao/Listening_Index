@@ -30,6 +30,10 @@ Groups continuous listening into sessions, marks first-time plays, and tracks se
 
 ![Sessions](public/screenshots/sessions.png)
 
+### Calendar
+
+Displays a daily listening heatmap for every year in the archive. Select spans by dragging across days, tapping two dates on mobile, or choosing a month or year label. The metric ribbon shows playback statistics for the selected span, and "Open in Overview" applies that window as a `?range=` URL in the Overview tab.
+
 ### Search & profiles
 
 Search Tracks, Artists, and Albums with entity type filters, play-count and recency sorting, and a random profile picker. Every Track, Artist, and Album opens a dedicated profile page with rolling presets (`1d` to `All`), histogram drill-down to inclusive local-date windows (`prange=YYYY-MM-DD..YYYY-MM-DD` resolving in the visitor's timezone) with a drill-up back button, play cadence charts, share breakdowns, and breadcrumb navigation.

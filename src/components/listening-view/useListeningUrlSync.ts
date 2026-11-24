@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Mode } from "@/lib/types";
 import { formatRangeParam, isSameRange, parseRangeParam, type RangeSelection } from "@/lib/range";
+import { parseModeParam } from "./listening-helpers";
 
 export interface UseListeningUrlSyncParams {
   isAuthenticated: boolean;
@@ -50,9 +51,9 @@ export function useListeningUrlSync({
 
     const params = new URLSearchParams(window.location.search);
     let willUpdateState = false;
-    const m = params.get("mode");
-    if (m === "0" || m === "1" || m === "2" || m === "3" || m === "4") {
-      const requested = parseInt(m, 10) as Mode;
+    const parsedMode = parseModeParam(params.get("mode"));
+    if (parsedMode !== null) {
+      const requested = parsedMode;
       const pending = requested === 3 && !isAuthenticated;
       pendingLivePlayerRef.current = pending;
       if (pending) setIsPendingLivePlayer(true);
