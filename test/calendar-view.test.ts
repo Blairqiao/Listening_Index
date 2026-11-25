@@ -108,6 +108,7 @@ test("CalendarView with selection contains formatted label and enabled Open in O
   const overviewButtonMatch = html.match(/<button[^>]*>[^<]*Open in Overview[^<]*<\/button>/i);
   assert.ok(overviewButtonMatch, "should render Open in Overview button");
   assert.doesNotMatch(overviewButtonMatch[0], /\sdisabled(?=[>\s=])/, "Open in Overview button must not have disabled attribute with selection");
+  assert.match(overviewButtonMatch[0], /hover:enabled:bg-music-accent\/10/, "Open in Overview button must tint on hover");
 });
 
 test("CalendarView first load with no data renders animate-pulse and no loading text", () => {
@@ -171,10 +172,16 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   assert.match(cellStart[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
   assert.match(cellStart[0], /opacity-100/);
 
-  // 2025-01-10 is outside selection -> opacity-35
+  // 2024-12-20 is inside the selection but not an edge -> no ring
+  const cellMid = html.match(/<div[^>]*data-date="2024-12-20"[^>]*class="[^"]*"/);
+  assert.ok(cellMid, "should find 2024-12-20 cell");
+  assert.match(cellMid[0], /opacity-100/);
+  assert.doesNotMatch(cellMid[0], /ring-1/);
+
+  // 2025-01-10 is outside selection -> opacity-20
   const cellOut = html.match(/<div[^>]*data-date="2025-01-10"[^>]*class="[^"]*"/);
   assert.ok(cellOut, "should find 2025-01-10 cell");
-  assert.match(cellOut[0], /opacity-35/);
+  assert.match(cellOut[0], /opacity-20/);
   assert.doesNotMatch(cellOut[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
 });
 

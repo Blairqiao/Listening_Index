@@ -238,11 +238,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   if (mode === 0) {
     const isAllRange = range.kind === "preset" && range.key === "all";
     const overviewLabel = (
-      <span
-        className={`font-mono text-[12px] whitespace-nowrap ${
-          isAllRange ? "text-[#5A5A55]" : "text-[#EDEDE8]"
-        }`}
-      >
+      <span className="font-mono text-[12px] whitespace-nowrap text-[#5A5A55]">
         {isAllRange
           ? `Since ${compactDate(logStartDate)}`
           : formatRangeLabel(normalizeLegacyRange(range, todayKey))}

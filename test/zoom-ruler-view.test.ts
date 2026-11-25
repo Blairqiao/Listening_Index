@@ -34,6 +34,10 @@ test("ZoomRuler renders Week label, zoom buttons, Today, and group aria-label fo
     markup.includes('aria-label="Jump to today"'),
     "Must render Jump to today button",
   );
+  const todayBtn = markup.match(/<button[^>]*aria-label="Jump to today"[^>]*>/)?.[0] ?? "";
+  assert.ok(!todayBtn.includes("invisible"), "Jump to today stays visible while on today");
+  assert.ok(!todayBtn.includes("aria-hidden"), "Jump to today stays in the accessibility tree");
+  assert.match(todayBtn, /\sdisabled(?=[>\s=])/, "Jump to today is disabled while on today");
   assert.ok(markup.includes("<canvas"), "Must render canvas element");
   assert.ok(markup.includes('aria-live="polite"'), "Unit word must have aria-live=polite");
   assert.ok(!markup.includes("border-[#26261F]"), "Variant A tape must have no frame border");

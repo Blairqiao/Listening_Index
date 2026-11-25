@@ -97,8 +97,8 @@ interface RulerInternalState {
 }
 
 /**
- * Whether the Today icon should be hidden. While a zoom animates, the previous
- * value holds, so a zoom step taken on today doesn't flash the icon.
+ * Whether the Today icon should be grayed out. While a zoom animates, the previous
+ * value holds, so a zoom step taken on today doesn't flash the icon state.
  */
 export function nextOnToday(
   prev: boolean,
@@ -1074,7 +1074,7 @@ export function ZoomRuler({
 
   const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border transition-none hover:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
-  } ${ui.onToday ? "invisible" : ""}`;
+  }`;
 
   return (
     <div
@@ -1144,9 +1144,7 @@ export function ZoomRuler({
             type="button"
             aria-label="Jump to today"
             title="Jump to today (T)"
-            aria-hidden={ui.onToday ? "true" : undefined}
-            tabIndex={ui.onToday ? -1 : undefined}
-            disabled={isDisabled}
+            disabled={isDisabled || ui.onToday}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               actionsRef.current?.handleToday();

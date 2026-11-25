@@ -299,6 +299,11 @@ test("ControlRow in mode 0 renders the active range label and switches to Since 
     !weekMarkup.includes("Since "),
     "Mode 0 non-all range must not render the static Since scope label",
   );
+  assert.match(
+    weekMarkup,
+    /<span class="font-mono text-\[12px\] whitespace-nowrap text-\[#5A5A55\]">Nov 22–28, 2026/,
+    "Mode 0 range label must use the same muted color as the Since label",
+  );
 
   const allMarkup = renderToStaticMarkup(
     React.createElement(ControlRow, {

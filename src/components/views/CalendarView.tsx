@@ -209,7 +209,7 @@ const YearBlock = React.memo<YearBlockProps>(
                       dateKey === selectionStart || dateKey === selectionEnd;
 
                     const opacityClass =
-                      hasActiveSelection && !isSelected ? "opacity-35" : "opacity-100";
+                      hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
                     const ringClass = isStartOrEnd
                       ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                       : "";
@@ -330,7 +330,7 @@ const YearBlock = React.memo<YearBlockProps>(
                   dateKey === selectionStart || dateKey === selectionEnd;
 
                 const opacityClass =
-                  hasActiveSelection && !isSelected ? "opacity-35" : "opacity-100";
+                  hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
                 const ringClass = isStartOrEnd
                   ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                   : "";
@@ -785,7 +785,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             type="button"
             disabled={!draft}
             onClick={handleOpenInOverview}
-            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none transition-none border border-music-accent text-music-accent bg-transparent flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
+            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none transition-colors border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
           >
             Open in Overview &rarr;
           </button>
