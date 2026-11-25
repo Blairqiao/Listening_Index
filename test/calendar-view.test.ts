@@ -216,7 +216,7 @@ test("CalendarView renders no content when data is null and isLoading is false",
   assert.ok(!htmlIdle.includes("No Plays yet."), "must not show 'No Plays yet.' when data is null");
 });
 
-test("CalendarView aligns M/W/F weekday labels to row tracks 1, 3, 5 of the week grid", () => {
+test("CalendarView aligns M/W/F weekday labels to row tracks 2, 4, 6 of the week grid", () => {
   const fixtureData: CalendarData = {
     firstDate: "2026-09-04",
     today: "2026-11-23",
@@ -234,10 +234,10 @@ test("CalendarView aligns M/W/F weekday labels to row tracks 1, 3, 5 of the week
     })
   );
 
-  // Check that M, W, F are placed in grid-column: 1 and grid-row: 1, 3, 5
-  assert.match(html, /grid-column:1;\s*grid-row:1/);
-  assert.match(html, /grid-column:1;\s*grid-row:3/);
-  assert.match(html, /grid-column:1;\s*grid-row:5/);
+  // Check that M, W, F are placed in grid-column: 1 and grid-row: 2, 4, 6
+  assert.match(html, /grid-column:1;\s*grid-row:2/);
+  assert.match(html, /grid-column:1;\s*grid-row:4/);
+  assert.match(html, /grid-column:1;\s*grid-row:6/);
   assert.match(html, />M<\/div>/);
   assert.match(html, />W<\/div>/);
   assert.match(html, />F<\/div>/);

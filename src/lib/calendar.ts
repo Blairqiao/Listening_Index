@@ -156,13 +156,13 @@ export function calendarYears(firstDate: string | null, today: string): number[]
 }
 
 /**
- * 53 columns × 7 rows, Monday first (row 0 = Monday). Column 0 holds Jan 1 at row (weekday of Jan 1, Monday = 0).
- * Cells outside the year are null. Some years need 54 columns (a leap year starting on Sunday):
+ * 53 columns × 7 rows, Sunday first (row 0 = Sunday). Column 0 holds Jan 1 at row (weekday of Jan 1, Sunday = 0).
+ * Cells outside the year are null. Some years need 54 columns (a leap year starting on Saturday):
  * return as many columns as needed, at least 53.
  */
 export function weekColumns(year: number): Array<Array<string | null>> {
   const jan1 = new Date(utcMs(year, 0, 1));
-  const startRow = (jan1.getUTCDay() + 6) % 7;
+  const startRow = jan1.getUTCDay();
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
   const totalDays = isLeap ? 366 : 365;
 
@@ -194,7 +194,7 @@ export function weekColumns(year: number): Array<Array<string | null>> {
 /** 12 entries: the column index holding the 1st of each month */
 export function monthStartColumns(year: number): number[] {
   const jan1 = new Date(utcMs(year, 0, 1));
-  const startRow = (jan1.getUTCDay() + 6) % 7;
+  const startRow = jan1.getUTCDay();
   const cols: number[] = [];
   for (let m = 0; m < 12; m++) {
     const firstOfMonth = new Date(utcMs(year, m, 1));

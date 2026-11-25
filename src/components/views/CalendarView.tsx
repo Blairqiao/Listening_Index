@@ -276,21 +276,21 @@ const YearBlock = React.memo<YearBlockProps>(
               gap: "3px",
             }}
           >
-            {/* Weekday labels in column 1 aligned to rows 1, 3, 5 (M, W, F) */}
+            {/* Weekday labels in column 1 aligned to rows 2, 4, 6 (M, W, F) */}
             <div
-              style={{ gridColumn: 1, gridRow: 1 }}
+              style={{ gridColumn: 1, gridRow: 2 }}
               className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
             >
               M
             </div>
             <div
-              style={{ gridColumn: 1, gridRow: 3 }}
+              style={{ gridColumn: 1, gridRow: 4 }}
               className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
             >
               W
             </div>
             <div
-              style={{ gridColumn: 1, gridRow: 5 }}
+              style={{ gridColumn: 1, gridRow: 6 }}
               className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
             >
               F

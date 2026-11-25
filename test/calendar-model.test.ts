@@ -139,11 +139,12 @@ test('calendarYears returns descending years from today down to firstDate', () =
   assert.deepEqual(calendarYears(null, '2026-11-23'), []);
 });
 
-test('weekColumns(2024) places Jan 1 at column 0 row 0 and has 366 non-null cells', () => {
+test('weekColumns(2024) places Jan 1 at column 0 row 1 and has 366 non-null cells', () => {
   const cols = weekColumns(2024);
   assert.ok(cols.length >= 53);
-  // Jan 1 2024 was Monday -> row 0
-  assert.equal(cols[0][0], '2024-01-01');
+  // Jan 1 2024 was Monday -> row 1 (Sunday = 0)
+  assert.equal(cols[0][0], null);
+  assert.equal(cols[0][1], '2024-01-01');
 
   // Verify all cells have length 7
   for (const col of cols) {
@@ -173,30 +174,37 @@ test('weekColumns(2024) places Jan 1 at column 0 row 0 and has 366 non-null cell
   assert.ok(dateSet.has('2024-12-31'));
 });
 
-test('weekColumns(2033) places Jan 1 at row 5', () => {
+test('weekColumns(2033) places Jan 1 at row 6', () => {
   const cols = weekColumns(2033);
   assert.ok(cols.length >= 53);
-  // Jan 1 2033 was Saturday -> row 5
+  // Jan 1 2033 was Saturday -> row 6 (Sunday = 0)
   assert.equal(cols[0][0], null);
   assert.equal(cols[0][1], null);
   assert.equal(cols[0][2], null);
   assert.equal(cols[0][3], null);
   assert.equal(cols[0][4], null);
-  assert.equal(cols[0][5], '2033-01-01');
-  assert.equal(cols[0][6], '2033-01-02');
+  assert.equal(cols[0][5], null);
+  assert.equal(cols[0][6], '2033-01-01');
+  assert.equal(cols[1][0], '2033-01-02');
 
   const nonNull = cols.flat().filter((c): c is string => c !== null);
   assert.equal(nonNull.length, 365);
 });
 
-test('weekColumns handles leap year starting on Sunday with 54 columns', () => {
-  // 2012 was a leap year starting on Sunday (Jan 1 was Sunday, row 6)
-  const cols = weekColumns(2012);
-  assert.equal(cols.length, 54);
-  assert.equal(cols[0][6], '2012-01-01');
-  assert.equal(cols[53][0], '2012-12-31');
-  const nonNull = cols.flat().filter((c): c is string => c !== null);
-  assert.equal(nonNull.length, 366);
+test('weekColumns handles leap year starting on Saturday (54 cols) and Sunday (53 cols)', () => {
+  // 2028 is a leap year starting on Saturday (Jan 1 is Saturday, row 6)
+  const cols2028 = weekColumns(2028);
+  assert.equal(cols2028.length, 54);
+  assert.equal(cols2028[0][6], '2028-01-01');
+  assert.equal(cols2028[53][0], '2028-12-31');
+  assert.equal(cols2028.flat().filter((c): c is string => c !== null).length, 366);
+
+  // 2012 was a leap year starting on Sunday (Jan 1 was Sunday, row 0)
+  const cols2012 = weekColumns(2012);
+  assert.equal(cols2012.length, 53);
+  assert.equal(cols2012[0][0], '2012-01-01');
+  assert.equal(cols2012[52][1], '2012-12-31');
+  assert.equal(cols2012.flat().filter((c): c is string => c !== null).length, 366);
 });
 
 test('monthStartColumns returns 12 entries and 2024[1] holds Feb 1', () => {
