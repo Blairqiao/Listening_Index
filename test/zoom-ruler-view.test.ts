@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ZoomRuler } from "../src/components/listening-view/zoom-ruler/ZoomRuler";
+import {
+  ZoomRuler,
+  nextOnToday,
+} from "../src/components/listening-view/zoom-ruler/ZoomRuler";
 import { presetRange, unitWindow } from "../src/lib/range";
 
 const BASE_PROPS = {
@@ -116,4 +119,37 @@ test("ZoomRuler SSR markup depends only on range and never on todayKey", () => {
     }),
   );
   assert.equal(a, b, "SSR markup must not depend on todayKey");
+});
+
+test("nextOnToday keeps the Today icon state unchanged while the ruler is zooming", () => {
+  const todayWeek = { from: "2026-11-22", to: "2026-11-28" };
+  const settled = {
+    settledLevel: "week" as const,
+    isZooming: false,
+    exact: true,
+    selectedUnit: todayWeek,
+    todayKey: "2026-11-24",
+  };
+
+  assert.equal(nextOnToday(false, settled), true, "settled on today's week hides the icon");
+  assert.equal(
+    nextOnToday(false, { ...settled, selectedUnit: { from: "2026-11-15", to: "2026-11-21" } }),
+    false,
+    "settled away from today shows the icon",
+  );
+  assert.equal(
+    nextOnToday(true, { ...settled, isZooming: true }),
+    true,
+    "a zoom step started on today must not flash the icon",
+  );
+  assert.equal(
+    nextOnToday(false, { ...settled, isZooming: true }),
+    false,
+    "a zoom step started away from today keeps the icon",
+  );
+  assert.equal(
+    nextOnToday(false, { ...settled, settledLevel: "all", exact: false, selectedUnit: undefined }),
+    true,
+    "the All level hides the icon",
+  );
 });

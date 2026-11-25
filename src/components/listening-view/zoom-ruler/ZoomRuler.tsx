@@ -96,6 +96,30 @@ interface RulerInternalState {
   drawRafId: number | null;
 }
 
+/**
+ * Whether the Today icon should be hidden. While a zoom animates, the previous
+ * value holds, so a zoom step taken on today doesn't flash the icon.
+ */
+export function nextOnToday(
+  prev: boolean,
+  s: {
+    settledLevel: RulerLevel;
+    isZooming: boolean;
+    exact: boolean;
+    selectedUnit: { from: string; to: string } | undefined;
+    todayKey: string;
+  },
+): boolean {
+  if (s.settledLevel === "all") return true;
+  if (s.isZooming) return prev;
+  return (
+    s.exact &&
+    s.selectedUnit !== undefined &&
+    s.todayKey >= s.selectedUnit.from &&
+    s.todayKey <= s.selectedUnit.to
+  );
+}
+
 function levelForSpan(spanDays: number): RulerLevel {
   if (spanDays <= 1) return "day";
   if (spanDays <= 7) return "week";
@@ -369,22 +393,23 @@ export function ZoomRuler({
       const nextAllLocked = isAllSettled(state);
       const selectedUnit =
         state.selected !== null ? state.units[state.selected] : undefined;
-      const nextOnToday =
-        state.settledLevel === "all" ||
-        (!state.isZooming &&
-          state.exact &&
-          selectedUnit !== undefined &&
-          state.todayKey >= selectedUnit.from &&
-          state.todayKey <= selectedUnit.to);
+      const todayInputs = {
+        settledLevel: state.settledLevel,
+        isZooming: state.isZooming,
+        exact: state.exact,
+        selectedUnit,
+        todayKey: state.todayKey,
+      };
 
       setUi((prev) => {
+        const onToday = nextOnToday(prev.onToday, todayInputs);
         const currentWord = prev.activeLayer === 0 ? prev.layer0 : prev.layer1;
         const wordChanged = nextWord !== currentWord;
         const flagsChanged =
           prev.zoomOutDisabled !== nextZoomOutDisabled ||
           prev.zoomInDisabled !== nextZoomInDisabled ||
           prev.isAllLocked !== nextAllLocked ||
-          prev.onToday !== nextOnToday;
+          prev.onToday !== onToday;
 
         if (!wordChanged && !flagsChanged) return prev;
 
@@ -394,7 +419,7 @@ export function ZoomRuler({
             zoomOutDisabled: nextZoomOutDisabled,
             zoomInDisabled: nextZoomInDisabled,
             isAllLocked: nextAllLocked,
-            onToday: nextOnToday,
+            onToday,
           };
         }
 
@@ -406,7 +431,7 @@ export function ZoomRuler({
           zoomOutDisabled: nextZoomOutDisabled,
           zoomInDisabled: nextZoomInDisabled,
           isAllLocked: nextAllLocked,
-          onToday: nextOnToday,
+          onToday,
         };
       });
     }
