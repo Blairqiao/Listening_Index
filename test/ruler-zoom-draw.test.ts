@@ -13,6 +13,7 @@ import {
 import {
   LABEL_ROW,
   MAJOR_TICK,
+  MEDIUM_TICK,
   MINOR_TICK,
   PHANTOM_ALPHA,
   drawRuler,
@@ -42,8 +43,18 @@ interface RectCall {
   fillStyle: string;
 }
 
-function createRecordingCtx(): { ctx: RulerCtx; rects: RectCall[] } {
+interface TextCall {
+  text: string;
+  x: number;
+  y: number;
+  globalAlpha: number;
+  fillStyle: string;
+  textAlign: CanvasTextAlign;
+}
+
+function createRecordingCtx(): { ctx: RulerCtx; rects: RectCall[]; texts: TextCall[] } {
   const rects: RectCall[] = [];
+  const texts: TextCall[] = [];
   const ctx: RulerCtx = {
     fillStyle: "#000000",
     globalAlpha: 1,
@@ -61,12 +72,21 @@ function createRecordingCtx(): { ctx: RulerCtx; rects: RectCall[] } {
         fillStyle: ctx.fillStyle,
       });
     },
-    fillText() {},
+    fillText(text: string, x: number, y: number) {
+      texts.push({
+        text,
+        x,
+        y,
+        globalAlpha: ctx.globalAlpha,
+        fillStyle: ctx.fillStyle,
+        textAlign: ctx.textAlign,
+      });
+    },
     measureText(text: string) {
       return { width: text.length * 6 };
     },
   };
-  return { ctx, rects };
+  return { ctx, rects, texts };
 }
 
 function findTickNearX(rects: RectCall[], expectedX: number, height: number): RectCall {
@@ -337,5 +357,125 @@ describe("drawRuler", () => {
       (r) => r.x === reticleX && r.y === LABEL_ROW && r.w === 2,
     );
     assert.equal(reticleRects.length, 0);
+  });
+
+  it("draws Sunday numbers, Dec label, medium 7px Sunday ticks, and priority-3 accent selected label", () => {
+    const width = 396;
+    const height = 26;
+    const ppd = 12;
+    const { units, realFirst, realLast } = buildRulerUnits("day", FIRST_KEY, "2026-11-24");
+    const centers = units.map((u) => unitCenterDay(u, FIRST_KEY) * ppd);
+    const centerIdx = units.findIndex((u) => u.from === "2026-11-24");
+    const offset = centers[centerIdx];
+
+    // Unselected: "15", "22", "29", and "Dec" all draw without collision
+    const unselectedRun = createRecordingCtx();
+    drawRuler(unselectedRun.ctx, {
+      width,
+      height,
+      level: "day",
+      units,
+      centers,
+      offset,
+      realFirst,
+      realLast,
+      selected: null,
+      allMode: false,
+      palette: { ...TEST_PALETTE, medium: "#5A5A52" },
+    });
+
+    const drawnTexts = unselectedRun.texts.map((t) => t.text);
+    for (const expected of ["15", "22", "29", "Dec"]) {
+      assert.ok(drawnTexts.includes(expected), `Expected label ${expected} in ${drawnTexts.join(", ")}`);
+    }
+    const decCall = unselectedRun.texts.find((t) => t.text === "Dec")!;
+    assert.equal(decCall.globalAlpha, PHANTOM_ALPHA);
+    assert.equal(decCall.y, 1);
+    assert.equal(decCall.textAlign, "center");
+
+    // Sunday ticks are MEDIUM_TICK (7px) tall and use palette.medium (falling back to minor)
+    const nov22Idx = units.findIndex((u) => u.from === "2026-11-22");
+    const nov22X = Math.round(width / 2 + centers[nov22Idx] - offset);
+    const nov22Tick = findTickNearX(unselectedRun.rects, nov22X, height);
+    assert.equal(nov22Tick.h, MEDIUM_TICK);
+    assert.equal(nov22Tick.fillStyle, "#5A5A52");
+
+    // Fallback to palette.minor when palette.medium is omitted
+    const fallbackRun = createRecordingCtx();
+    drawRuler(fallbackRun.ctx, {
+      width,
+      height,
+      level: "day",
+      units,
+      centers,
+      offset,
+      realFirst,
+      realLast,
+      selected: null,
+      allMode: false,
+      palette: TEST_PALETTE,
+    });
+    const fallbackTick = findTickNearX(fallbackRun.rects, nov22X, height);
+    assert.equal(fallbackTick.h, MEDIUM_TICK);
+    assert.equal(fallbackTick.fillStyle, TEST_PALETTE.minor);
+
+    // Selected Monday Nov 23: "23" draws in accent and suppresses colliding Sunday "22"
+    const nov23Idx = units.findIndex((u) => u.from === "2026-11-23");
+    const selectedRun = createRecordingCtx();
+    drawRuler(selectedRun.ctx, {
+      width,
+      height,
+      level: "day",
+      units,
+      centers,
+      offset,
+      realFirst,
+      realLast,
+      selected: nov23Idx,
+      allMode: false,
+      palette: TEST_PALETTE,
+    });
+
+    const selLabel = selectedRun.texts.find((t) => t.text === "23");
+    assert.ok(selLabel, "Expected selected label '23'");
+    assert.equal(selLabel.fillStyle, TEST_PALETTE.accent);
+    assert.equal(
+      selectedRun.texts.some((t) => t.text === "22"),
+      false,
+      "Expected colliding Sunday '22' to be suppressed by priority-3 '23'",
+    );
+    assert.ok(selectedRun.texts.some((t) => t.text === "15"));
+    assert.ok(selectedRun.texts.some((t) => t.text === "29"));
+    assert.ok(selectedRun.texts.some((t) => t.text === "Dec"));
+  });
+
+  it("adds no priority-3 label for a selected week without a boundaryLabel", () => {
+    const width = 396;
+    const height = 26;
+    const { units, realFirst, realLast } = buildRulerUnits("week", FIRST_KEY, "2026-11-24");
+    const ppd = FIXED_PPD.week;
+    const centers = units.map((u) => unitCenterDay(u, FIRST_KEY) * ppd);
+    const midWeekIdx = units.findIndex((u) => u.from === "2026-11-15");
+    assert.equal(units[midWeekIdx].monthStart, false);
+
+    const { ctx, texts } = createRecordingCtx();
+    drawRuler(ctx, {
+      width,
+      height,
+      level: "week",
+      units,
+      centers,
+      offset: centers[midWeekIdx],
+      realFirst,
+      realLast,
+      selected: midWeekIdx,
+      allMode: false,
+      palette: TEST_PALETTE,
+    });
+
+    assert.equal(
+      texts.some((t) => t.fillStyle === TEST_PALETTE.accent),
+      false,
+    );
   });
 });

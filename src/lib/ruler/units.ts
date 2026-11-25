@@ -5,6 +5,7 @@ import {
   formatRangeLabel,
   normalizeLegacyRange,
   unitBounds,
+  weekdayIndex,
   type CalendarUnit,
   type RangeSelection,
 } from "@/lib/range";
@@ -49,8 +50,11 @@ export interface RulerUnit {
   phantom: boolean;
   monthStart: boolean;
   yearStart: boolean;
+  weekStart: boolean;
   short: string;
 }
+
+export type TickRank = "major" | "medium" | "minor";
 
 export interface RulerPlacement {
   level: RulerLevel;
@@ -68,12 +72,13 @@ function buildUnitFlags(
   unit: CalendarUnit,
   from: string,
   to: string,
-): { monthStart: boolean; yearStart: boolean; short: string } {
+): { monthStart: boolean; yearStart: boolean; weekStart: boolean; short: string } {
   const [fy, fm, fd] = parseParts(from);
   if (unit === "day") {
     return {
       monthStart: fd === 1,
       yearStart: fm === 1 && fd === 1,
+      weekStart: weekdayIndex(from) === 0,
       short: String(fd),
     };
   }
@@ -82,6 +87,7 @@ function buildUnitFlags(
     return {
       monthStart: fm !== tm || fd === 1,
       yearStart: fy !== ty || (fm === 1 && fd === 1),
+      weekStart: true,
       short: String(td),
     };
   }
@@ -89,12 +95,14 @@ function buildUnitFlags(
     return {
       monthStart: true,
       yearStart: fm === 1,
+      weekStart: false,
       short: SHORT_MONTHS[fm - 1],
     };
   }
   return {
     monthStart: true,
     yearStart: true,
+    weekStart: false,
     short: from.slice(0, 4),
   };
 }
@@ -127,14 +135,14 @@ export function buildRulerUnits(
   while (cur <= curEnd) {
     const { from, to } = unitBounds(cur, unit);
     const phantom = to < firstKey || from > todayKey;
-    const { monthStart, yearStart, short } = buildUnitFlags(unit, from, to);
+    const { monthStart, yearStart, weekStart, short } = buildUnitFlags(unit, from, to);
 
     if (!phantom) {
       if (realFirst === -1) realFirst = units.length;
       realLast = units.length;
     }
 
-    units.push({ from, to, phantom, monthStart, yearStart, short });
+    units.push({ from, to, phantom, monthStart, yearStart, weekStart, short });
     cur = addCalendarDays(to, 1);
   }
 
@@ -183,6 +191,19 @@ export function isMajorTick(level: RulerLevel, u: RulerUnit): boolean {
   if (level === "day" || level === "week") return u.monthStart;
   if (level === "month") return u.yearStart;
   return true;
+}
+
+/** Structural tick rank rule; ignores `u.phantom`. */
+export function tickRank(level: RulerLevel, u: RulerUnit): TickRank {
+  if (isMajorTick(level, u)) return "major";
+  if (level === "day" && u.weekStart && !u.monthStart) return "medium";
+  return "minor";
+}
+
+/** Returns the Sunday day-number label at the day level (non-month-start), else null. */
+export function weekStartLabel(level: RulerLevel, u: RulerUnit): string | null {
+  if (level === "day" && u.weekStart && !u.monthStart) return u.short;
+  return null;
 }
 
 function clampDateKey(key: string, firstKey: string, todayKey: string): string {

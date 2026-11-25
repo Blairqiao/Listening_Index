@@ -9,6 +9,8 @@ import {
   indexForDate,
   isMajorTick,
   placementForRange,
+  tickRank,
+  weekStartLabel,
 } from "../src/lib/ruler/units";
 
 const FIRST_KEY = "2019-03-01";
@@ -233,5 +235,43 @@ describe("placementForRange", () => {
         label: null,
       },
     );
+  });
+});
+
+describe("weekStart, tickRank, and weekStartLabel", () => {
+  it("sets weekStart true for day Sundays and all weeks, false for months and years", () => {
+    const dayRes = buildRulerUnits("day", FIRST_KEY, "2026-11-24");
+    const sunIdx = indexForDate(dayRes.units, "2026-11-22");
+    const monIdx = indexForDate(dayRes.units, "2026-11-23");
+    assert.equal(dayRes.units[sunIdx].weekStart, true);
+    assert.equal(dayRes.units[monIdx].weekStart, false);
+
+    const weekRes = buildRulerUnits("week", FIRST_KEY, "2026-11-24");
+    assert.equal(weekRes.units[weekRes.realLast].weekStart, true);
+
+    const monthRes = buildRulerUnits("month", FIRST_KEY, "2026-11-24");
+    assert.equal(monthRes.units[monthRes.realLast].weekStart, false);
+
+    const yearRes = buildRulerUnits("year", FIRST_KEY, "2026-11-24");
+    assert.equal(yearRes.units[yearRes.realLast].weekStart, false);
+  });
+
+  it("returns medium, minor, and major from tickRank and day numbers from weekStartLabel", () => {
+    const dayRes = buildRulerUnits("day", FIRST_KEY, "2026-11-24");
+    const nov1 = dayRes.units[indexForDate(dayRes.units, "2026-11-01")]; // Sunday + 1st
+    const nov22 = dayRes.units[indexForDate(dayRes.units, "2026-11-22")]; // Sunday
+    const nov23 = dayRes.units[indexForDate(dayRes.units, "2026-11-23")]; // Monday
+
+    assert.equal(tickRank("day", nov22), "medium");
+    assert.equal(tickRank("day", nov23), "minor");
+    assert.equal(tickRank("day", nov1), "major");
+
+    assert.equal(weekStartLabel("day", nov22), "22");
+    assert.equal(weekStartLabel("day", nov23), null);
+    assert.equal(weekStartLabel("day", nov1), null);
+
+    const weekRes = buildRulerUnits("week", FIRST_KEY, "2026-11-24");
+    assert.equal(weekStartLabel("week", weekRes.units[weekRes.realLast]), null);
+    assert.equal(tickRank("week", weekRes.units[weekRes.realLast]), "minor");
   });
 });
