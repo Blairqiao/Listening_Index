@@ -454,7 +454,15 @@ export function todayDateKey(tz: string, now: Date = new Date()): string {
 }
 
 /**
- * Full calendar unit holding dateKey. Weeks run Monday..Sunday (matches
+ * Day of week for a calendar date key: 0 = Sunday … 6 = Saturday (UTC, never shifted by timezone).
+ */
+export function weekdayIndex(dateKey: string): number {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(utcMs(year, month - 1, day)).getUTCDay();
+}
+
+/**
+ * Full calendar unit holding dateKey. Weeks run Sunday..Saturday (matches
  * /src/lib/calendar.ts weekColumns). Never clamped.
  */
 export function unitBounds(
@@ -465,13 +473,12 @@ export function unitBounds(
     return { from: dateKey, to: dateKey };
   }
 
-  const [year, month, day] = dateKey.split("-").map(Number);
-
   if (unit === "week") {
-    const dow = (new Date(utcMs(year, month - 1, day)).getUTCDay() + 6) % 7;
-    const from = addCalendarDays(dateKey, -dow);
+    const from = addCalendarDays(dateKey, -weekdayIndex(dateKey));
     return { from, to: addCalendarDays(from, 6) };
   }
+
+  const [year, month] = dateKey.split("-").map(Number);
 
   if (unit === "month") {
     return {
@@ -508,9 +515,7 @@ export function exactUnitOf(
     return { unit: "day", from };
   }
 
-  const [fy, fm, fd] = from.split("-").map(Number);
-  const dow = (new Date(utcMs(fy, fm - 1, fd)).getUTCDay() + 6) % 7;
-  if (dow === 0 && to === addCalendarDays(from, 6)) {
+  if (weekdayIndex(from) === 0 && to === addCalendarDays(from, 6)) {
     return { unit: "week", from };
   }
 

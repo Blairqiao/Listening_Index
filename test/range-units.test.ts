@@ -10,32 +10,48 @@ import {
   todayDateKey,
   unitBounds,
   unitWindow,
+  weekdayIndex,
   type CalendarUnit,
 } from "../src/lib/range";
 
+describe("weekdayIndex", () => {
+  it("returns 0 for Sunday through 6 for Saturday in UTC", () => {
+    assert.equal(weekdayIndex("2026-11-22"), 0);
+    assert.equal(weekdayIndex("2026-11-23"), 1);
+    assert.equal(weekdayIndex("2026-11-25"), 3);
+    assert.equal(weekdayIndex("2026-11-28"), 6);
+  });
+});
+
 describe("unitBounds / unitWindow", () => {
-  it("computes bounds for day, week (Monday-first), month (including leap Feb), and year", () => {
+  it("computes bounds for day, week (Sunday-first), month (including leap Feb), and year", () => {
     assert.deepEqual(unitBounds("2026-11-22", "day"), {
       from: "2026-11-22",
       to: "2026-11-22",
     });
 
-    // Sunday -> Monday..Sunday
+    // Sunday -> Sunday..Saturday
     assert.deepEqual(unitBounds("2026-11-22", "week"), {
-      from: "2026-11-16",
-      to: "2026-11-22",
+      from: "2026-11-22",
+      to: "2026-11-28",
     });
 
-    // Monday -> same Monday..Sunday
-    assert.deepEqual(unitBounds("2026-11-16", "week"), {
-      from: "2026-11-16",
-      to: "2026-11-22",
+    // Mid-week (Wednesday) -> same Sunday..Saturday
+    assert.deepEqual(unitBounds("2026-11-25", "week"), {
+      from: "2026-11-22",
+      to: "2026-11-28",
     });
 
-    // Week crossing a year boundary (2026-01-01 is Thursday)
-    assert.deepEqual(unitBounds("2026-01-01", "week"), {
-      from: "2025-12-29",
-      to: "2026-01-04",
+    // Saturday -> same Sunday..Saturday
+    assert.deepEqual(unitBounds("2026-11-28", "week"), {
+      from: "2026-11-22",
+      to: "2026-11-28",
+    });
+
+    // Week crossing a year boundary (2026-12-31 is Thursday)
+    assert.deepEqual(unitBounds("2026-12-31", "week"), {
+      from: "2026-12-27",
+      to: "2027-01-02",
     });
 
     // Leap year February
@@ -74,8 +90,15 @@ describe("exactUnitOf", () => {
     });
     assert.deepEqual(exactUnitOf(unitWindow("2026-11-22", "week")), {
       unit: "week",
-      from: "2026-11-16",
+      from: "2026-11-22",
     });
+    assert.deepEqual(
+      exactUnitOf({ kind: "window", from: "2026-11-22", to: "2026-11-28" }),
+      {
+        unit: "week",
+        from: "2026-11-22",
+      },
+    );
     assert.deepEqual(exactUnitOf(unitWindow("2024-02-10", "month")), {
       unit: "month",
       from: "2024-02-01",
@@ -84,6 +107,12 @@ describe("exactUnitOf", () => {
       unit: "year",
       from: "2026-01-01",
     });
+
+    // 7-day window starting on a Monday is not a calendar week
+    assert.equal(
+      exactUnitOf({ kind: "window", from: "2026-11-23", to: "2026-11-29" }),
+      null,
+    );
 
     // 7-day window starting on a Tuesday is not a calendar week
     assert.equal(
@@ -115,8 +144,8 @@ describe("normalizeLegacyRange", () => {
     });
     assert.deepEqual(normalizeLegacyRange(presetRange("1w"), todayKey), {
       kind: "window",
-      from: "2026-11-16",
-      to: "2026-11-22",
+      from: "2026-11-22",
+      to: "2026-11-28",
     });
     assert.deepEqual(normalizeLegacyRange(presetRange("1m"), todayKey), {
       kind: "window",

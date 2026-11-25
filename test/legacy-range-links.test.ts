@@ -83,11 +83,11 @@ function mountWithFixedClock(search: string, visitorTimezone: string, fixedIso: 
   return calls;
 }
 
-test('useListeningUrlSync normalizes ?range=1w to Monday..Sunday window in visitorTimezone for fixed clock', () => {
+test('useListeningUrlSync normalizes ?range=1w to Sunday..Saturday window in visitorTimezone for fixed clock', () => {
   // 2026-11-23T01:00:00Z is Monday 2026-11-23 in UTC, but Sunday 2026-11-22 in Pacific/Honolulu (UTC-10)
   const calls = mountWithFixedClock('?range=1w', 'Pacific/Honolulu', '2026-11-23T01:00:00.000Z');
   const expected = unitWindow('2026-11-22', 'week');
-  assert.deepEqual(expected, { kind: 'window', from: '2026-11-16', to: '2026-11-22' });
+  assert.deepEqual(expected, { kind: 'window', from: '2026-11-22', to: '2026-11-28' });
   assert.deepEqual(calls.ranges, [expected]);
   assert.deepEqual(calls.fetched, [expected]);
 });

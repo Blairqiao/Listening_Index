@@ -46,7 +46,7 @@ describe("buildRulerUnits", () => {
     assert.equal(units[units.length - 1].phantom, true);
   });
 
-  it("builds week units with 30 phantoms on each side and Monday..Sunday bounds", () => {
+  it("builds week units with 30 phantoms on each side and Sunday..Saturday bounds", () => {
     const { units, realFirst, realLast } = buildRulerUnits(
       "week",
       FIRST_KEY,
@@ -55,18 +55,18 @@ describe("buildRulerUnits", () => {
 
     assert.equal(realFirst, 30);
     assert.equal(units.length - 1 - realLast, 30);
-    assert.equal(units[realLast].from, "2026-11-16");
-    assert.equal(units[realLast].to, "2026-11-22");
-    assert.equal(units[realLast].short, "22");
+    assert.equal(units[realLast].from, "2026-11-22");
+    assert.equal(units[realLast].to, "2026-11-28");
+    assert.equal(units[realLast].short, "28");
     assert.equal(units[realLast].phantom, false);
 
-    // Week containing 2026-11-01 (2026-10-26..2026-11-01) is a monthStart
+    // Week containing 2026-11-01 (2026-11-01..2026-11-07) is a monthStart
     const novStartIdx = indexForDate(units, "2026-11-01");
     assert.ok(novStartIdx >= realFirst);
     assert.equal(units[novStartIdx].monthStart, true);
-    assert.equal(units[novStartIdx].short, "1");
+    assert.equal(units[novStartIdx].short, "7");
 
-    // Week containing Jan 1 2026 (2025-12-29..2026-01-04) is both monthStart and yearStart
+    // Week containing Jan 1 2026 (2025-12-28..2026-01-03) is both monthStart and yearStart
     const janStartIdx = indexForDate(units, "2026-01-01");
     assert.equal(units[janStartIdx].monthStart, true);
     assert.equal(units[janStartIdx].yearStart, true);
