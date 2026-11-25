@@ -1,11 +1,10 @@
-import { RANGE_KEYS, type Mode } from "@/lib/types";
+import type { Mode } from "@/lib/types";
 import type { OverviewData, StreamLogData, TrackTelemetryStats } from "@/lib/db/queries";
 import {
   DEFAULT_OVERVIEW_RANGE,
   formatRangeParam,
   isSameRange,
   parseRangeParam,
-  presetRange,
   type RangeSelection,
 } from "@/lib/range";
 import {
@@ -21,15 +20,12 @@ import {
 import { formatLogStartDate } from "@/lib/db/queries/helpers";
 import { formatRankDisplay, formatPlaysDisplay } from "@/lib/format-utils";
 
-const PRESET_KEY_SET = new Set<string>(RANGE_KEYS);
-
-/** Active selection first, then every preset with no duplicates. */
+/** Active selection only; rolling presets are no longer shown in the UI. */
 export function overviewRefreshOrder(active: RangeSelection): RangeSelection[] {
-  const presets = RANGE_KEYS.map(presetRange).filter((preset) => !isSameRange(preset, active));
-  return [active, ...presets];
+  return [active];
 }
 
-/** Drop cached window entries other than the active selection so stale windows cannot show after a refresh. */
+/** Drop cached entries other than the active selection so stale ranges cannot show after a refresh. */
 export function pruneOverviewCacheWindows(
   cache: Record<string, OverviewData>,
   active: RangeSelection
@@ -38,13 +34,23 @@ export function pruneOverviewCacheWindows(
   let dropped = false;
   const next: Record<string, OverviewData> = {};
   for (const [key, value] of Object.entries(cache)) {
-    if (PRESET_KEY_SET.has(key) || key === activeKey) {
+    if (key === activeKey) {
       next[key] = value;
     } else {
       dropped = true;
     }
   }
   return dropped ? next : cache;
+}
+
+export function parseModeParam(raw: string | null | undefined): Mode | null {
+  if (raw === "0") return 0;
+  if (raw === "1") return 1;
+  if (raw === "2") return 2;
+  if (raw === "3") return 3;
+  if (raw === "4") return 4;
+  if (raw === "5") return 5;
+  return null;
 }
 
 export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
@@ -335,6 +341,8 @@ export function buildListeningUrlSearch(
 
   if (state.activeMode === 4) {
     params.set("mode", "4");
+  } else if (state.activeMode === 5) {
+    params.set("mode", "5");
   } else if (state.activeMode === 0) {
     if (state.preservePendingMode3 && params.get("mode") === "3") {
       params.set("mode", "3");

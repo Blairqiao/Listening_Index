@@ -19,6 +19,7 @@ export const BASE_MODES: Array<{ id: Mode; label: string; abbrev: string }> = [
   { id: 0, label: "Overview", abbrev: "Overview" },
   { id: 1, label: "Stream log", abbrev: "Log" },
   { id: 2, label: "Sessions", abbrev: "Sessions" },
+  { id: 5, label: "Calendar", abbrev: "Cal" },
   { id: 4, label: "Search", abbrev: "Search" },
 ];
 

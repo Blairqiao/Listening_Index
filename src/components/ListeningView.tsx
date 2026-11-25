@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { ListeningHeader } from "@/components/listening-view/ListeningHeader";
 import { ModeTabs } from "@/components/listening-view/ModeTabs";
@@ -12,9 +12,9 @@ import { StreamLogView } from "@/components/views/StreamLogView";
 import { SessionView } from "@/components/views/session-view/SessionView";
 import { SearchView } from "@/components/views/search-view/SearchView";
 import { ProfileView } from "@/components/views/search-view/ProfileView";
+import { CalendarView } from "@/components/views/CalendarView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 import { MiniPlayerBar } from "@/components/listening-view/MiniPlayerBar";
-import { useRangeDrillStack } from "@/components/listening-view/useRangeDrillStack";
 import { shouldShowMiniPlayer, miniPlayerProgress } from "@/components/listening-view/mini-player";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -56,8 +56,11 @@ import {
   formatRangeLabel,
   formatRangeParam,
   isSameRange,
+  logStartDateKey,
+  normalizeLegacyRange,
   parseRangeParam,
   PRESET_GRANULARITY,
+  todayDateKey,
   type CadenceGranularity,
   type RangeSelection,
 } from "@/lib/range";
@@ -73,12 +76,21 @@ import { usePersistedToggle } from "./listening-view/usePersistedToggle";
 import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import { useSearchProfile } from "./listening-view/useSearchProfile";
+import { useCalendarData } from "./listening-view/useCalendarData";
+import {
+  CalendarSelection,
+  formatCalendarMetrics,
+  selectionFromRange,
+  selectionToRange,
+  summarizeCalendar,
+} from "@/lib/calendar";
 import {
   buildHistoryState,
   buildListeningUrlSearch,
   computeLivePlayerMetrics,
   findSelectedSession,
   formatProfileRibbonMetrics,
+  parseModeParam,
   readHistoryState,
   resolveActiveEntity,
   sanitizeActiveMode,
@@ -243,6 +255,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
+  // Mode 5: Calendar selection state
+  const [calendarSelection, setCalendarSelection] = useState<CalendarSelection | null>(null);
+
   // Mode 4: Search & Profile state
   const {
     searchQuery,
@@ -271,6 +286,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     onRequestPushHistory: () => {
       shouldPushHistoryRef.current = true;
     },
+  });
+
+  const calendar = useCalendarData({
+    enabled: activeMode === 5,
+    timezone: visitorTimezone,
+    refreshKey: lastSyncedAt?.getTime() ?? 0,
   });
 
   const handleSyncWithCacheClear = useCallback(async () => {
@@ -320,6 +341,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     skipNextUrlSyncRef,
   } = useListeningUrlSync({
     isAuthenticated,
+    visitorTimezone,
     activeMode,
     openModal,
     setActiveMode,
@@ -395,22 +417,19 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       shouldPushHistoryRef.current = false;
       clearPendingLivePlayer();
       const params = new URL(window.location.href).searchParams;
-      const modeParam = params.get("mode");
+      const parsed = parseModeParam(params.get("mode"));
       const parsedMode: Mode =
-        modeParam === "0" ||
-        modeParam === "1" ||
-        modeParam === "2" ||
-        modeParam === "3" ||
-        modeParam === "4"
-          ? sanitizeActiveMode(parseInt(modeParam, 10) as Mode, isAuthenticated)
-          : 0;
+        parsed !== null ? sanitizeActiveMode(parsed, isAuthenticated) : 0;
       setActiveMode(parsedMode);
 
       const saved = readHistoryState(event.state);
 
+      const todayKey = todayDateKey(visitorTimezone);
+
       if (parsedMode === 4) {
         const target = parseProfileTarget(params);
-        const range = parseRangeParam(params.get("prange"));
+        const parsedProfileRange = parseRangeParam(params.get("prange"));
+        const range = parsedProfileRange ? normalizeLegacyRange(parsedProfileRange, todayKey) : null;
         if (target) {
           syncFromLocation(target, range, saved?.profileHistory);
           if (saved?.search) {
@@ -430,7 +449,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       } else {
         const parsedRange = parseRangeParam(params.get("range"));
         if (parsedRange || parsedMode === 0) {
-          const nextRange = parsedRange ?? DEFAULT_OVERVIEW_RANGE;
+          const nextRange = normalizeLegacyRange(
+            parsedRange ?? DEFAULT_OVERVIEW_RANGE,
+            todayKey
+          );
           selectRange(nextRange);
         }
         const sess = params.get("session");
@@ -444,6 +466,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [
     isAuthenticated,
+    visitorTimezone,
     syncFromLocation,
     setSearchQuery,
     selectRange,
@@ -521,6 +544,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         return;
       }
       const nextMode = sanitizeActiveMode(mode, isAuthenticated);
+      if (nextMode === 5 && calendarSelection === null) {
+        setCalendarSelection(selectionFromRange(activeRangeRef.current));
+      }
       setActiveMode(nextMode);
       if (nextMode === 3) {
         void checkTokenStatus();
@@ -532,6 +558,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       profileTarget,
       handleReturnToSearch,
       isAuthenticated,
+      calendarSelection,
+      activeRangeRef,
       checkTokenStatus,
       clearPendingLivePlayer,
     ]
@@ -541,30 +569,40 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     (range: RangeSelection, opts?: { push?: boolean }) => {
       if (isSyncing) return;
       clearPendingLivePlayer();
-      if (isSameRange(activeRangeRef.current, range)) {
-        if (!overviewCacheRef.current[formatRangeParam(range)]) {
-          selectRange(range);
+      const normalized = normalizeLegacyRange(range, todayDateKey(visitorTimezone));
+      if (isSameRange(activeRangeRef.current, normalized)) {
+        if (!overviewCacheRef.current[formatRangeParam(normalized)]) {
+          selectRange(normalized);
         }
         return;
       }
       shouldPushHistoryRef.current = Boolean(opts?.push);
-      selectRange(range);
+      selectRange(normalized);
     },
-    [isSyncing, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
+    [isSyncing, visitorTimezone, activeRangeRef, overviewCacheRef, selectRange, clearPendingLivePlayer]
   );
 
-  // Histogram drill-up: Overview and profiles each remember where a drill came from
-  const overviewDrill = useRangeDrillStack(activeRange);
-  const profileDrill = useRangeDrillStack(
-    profileRange,
-    profileTarget ? `${profileTarget.kind}:${profileTarget.key}` : ""
+  const handleOpenCalendarSelection = useCallback(
+    (sel: CalendarSelection) => {
+      if (isSyncing) return;
+      shouldPushHistoryRef.current = true;
+      setActiveMode(0);
+      handleSelectRange(selectionToRange(sel), { push: true });
+      window.scrollTo(0, 0);
+    },
+    [isSyncing, handleSelectRange]
   );
-  const drill = activeMode === 4 ? profileDrill : overviewDrill;
-  const selectDrillRange = activeMode === 4 ? handleSelectProfileRange : handleSelectRange;
-  const drillBackTarget = drill.backTarget;
-  const rangeBack = drillBackTarget
-    ? { target: drillBackTarget, onBack: () => selectDrillRange(drillBackTarget, { push: true }) }
-    : null;
+
+  const handleRulerSelectRange = useCallback(
+    (next: RangeSelection) => {
+      if (activeMode === 4) {
+        handleSelectProfileRange(next, { push: true });
+      } else {
+        handleSelectRange(next, { push: true });
+      }
+    },
+    [activeMode, handleSelectProfileRange, handleSelectRange]
+  );
 
   // Derived datasets — strictly real data, no dummy mock data fallbacks
   const displayedRangeKey = formatRangeParam(displayedRange);
@@ -576,6 +614,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     range: displayedRangeKey,
     granularity: fallbackGranularity,
   };
+  const todayKey = useMemo(() => todayDateKey(visitorTimezone), [visitorTimezone]);
+  const firstKey = useMemo(
+    () => logStartDateKey(currentOverview.logStartDate, todayKey),
+    [currentOverview.logStartDate, todayKey]
+  );
   const overviewGranularity: CadenceGranularity = currentOverview.granularity;
   const overviewRangeKey: RangeKey | null =
     displayedRange.kind === "preset" ? displayedRange.key : null;
@@ -706,12 +749,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     profileTarget?.kind === "track" ? trackRankFormat : artistRankFormat,
   );
 
+  const calendarMetrics: [string, string, string, string] = calendar.data
+    ? formatCalendarMetrics(
+        summarizeCalendar(calendar.data.days, calendarSelection, {
+          firstDate: calendar.data.firstDate,
+          today: calendar.data.today,
+        }),
+        calendarSelection,
+        {
+          firstDate: calendar.data.firstDate,
+          today: calendar.data.today,
+        }
+      )
+    : ["--", "--", "--", "--"];
+
   const metricByMode: Record<Mode, [string, string, string, string]> = {
     0: overviewMetrics,
     1: streamMetrics,
     2: currentSessionMetrics,
     3: livePlayerMetrics,
     4: profileMetrics,
+    5: calendarMetrics,
   };
   const currentMetrics = metricByMode[activeMode];
 
@@ -722,8 +780,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const isProfileRangeLoading =
     activeMode === 4 && profileStatus === "loading" && Boolean(profileData);
+  const isCalendarLoading =
+    activeMode === 5 && calendar.status === "loading" && Boolean(calendar.data);
   const isViewDimmed =
-    isSyncing || (activeMode === 0 && isRangeLoading) || isProfileRangeLoading;
+    isSyncing || (activeMode === 0 && isRangeLoading) || isProfileRangeLoading || isCalendarLoading;
 
   const showMiniPlayer = shouldShowMiniPlayer({
     isAuthenticated,
@@ -732,7 +792,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   });
 
   return (
-    <div id="music-page-root" className="min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative overflow-x-hidden">
+    <div
+      id="music-page-root"
+      className={`min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative ${
+        activeMode === 5 ? "overflow-x-clip" : "overflow-x-hidden"
+      }`}
+    >
       {/* Black veil holding the screen as long as needed until real data is ready */}
       <div
         aria-hidden="true"
@@ -763,17 +828,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
             <ControlRow
               mode={activeMode}
               range={activeMode === 4 ? profileRange : activeRange}
-              rangeLabel={
-                (activeMode === 4 ? profileRange : activeRange).kind === "window"
-                  ? formatRangeLabel(activeMode === 4 ? profileRange : activeRange)
-                  : null
-              }
-              onSelectRange={
-                activeMode === 4
-                  ? handleSelectProfileRange
-                  : handleSelectRange
-              }
-              rangeBack={rangeBack}
+              onSelectRange={handleRulerSelectRange}
+              firstKey={firstKey}
+              todayKey={todayKey}
               logStartDate={currentOverview.logStartDate}
               isSessionOpen={activeSession?.isOpen || false}
               sessionTagTime={sessionTagTime}
@@ -825,7 +882,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player and Search) */}
           <div
             aria-busy={isViewDimmed}
-            className={`h-auto ${activeMode === 3 || activeMode === 4 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+            className={`h-auto ${activeMode === 3 || activeMode === 4 || activeMode === 5 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
               } transition-opacity duration-150 ${isViewDimmed
                 ? "opacity-60 pointer-events-none"
                 : "opacity-100"
@@ -854,7 +911,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                         if (isViewDimmed) return;
                         const next = drillSelection(bucket, granularity, visitorTimezone);
                         if (!next || isSameRange(next, activeRange)) return;
-                        overviewDrill.recordDrill(activeRange);
                         handleSelectRange(next, { push: true });
                       }
                 }
@@ -916,7 +972,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                           if (isViewDimmed || !profileData) return;
                           const next = drillSelection(bucket, granularity, visitorTimezone);
                           if (!next || isSameRange(next, profileRange)) return;
-                          profileDrill.recordDrill(profileRange);
                           handleSelectProfileRange(next, { push: true });
                         }
                   }
@@ -948,6 +1003,22 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                     handleOpenProfile(target);
                     window.scrollTo(0, 0);
                   }}
+                />
+              )
+            )}
+
+            {activeMode === 5 && (
+              calendar.status === "error" && !calendar.data ? (
+                <div role="alert" className="w-full py-8 text-center font-mono text-[12px] text-[#5A5A55]">
+                  Unable to load calendar data.
+                </div>
+              ) : (
+                <CalendarView
+                  data={calendar.data}
+                  isLoading={!calendar.data && (calendar.status === "loading" || calendar.status === "idle")}
+                  selection={calendarSelection}
+                  onSelectionChange={setCalendarSelection}
+                  onOpenInOverview={handleOpenCalendarSelection}
                 />
               )
             )}

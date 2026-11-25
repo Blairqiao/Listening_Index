@@ -41,6 +41,8 @@ function controlRowMarkup(selectedSessionId?: string) {
       mode: 2,
       range: presetRange('1w'),
       onSelectRange: () => {},
+      firstKey: '2026-11-24',
+      todayKey: '2026-11-24',
       logStartDate: '--',
       isSessionOpen: selected?.isOpen || false,
       sessionTagTime: '1D',

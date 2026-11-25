@@ -8,7 +8,13 @@ import { DEFAULT_SITE_CONFIG } from "@/lib/config-utils";
 import { isDbConfigured } from "@/lib/db";
 import { ADMIN_COOKIE_NAME, verifySessionToken } from "@/lib/admin-auth";
 import type { Mode } from "@/lib/types";
-import { DEFAULT_OVERVIEW_RANGE, parseRangeParam, type RangeSelection } from "@/lib/range";
+import {
+  DEFAULT_OVERVIEW_RANGE,
+  normalizeLegacyRange,
+  parseRangeParam,
+  todayDateKey,
+  type RangeSelection,
+} from "@/lib/range";
 import {
   checkSearchQuery,
   parseProfileTarget,
@@ -16,6 +22,7 @@ import {
   parseSearchPage,
   parseSearchSort,
 } from "@/lib/search-utils";
+import { parseModeParam } from "@/components/listening-view/listening-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -58,19 +65,26 @@ export default async function Page({ searchParams }: PageProps) {
   
   const resolvedParams = searchParams ? await searchParams : {};
 
-  const initialRange: RangeSelection =
-    parseRangeParam(resolvedParams?.range) ?? DEFAULT_OVERVIEW_RANGE;
+  const activeConfig = isForceMock ? DEFAULT_SITE_CONFIG : await getActiveSiteConfig();
+  const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
+  const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
+  const todayKey = todayDateKey(initialVisitorTimezone);
 
-  const modeParam = resolvedParams?.mode;
-  const initialMode: Mode =
-    modeParam === "0" || modeParam === "1" || modeParam === "2" || modeParam === "4"
-      ? (parseInt(modeParam, 10) as Mode)
-      : 0;
+  const initialRange: RangeSelection = normalizeLegacyRange(
+    parseRangeParam(resolvedParams?.range) ?? DEFAULT_OVERVIEW_RANGE,
+    todayKey
+  );
+
+  const parsed = parseModeParam(firstParam(resolvedParams?.mode));
+  const initialMode: Mode = parsed !== null && parsed !== 3 ? parsed : 0;
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;
-  const initialProfileRange: RangeSelection | null =
+  const parsedProfileRange =
     initialMode === 4 ? parseRangeParam(firstParam(resolvedParams?.prange)) : null;
+  const initialProfileRange: RangeSelection | null = parsedProfileRange
+    ? normalizeLegacyRange(parsedProfileRange, todayKey)
+    : null;
 
   const isInitialSearch = initialMode === 4 && !initialProfile;
   const checkedQuery = checkSearchQuery(firstParam(resolvedParams?.q) ?? "");
@@ -89,9 +103,6 @@ export default async function Page({ searchParams }: PageProps) {
     ? parseSearchPage(firstParam(resolvedParams?.page))
     : undefined;
 
-  const activeConfig = isForceMock ? DEFAULT_SITE_CONFIG : await getActiveSiteConfig();
-  const cookieTimezone = parseTimezoneCookie(cookieStore.get("listening_timezone")?.value);
-  const initialVisitorTimezone = isValidIanaTimezone(cookieTimezone) ? cookieTimezone! : "UTC";
   const initialData = isConfigured ? await getInitialMusicData(initialRange, initialVisitorTimezone) : {
     overview: getMockOverview(initialRange, initialVisitorTimezone), streamLog: MOCK_DATA.streamLog, session: MOCK_DATA.session,
   };

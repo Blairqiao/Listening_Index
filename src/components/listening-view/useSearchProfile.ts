@@ -9,6 +9,8 @@ import type { Mode } from "@/lib/types";
 import {
   formatRangeParam,
   isSameRange,
+  normalizeLegacyRange,
+  todayDateKey,
   type RangeSelection,
 } from "@/lib/range";
 import {
@@ -43,7 +45,8 @@ export function useSearchProfile({
     () => initialProfile ?? null
   );
   const [profileRange, setProfileRange] = useState<RangeSelection>(() => {
-    return initialProfileRange ?? DEFAULT_PROFILE_RANGE;
+    const raw = initialProfileRange ?? DEFAULT_PROFILE_RANGE;
+    return normalizeLegacyRange(raw, todayDateKey(visitorTimezone));
   });
   const [profileHistory, setProfileHistory] = useState<ProfileHistoryEntry[]>([]);
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
@@ -57,16 +60,17 @@ export function useSearchProfile({
 
   const openProfileAt = useCallback(
     (target: ProfileTarget, nextRange: RangeSelection) => {
-      const cacheKey = getProfileCacheKey(target, nextRange, visitorTimezone);
+      const normalized = normalizeLegacyRange(nextRange, todayDateKey(visitorTimezone));
+      const cacheKey = getProfileCacheKey(target, normalized, visitorTimezone);
       const cached = profileCacheRef.current.get(cacheKey);
 
-      setProfileRange(nextRange);
+      setProfileRange(normalized);
 
       if (cached) {
         const canonicalTarget: ProfileTarget = { kind: cached.kind, key: cached.key };
         const canonicalCacheKey = getProfileCacheKey(
           canonicalTarget,
-          nextRange,
+          normalized,
           visitorTimezone
         );
         profileCacheRef.current.set(canonicalCacheKey, cached);
@@ -191,20 +195,21 @@ export function useSearchProfile({
 
   const handleSelectProfileRange = useCallback(
     (range: RangeSelection, opts?: { push?: boolean }) => {
-      if (isSyncing || isSameRange(range, profileRange)) return;
+      const normalized = normalizeLegacyRange(range, todayDateKey(visitorTimezone));
+      if (isSyncing || isSameRange(normalized, profileRange)) return;
       if (opts?.push) {
         onRequestPushHistory?.();
       }
-      setProfileRange(range);
+      setProfileRange(normalized);
       if (!profileTarget) return;
 
-      const cacheKey = getProfileCacheKey(profileTarget, range, visitorTimezone);
+      const cacheKey = getProfileCacheKey(profileTarget, normalized, visitorTimezone);
       const cached = profileCacheRef.current.get(cacheKey);
       if (cached) {
         const canonicalTarget: ProfileTarget = { kind: cached.kind, key: cached.key };
         const canonicalCacheKey = getProfileCacheKey(
           canonicalTarget,
-          range,
+          normalized,
           visitorTimezone
         );
         profileCacheRef.current.set(canonicalCacheKey, cached);

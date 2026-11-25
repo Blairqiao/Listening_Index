@@ -22,6 +22,8 @@ test("the Live Player control row has no layout toggle", () => {
       mode: 3,
       range: presetRange("1w"),
       onSelectRange: () => {},
+      firstKey: "2026-01-01",
+      todayKey: "2026-11-24",
       logStartDate: "2026-01-01",
       isSessionOpen: false,
       sessionTagTime: "",

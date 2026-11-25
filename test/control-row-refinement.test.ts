@@ -5,8 +5,8 @@ import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
-import { formatStreamLogDateSpan } from "../src/lib/format-utils";
-import { presetRange } from "../src/lib/range";
+import { compactDate, formatStreamLogDateSpan } from "../src/lib/format-utils";
+import { presetRange, unitWindow } from "../src/lib/range";
 import type { ProfileHistoryEntry } from "../src/lib/search-types";
 
 test("formatStreamLogDateSpan formats date ranges correctly", () => {
@@ -59,6 +59,8 @@ test("ControlRow shows the Album profile label and the profile back destination"
     mode: 4 as const,
     range: presetRange("1y"),
     onSelectRange: () => {},
+    firstKey: "2024-08-14",
+    todayKey: "2026-11-24",
     logStartDate: "",
     isSessionOpen: false,
     sessionTagTime: "",
@@ -107,6 +109,8 @@ test("ControlRow renders breadcrumb trail for multi-hop profile history with tru
     mode: 4 as const,
     range: presetRange("1y"),
     onSelectRange: () => {},
+    firstKey: "2024-08-14",
+    todayKey: "2026-11-24",
     logStartDate: "",
     isSessionOpen: false,
     sessionTagTime: "",
@@ -197,6 +201,8 @@ test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () 
     mode: 4,
     range: presetRange("1y"),
     onSelectRange: () => {},
+    firstKey: "2024-08-14",
+    todayKey: "2026-11-24",
     logStartDate: "",
     isSessionOpen: false,
     sessionTagTime: "",
@@ -214,45 +220,99 @@ test("ControlRow renders ellipsis when profile history exceeds 2 ancestors", () 
   assert.ok(markup.includes("Parent Track"), "Direct parent should be visible");
 });
 
-test("ControlRow renders non-interactive window chip and highlights no preset when range is a window", () => {
-  const props = {
+test("ControlRow in mode 0 renders the zoom ruler without preset buttons or back chip", () => {
+  const windowProps = {
     mode: 0 as const,
     range: { kind: "window" as const, from: "2026-11-01", to: "2026-11-30" },
-    rangeLabel: "Nov 2026",
     onSelectRange: () => {},
-    logStartDate: "",
+    firstKey: "2024-08-14",
+    todayKey: "2026-11-24",
+    logStartDate: "14 AUG 2024",
     isSessionOpen: false,
     sessionTagTime: "",
   };
 
-  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+  const windowMarkup = renderToStaticMarkup(React.createElement(ControlRow, windowProps));
+  assert.ok(windowMarkup.includes("Time range filters"), "Must render Time range filters group");
+  assert.ok(windowMarkup.includes("Zoom out"), "Must render Zoom out button");
+  assert.ok(!windowMarkup.includes(">1w</button>"), "Must not render 1w preset button");
+  assert.ok(!windowMarkup.includes("← "), "Must not render drill-back chip");
 
-  // Renders non-interactive chip with rangeLabel
-  assert.ok(markup.includes("Nov 2026"), "Must render rangeLabel text");
-  assert.ok(
-    markup.includes("<span") && markup.includes("col-span-6") && markup.includes("Nov 2026"),
-    "Chip must be a span with col-span-6 on mobile and active-button styling"
+  const presetMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...windowProps,
+      range: presetRange("1w"),
+    })
   );
-
-  // No preset is highlighted while a window is active
-  const buttonMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>/g);
-  assert.equal(buttonMatches, null, "No preset button must be highlighted when range is a window");
+  assert.ok(presetMarkup.includes("Time range filters"), "Must render Time range filters group");
+  assert.ok(presetMarkup.includes("Zoom out"), "Must render Zoom out button");
+  assert.ok(!presetMarkup.includes(">1w</button>"), "Must not render 1w preset button");
+  assert.ok(!presetMarkup.includes("← "), "Must not render drill-back chip");
 });
 
-test("ControlRow renders no chip when range is a preset", () => {
-  const props = {
-    mode: 0 as const,
+test("ControlRow in mode 4 renders the ruler only when a profile is active", () => {
+  const base = {
+    mode: 4 as const,
     range: presetRange("1w"),
-    rangeLabel: null,
     onSelectRange: () => {},
-    logStartDate: "",
+    firstKey: "2024-08-14",
+    todayKey: "2026-11-24",
+    logStartDate: "14 AUG 2024",
     isSessionOpen: false,
     sessionTagTime: "",
   };
 
-  const markup = renderToStaticMarkup(React.createElement(ControlRow, props));
+  const searchMarkup = renderToStaticMarkup(React.createElement(ControlRow, base));
+  assert.ok(!searchMarkup.includes("Time range filters"), "Search mode must not render ruler");
+  assert.ok(!searchMarkup.includes("Zoom out"), "Search mode must not render Zoom out");
 
-  assert.ok(!markup.includes("col-span-6"), "Must not render window chip when range is a preset");
-  const activePresetMatches = markup.match(/<button[^>]*class="[^"]*text-music-accent border-music-accent[^"]*"[^>]*>1w<\/button>/g);
-  assert.ok(activePresetMatches?.length === 1, "Must highlight the active preset 1w");
+  const profileMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, { ...base, profileKind: "track" })
+  );
+  assert.ok(profileMarkup.includes("Time range filters"), "Profile mode must render ruler");
+  assert.ok(profileMarkup.includes("Zoom out"), "Profile mode must render Zoom out");
+  assert.ok(!profileMarkup.includes(">1w</button>"), "Profile mode must not render 1w preset button");
+});
+
+test("ControlRow in mode 0 renders the active range label and switches to Since on all", () => {
+  const base = {
+    mode: 0 as const,
+    onSelectRange: () => {},
+    firstKey: "2026-09-04",
+    todayKey: "2026-11-24",
+    logStartDate: "2026-09-04",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const weekMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...base,
+      range: unitWindow("2026-11-24", "week"),
+    }),
+  );
+  assert.ok(
+    weekMarkup.includes("Nov 22–28, 2026"),
+    "Mode 0 week window must render formatted range label Nov 22–28, 2026",
+  );
+  assert.ok(
+    !weekMarkup.includes("Since "),
+    "Mode 0 non-all range must not render the static Since scope label",
+  );
+  assert.match(
+    weekMarkup,
+    /<span class="font-mono text-\[12px\] whitespace-nowrap text-\[#5A5A55\]">Nov 22–28, 2026/,
+    "Mode 0 range label must use the same muted color as the Since label",
+  );
+
+  const allMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...base,
+      range: presetRange("all"),
+    }),
+  );
+  assert.ok(
+    allMarkup.includes(`Since ${compactDate("2026-09-04")}`),
+    "Mode 0 all preset must render Since followed by compactDate(logStartDate)",
+  );
 });

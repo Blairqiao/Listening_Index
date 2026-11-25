@@ -7,7 +7,6 @@ import { formatRangeParam, presetRange, type RangeSelection } from '../src/lib/r
 
 const SOURCE = 'src/components/listening-view/useListeningSync.ts';
 const DATA_SOURCE = 'src/components/listening-view/useListeningData.ts';
-const ALL_PRESETS = ['1d', '1w', '1m', '6m', '1y', 'all'];
 
 function callbackFrom(file: string, name: string, scope: Record<string, unknown>) {
   const source = readFileSync(file, 'utf8');
@@ -28,21 +27,15 @@ function helpers() {
   return loadTs('src/components/listening-view/listening-helpers.ts');
 }
 
-test('overviewRefreshOrder with 1y returns 6 presets with 1y first and no duplicates', () => {
-  const order = helpers().overviewRefreshOrder(presetRange('1y')) as RangeSelection[];
-  assert.deepEqual(
-    order.map(formatRangeParam),
-    ['1y', '1d', '1w', '1m', '6m', 'all'],
-  );
+test('overviewRefreshOrder with a preset returns only that preset', () => {
+  const order = helpers().overviewRefreshOrder(presetRange('all')) as RangeSelection[];
+  assert.deepEqual(order.map(formatRangeParam), ['all']);
 });
 
-test('overviewRefreshOrder with a window returns the window first followed by all 6 presets', () => {
+test('overviewRefreshOrder with a window returns only that window', () => {
   const win: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-30' };
   const order = helpers().overviewRefreshOrder(win) as RangeSelection[];
-  assert.deepEqual(
-    order.map(formatRangeParam),
-    ['2025-11-01..2025-11-30', '1d', '1w', '1m', '6m', '1y', 'all'],
-  );
+  assert.deepEqual(order.map(formatRangeParam), ['2025-11-01..2025-11-30']);
 });
 
 function harness(activeRange: RangeSelection) {
@@ -70,53 +63,51 @@ function harness(activeRange: RangeSelection) {
   return { scope, fetched, cacheWrites, requestGenerationRef };
 }
 
-test('background refetch refreshes every range, active range first, bumps generation, and drops non-active window cache entries', async () => {
+test('background refetch refreshes active range, bumps generation, and drops non-active cache entries including stale all', async () => {
   const activeWin: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-30' };
   const { scope, fetched, cacheWrites, requestGenerationRef } = harness(activeWin);
   await callback('refetchActiveData', scope)();
-  assert.equal(formatRangeParam(fetched[0]), '2025-11-01..2025-11-30');
-  assert.deepEqual(
-    fetched.map(formatRangeParam).sort(),
-    ['2025-11-01..2025-11-30', ...ALL_PRESETS].sort(),
-  );
+  assert.deepEqual(fetched.map(formatRangeParam), ['2025-11-01..2025-11-30']);
   assert.equal(requestGenerationRef.current, 1, 'overlapping refreshes must bump requestGenerationRef');
-  assert.ok(cacheWrites.length >= 1, 'refresh must prune non-active cached windows');
+  assert.ok(cacheWrites.length >= 1, 'refresh must prune non-active cached entries');
   const write = cacheWrites[0] as (prev: Record<string, string>) => Record<string, string>;
   const pruned = write({
-    '1d': 'old-1d',
+    all: 'stale-all',
     '2025-10-01..2025-10-31': 'stale-oct',
     '2025-11-01..2025-11-30': 'active-nov',
   });
-  assert.ok('1d' in pruned, 'presets must stay visible until replaced');
   assert.ok('2025-11-01..2025-11-30' in pruned, 'active window must stay visible until replaced');
+  assert.ok(!('all' in pruned), 'stale non-active all must be dropped');
   assert.ok(!('2025-10-01..2025-10-31' in pruned), 'stale non-active windows must be dropped');
 });
 
-test('manual sync refreshes every range, preserves cached presets, and drops stale windows', async () => {
-  const { scope, fetched, cacheWrites } = harness(presetRange('6m'));
+test('manual sync refreshes active range, retains active cache entry, and drops non-active entries including stale all', async () => {
+  const activeWin: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-30' };
+  const { scope, fetched, cacheWrites } = harness(activeWin);
   await callback('handleTriggerSync', scope)();
-  assert.equal(formatRangeParam(fetched[0]), '6m');
-  assert.deepEqual(fetched.map(formatRangeParam).sort(), [...ALL_PRESETS].sort());
+  assert.deepEqual(fetched.map(formatRangeParam), ['2025-11-01..2025-11-30']);
   assert.ok(cacheWrites.length >= 1);
   for (const write of cacheWrites) {
     const next = typeof write === 'function'
-      ? write({ '1d': 'old-1d', '6m': 'old-6m', '2025-11-01..2025-11-30': 'stale-window' })
+      ? write({ all: 'stale-all', '2025-10-01..2025-10-31': 'stale-oct', '2025-11-01..2025-11-30': 'active-nov' })
       : write;
-    assert.ok(next && '1d' in next, 'sync must not wipe other cached preset ranges');
-    assert.ok(next && !('2025-11-01..2025-11-30' in next), 'sync must drop stale non-active windows');
+    assert.ok(next && '2025-11-01..2025-11-30' in next, 'sync must retain active entry until replaced');
+    assert.ok(next && !('all' in next), 'sync must drop stale non-active all');
+    assert.ok(next && !('2025-10-01..2025-10-31' in next), 'sync must drop stale non-active windows');
   }
 });
 
-test('upload completion refreshes every range and drops stale windows', async () => {
-  const { scope, fetched, cacheWrites } = harness(presetRange('1y'));
+test('upload completion refreshes active range, retains active cache entry, and drops non-active entries including stale all', async () => {
+  const activeWin: RangeSelection = { kind: 'window', from: '2025-11-01', to: '2025-11-30' };
+  const { scope, fetched, cacheWrites } = harness(activeWin);
   await callback('handleUploadComplete', scope)();
-  assert.equal(formatRangeParam(fetched[0]), '1y');
-  assert.deepEqual(fetched.map(formatRangeParam).sort(), [...ALL_PRESETS].sort());
+  assert.deepEqual(fetched.map(formatRangeParam), ['2025-11-01..2025-11-30']);
   assert.ok(cacheWrites.length >= 1);
   const write = cacheWrites[0] as (prev: Record<string, string>) => Record<string, string>;
-  const pruned = write({ '1y': 'old-1y', '2025-09-01..2025-09-30': 'stale-sep' });
-  assert.ok('1y' in pruned);
-  assert.ok(!('2025-09-01..2025-09-30' in pruned));
+  const pruned = write({ all: 'stale-all', '2025-09-01..2025-09-30': 'stale-sep', '2025-11-01..2025-11-30': 'active-nov' });
+  assert.ok('2025-11-01..2025-11-30' in pruned, 'upload refresh must retain active entry until replaced');
+  assert.ok(!('all' in pruned), 'upload refresh must drop stale non-active all');
+  assert.ok(!('2025-09-01..2025-09-30' in pruned), 'upload refresh must drop stale non-active windows');
 });
 
 test('fetchOverview drops stale response in an A -> B -> A range race', async () => {

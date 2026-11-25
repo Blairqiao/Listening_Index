@@ -2,6 +2,7 @@ import React from "react";
 import { peakDayOfWeek } from "@/lib/profile-stats";
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DISPLAY_ORDER = [6, 0, 1, 2, 3, 4, 5] as const; // Sun..Sat as data indexes
 
 const headingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
@@ -41,8 +42,9 @@ export function DayOfWeekChart({
         aria-label={peak === null ? "No plays by day of week" : `Plays by day of week, peak ${DAY_LABELS[peak]}`}
       >
         <div className="h-[80px] w-full flex gap-[4px] items-end">
-          {DAY_LABELS.map((dayLabel, index) => {
-            const count = counts[index] ?? 0;
+          {DISPLAY_ORDER.map((dataIndex) => {
+            const dayLabel = DAY_LABELS[dataIndex];
+            const count = counts[dataIndex] ?? 0;
             const ratio = max === 0 ? 0 : count / max;
             const isHot = count > 0 && ratio > 0.8;
             return (
@@ -61,9 +63,10 @@ export function DayOfWeekChart({
           aria-hidden="true"
           className="grid grid-cols-7 text-center gap-[4px] mt-1.5 font-mono text-[11px] text-[#5A5A55] select-none h-[14px] leading-[14px]"
         >
-          {DAY_LABELS.map((dayLabel) => (
-            <span key={dayLabel}>{dayLabel}</span>
-          ))}
+          {DISPLAY_ORDER.map((dataIndex) => {
+            const dayLabel = DAY_LABELS[dataIndex];
+            return <span key={dayLabel}>{dayLabel}</span>;
+          })}
         </div>
       </div>
     </div>
