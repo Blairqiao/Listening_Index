@@ -35,7 +35,7 @@ test("DayOfWeekChart renders 7 labeled bars in the 80px frame with peak aria-lab
   assert.match(markup, /title="Fri · 3 plays"/);
   assert.match(markup, /h-\[80px\] w-full flex gap-\[4px\] items-end/);
   assert.match(markup, /grid grid-cols-7 text-center/);
-  assert.match(markup, />Mon<.*>Tue<.*>Wed<.*>Thu<.*>Fri<.*>Sat<.*>Sun</);
+  assert.match(markup, />Sun<.*>Mon<.*>Tue<.*>Wed<.*>Thu<.*>Fri<.*>Sat</);
 
   const empty = renderToStaticMarkup(React.createElement(DayOfWeekChart, { counts: [0, 0, 0, 0, 0, 0, 0] }));
   assert.match(empty, /aria-label="No plays by day of week"/);
