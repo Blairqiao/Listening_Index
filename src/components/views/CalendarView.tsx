@@ -209,7 +209,7 @@ const YearBlock = React.memo<YearBlockProps>(
                       dateKey === selectionStart || dateKey === selectionEnd;
 
                     const opacityClass =
-                      hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
+                      hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                     const inRangeClass =
                       hasActiveSelection && isSelected ? "calendar-in-range" : "";
                     const ringClass = isStartOrEnd
@@ -332,7 +332,7 @@ const YearBlock = React.memo<YearBlockProps>(
                   dateKey === selectionStart || dateKey === selectionEnd;
 
                 const opacityClass =
-                  hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
+                  hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                 const inRangeClass =
                   hasActiveSelection && isSelected ? "calendar-in-range" : "";
                 const ringClass = isStartOrEnd
