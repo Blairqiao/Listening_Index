@@ -1153,12 +1153,11 @@ export function ZoomRuler({
           >
             <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true">
               <path
-                d="M1.5 6.5h7M6 3.5l3 3-3 3"
+                d="M2 6.5h8.5M7.5 3.5l3 3-3 3"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.2"
               />
-              <path d="M11.5 2v9" stroke="currentColor" strokeWidth="1.2" />
             </svg>
           </button>
         </div>
