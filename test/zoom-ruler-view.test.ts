@@ -27,9 +27,14 @@ test("ZoomRuler renders Week label, zoom buttons, Today, and group aria-label fo
   assert.ok(markup.includes("Week"), "Must render unit word Week");
   assert.ok(markup.includes('aria-label="Zoom out"'), "Must render Zoom out button");
   assert.ok(markup.includes('aria-label="Zoom in"'), "Must render Zoom in button");
-  assert.ok(markup.includes("Today"), "Must render Today button");
+  assert.ok(
+    markup.includes('aria-label="Jump to today"'),
+    "Must render Jump to today button",
+  );
   assert.ok(markup.includes("<canvas"), "Must render canvas element");
   assert.ok(markup.includes('aria-live="polite"'), "Unit word must have aria-live=polite");
+  assert.ok(!markup.includes("border-[#26261F]"), "Variant A tape must have no frame border");
+  assert.ok(!markup.includes("bg-[#0B0B0A]"), "Variant A tape must have no box background");
 });
 
 test("ZoomRuler renders All and disables Zoom out button for presetRange('all')", () => {
@@ -50,15 +55,31 @@ test("ZoomRuler renders All and disables Zoom out button for presetRange('all')"
   assert.doesNotMatch(zoomInBtn[0], /\sdisabled=""/, "Zoom in button must remain enabled at All");
 });
 
-test("ZoomRuler renders formatted custom span label for non-unit window", () => {
+test("ZoomRuler shows the level word rather than custom span text for a custom 10-day window", () => {
   const markup = renderToStaticMarkup(
     React.createElement(ZoomRuler, {
       ...BASE_PROPS,
-      range: { kind: "window", from: "2026-11-03", to: "2026-11-17" },
+      range: { kind: "window", from: "2026-11-03", to: "2026-11-12" },
     }),
   );
 
-  assert.ok(markup.includes("Nov 3–17, 2026"), "Must render formatted custom range label");
+  assert.ok(markup.includes("Month"), "10-day custom window must show its level word Month");
+  assert.ok(
+    !markup.includes("Nov 3–12, 2026"),
+    "Ruler must not show custom range text in place of the level word",
+  );
+});
+
+test("ZoomRuler renders a provided label node", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ZoomRuler, {
+      ...BASE_PROPS,
+      range: unitWindow("2026-11-24", "week"),
+      label: React.createElement("span", null, "Nov 22–28, 2026"),
+    }),
+  );
+
+  assert.ok(markup.includes("Nov 22–28, 2026"), "Must render provided label node");
 });
 
 test("ZoomRuler disables all buttons when disabled prop is true", () => {

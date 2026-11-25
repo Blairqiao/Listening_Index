@@ -2,7 +2,11 @@
 
 import React from "react";
 import { Mode } from "@/lib/types";
-import type { RangeSelection } from "@/lib/range";
+import {
+  formatRangeLabel,
+  normalizeLegacyRange,
+  type RangeSelection,
+} from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 import { CalendarLegend } from "@/components/views/CalendarView";
@@ -228,8 +232,41 @@ export const ControlRow: React.FC<ControlRowProps> = ({
     }
   };
 
-  const showsRanges = mode === 0 || (mode === 4 && !!profileKind);
+  const showsRanges = mode === 4 && !!profileKind;
   const showsProfileNav = mode === 4 && profileKind && (onProfileBack || onJumpToHistory);
+
+  if (mode === 0) {
+    const isAllRange = range.kind === "preset" && range.key === "all";
+    const overviewLabel = (
+      <span
+        className={`font-mono text-[12px] whitespace-nowrap ${
+          isAllRange ? "text-[#5A5A55]" : "text-[#EDEDE8]"
+        }`}
+      >
+        {isAllRange
+          ? `Since ${compactDate(logStartDate)}`
+          : formatRangeLabel(normalizeLegacyRange(range, todayKey))}
+        {syncError && (
+          <span className="ml-2 text-[#FF6B6B]">
+            {syncError}
+          </span>
+        )}
+      </span>
+    );
+
+    return (
+      <div className="my-3.5 sm:my-4 md:my-5 select-none">
+        <ZoomRuler
+          range={range}
+          onSelectRange={onSelectRange}
+          firstKey={firstKey}
+          todayKey={todayKey}
+          disabled={isSyncing}
+          label={overviewLabel}
+        />
+      </div>
+    );
+  }
 
   const Scope = showsProfileNav ? "div" : "span";
   const renderProfileNav = () => {

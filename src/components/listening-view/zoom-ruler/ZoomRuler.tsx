@@ -42,6 +42,7 @@ export interface ZoomRulerProps {
   firstKey: string;
   todayKey: string;
   disabled?: boolean;
+  label?: React.ReactNode;
 }
 
 const LEVEL_LABELS: Record<RulerLevel, string> = {
@@ -56,8 +57,8 @@ const ALL_FILL_RATIO = 0.7;
 const MAX_ALL_PPD = FIXED_PPD.year * 0.6;
 const ZOOM_ANIM_DURATION_MS = 200;
 const LIVE_ZOOM_SNAP_DELAY_MS = 150;
-const DEFAULT_RULER_WIDTH = 396;
-const DEFAULT_RULER_HEIGHT = 26;
+const DEFAULT_RULER_WIDTH = 440;
+const DEFAULT_RULER_HEIGHT = 28;
 
 interface UiSnapshot {
   activeLayer: 0 | 1;
@@ -66,6 +67,7 @@ interface UiSnapshot {
   zoomOutDisabled: boolean;
   zoomInDisabled: boolean;
   isAllLocked: boolean;
+  onToday: boolean;
 }
 
 interface RulerInternalState {
@@ -132,9 +134,10 @@ function describeRangeForUi(range: RangeSelection): {
   }
 
   const spanDays = daysBetween(range.from, range.to) + 1;
+  const level = levelForSpan(spanDays);
   return {
-    level: levelForSpan(spanDays),
-    word: formatRangeLabel(range),
+    level,
+    word: LEVEL_LABELS[level],
   };
 }
 
@@ -203,8 +206,9 @@ function readPalette(el: HTMLElement): RulerPalette {
   return {
     accent,
     major: "#8A8A82",
+    medium: "#5A5A52",
     minor: "#3A3A32",
-    baseline: "#1C1C1A",
+    baseline: "#26261F",
     label: "#8A8A82",
     font: `10px ${fontFamily}`,
   };
@@ -228,8 +232,10 @@ export function ZoomRuler({
   firstKey,
   todayKey,
   disabled = false,
+  label,
 }: ZoomRulerProps) {
   const isDisabled = Boolean(disabled);
+  const hasLabel = label !== undefined && label !== null;
 
   const [ui, setUi] = useState<UiSnapshot>(() => {
     const initial = describeRangeForUi(range);
@@ -241,6 +247,7 @@ export function ZoomRuler({
       zoomOutDisabled: idx <= 0,
       zoomInDisabled: idx >= LEVELS.length - 1,
       isAllLocked: initial.level === "all",
+      onToday: true,
     };
   });
 
@@ -350,9 +357,6 @@ export function ZoomRuler({
     }
 
     function currentDisplayWord(): string {
-      if (!state.exact && !state.isZooming && state.customLabel) {
-        return state.customLabel;
-      }
       return LEVEL_LABELS[state.workingLevel];
     }
 
@@ -363,6 +367,15 @@ export function ZoomRuler({
       const nextZoomOutDisabled = idx <= 0;
       const nextZoomInDisabled = idx >= LEVELS.length - 1;
       const nextAllLocked = isAllSettled(state);
+      const selectedUnit =
+        state.selected !== null ? state.units[state.selected] : undefined;
+      const nextOnToday =
+        state.settledLevel === "all" ||
+        (!state.isZooming &&
+          state.exact &&
+          selectedUnit !== undefined &&
+          state.todayKey >= selectedUnit.from &&
+          state.todayKey <= selectedUnit.to);
 
       setUi((prev) => {
         const currentWord = prev.activeLayer === 0 ? prev.layer0 : prev.layer1;
@@ -370,7 +383,8 @@ export function ZoomRuler({
         const flagsChanged =
           prev.zoomOutDisabled !== nextZoomOutDisabled ||
           prev.zoomInDisabled !== nextZoomInDisabled ||
-          prev.isAllLocked !== nextAllLocked;
+          prev.isAllLocked !== nextAllLocked ||
+          prev.onToday !== nextOnToday;
 
         if (!wordChanged && !flagsChanged) return prev;
 
@@ -380,6 +394,7 @@ export function ZoomRuler({
             zoomOutDisabled: nextZoomOutDisabled,
             zoomInDisabled: nextZoomInDisabled,
             isAllLocked: nextAllLocked,
+            onToday: nextOnToday,
           };
         }
 
@@ -391,6 +406,7 @@ export function ZoomRuler({
           zoomOutDisabled: nextZoomOutDisabled,
           zoomInDisabled: nextZoomInDisabled,
           isAllLocked: nextAllLocked,
+          onToday: nextOnToday,
         };
       });
     }
@@ -731,6 +747,17 @@ export function ZoomRuler({
     function onKeyDownCapture(e: KeyboardEvent): void {
       if (disabledRef.current) return;
       if (
+        (e.key === "t" || e.key === "T") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleToday();
+        return;
+      }
+      if (
         isAllSettled(state) &&
         (e.key === "ArrowLeft" ||
           e.key === "ArrowRight" ||
@@ -1016,88 +1043,108 @@ export function ZoomRuler({
     controller.refreshAria();
   }, [range, firstKey, todayKey]);
 
-  const zoomBtnClass = `font-mono text-[11px] sm:text-[12px] font-medium leading-none w-[18px] h-[18px] sm:w-[24px] sm:h-[24px] p-0 rounded-none border border-[#26261F] bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border transition-none hover:enabled:border-[#3A3A32] hover:enabled:text-[#EDEDE8] active:enabled:border-music-accent active:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-35 disabled:cursor-default ${
+  const zoomBtnClass = `font-mono text-[14px] leading-none h-[24px] sm:h-[28px] min-w-[22px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border transition-none hover:enabled:text-[#EDEDE8] active:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
-  const todayBtnClass = `font-mono text-[10px] sm:text-[12px] leading-none h-[18px] sm:h-[24px] px-1.5 sm:px-[7px] rounded-none border border-[#26261F] bg-transparent text-[#6A6A64] whitespace-nowrap inline-flex items-center justify-center select-none flex-none sm:order-3 box-border transition-none hover:enabled:border-[#3A3A32] hover:enabled:text-[#EDEDE8] active:enabled:border-music-accent active:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-35 disabled:cursor-default ${
+  const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border transition-none hover:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
-  }`;
+  } ${ui.onToday ? "invisible" : ""}`;
 
   return (
     <div
       role="group"
       aria-label="Time range filters"
-      className={`flex flex-col items-stretch justify-start gap-[2px] w-full h-[46px] sm:flex-row sm:items-center sm:gap-1.5 sm:w-auto sm:max-w-[560px] sm:h-[28px] shrink-0 select-none box-border ${
-        isDisabled ? "opacity-60 cursor-wait" : ""
-      }`}
+      className={`flex flex-col items-stretch gap-2 w-full sm:flex-row sm:items-center sm:gap-1.5 sm:h-[28px] select-none box-border ${
+        hasLabel ? "sm:justify-between" : "sm:w-auto shrink-0"
+      } ${isDisabled ? "opacity-60 cursor-wait" : ""}`}
     >
-      <div className="flex justify-between items-center w-full h-[18px] order-1 flex-none sm:contents">
-        <div className="inline-flex items-center gap-1 flex-none h-[18px] sm:h-auto sm:order-1">
-          <button
-            type="button"
-            aria-label="Zoom out"
-            disabled={isDisabled || ui.zoomOutDisabled}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              actionsRef.current?.handleZoomStep(-1);
-            }}
-            className={zoomBtnClass}
-          >
-            {"\u2212"}
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom in"
-            disabled={isDisabled || ui.zoomInDisabled}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => {
-              actionsRef.current?.handleZoomStep(1);
-            }}
-            className={zoomBtnClass}
-          >
-            +
-          </button>
-          <span
-            aria-live="polite"
-            className="inline-grid min-w-[44px] h-[18px] sm:h-[24px] items-center justify-items-center font-mono text-[10px] text-[#8A8A82] select-none overflow-hidden shrink-0"
-          >
-            <span
-              aria-hidden={ui.activeLayer !== 0}
-              className={`col-start-1 row-start-1 whitespace-nowrap transition-opacity duration-150 ${
-                ui.activeLayer === 0 ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {ui.layer0}
-            </span>
-            <span
-              aria-hidden={ui.activeLayer !== 1}
-              className={`col-start-1 row-start-1 whitespace-nowrap transition-opacity duration-150 ${
-                ui.activeLayer === 1 ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {ui.layer1}
-            </span>
-          </span>
-        </div>
+      <div className="flex items-center justify-between gap-3 w-full h-[24px] sm:contents">
+        {hasLabel && (
+          <div className="flex-1 min-w-0 truncate sm:order-1 sm:mr-2.5">
+            {label}
+          </div>
+        )}
 
-        <button
-          type="button"
-          disabled={isDisabled}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            actionsRef.current?.handleToday();
-          }}
-          className={todayBtnClass}
-        >
-          Today
-        </button>
+        <div className="inline-flex items-center gap-1.5 shrink-0 sm:contents">
+          <div className="inline-flex items-center gap-1.5 shrink-0 sm:order-2">
+            <button
+              type="button"
+              aria-label="Zoom out"
+              disabled={isDisabled || ui.zoomOutDisabled}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                actionsRef.current?.handleZoomStep(-1);
+              }}
+              className={zoomBtnClass}
+            >
+              {"\u2212"}
+            </button>
+            <span
+              aria-live="polite"
+              className="inline-grid min-w-[38px] h-[24px] sm:h-[28px] items-center justify-items-center text-center font-mono text-[10px] text-[#8A8A82] select-none overflow-hidden shrink-0"
+            >
+              <span
+                aria-hidden={ui.activeLayer !== 0}
+                className={`col-start-1 row-start-1 whitespace-nowrap transition-opacity duration-150 ${
+                  ui.activeLayer === 0 ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {ui.layer0}
+              </span>
+              <span
+                aria-hidden={ui.activeLayer !== 1}
+                className={`col-start-1 row-start-1 whitespace-nowrap transition-opacity duration-150 ${
+                  ui.activeLayer === 1 ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {ui.layer1}
+              </span>
+            </span>
+            <button
+              type="button"
+              aria-label="Zoom in"
+              disabled={isDisabled || ui.zoomInDisabled}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                actionsRef.current?.handleZoomStep(1);
+              }}
+              className={zoomBtnClass}
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Jump to today"
+            title="Jump to today (T)"
+            aria-hidden={ui.onToday ? "true" : undefined}
+            tabIndex={ui.onToday ? -1 : undefined}
+            disabled={isDisabled}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              actionsRef.current?.handleToday();
+            }}
+            className={todayBtnClass}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true">
+              <path
+                d="M1.5 6.5h7M6 3.5l3 3-3 3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.2"
+              />
+              <path d="M11.5 2v9" stroke="currentColor" strokeWidth="1.2" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div
         ref={rulerContainerRef}
         aria-label="Zoomable timeline ruler"
-        className={`order-2 flex-none w-full h-[26px] sm:flex-1 sm:w-[396px] sm:min-w-[200px] sm:h-[28px] relative border border-[#26261F] bg-[#0B0B0A] overflow-hidden touch-none select-none box-border focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:border-music-accent ${
+        className={`w-full h-[28px] sm:order-3 sm:flex-initial sm:w-[440px] sm:min-w-[200px] sm:mx-1 relative overflow-hidden touch-none select-none box-border focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-2 ${
           isDisabled
             ? "cursor-wait"
             : ui.isAllLocked

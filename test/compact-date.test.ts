@@ -22,11 +22,11 @@ test('compactDate formats the month as a plain number in every locale', () => {
   }
 });
 
-test('ControlRow shows the placeholder scope label while the Overview has no start date', () => {
+test('ControlRow shows the placeholder All range label while the Overview has no start date', () => {
   const markup = renderToStaticMarkup(
     React.createElement(ControlRow, {
       mode: 0,
-      range: presetRange('1w'),
+      range: presetRange('all'),
       onSelectRange: () => {},
       firstKey: '2026-11-24',
       todayKey: '2026-11-24',

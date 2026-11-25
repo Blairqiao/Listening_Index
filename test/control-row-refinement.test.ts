@@ -5,8 +5,8 @@ import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ControlRow } from "../src/components/listening-view/ControlRow";
-import { formatStreamLogDateSpan } from "../src/lib/format-utils";
-import { presetRange } from "../src/lib/range";
+import { compactDate, formatStreamLogDateSpan } from "../src/lib/format-utils";
+import { presetRange, unitWindow } from "../src/lib/range";
 import type { ProfileHistoryEntry } from "../src/lib/search-types";
 
 test("formatStreamLogDateSpan formats date ranges correctly", () => {
@@ -272,4 +272,42 @@ test("ControlRow in mode 4 renders the ruler only when a profile is active", () 
   assert.ok(profileMarkup.includes("Time range filters"), "Profile mode must render ruler");
   assert.ok(profileMarkup.includes("Zoom out"), "Profile mode must render Zoom out");
   assert.ok(!profileMarkup.includes(">1w</button>"), "Profile mode must not render 1w preset button");
+});
+
+test("ControlRow in mode 0 renders the active range label and switches to Since on all", () => {
+  const base = {
+    mode: 0 as const,
+    onSelectRange: () => {},
+    firstKey: "2026-09-04",
+    todayKey: "2026-11-24",
+    logStartDate: "2026-09-04",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const weekMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...base,
+      range: unitWindow("2026-11-24", "week"),
+    }),
+  );
+  assert.ok(
+    weekMarkup.includes("Nov 22–28, 2026"),
+    "Mode 0 week window must render formatted range label Nov 22–28, 2026",
+  );
+  assert.ok(
+    !weekMarkup.includes("Since "),
+    "Mode 0 non-all range must not render the static Since scope label",
+  );
+
+  const allMarkup = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...base,
+      range: presetRange("all"),
+    }),
+  );
+  assert.ok(
+    allMarkup.includes(`Since ${compactDate("2026-09-04")}`),
+    "Mode 0 all preset must render Since followed by compactDate(logStartDate)",
+  );
 });
