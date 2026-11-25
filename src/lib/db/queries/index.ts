@@ -80,3 +80,6 @@ export { getProfile } from "./profile";
 
 // Calendar
 export { getCalendarData } from "./calendar";
+
+// Taste Phases
+export { getWeeklyArtistCounts, getTastePhasesData } from "./taste";

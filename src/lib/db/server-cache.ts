@@ -1,11 +1,17 @@
 import { revalidateTag } from "next/cache";
 import type { OverviewData, StreamLogData, SessionData } from "./queries/types";
 import type { CalendarData } from "@/lib/calendar";
+import type { TastePhasesData } from "@/lib/taste/types";
 import { formatRangeParam, type RangeSelection } from "@/lib/range";
 import { KeyedAsyncCache } from "@/lib/async-utils";
 import { sanitizeTimezone } from "./queries/helpers";
 
-type ListeningData = OverviewData | StreamLogData | SessionData | CalendarData;
+type ListeningData =
+  | OverviewData
+  | StreamLogData
+  | SessionData
+  | CalendarData
+  | TastePhasesData;
 const globalForCache = globalThis as unknown as {
   __boundedListeningCache?: KeyedAsyncCache<ListeningData>;
 };
@@ -80,5 +86,13 @@ export function getOrFetchCalendar<T extends CalendarData = CalendarData>(
   fetcher: () => Promise<T>
 ): Promise<T> {
   const key = JSON.stringify([cacheEpoch, "calendar", timezoneIdentity(timezone)]);
+  return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
+}
+
+export function getOrFetchTaste<T extends TastePhasesData = TastePhasesData>(
+  timezone: string,
+  fetcher: () => Promise<T>
+): Promise<T> {
+  const key = JSON.stringify([cacheEpoch, "taste", timezoneIdentity(timezone)]);
   return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
 }
