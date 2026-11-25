@@ -178,6 +178,14 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   assert.match(cellMid[0], /opacity-100/);
   assert.doesNotMatch(cellMid[0], /ring-1/);
 
+  // Empty days inside the selection are lifted so they stand apart from empty days outside it
+  const emptyIn = html.match(/<div[^>]*data-date="2024-11-20"[^>]*class="[^"]*"/)?.[0] ?? "";
+  assert.match(emptyIn, /calendar-level-0/);
+  assert.match(emptyIn, /calendar-in-range/);
+  const emptyOut = html.match(/<div[^>]*data-date="2025-01-20"[^>]*class="[^"]*"/)?.[0] ?? "";
+  assert.match(emptyOut, /calendar-level-0/);
+  assert.doesNotMatch(emptyOut, /calendar-in-range/);
+
   // 2025-01-10 is outside selection -> opacity-20
   const cellOut = html.match(/<div[^>]*data-date="2025-01-10"[^>]*class="[^"]*"/);
   assert.ok(cellOut, "should find 2025-01-10 cell");

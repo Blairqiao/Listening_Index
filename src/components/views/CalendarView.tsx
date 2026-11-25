@@ -210,6 +210,8 @@ const YearBlock = React.memo<YearBlockProps>(
 
                     const opacityClass =
                       hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
+                    const inRangeClass =
+                      hasActiveSelection && isSelected ? "calendar-in-range" : "";
                     const ringClass = isStartOrEnd
                       ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                       : "";
@@ -219,7 +221,7 @@ const YearBlock = React.memo<YearBlockProps>(
                         key={dateKey}
                         data-date={dateKey}
                         title={`${dateKey} · ${count} plays`}
-                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
+                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
                         style={{ touchAction: "pan-y" }}
                       />
                     );
@@ -331,6 +333,8 @@ const YearBlock = React.memo<YearBlockProps>(
 
                 const opacityClass =
                   hasActiveSelection && !isSelected ? "opacity-20" : "opacity-100";
+                const inRangeClass =
+                  hasActiveSelection && isSelected ? "calendar-in-range" : "";
                 const ringClass = isStartOrEnd
                   ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                   : "";
@@ -341,7 +345,7 @@ const YearBlock = React.memo<YearBlockProps>(
                     data-date={dateKey}
                     style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
                     title={`${dateKey} · ${count} plays`}
-                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
+                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
                   />
                 );
               })
