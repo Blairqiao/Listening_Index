@@ -32,13 +32,7 @@ export interface TasteCardItem {
   shiftIn: TasteShiftAtLevel | null;
 }
 
-export interface TasteGapItem {
-  kind: "gap";
-  gap: TasteGap;
-  weeks: number;
-}
-
-export type TasteRowItem = TasteCardItem | TasteGapItem;
+export type TasteRowItem = TasteCardItem;
 
 export interface DesktopRibbonPiece {
   kind: "phase" | "gap" | "ramp";
@@ -68,6 +62,18 @@ function parseIsoDate(date: string): [number, number, number] {
 function toUtcMs(date: string): number {
   const [y, m, d] = parseIsoDate(date);
   return Date.UTC(y, m - 1, d);
+}
+
+function formatIsoUtc(ms: number): string {
+  const d = new Date(ms);
+  const y = String(d.getUTCFullYear()).padStart(4, "0");
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysIso(date: string, days: number): string {
+  return formatIsoUtc(toUtcMs(date) + days * MS_PER_DAY);
 }
 
 export function inclusiveWeeks(start: string, end: string): number {
@@ -100,10 +106,107 @@ export function clampTasteLevel(
   return k;
 }
 
+export function mergeAdjacentGaps(gaps: readonly TasteGap[]): TasteGap[] {
+  if (gaps.length <= 1) return gaps.map((g) => ({ ...g }));
+  const sorted = [...gaps].sort((a, b) => a.start.localeCompare(b.start));
+  const merged: TasteGap[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = merged[merged.length - 1];
+    const cur = sorted[i];
+    if (addDaysIso(prev.end, 1) >= cur.start) {
+      if (cur.end > prev.end) prev.end = cur.end;
+      if (prev.plays !== undefined || cur.plays !== undefined) {
+        prev.plays = (prev.plays ?? 0) + (cur.plays ?? 0);
+      }
+    } else {
+      merged.push({ ...cur });
+    }
+  }
+  return merged;
+}
+
+function splitPhaseAroundGaps(
+  phase: TastePhase,
+  gaps: readonly TasteGap[],
+): TastePhase[] {
+  if (gaps.length === 0) return [phase];
+  const pieces: TastePhase[] = [];
+  let curStart = phase.start;
+  const curEnd = phase.end;
+
+  for (const gap of gaps) {
+    if (gap.end < curStart) continue;
+    if (gap.start > curEnd) break;
+    if (gap.start > curStart) {
+      const pieceEnd = addDaysIso(gap.start, -1);
+      pieces.push({
+        ...phase,
+        id: `${curStart}_${pieceEnd}`,
+        start: curStart,
+        end: pieceEnd,
+      });
+    }
+    curStart = addDaysIso(gap.end, 1);
+    if (curStart > curEnd) break;
+  }
+
+  if (curStart <= curEnd) {
+    if (curStart === phase.start && pieces.length === 0) {
+      pieces.push(phase);
+    } else {
+      pieces.push({
+        ...phase,
+        id: `${curStart}_${curEnd}`,
+        start: curStart,
+        end: curEnd,
+      });
+    }
+  }
+  return pieces;
+}
+
 export function phasesAtLevel(data: TastePhasesData, k: number): TastePhase[] {
-  return data.phases
-    .filter((p) => p.minK <= k && p.maxK >= k)
+  const rawActive = data.phases
+    .filter((p) => !p.isGap && p.minK <= k && p.maxK >= k)
     .sort((a, b) => a.start.localeCompare(b.start));
+
+  const gaps = visibleGaps(data);
+  if (gaps.length === 0) return rawActive;
+
+  const active = rawActive.flatMap((p) => splitPhaseAroundGaps(p, gaps));
+  const gapPhases: TastePhase[] = gaps.map((gap) => ({
+    id: `${gap.start}_${gap.end}`,
+    start: gap.start,
+    end: gap.end,
+    minK: 1,
+    maxK: data.kFine,
+    plays: gap.plays ?? 0,
+    topArtists: [],
+    inShift: false,
+    isGap: true,
+  }));
+
+  const combined = [...active, ...gapPhases].sort((a, b) =>
+    a.start.localeCompare(b.start),
+  );
+
+  // Merge any back-to-back gap phases that have no active phase between them.
+  const result: TastePhase[] = [];
+  for (const phase of combined) {
+    const prev = result[result.length - 1];
+    if (prev && prev.isGap && phase.isGap) {
+      const end = phase.end > prev.end ? phase.end : prev.end;
+      result[result.length - 1] = {
+        ...prev,
+        end,
+        id: `${prev.start}_${end}`,
+        plays: prev.plays + phase.plays,
+      };
+    } else {
+      result.push(phase);
+    }
+  }
+  return result;
 }
 
 export function shiftAtLevel(
@@ -117,62 +220,45 @@ export function shiftAtLevel(
 }
 
 export function visibleGaps(data: TastePhasesData): TasteGap[] {
-  if (data.phases.length === 0 || data.gaps.length === 0) return [];
-  let firstStart = data.phases[0].start;
-  let lastEnd = data.phases[0].end;
-  for (let i = 1; i < data.phases.length; i++) {
-    const p = data.phases[i];
+  const activePhases = data.phases.filter((p) => !p.isGap);
+  if (activePhases.length === 0 || data.gaps.length === 0) return [];
+  let firstStart = activePhases[0].start;
+  let lastEnd = activePhases[0].end;
+  for (let i = 1; i < activePhases.length; i++) {
+    const p = activePhases[i];
     if (p.start < firstStart) firstStart = p.start;
     if (p.end > lastEnd) lastEnd = p.end;
   }
-  return data.gaps
-    .filter((g) => g.start > firstStart && g.end < lastEnd)
-    .sort((a, b) => a.start.localeCompare(b.start));
+  const interior = data.gaps.filter(
+    (g) => g.start > firstStart && g.end < lastEnd,
+  );
+  return mergeAdjacentGaps(interior);
 }
 
 export function tasteRow(data: TastePhasesData, k: number): TasteRowItem[] {
   const phases = phasesAtLevel(data, k);
-  const gaps = visibleGaps(data);
-
-  const gapsAfterPhase = new Map<number, TasteGap[]>();
-  for (const gap of gaps) {
-    let targetIdx = -1;
-    for (let i = 0; i < phases.length; i++) {
-      if (phases[i].start < gap.start) {
-        targetIdx = i;
-      } else {
-        break;
-      }
-    }
-    if (targetIdx >= 0) {
-      const bucket = gapsAfterPhase.get(targetIdx);
-      if (bucket) {
-        bucket.push(gap);
-      } else {
-        gapsAfterPhase.set(targetIdx, [gap]);
-      }
-    }
-  }
-
   const items: TasteRowItem[] = [];
+  let activeIdx = 0;
+
   for (let i = 0; i < phases.length; i++) {
     const phase = phases[i];
+    const prev = i > 0 ? phases[i - 1] : null;
+    const tone: TasteTone = phase.isGap
+      ? "a"
+      : activeIdx++ % 2 === 0
+        ? "a"
+        : "b";
+    const shiftIn =
+      i === 0 || phase.isGap || prev?.isGap
+        ? null
+        : shiftAtLevel(data, phase.start, k);
+
     items.push({
       kind: "phase",
       phase,
-      tone: i % 2 === 0 ? "a" : "b",
-      shiftIn: i === 0 ? null : shiftAtLevel(data, phase.start, k),
+      tone,
+      shiftIn,
     });
-    const after = gapsAfterPhase.get(i);
-    if (after) {
-      for (const gap of after) {
-        items.push({
-          kind: "gap",
-          gap,
-          weeks: inclusiveWeeks(gap.start, gap.end),
-        });
-      }
-    }
   }
   return items;
 }
@@ -231,38 +317,42 @@ export function desktopRibbon(
   k: number,
 ): DesktopRibbonPiece[] {
   const phases = phasesAtLevel(data, k);
-  const gaps = visibleGaps(data);
   const pieces: DesktopRibbonPiece[] = [];
+  let activeIdx = 0;
 
-  for (let i = 0; i < phases.length; i++) {
-    const phase = phases[i];
+  for (const phase of phases) {
     const span = clipSpanToDesktopCols(year, phase.start, phase.end);
-    if (!span) continue;
-    pieces.push({
-      kind: "phase",
-      colStart: span.colStart,
-      colEnd: span.colEnd,
-      phaseId: phase.id,
-      tone: i % 2 === 0 ? "a" : "b",
-    });
-  }
-
-  for (const gap of gaps) {
-    const span = clipSpanToDesktopCols(year, gap.start, gap.end);
-    if (!span) continue;
-    pieces.push({
-      kind: "gap",
-      colStart: span.colStart,
-      colEnd: span.colEnd,
-    });
+    if (phase.isGap) {
+      if (!span) continue;
+      pieces.push({
+        kind: "gap",
+        colStart: span.colStart,
+        colEnd: span.colEnd,
+        phaseId: phase.id,
+      });
+    } else {
+      const tone: TasteTone = activeIdx++ % 2 === 0 ? "a" : "b";
+      if (!span) continue;
+      pieces.push({
+        kind: "phase",
+        colStart: span.colStart,
+        colEnd: span.colEnd,
+        phaseId: phase.id,
+        tone,
+      });
+    }
   }
 
   for (let i = 1; i < phases.length; i++) {
     const prev = phases[i - 1];
     const next = phases[i];
+    if (prev.isGap || next.isGap) continue;
     const shift = shiftAtLevel(data, next.start, k);
     if (!shift || shift.kind !== "gradual") continue;
-    const span = clipSpanToDesktopCols(year, shift.rampStart, shift.rampEnd);
+    const rampStart = shift.rampStart < prev.start ? prev.start : shift.rampStart;
+    const rampEnd = shift.rampEnd > next.end ? next.end : shift.rampEnd;
+    if (rampStart > rampEnd) continue;
+    const span = clipSpanToDesktopCols(year, rampStart, rampEnd);
     if (!span) continue;
     pieces.push({
       kind: "ramp",
@@ -309,38 +399,42 @@ export function mobileRibbon(
   k: number,
 ): MobileRibbonPiece[] {
   const phases = phasesAtLevel(data, k);
-  const gaps = visibleGaps(data);
   const pieces: MobileRibbonPiece[] = [];
+  let activeIdx = 0;
 
-  for (let i = 0; i < phases.length; i++) {
-    const phase = phases[i];
+  for (const phase of phases) {
     const span = clipSpanToMobilePct(year, phase.start, phase.end);
-    if (!span) continue;
-    pieces.push({
-      kind: "phase",
-      leftPct: span.leftPct,
-      widthPct: span.widthPct,
-      phaseId: phase.id,
-      tone: i % 2 === 0 ? "a" : "b",
-    });
-  }
-
-  for (const gap of gaps) {
-    const span = clipSpanToMobilePct(year, gap.start, gap.end);
-    if (!span) continue;
-    pieces.push({
-      kind: "gap",
-      leftPct: span.leftPct,
-      widthPct: span.widthPct,
-    });
+    if (phase.isGap) {
+      if (!span) continue;
+      pieces.push({
+        kind: "gap",
+        leftPct: span.leftPct,
+        widthPct: span.widthPct,
+        phaseId: phase.id,
+      });
+    } else {
+      const tone: TasteTone = activeIdx++ % 2 === 0 ? "a" : "b";
+      if (!span) continue;
+      pieces.push({
+        kind: "phase",
+        leftPct: span.leftPct,
+        widthPct: span.widthPct,
+        phaseId: phase.id,
+        tone,
+      });
+    }
   }
 
   for (let i = 1; i < phases.length; i++) {
     const prev = phases[i - 1];
     const next = phases[i];
+    if (prev.isGap || next.isGap) continue;
     const shift = shiftAtLevel(data, next.start, k);
     if (!shift || shift.kind !== "gradual") continue;
-    const span = clipSpanToMobilePct(year, shift.rampStart, shift.rampEnd);
+    const rampStart = shift.rampStart < prev.start ? prev.start : shift.rampStart;
+    const rampEnd = shift.rampEnd > next.end ? next.end : shift.rampEnd;
+    if (rampStart > rampEnd) continue;
+    const span = clipSpanToMobilePct(year, rampStart, rampEnd);
     if (!span) continue;
     pieces.push({
       kind: "ramp",

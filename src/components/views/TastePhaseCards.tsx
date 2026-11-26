@@ -40,9 +40,9 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
   if (items.length === 0) return null;
 
   const hasGradual = items.some(
-    (item) => item.kind === "phase" && item.shiftIn?.kind === "gradual",
+    (item) => !item.phase.isGap && item.shiftIn?.kind === "gradual",
   );
-  const hasGap = items.some((item) => item.kind === "gap");
+  const hasGap = items.some((item) => Boolean(item.phase.isGap));
 
   return (
     <div className="w-full mb-4">
@@ -52,8 +52,9 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
       >
         {items.map((item, idx) => {
           const showConnector = idx > 0;
+          const { phase } = item;
           const gradualShift =
-            item.kind === "phase" && item.shiftIn?.kind === "gradual"
+            !phase.isGap && item.shiftIn?.kind === "gradual"
               ? item.shiftIn
               : null;
 
@@ -67,10 +68,8 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
                   className="block w-[22px] md:w-[24px] h-[8px] rounded-[1px]"
                   style={{
                     background: `linear-gradient(90deg, var(--taste-tone-${
-                      item.kind === "phase" && item.tone === "a" ? "b" : "a"
-                    }), var(--taste-tone-${
-                      item.kind === "phase" ? item.tone : "b"
-                    }))`,
+                      item.tone === "a" ? "b" : "a"
+                    }), var(--taste-tone-${item.tone}))`,
                   }}
                 />
                 <span>{gradualShift.widthWeeks}w</span>
@@ -85,21 +84,48 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
             )
           ) : null;
 
-          if (item.kind === "gap") {
+          const isSelected = phase.id === selectedPhaseId;
+          const weeks = inclusiveWeeks(phase.start, phase.end);
+
+          if (phase.isGap) {
             return (
-              <React.Fragment key={`gap-${item.gap.start}-${item.gap.end}`}>
+              <React.Fragment key={phase.id}>
                 {connector}
-                <div className="flex-none w-[110px] border border-dashed border-[#1C1C1A] bg-[#0B0B0A] px-2.5 py-2.5 flex flex-col items-center justify-center text-center font-mono text-[11px] text-[#5A5A55] select-none">
-                  <span>{item.weeks} weeks</span>
-                  <span>no data</span>
-                </div>
+                <button
+                  ref={(el) => {
+                    if (el) {
+                      cardRefs.current.set(phase.id, el);
+                    } else {
+                      cardRefs.current.delete(phase.id);
+                    }
+                  }}
+                  type="button"
+                  aria-pressed={isSelected}
+                  data-taste-phase={phase.id}
+                  data-taste-gap="true"
+                  onClick={() => onSelectPhase(phase)}
+                  className={`flex-none w-[180px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer motion-hover focus-ring active:scale-[0.99] flex flex-col justify-between ${
+                    isSelected
+                      ? "border-music-accent"
+                      : "border-dashed border-[#2A2A24] hover:border-[#47473B]"
+                  }`}
+                >
+                  <div>
+                    <div className="font-mono text-[11px] text-[#5A5A55] leading-snug">
+                      {formatTasteDateSpan(phase.start, phase.end)} &middot; {weeks}w
+                    </div>
+                    <div className="font-mono text-[12px] text-[#8A8A82] mt-1 leading-snug">
+                      {phase.plays.toLocaleString("en-US")} plays
+                    </div>
+                  </div>
+                  <div className="font-mono text-[11px] text-[#5A5A55] mt-2">
+                    {phase.plays > 0 ? "Low activity" : "No data"}
+                  </div>
+                </button>
               </React.Fragment>
             );
           }
 
-          const { phase } = item;
-          const isSelected = phase.id === selectedPhaseId;
-          const weeks = inclusiveWeeks(phase.start, phase.end);
           const topArtists = phase.topArtists.slice(0, 3);
           const maxShare = topArtists[0]?.share || 1;
 

@@ -26,13 +26,14 @@ export interface TasteArtist {
 
 export interface TastePhase {
   id: string; // `${start}_${end}`
-  start: string; // Sunday YYYY-MM-DD of the first analyzed week
+  start: string; // Sunday YYYY-MM-DD of the first analyzed week (or gap start)
   end: string; // Saturday YYYY-MM-DD
   minK: number;
   maxK: number; // this Taste Phase exists at every level K in [minK, maxK]
   plays: number;
   topArtists: TasteArtist[];
   inShift: boolean; // lies inside a gradual Taste Shift ramp at some coarser level
+  isGap?: boolean; // true for gap phases (>= MIN_PHASE_WEEKS consecutive weeks < MIN_WEEK_PLAYS)
 }
 
 export interface TasteShiftAtLevel {
@@ -52,6 +53,7 @@ export interface TasteShift {
 export interface TasteGap {
   start: string; // Sunday YYYY-MM-DD
   end: string; // Saturday YYYY-MM-DD
+  plays?: number; // total Plays during the gap (0 or light listening < MIN_WEEK_PLAYS/wk)
 }
 
 export interface TastePhasesData {

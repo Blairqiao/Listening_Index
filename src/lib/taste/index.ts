@@ -1,6 +1,6 @@
 export * from "./types";
 
-import { buildMergeTree } from "./merge-tree";
+import { buildMergeTree, type TreeSegment } from "./merge-tree";
 import { segmentAnalyzedWeeks } from "./segment";
 import { computeShiftsAndGradualSpans, isPhaseInShift } from "./shifts";
 import {
@@ -43,14 +43,48 @@ export function computeTastePhases(
   const G = buildGramMatrix(analyzed.map((w) => w.vector));
   const { kFine, kEra, fineBounds, cost } = segmentAnalyzedWeeks(G);
   const { levels, boundaryMinK, segments } = buildMergeTree(cost, n, fineBounds);
+
+  const gapSplitIndices: number[] = [];
+  for (let i = 1; i < n; i++) {
+    if (analyzed[i].timelineIdx - analyzed[i - 1].timelineIdx - 1 >= MIN_PHASE_WEEKS) {
+      gapSplitIndices.push(i);
+    }
+  }
+  const gapSplitSet = new Set(gapSplitIndices);
+
   const { shifts, gradualSpans } = computeShiftsAndGradualSpans(
     analyzed,
     levels,
     boundaryMinK,
-    kFine
+    kFine,
+    gapSplitSet
   );
 
-  const phases: TastePhase[] = segments.map((seg) => {
+  // Split any segment that straddles an interior TasteGap so no active phase overlaps a gap.
+  let finalSegments: TreeSegment[] = segments;
+  if (gapSplitIndices.length > 0) {
+    const segmentMap = new Map<string, TreeSegment>();
+    for (const [k, bounds] of levels) {
+      const splitBounds = [...new Set([...bounds, ...gapSplitIndices])].sort((a, b) => a - b);
+      for (let i = 0; i < splitBounds.length - 1; i++) {
+        const startIdx = splitBounds[i];
+        const endIdx = splitBounds[i + 1];
+        const key = `${startIdx}:${endIdx}`;
+        const existing = segmentMap.get(key);
+        if (existing) {
+          if (k < existing.minK) existing.minK = k;
+          if (k > existing.maxK) existing.maxK = k;
+        } else {
+          segmentMap.set(key, { startIdx, endIdx, minK: k, maxK: k });
+        }
+      }
+    }
+    finalSegments = [...segmentMap.values()].sort((a, b) =>
+      a.startIdx !== b.startIdx ? a.startIdx - b.startIdx : a.minK - b.minK
+    );
+  }
+
+  const phases: TastePhase[] = finalSegments.map((seg) => {
     const start = analyzed[seg.startIdx].week;
     let end: string;
     if (seg.endIdx === n) {

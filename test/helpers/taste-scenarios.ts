@@ -308,11 +308,25 @@ export function assertTasteInvariants(data: TastePhasesData): void {
     return;
   }
 
-  assert.equal(
-    data.phases.length,
-    2 * data.kFine - 1,
-    `expected ${2 * data.kFine - 1} phases, got ${data.phases.length}`
+  const firstPhaseStart = data.phases.reduce(
+    (min, p) => (p.start < min ? p.start : min),
+    data.phases[0]?.start ?? ""
   );
+  const lastPhaseEnd = data.phases.reduce(
+    (max, p) => (p.end > max ? p.end : max),
+    data.phases[0]?.end ?? ""
+  );
+  const interiorGaps = data.gaps.filter(
+    (g) => g.start > firstPhaseStart && g.end < lastPhaseEnd
+  );
+
+  if (interiorGaps.length === 0) {
+    assert.equal(
+      data.phases.length,
+      2 * data.kFine - 1,
+      `expected ${2 * data.kFine - 1} phases, got ${data.phases.length}`
+    );
+  }
   assert.equal(
     data.shifts.length,
     data.kFine - 1,
@@ -368,7 +382,14 @@ export function assertTasteInvariants(data: TastePhasesData): void {
     const activePhases = data.phases
       .filter((p) => p.minK <= k && k <= p.maxK)
       .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
-    assert.equal(activePhases.length, k, `level ${k} must have ${k} active Taste Phases`);
+    if (interiorGaps.length === 0) {
+      assert.equal(activePhases.length, k, `level ${k} must have ${k} active Taste Phases`);
+    } else {
+      assert.ok(
+        activePhases.length >= k,
+        `level ${k} must have at least ${k} active Taste Phases, got ${activePhases.length}`
+      );
+    }
 
     for (let i = 0; i < activePhases.length; i++) {
       const phase = activePhases[i];
@@ -376,6 +397,12 @@ export function assertTasteInvariants(data: TastePhasesData): void {
       assert.ok(phase.start <= phase.end);
       assert.ok(phase.plays >= MIN_WEEK_PLAYS);
       assert.ok(phase.topArtists.length >= 1 && phase.topArtists.length <= TOP_ARTISTS);
+      for (const gap of data.gaps) {
+        assert.ok(
+          phase.end < gap.start || phase.start > gap.end,
+          `active phase ${phase.id} must not overlap gap ${gap.start}..${gap.end}`
+        );
+      }
       for (let j = 0; j < phase.topArtists.length; j++) {
         const artist = phase.topArtists[j];
         assert.ok(artist.share > 0 && artist.share <= 1, `invalid share ${artist.share}`);
@@ -392,11 +419,21 @@ export function assertTasteInvariants(data: TastePhasesData): void {
       }
     }
 
-    assert.deepEqual(
-      activePhases.slice(1).map((p) => p.start),
-      levelBounds,
-      `active phase starts at level ${k} must match shift weeks`
-    );
+    const activeStarts = new Set(activePhases.slice(1).map((p) => p.start));
+    if (interiorGaps.length === 0) {
+      assert.deepEqual(
+        activePhases.slice(1).map((p) => p.start),
+        levelBounds,
+        `active phase starts at level ${k} must match shift weeks`
+      );
+    } else {
+      for (const b of levelBounds) {
+        assert.ok(
+          activeStarts.has(b),
+          `level ${k} shift week ${b} must be an active phase start`
+        );
+      }
+    }
   }
 
   for (let i = 0; i < data.gaps.length; i++) {

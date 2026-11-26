@@ -152,7 +152,7 @@ test("gap scenarios preserve era continuity and compute gap/phase end dates", ()
     assertTasteInvariants(data);
 
     assert.deepEqual(
-      data.gaps,
+      data.gaps.map(({ start, end }) => ({ start, end })),
       sc.expectedGaps.map((g) => ({
         start: weekDate(g.startIdx, START_SUNDAY),
         end: addDaysUtc(weekDate(g.endIdx, START_SUNDAY), 6),
@@ -174,7 +174,42 @@ test("gap scenarios preserve era continuity and compute gap/phase end dates", ()
       assert.equal(firstPhase.end, addDaysUtc(weekDate(59, START_SUNDAY), 6));
       assert.equal(data.shifts[0].week, weekDate(80, START_SUNDAY));
     }
+
+    // No active phase at any level may overlap any gap
+    for (const phase of data.phases) {
+      for (const gap of data.gaps) {
+        assert.ok(
+          phase.end < gap.start || phase.start > gap.end,
+          `${sc.name}: phase ${phase.id} must not overlap gap ${gap.start}..${gap.end}`
+        );
+      }
+    }
   }
+});
+
+test("short active islands (< MIN_PHASE_WEEKS) between two gaps merge into one continuous gap", () => {
+  const rows: WeekArtistRow[] = [];
+  // 20w active A, 6w low (5 plays/wk), 2w active island (20 plays/wk), 24w zero, 20w active B
+  for (let w = 0; w < 20; w++) {
+    rows.push({ week: weekDate(w, START_SUNDAY), artistKey: "a", artistName: "Artist A", plays: 40 });
+  }
+  for (let w = 20; w < 26; w++) {
+    rows.push({ week: weekDate(w, START_SUNDAY), artistKey: "a", artistName: "Artist A", plays: 5 });
+  }
+  for (let w = 26; w < 28; w++) {
+    rows.push({ week: weekDate(w, START_SUNDAY), artistKey: "m", artistName: "Artist M", plays: 20 });
+  }
+  // weeks 28..51 have 0 plays
+  for (let w = 52; w < 72; w++) {
+    rows.push({ week: weekDate(w, START_SUNDAY), artistKey: "b", artistName: "Artist B", plays: 40 });
+  }
+
+  const data = computeTastePhases(rows, "UTC");
+  assertTasteInvariants(data);
+  assert.equal(data.gaps.length, 1, "flanking gaps around a <4w island must merge into one gap");
+  assert.equal(data.gaps[0].start, weekDate(20, START_SUNDAY));
+  assert.equal(data.gaps[0].end, addDaysUtc(weekDate(51, START_SUNDAY), 6));
+  assert.equal(data.gaps[0].plays, 6 * 5 + 2 * 20);
 });
 
 test("Phase dates bridge non-gap sparse weeks and resolve most-played Artist names", () => {

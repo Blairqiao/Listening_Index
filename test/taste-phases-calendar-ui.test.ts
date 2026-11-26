@@ -159,9 +159,9 @@ test("CalendarView renders default Taste Era level, 2 cards, slider bounds, labe
     }),
   );
 
-  // Exactly 2 phase cards (aria-pressed buttons)
+  // 4 selectable cards at default kEra=2 (Era 1 splits around the interior gap + gap card + Era 2)
   const cardButtons = html.match(/<button\b[^>]*\baria-pressed="false"[^>]*>/g) ?? [];
-  assert.equal(cardButtons.length, 2, "must render exactly 2 phase cards at default kEra=2");
+  assert.equal(cardButtons.length, 4, "must render 4 selectable phase/gap cards at default kEra=2");
 
   // Slider with min="2", max="4", aria-label="Taste detail", aria-valuetext="2 Taste Eras"
   const sliderMatch = html.match(/<input\b[^>]*type="range"[^>]*>/);
@@ -176,8 +176,9 @@ test("CalendarView renders default Taste Era level, 2 cards, slider bounds, labe
   assert.ok(html.includes("Drag across days, pick a month, or pick a phase"));
 
   // Gap card, gradual connector, and legend render when present at level
-  assert.ok(html.includes("9 weeks"), "must render interior gap week count");
-  assert.ok(html.includes("no data"), "must render gap card and legend");
+  assert.ok(html.includes("9w"), "must render interior gap week count");
+  assert.ok(html.includes("No data"), "must render gap card label");
+  assert.ok(html.includes("no data"), "must render gap legend");
   assert.ok(html.includes("6w"), "must render gradual shift widthWeeks on connector");
   assert.ok(html.includes("gradual shift"), "must render gradual shift legend");
 
@@ -191,13 +192,44 @@ test("CalendarView renders default Taste Era level, 2 cards, slider bounds, labe
   }
 });
 
-test("CalendarView highlights selected phase card and its ribbon pieces when selection matches a phase", () => {
-  const era1 = TASTE_FIXTURE.phases.find((p) => p.id === "2024-06-02_2025-02-08")!;
+test("CalendarView renders gap phases as selectable cards and ribbon buttons that highlight when selected", () => {
+  const gapSelection = { from: "2024-09-01", to: "2024-11-02" };
   const html = renderToStaticMarkup(
     React.createElement(CalendarView, {
       data: CALENDAR_FIXTURE,
       isLoading: false,
-      selection: phaseSelection(era1),
+      selection: gapSelection,
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+      taste: TASTE_FIXTURE,
+      tasteLevel: 2,
+      onTasteLevelChange: () => {},
+    }),
+  );
+
+  const pressedGapCard = html.match(
+    /<button\b[^>]*aria-pressed="true"[^>]*data-taste-phase="2024-09-01_2024-11-02"[^>]*>/g,
+  ) ?? [];
+  assert.equal(pressedGapCard.length, 1, "gap card must be a selectable button highlighted when selected");
+
+  const accentGapRibbons =
+    html.match(
+      /<button\b[^>]*data-taste-ribbon="gap"[^>]*bg-music-accent[^>]*>|<button\b[^>]*bg-music-accent[^>]*data-taste-ribbon="gap"[^>]*>/g,
+    ) ?? [];
+  assert.equal(
+    accentGapRibbons.length,
+    2,
+    "selected gap ribbon buttons (desktop & mobile) must use bg-music-accent",
+  );
+});
+
+test("CalendarView highlights selected phase card and its ribbon pieces when selection matches a phase", () => {
+  const era2 = TASTE_FIXTURE.phases.find((p) => p.id === "2025-02-09_2025-12-27")!;
+  const html = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data: CALENDAR_FIXTURE,
+      isLoading: false,
+      selection: phaseSelection(era2),
       onSelectionChange: () => {},
       onOpenInOverview: () => {},
       taste: TASTE_FIXTURE,
@@ -209,7 +241,7 @@ test("CalendarView highlights selected phase card and its ribbon pieces when sel
   const pressedTrue = html.match(/<button\b[^>]*\baria-pressed="true"[^>]*>/g) ?? [];
   const pressedFalse = html.match(/<button\b[^>]*\baria-pressed="false"[^>]*>/g) ?? [];
   assert.equal(pressedTrue.length, 1, "exactly one card must be pressed");
-  assert.equal(pressedFalse.length, 1, "the other card must not be pressed");
+  assert.equal(pressedFalse.length, 3, "the other cards must not be pressed");
 
   // Ribbon piece for selected phase has bg-music-accent
   const accentRibbonButtons =
@@ -234,7 +266,7 @@ test("CalendarView leaves all cards unpressed when selection matches no phase, w
   const pressedTrue = html.match(/<button\b[^>]*\baria-pressed="true"[^>]*>/g) ?? [];
   const pressedFalse = html.match(/<button\b[^>]*\baria-pressed="false"[^>]*>/g) ?? [];
   assert.equal(pressedTrue.length, 0, "no card may be pressed for a non-matching range");
-  assert.equal(pressedFalse.length, 2, "both cards remain unpressed");
+  assert.equal(pressedFalse.length, 4, "all cards remain unpressed");
 
   // Outside day is still dimmed
   const outDay = html.match(/<div[^>]*data-date="2025-03-10"[^>]*class="[^"]*"/)?.[0] ?? "";
@@ -517,7 +549,7 @@ test("CalendarView and TastePhaseCards apply focus-ring, press, mobile hit-area-
   assert.match(overviewBtn[0], /\bfocus-ring\b/, "Open in Overview button must include focus-ring");
 
   const cardButtons = html.match(/<button\b[^>]*data-taste-phase="[^"]+"[^>]*>/g) ?? [];
-  assert.equal(cardButtons.length, 2);
+  assert.equal(cardButtons.length, 4);
   for (const card of cardButtons) {
     assert.match(card, /\bfocus-ring\b/, "phase cards must include focus-ring");
     assert.match(card, /\bactive:scale-\[0\.99\]/, "phase cards must use active:scale-[0.99]");
@@ -598,9 +630,9 @@ test("TastePhaseCards uses scrollTo with scrollBehavior() and respects prefers-r
 
   const items = tasteRow(TASTE_FIXTURE, 2);
   const phaseItems = items.filter((item) => item.kind === "phase");
-  assert.equal(phaseItems.length, 2);
+  assert.equal(phaseItems.length, 4);
   const phase1Id = phaseItems[0].phase.id;
-  const phase2Id = phaseItems[1].phase.id;
+  const phase2Id = phaseItems[3].phase.id;
 
   const scrollCalls: Array<{ left?: number; behavior?: ScrollBehavior }> = [];
   let reduceMotion = false;

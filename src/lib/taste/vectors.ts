@@ -129,40 +129,96 @@ export function buildWeekSeries(rows: readonly WeekArtistRow[]): WeekSeries {
 
   const minMs = parseDateUtc(minWeek);
   const maxMs = parseDateUtc(maxWeek);
+
+  interface TimelineWeek {
+    week: string;
+    timelineIdx: number;
+    plays: number;
+    counts?: Map<string, number>;
+    isActive: boolean;
+  }
+
+  const timeline: TimelineWeek[] = [];
+  for (let ms = minMs, timelineIdx = 0; ms <= maxMs; ms += MS_PER_WEEK, timelineIdx++) {
+    const week = formatDateUtc(ms);
+    const totalPlays = weekTotals.get(week) ?? 0;
+    const isActive = totalPlays >= MIN_WEEK_PLAYS;
+    timeline.push({
+      week,
+      timelineIdx,
+      plays: totalPlays,
+      counts: isActive ? weekCounts.get(week) : undefined,
+      isActive,
+    });
+  }
+
+  // Fold short active islands (< MIN_PHASE_WEEKS) sandwiched between two gaps
+  // into the gap so flanking gaps merge into one continuous TasteGap.
+  let folded = true;
+  while (folded) {
+    folded = false;
+    const runs: Array<{ start: number; end: number; isActive: boolean }> = [];
+    for (let i = 0; i < timeline.length; i++) {
+      const last = runs[runs.length - 1];
+      if (last && last.isActive === timeline[i].isActive) {
+        last.end = i + 1;
+      } else {
+        runs.push({ start: i, end: i + 1, isActive: timeline[i].isActive });
+      }
+    }
+    for (let r = 1; r < runs.length - 1; r++) {
+      const prev = runs[r - 1];
+      const cur = runs[r];
+      const next = runs[r + 1];
+      if (
+        cur.isActive &&
+        cur.end - cur.start < MIN_PHASE_WEEKS &&
+        !prev.isActive &&
+        prev.end - prev.start >= MIN_PHASE_WEEKS &&
+        !next.isActive &&
+        next.end - next.start >= MIN_PHASE_WEEKS
+      ) {
+        for (let i = cur.start; i < cur.end; i++) {
+          timeline[i].isActive = false;
+        }
+        folded = true;
+      }
+    }
+  }
+
   const analyzed: AnalyzedWeek[] = [];
   const gaps: TasteGap[] = [];
 
   let gapStart: string | null = null;
   let gapEnd: string | null = null;
   let gapLen = 0;
+  let gapPlays = 0;
 
   const flushGap = () => {
     if (gapStart !== null && gapEnd !== null && gapLen >= MIN_PHASE_WEEKS) {
-      gaps.push({ start: gapStart, end: weekSaturday(gapEnd) });
+      gaps.push({ start: gapStart, end: weekSaturday(gapEnd), plays: gapPlays });
     }
     gapStart = null;
     gapEnd = null;
     gapLen = 0;
+    gapPlays = 0;
   };
 
-  for (let ms = minMs, timelineIdx = 0; ms <= maxMs; ms += MS_PER_WEEK, timelineIdx++) {
-    const week = formatDateUtc(ms);
-    const totalPlays = weekTotals.get(week) ?? 0;
-
-    if (totalPlays >= MIN_WEEK_PLAYS) {
+  for (const w of timeline) {
+    if (w.isActive && w.counts) {
       flushGap();
-      const counts = weekCounts.get(week)!;
       analyzed.push({
-        week,
-        timelineIdx,
-        plays: totalPlays,
-        counts,
-        vector: normalizeVector(counts),
+        week: w.week,
+        timelineIdx: w.timelineIdx,
+        plays: w.plays,
+        counts: w.counts,
+        vector: normalizeVector(w.counts),
       });
     } else {
-      if (gapStart === null) gapStart = week;
-      gapEnd = week;
+      if (gapStart === null) gapStart = w.week;
+      gapEnd = w.week;
       gapLen++;
+      gapPlays += w.plays;
     }
   }
   flushGap();

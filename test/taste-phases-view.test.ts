@@ -90,32 +90,62 @@ const FIXTURE: TastePhasesData = {
   ],
 };
 
-test("phasesAtLevel returns nested phases sorted by start with count equal to k", () => {
+test("phasesAtLevel includes interior gaps as selectable non-overlapping phases and splits straddling phases", () => {
+  // At k=2, Phase 1 (2024-06-02..2025-02-08) straddles the interior gap (2024-09-01..2024-11-02).
+  // It must be split around the gap so no phase overlaps the gap, and the gap itself is a phase.
   const era = phasesAtLevel(FIXTURE, 2);
-  assert.equal(era.length, 2);
   assert.deepEqual(
-    era.map((p) => p.id),
-    ["2024-06-02_2025-02-08", "2025-02-09_2025-12-27"],
+    era.map((p) => ({ id: p.id, isGap: Boolean(p.isGap) })),
+    [
+      { id: "2024-06-02_2024-08-31", isGap: false },
+      { id: "2024-09-01_2024-11-02", isGap: true },
+      { id: "2024-11-03_2025-02-08", isGap: false },
+      { id: "2025-02-09_2025-12-27", isGap: false },
+    ],
   );
 
   const mid = phasesAtLevel(FIXTURE, 3);
-  assert.equal(mid.length, 3);
   assert.deepEqual(
-    mid.map((p) => p.id),
-    ["2024-06-02_2024-08-31", "2024-11-03_2025-02-08", "2025-02-09_2025-12-27"],
+    mid.map((p) => ({ id: p.id, isGap: Boolean(p.isGap) })),
+    [
+      { id: "2024-06-02_2024-08-31", isGap: false },
+      { id: "2024-09-01_2024-11-02", isGap: true },
+      { id: "2024-11-03_2025-02-08", isGap: false },
+      { id: "2025-02-09_2025-12-27", isGap: false },
+    ],
   );
 
   const fine = phasesAtLevel(FIXTURE, 4);
-  assert.equal(fine.length, 4);
   assert.deepEqual(
-    fine.map((p) => p.id),
+    fine.map((p) => ({ id: p.id, isGap: Boolean(p.isGap) })),
     [
-      "2024-06-02_2024-08-31",
-      "2024-11-03_2025-02-08",
-      "2025-02-09_2025-05-24",
-      "2025-05-25_2025-12-27",
+      { id: "2024-06-02_2024-08-31", isGap: false },
+      { id: "2024-09-01_2024-11-02", isGap: true },
+      { id: "2024-11-03_2025-02-08", isGap: false },
+      { id: "2025-02-09_2025-05-24", isGap: false },
+      { id: "2025-05-25_2025-12-27", isGap: false },
     ],
   );
+});
+
+test("back-to-back gaps merge into a single gap phase", () => {
+  const adjacentGapData: TastePhasesData = {
+    ...FIXTURE,
+    gaps: [
+      { start: "2024-09-01", end: "2024-09-28", plays: 18 },
+      { start: "2024-09-29", end: "2024-11-02", plays: 0 },
+    ],
+  };
+
+  assert.deepEqual(visibleGaps(adjacentGapData), [
+    { start: "2024-09-01", end: "2024-11-02", plays: 18 },
+  ]);
+
+  const row = tasteRow(adjacentGapData, 3);
+  const gapItems = row.filter((item) => item.phase.isGap);
+  assert.equal(gapItems.length, 1);
+  assert.equal(gapItems[0].phase.id, "2024-09-01_2024-11-02");
+  assert.equal(gapItems[0].phase.plays, 18);
 });
 
 test("clampTasteLevel defaults null and out-of-range values to kEra and preserves in-range values", () => {
@@ -148,59 +178,60 @@ test("visibleGaps drops leading and trailing gaps and keeps interior gaps", () =
   assert.deepEqual(gaps, [{ start: "2024-09-01", end: "2024-11-02" }]);
 });
 
-test("tasteRow inserts interior gaps with week count, sets first shiftIn null, and tracks gradual vs sharp per level", () => {
+test("tasteRow includes interior gaps as selectable phases, clears shiftIn across gaps, and tracks gradual vs sharp per level", () => {
   const row3 = tasteRow(FIXTURE, 3);
   assert.equal(row3.length, 4);
 
   // Item 0: first phase
   assert.equal(row3[0].kind, "phase");
-  if (row3[0].kind === "phase") {
-    assert.equal(row3[0].phase.id, "2024-06-02_2024-08-31");
-    assert.equal(row3[0].tone, "a");
-    assert.equal(row3[0].shiftIn, null);
-  }
+  assert.equal(row3[0].phase.id, "2024-06-02_2024-08-31");
+  assert.equal(row3[0].phase.isGap, undefined);
+  assert.equal(row3[0].tone, "a");
+  assert.equal(row3[0].shiftIn, null);
 
   // Item 1: interior gap (2024-09-01 .. 2024-11-02 = 63 days = 9 weeks)
-  assert.equal(row3[1].kind, "gap");
-  if (row3[1].kind === "gap") {
-    assert.deepEqual(row3[1].gap, { start: "2024-09-01", end: "2024-11-02" });
-    assert.equal(row3[1].weeks, 9);
-  }
+  assert.equal(row3[1].kind, "phase");
+  assert.equal(row3[1].phase.isGap, true);
+  assert.equal(row3[1].phase.id, "2024-09-01_2024-11-02");
+  assert.equal(row3[1].phase.start, "2024-09-01");
+  assert.equal(row3[1].phase.end, "2024-11-02");
+  assert.equal(row3[1].shiftIn, null);
 
-  // Item 2: second phase (sharp shift)
+  // Item 2: second active phase (follows a gap, so shiftIn is null)
   assert.equal(row3[2].kind, "phase");
-  if (row3[2].kind === "phase") {
-    assert.equal(row3[2].phase.id, "2024-11-03_2025-02-08");
-    assert.equal(row3[2].tone, "b");
-    assert.equal(row3[2].shiftIn?.kind, "sharp");
-  }
+  assert.equal(row3[2].phase.id, "2024-11-03_2025-02-08");
+  assert.equal(row3[2].tone, "b");
+  assert.equal(row3[2].shiftIn, null);
 
-  // Item 3: third phase (gradual shift at level 3)
+  // Item 3: third active phase (gradual shift at level 3)
   assert.equal(row3[3].kind, "phase");
-  if (row3[3].kind === "phase") {
-    assert.equal(row3[3].phase.id, "2025-02-09_2025-12-27");
-    assert.equal(row3[3].tone, "a");
-    assert.equal(row3[3].shiftIn?.kind, "gradual");
-    assert.equal(row3[3].shiftIn?.widthWeeks, 6);
-  }
+  assert.equal(row3[3].phase.id, "2025-02-09_2025-12-27");
+  assert.equal(row3[3].tone, "a");
+  assert.equal(row3[3].shiftIn?.kind, "gradual");
+  assert.equal(row3[3].shiftIn?.widthWeeks, 6);
 
   // At level 4, the 2025-02-09 boundary is sharp instead of gradual
   const row4 = tasteRow(FIXTURE, 4);
   const febPhase = row4.find(
-    (item) => item.kind === "phase" && item.phase.start === "2025-02-09",
+    (item) => !item.phase.isGap && item.phase.start === "2025-02-09",
   );
-  assert.ok(febPhase && febPhase.kind === "phase");
+  assert.ok(febPhase);
   assert.equal(febPhase.shiftIn?.kind, "sharp");
   assert.equal(shiftAtLevel(FIXTURE, "2025-02-09", 3)?.kind, "gradual");
   assert.equal(shiftAtLevel(FIXTURE, "2025-02-09", 4)?.kind, "sharp");
   assert.equal(shiftAtLevel(FIXTURE, "2024-11-03", 2), null);
 });
 
-test("selectedPhaseId matches only exact phase boundaries", () => {
+test("selectedPhaseId matches exact phase and gap boundaries", () => {
   const phases = phasesAtLevel(FIXTURE, 3);
-  const target = phases[1];
-  assert.deepEqual(phaseSelection(target), { from: "2024-11-03", to: "2025-02-08" });
-  assert.equal(selectedPhaseId(phases, phaseSelection(target)), target.id);
+  const gapTarget = phases[1];
+  assert.equal(gapTarget.isGap, true);
+  assert.deepEqual(phaseSelection(gapTarget), { from: "2024-09-01", to: "2024-11-02" });
+  assert.equal(selectedPhaseId(phases, phaseSelection(gapTarget)), gapTarget.id);
+
+  const activeTarget = phases[2];
+  assert.deepEqual(phaseSelection(activeTarget), { from: "2024-11-03", to: "2025-02-08" });
+  assert.equal(selectedPhaseId(phases, phaseSelection(activeTarget)), activeTarget.id);
   assert.equal(selectedPhaseId(phases, { from: "2024-11-04", to: "2025-02-08" }), null);
   assert.equal(selectedPhaseId(phases, { from: "2024-11-03", to: "2025-02-07" }), null);
   assert.equal(selectedPhaseId(phases, null), null);
@@ -218,8 +249,8 @@ test("desktopRibbon computes hand-verified columns across year boundaries, drops
   const r2024 = desktopRibbon(2024, FIXTURE, 3);
   assert.deepEqual(r2024, [
     { kind: "phase", colStart: 22, colEnd: 34, phaseId: "2024-06-02_2024-08-31", tone: "a" },
+    { kind: "gap", colStart: 35, colEnd: 43, phaseId: "2024-09-01_2024-11-02" },
     { kind: "phase", colStart: 44, colEnd: 52, phaseId: "2024-11-03_2025-02-08", tone: "b" },
-    { kind: "gap", colStart: 35, colEnd: 43 },
   ]);
 
   // Year 2025 at level 3:

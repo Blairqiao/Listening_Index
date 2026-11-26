@@ -78,6 +78,9 @@ interface YearRibbonData {
 
 function formatRibbonPhaseLabel(phase: TastePhase): string {
   const span = formatTasteDateSpan(phase.start, phase.end);
+  if (phase.isGap) {
+    return `${span} \u00B7 ${phase.plays > 0 ? "Low activity" : "No data"}`;
+  }
   const topArtist = phase.topArtists[0]?.name;
   return topArtist ? `${span} \u00B7 ${topArtist}` : span;
 }
@@ -187,13 +190,24 @@ const YearMobileRibbon = React.memo<YearMobileRibbonProps>(
                 />
               );
             }
-            if (piece.kind === "gap") {
+            if (piece.kind === "gap" && piece.phaseId) {
+              const meta = ribbon.phaseById.get(piece.phaseId);
+              const isSelected = piece.phaseId === selectedPhaseId;
+              const label = meta
+                ? formatRibbonPhaseLabel(meta.phase)
+                : "Select gap";
               return (
-                <div
-                  key={`m-gap-${idx}`}
-                  aria-hidden="true"
+                <button
+                  key={`m-gap-${piece.phaseId}-${idx}`}
+                  type="button"
+                  data-taste-ribbon="gap"
+                  onClick={() => meta && onSelectPhase(meta.phase)}
                   style={posStyle}
-                  className="absolute top-0 h-[8px] rounded-[2px] taste-gap"
+                  title={label}
+                  aria-label={label}
+                  className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer motion-hover hover:brightness-125 focus-ring hit-area-y ${
+                    isSelected ? "bg-music-accent" : "taste-gap"
+                  }`}
                 />
               );
             }
@@ -278,13 +292,24 @@ const YearDesktopRibbon = React.memo<YearDesktopRibbonProps>(
               />
             );
           }
-          if (piece.kind === "gap") {
+          if (piece.kind === "gap" && piece.phaseId) {
+            const meta = ribbon.phaseById.get(piece.phaseId);
+            const isSelected = piece.phaseId === selectedPhaseId;
+            const label = meta
+              ? formatRibbonPhaseLabel(meta.phase)
+              : "Select gap";
             return (
-              <div
-                key={`d-gap-${piece.colStart}-${idx}`}
-                aria-hidden="true"
+              <button
+                key={`d-gap-${piece.phaseId}-${idx}`}
+                type="button"
+                data-taste-ribbon="gap"
+                onClick={() => meta && onSelectPhase(meta.phase)}
                 style={gridStyle}
-                className="h-[10px] w-full rounded-[2px] taste-gap"
+                title={label}
+                aria-label={label}
+                className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer motion-hover hover:brightness-125 focus-ring ${
+                  isSelected ? "bg-music-accent" : "taste-gap"
+                }`}
               />
             );
           }
@@ -1238,9 +1263,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const ribbonsByYear = useMemo(() => {
     if (!activeTaste || activeTasteLevel === null) return null;
     const phaseById = new Map<string, { phase: TastePhase; tone: TasteTone }>();
-    activePhases.forEach((phase, idx) => {
-      phaseById.set(phase.id, { phase, tone: idx % 2 === 0 ? "a" : "b" });
-    });
+    let activeIdx = 0;
+    for (const phase of activePhases) {
+      const tone: TasteTone = phase.isGap
+        ? "a"
+        : activeIdx++ % 2 === 0
+          ? "a"
+          : "b";
+      phaseById.set(phase.id, { phase, tone });
+    }
     const map = new Map<number, YearRibbonData>();
     for (const year of years) {
       map.set(year, {

@@ -105,7 +105,8 @@ export function computeShiftsAndGradualSpans(
   analyzed: readonly AnalyzedWeek[],
   levels: ReadonlyMap<number, number[]>,
   boundaryMinK: ReadonlyMap<number, number>,
-  kFine: number
+  kFine: number,
+  gapSplitIndices: ReadonlySet<number> = new Set()
 ): { shifts: TasteShift[]; gradualSpans: GradualSpan[] } {
   const n = analyzed.length;
   const vectors = analyzed.map((w) => w.vector);
@@ -122,26 +123,41 @@ export function computeShiftsAndGradualSpans(
       const m = bounds[i];
       const b = bounds[i + 1];
 
-      const cacheKey = `${a}:${m}:${b}`;
-      let fit = rampCache.get(cacheKey);
-      if (!fit) {
-        fit = fitTransitionRamp(vectors, a, m, b);
-        rampCache.set(cacheKey, fit);
+      let entry: TasteShiftAtLevel;
+      if (gapSplitIndices.has(m)) {
+        entry = {
+          k,
+          kind: "sharp",
+          widthWeeks: 1,
+          rampStart: analyzed[m].week,
+          rampEnd: weekSaturday(analyzed[m].week),
+        };
+      } else {
+        const cacheKey = `${a}:${m}:${b}`;
+        let fit = rampCache.get(cacheKey);
+        if (!fit) {
+          fit = fitTransitionRamp(vectors, a, m, b);
+          rampCache.set(cacheKey, fit);
+        }
+
+        const kind = fit.widthWeeks >= MIN_PHASE_WEEKS ? "gradual" : "sharp";
+        const loRaw = Math.round(fit.center - fit.widthWeeks / 2);
+        const hiRaw = Math.round(fit.center + fit.widthWeeks / 2);
+        const startIdx = Math.max(0, Math.min(n - 1, loRaw));
+        const endIdx = Math.max(startIdx, Math.min(n - 1, hiRaw - 1));
+
+        entry = {
+          k,
+          kind,
+          widthWeeks: fit.widthWeeks,
+          rampStart: analyzed[startIdx].week,
+          rampEnd: weekSaturday(analyzed[endIdx].week),
+        };
+
+        if (kind === "gradual") {
+          gradualSpans.push({ k, lo: loRaw, hi: hiRaw });
+        }
       }
-
-      const kind = fit.widthWeeks >= MIN_PHASE_WEEKS ? "gradual" : "sharp";
-      const loRaw = Math.round(fit.center - fit.widthWeeks / 2);
-      const hiRaw = Math.round(fit.center + fit.widthWeeks / 2);
-      const startIdx = Math.max(0, Math.min(n - 1, loRaw));
-      const endIdx = Math.max(startIdx, Math.min(n - 1, hiRaw - 1));
-
-      const entry: TasteShiftAtLevel = {
-        k,
-        kind,
-        widthWeeks: fit.widthWeeks,
-        rampStart: analyzed[startIdx].week,
-        rampEnd: weekSaturday(analyzed[endIdx].week),
-      };
 
       let list = levelsByBoundary.get(m);
       if (!list) {
@@ -149,10 +165,6 @@ export function computeShiftsAndGradualSpans(
         levelsByBoundary.set(m, list);
       }
       list.push(entry);
-
-      if (kind === "gradual") {
-        gradualSpans.push({ k, lo: loRaw, hi: hiRaw });
-      }
     }
   }
 
