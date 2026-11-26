@@ -1080,11 +1080,11 @@ export function ZoomRuler({
     controller.refreshAria();
   }, [range, firstKey, todayKey]);
 
-  const zoomBtnClass = `font-mono text-[14px] leading-none h-[24px] sm:h-[28px] min-w-[22px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border transition-none press hover:enabled:text-[#EDEDE8] active:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
+  const zoomBtnClass = `font-mono text-[14px] leading-none h-[24px] sm:h-[28px] min-w-[22px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border motion-hover press hover:enabled:text-[#EDEDE8] active:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
-  const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border transition-none press hover:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
+  const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border motion-hover press hover:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
