@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { isDbConfigured } from "@/lib/db";
 import { searchCatalog } from "@/lib/db/queries";
+import { getOrFetchSearchBrowse } from "@/lib/db/server-cache";
 import { getMockSearch } from "@/lib/mock/search-profile";
 import { jsonNoCache, handleApiError } from "@/lib/route-utils";
 import { checkSearchQuery, parseSearchFilter, parseSearchPage, parseSearchSort } from "@/lib/search-utils";
@@ -23,7 +24,10 @@ export async function GET(request: NextRequest) {
       return jsonNoCache(getMockSearch(queryCheck.query, sort, page, filter));
     }
 
-    const data = await searchCatalog(queryCheck.query, sort, page, filter);
+    const fetchResults = () => searchCatalog(queryCheck.query, sort, page, filter);
+    const data = queryCheck.query === ""
+      ? await getOrFetchSearchBrowse(sort, page, filter, fetchResults)
+      : await fetchResults();
     return jsonNoCache(data);
   } catch (error: unknown) {
     return handleApiError("/api/listening/search", error);

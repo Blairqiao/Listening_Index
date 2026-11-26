@@ -2,6 +2,7 @@ import { revalidateTag } from "next/cache";
 import type { OverviewData, StreamLogData, SessionData } from "./queries/types";
 import type { CalendarData } from "@/lib/calendar";
 import type { TastePhasesData } from "@/lib/taste/types";
+import type { SearchFilter, SearchResponse, SearchSort } from "@/lib/search-types";
 import { formatRangeParam, type RangeSelection } from "@/lib/range";
 import { KeyedAsyncCache } from "@/lib/async-utils";
 import { sanitizeTimezone } from "./queries/helpers";
@@ -11,7 +12,8 @@ type ListeningData =
   | StreamLogData
   | SessionData
   | CalendarData
-  | TastePhasesData;
+  | TastePhasesData
+  | SearchResponse;
 const globalForCache = globalThis as unknown as {
   __boundedListeningCache?: KeyedAsyncCache<ListeningData>;
 };
@@ -94,5 +96,16 @@ export function getOrFetchTaste<T extends TastePhasesData = TastePhasesData>(
   fetcher: () => Promise<T>
 ): Promise<T> {
   const key = JSON.stringify([cacheEpoch, "taste", timezoneIdentity(timezone)]);
+  return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
+}
+
+/** Caches the empty-query Search browse, which every visit to Search opens on. Typed queries are not cached. */
+export function getOrFetchSearchBrowse<T extends SearchResponse = SearchResponse>(
+  sort: SearchSort,
+  page: number,
+  filter: SearchFilter,
+  fetcher: () => Promise<T>
+): Promise<T> {
+  const key = JSON.stringify([cacheEpoch, "search-browse", sort, page, filter]);
   return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
 }
