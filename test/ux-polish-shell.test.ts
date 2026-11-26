@@ -287,15 +287,15 @@ test("MiniPlayerBar transport buttons include press and focus-ring", () => {
   }
 });
 
-test("ListeningView configures showpiece reveal on black veil and keyed animate-view-enter on view wrapper", () => {
+test("ListeningView fades the black veil and keys animate-view-enter on the view wrapper", () => {
   const src = fs.readFileSync(
     path.resolve(__dirname, "../src/components/ListeningView.tsx"),
     "utf8"
   );
 
   assert.ok(
-    src.includes("duration-[var(--motion-showpiece)]") && src.includes("ease-expressive"),
-    "Black veil must fade over var(--motion-showpiece) with --ease-expressive"
+    src.includes("duration-[var(--motion-medium)] ease-expressive"),
+    "Black veil must fade over var(--motion-medium) with --ease-expressive; the staged entrance does the rest"
   );
   assert.ok(
     !src.includes("duration-300 ease-in-out"),

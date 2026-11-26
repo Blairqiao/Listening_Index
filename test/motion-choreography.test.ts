@@ -157,3 +157,56 @@ test("CalendarView sweeps the range on phase, ribbon, month and year picks, neve
   const move = src.slice(src.indexOf("const handleWindowPointerMove"), src.indexOf("const handleWindowPointerUp"));
   assert.doesNotMatch(move, /pendingSweepRef/);
 });
+
+// First-load entrance
+
+test("intro delays: metrics lead, track rows follow with shrinking gaps, bars grow left to right", async () => {
+  const c = await import("../src/lib/choreography");
+  assert.deepEqual([0, 1, 2, 3].map(c.metricIntroDelay), [0, 40, 70, 90]);
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 9].map(c.trackRowIntroDelay), [100, 130, 155, 175, 190, 200, 200, 200]);
+  assert.equal(c.INDEX_INTRO_DELAY_MS, 140);
+  assert.equal(c.barIntroDelay(0, 28), 120);
+  assert.equal(c.barIntroDelay(27, 28), 220);
+  assert.ok(c.INTRO_MS >= 220 + 280, "the intro gate outlasts the last bar");
+  assert.ok(c.INTRO_MS <= 650);
+});
+
+test("intro CSS only runs under [data-intro] and collapses to a plain fade for reduced motion", () => {
+  const css = readSrc("src/app/globals.css");
+  assert.match(cssBlock(css, "@keyframes intro-rise"), /opacity:\s*0[\s\S]*translate:\s*0 var\(--intro-rise/);
+  assert.match(cssBlock(css, "@keyframes intro-grow"), /scale:\s*1 0/);
+  assert.match(cssBlock(css, "@keyframes intro-fade"), /opacity:\s*0/);
+  for (const cls of ["intro-rise", "intro-row", "intro-fade", "intro-grow"]) {
+    const block = cssBlock(css, `[data-intro] .${cls} {`);
+    assert.match(block, /var\(--intro-delay, 0ms\)/, `${cls} must read --intro-delay`);
+    assert.match(block, /\bboth\b/, `${cls} must hold its start state while delayed`);
+  }
+  const reduced = css.slice(css.indexOf("/* Reduced motion: the intro"));
+  assert.match(reduced.slice(0, 600), /animation-name:\s*intro-fade/);
+  assert.match(reduced.slice(0, 600), /animation-delay:\s*0ms/);
+});
+
+test("ListeningView flags the first reveal with data-intro and lifts the veil in 200ms", () => {
+  const src = readSrc("src/components/ListeningView.tsx");
+  assert.match(src, /data-intro=\{isIntroPlaying \? "" : undefined\}/);
+  assert.match(src, /INTRO_MS/);
+  assert.match(src, /fixed inset-0 z-40[^`]*duration-\[var\(--motion-medium\)\]/);
+  assert.doesNotMatch(readSrc("src/app/globals.css"), /--motion-showpiece/);
+});
+
+test("intro roles: metric contents rise, track rows rise, indexes fade, bars grow", async () => {
+  assert.match(readSrc("src/components/listening-view/MetricRibbon.tsx"), /intro-rise[\s\S]{0,200}metricIntroDelay\(i\)/);
+  const overview = readSrc("src/components/views/OverviewView.tsx");
+  assert.match(overview, /intro-row[\s\S]{0,300}trackRowIntroDelay\(idx\)/);
+  assert.equal((overview.match(/intro-fade/g) ?? []).length, 2, "artist and album indexes fade");
+  assert.match(overview, /INDEX_INTRO_DELAY_MS/);
+
+  const React = (await import("react")).default;
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { ActivityChart } = await import("../src/components/views/ActivityChart");
+  const html = renderToStaticMarkup(
+    React.createElement(ActivityChart, { granularity: "day", activityCadence: cadence, visitorTimezone: "UTC" }),
+  );
+  assert.match(html, /\bintro-grow\b/);
+  assert.match(html, /--intro-delay:120ms/);
+});

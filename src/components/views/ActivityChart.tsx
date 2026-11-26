@@ -5,6 +5,7 @@ import type { RangeKey, ActivityBucket } from "@/lib/types";
 import type { CadenceGranularity } from "@/lib/range";
 import { formatBucketTooltip } from "@/lib/format-utils";
 import { useConfig } from "@/context/ConfigContext";
+import { barIntroDelay, introDelayStyle } from "@/lib/choreography";
 
 export type ActivityBucketSelectHandler = (
   bucket: ActivityBucket,
@@ -82,6 +83,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       (activityCadence.length >= 3 && i === Math.floor(activityCadence.length / 2)))
     : activityCadence;
 
+  const emptyBarCount = rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0;
+
   const maxCadence = useMemo(() => {
     if (activityCadence.length === 0) return 1;
     return Math.max(...activityCadence.map((d) => d.count), 1);
@@ -137,11 +140,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
               />
             ))
           ) : activityCadence.length === 0 ? (
-            Array.from({ length: rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0 }).map((_, i) => (
+            Array.from({ length: emptyBarCount }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-default bg-[#1C1C1A]"
-                style={{ transform: "scaleY(0.04)" }}
+                className="flex-1 h-full origin-bottom rounded-none select-none bar-morph intro-grow cursor-default bg-[#1C1C1A]"
+                style={{ transform: "scaleY(0.04)", ...introDelayStyle(barIntroDelay(i, emptyBarCount)) }}
               />
             ))
           ) : (
@@ -181,9 +184,10 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                     onClick={() => {
                       onSelectBucket?.(item, effectiveGranularity);
                     }}
-                    className={`p-0 border-0 flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
+                    className={`p-0 border-0 flex-1 h-full origin-bottom rounded-none select-none bar-morph intro-grow cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
                     style={{
                       transform: barScale,
+                      ...introDelayStyle(barIntroDelay(i, activityCadence.length)),
                     }}
                   />
                 );
@@ -193,9 +197,10 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <div
                   key={i}
                   title={tooltipText}
-                  className={`flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-default ${barColor}`}
+                  className={`flex-1 h-full origin-bottom rounded-none select-none bar-morph intro-grow cursor-default ${barColor}`}
                   style={{
                     transform: barScale,
+                      ...introDelayStyle(barIntroDelay(i, activityCadence.length)),
                   }}
                 />
               );

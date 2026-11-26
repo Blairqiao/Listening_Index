@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { changedIndexes, METRIC_SWAP_KEYFRAMES, METRIC_SWAP_TIMING } from "@/lib/choreography";
+import {
+  changedIndexes,
+  introDelayStyle,
+  metricIntroDelay,
+  METRIC_SWAP_KEYFRAMES,
+  METRIC_SWAP_TIMING,
+} from "@/lib/choreography";
 import { Mode } from "@/lib/types";
 
 interface MetricRibbonProps {
@@ -127,6 +133,8 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
                 : ""
             }`}
           >
+            {/* The cell background stays put: the gap lines behind it would show through a fading cell. */}
+            <div className="intro-rise flex flex-1 flex-col justify-between" style={introDelayStyle(metricIntroDelay(i))}>
             <div className="font-mono text-[12px] text-[#5A5A55] flex items-center justify-between">
               <span>{label}</span>
             </div>
@@ -143,6 +151,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
               >
                 {metrics[i]}
               </span>
+            </div>
             </div>
           </div>
         );

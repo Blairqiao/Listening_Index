@@ -6,6 +6,7 @@ import type { CadenceGranularity } from "@/lib/range";
 import type { ProfileKind, ProfileTarget } from "@/lib/search-types";
 import { Artwork } from "../Artwork";
 import { ActivityChart, type ActivityBucketSelectHandler } from "./ActivityChart";
+import { INDEX_INTRO_DELAY_MS, introDelayStyle, trackRowIntroDelay } from "@/lib/choreography";
 
 export interface OverviewViewProps {
   granularity: CadenceGranularity;
@@ -118,7 +119,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     data-profile-kind="track"
                     onClick={() => onOpenProfile?.({ kind: "track", key: track.id })}
                     className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer motion-hover hover:bg-[#111110] ${isLast ? "border-b-0" : "border-b border-[#191917]"
-                      }`}
+                      } intro-row`}
+                    style={introDelayStyle(trackRowIntroDelay(idx))}
                   >
                     {/* Rank Index */}
                     <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -210,7 +212,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Artist index
           </div>
-          <div className={`flex flex-col ${isArtistsSkeleton ? "" : "animate-content-enter"}`} role="list">
+          <div
+            className={`flex flex-col ${isArtistsSkeleton ? "" : "animate-content-enter intro-fade"}`}
+            style={introDelayStyle(INDEX_INTRO_DELAY_MS)}
+            role="list"
+          >
             {isArtistsSkeleton ? (
               Array.from({ length: 5 }).map((_, idx) => (
                 <div
@@ -274,7 +280,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Album index
           </div>
-          <div className={`flex flex-col ${isAlbumsSkeleton ? "" : "animate-content-enter"}`} role="list">
+          <div
+            className={`flex flex-col ${isAlbumsSkeleton ? "" : "animate-content-enter intro-fade"}`}
+            style={introDelayStyle(INDEX_INTRO_DELAY_MS)}
+            role="list"
+          >
             {isAlbumsSkeleton ? (
               Array.from({ length: 5 }).map((_, idx) => (
                 <div

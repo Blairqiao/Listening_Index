@@ -38,7 +38,6 @@
   --motion-fast: 120ms;      /* tab enter, content enter, selection, menus */
   --motion-medium: 200ms;    /* modals, card-row scroll; matches ZOOM_ANIM_DURATION_MS */
   --motion-exit: 150ms;      /* modal close; matches MODAL_EXIT_MS */
-  --motion-showpiece: 450ms; /* first reveal after page load only */
 }
 
 /* Reduced motion keeps opacity fades and drops movement. Press feedback is a
@@ -86,6 +85,58 @@
   transition:
     background-color var(--motion-hover) linear,
     transform 180ms var(--ease-out-strong);
+}
+
+/* First-load entrance. ListeningView sets data-intro on the page root for
+   INTRO_MS once data is ready. Components carry a role class and an
+   --intro-delay (src/lib/choreography.ts). Outside that window these rules
+   match nothing, so tab switches and reloads of a region never replay them. */
+@keyframes intro-rise {
+  from {
+    opacity: 0;
+    translate: 0 var(--intro-rise, 8px);
+  }
+}
+
+@keyframes intro-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes intro-grow {
+  from {
+    opacity: 0;
+    scale: 1 0;
+  }
+}
+
+[data-intro] .intro-rise {
+  animation: intro-rise 300ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+}
+
+[data-intro] .intro-row {
+  --intro-rise: 4px;
+  animation: intro-rise 260ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+}
+
+[data-intro] .intro-fade {
+  animation: intro-fade 260ms ease var(--intro-delay, 0ms) both;
+}
+
+[data-intro] .intro-grow {
+  animation: intro-grow 280ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+}
+
+/* Reduced motion: the intro collapses to one fade, everything together. */
+@media (prefers-reduced-motion: reduce) {
+  [data-intro] .intro-rise,
+  [data-intro] .intro-row,
+  [data-intro] .intro-fade,
+  [data-intro] .intro-grow {
+    animation-name: intro-fade;
+    animation-delay: 0ms;
+  }
 }
 
 @utility motion-hover {

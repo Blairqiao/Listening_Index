@@ -22,6 +22,7 @@ import {
   MINI_PLAYER_EXIT_MS,
 } from "@/components/listening-view/mini-player";
 import { usePresence } from "@/lib/usePresence";
+import { INTRO_MS } from "@/lib/choreography";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
@@ -259,6 +260,15 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // Track whether real overview data is ready
   const isDataReady = Boolean(displayedOverview || initialOverview);
+
+  // The first reveal plays a staged entrance (globals.css, [data-intro]) once.
+  const [hasIntroPlayed, setHasIntroPlayed] = useState(false);
+  useEffect(() => {
+    if (!isDataReady || hasIntroPlayed) return;
+    const timer = setTimeout(() => setHasIntroPlayed(true), INTRO_MS);
+    return () => clearTimeout(timer);
+  }, [isDataReady, hasIntroPlayed]);
+  const isIntroPlaying = isDataReady && !hasIntroPlayed;
 
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
@@ -835,6 +845,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   return (
     <div
       id="music-page-root"
+      data-intro={isIntroPlaying ? "" : undefined}
       className={`min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative ${
         activeMode === 5 ? "overflow-x-clip" : "overflow-x-hidden"
       }`}
@@ -842,7 +853,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       {/* Black veil holding the screen as long as needed until real data is ready */}
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-[var(--motion-showpiece)] ease-expressive ${isDataReady ? "opacity-0" : "opacity-100"
+        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-[var(--motion-medium)] ease-expressive ${isDataReady ? "opacity-0" : "opacity-100"
           }`}
       />
       <main
