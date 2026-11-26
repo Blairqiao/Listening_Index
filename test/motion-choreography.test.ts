@@ -83,3 +83,39 @@ test("MetricRibbon plays the swap on values that change, not on mount", () => {
   assert.match(src, /changedIndexes\(/);
   assert.match(src, /\.animate\(METRIC_SWAP_KEYFRAMES, METRIC_SWAP_TIMING\)/);
 });
+
+// Activity bars
+
+const cadence = [
+  { date: "2026-11-01", count: 10, startTime: "2026-11-01T00:00:00.000Z", endTime: "2026-11-01T23:59:59.999Z" },
+  { date: "2026-11-02", count: 5, startTime: "2026-11-02T00:00:00.000Z", endTime: "2026-11-02T23:59:59.999Z" },
+  { date: "2026-11-03", count: 0, startTime: "2026-11-03T00:00:00.000Z", endTime: "2026-11-03T23:59:59.999Z" },
+];
+
+test("activity bars size with scaleY from the baseline so a range step can morph them", async () => {
+  const React = (await import("react")).default;
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { ActivityChart } = await import("../src/components/views/ActivityChart");
+  for (const onSelectBucket of [() => {}, undefined]) {
+    const html = renderToStaticMarkup(
+      React.createElement(ActivityChart, { granularity: "day", activityCadence: cadence, onSelectBucket, visitorTimezone: "UTC" }),
+    );
+    assert.match(html, /transform:scaleY\(1\)/);
+    assert.match(html, /transform:scaleY\(0\.5\)/);
+    assert.match(html, /transform:scaleY\(0\.04\)/, "empty buckets keep the 4% stub");
+    assert.doesNotMatch(html, /height:\d+%/);
+    assert.match(html, /\bbar-morph\b/);
+    assert.match(html, /\borigin-bottom\b/);
+  }
+});
+
+test("bar-morph eases bar heights over 180ms and keeps the fast hover color", () => {
+  const block = cssBlock(readSrc("src/app/globals.css"), "@utility bar-morph");
+  assert.match(block, /transform 180ms var\(--ease-out-strong\)/);
+  assert.match(block, /background-color var\(--motion-hover\)/);
+});
+
+test("the bar container remounts when the bar count changes, so only same-count steps morph", () => {
+  const src = readSrc("src/components/views/ActivityChart.tsx");
+  assert.match(src, /key=\{activityCadence\.length\}[\s\S]{0,80}ref=\{chartRef\}|ref=\{chartRef\}[\s\S]{0,80}key=\{activityCadence\.length\}/);
+});

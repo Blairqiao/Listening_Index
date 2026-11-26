@@ -81,6 +81,13 @@
     opacity 180ms ease;
 }
 
+/* Histogram bars: hover color stays fast, height (a scaleY) eases to its new value. */
+@utility bar-morph {
+  transition:
+    background-color var(--motion-hover) linear,
+    transform 180ms var(--ease-out-strong);
+}
+
 @utility motion-hover {
   transition:
     color var(--motion-hover) linear,

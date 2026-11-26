@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import type { RangeKey, ActivityBucket } from "@/lib/types";
 import type { CadenceGranularity } from "@/lib/range";
 import { formatBucketTooltip } from "@/lib/format-utils";
@@ -58,18 +58,20 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   }
   const tz = propTimezone || contextTimezone || "UTC";
 
-  const chartRef = useRef<HTMLDivElement>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const monthCount = granularity === "year" ? monthlyCadence?.length ?? 0 : 0;
 
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart || monthCount === 0) return;
-    setChartWidth(chart.clientWidth);
-    const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
-    observer.observe(chart);
-    return () => observer.disconnect();
-  }, [monthCount]);
+  // A callback ref, because the bar container remounts when the bar count changes.
+  const chartRef = useCallback(
+    (chart: HTMLDivElement | null) => {
+      if (!chart || monthCount === 0) return;
+      setChartWidth(chart.clientWidth);
+      const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
+      observer.observe(chart);
+      return () => observer.disconnect();
+    },
+    [monthCount],
+  );
 
   const showMonths = monthCount > 0 && chartWidth >= monthCount * 6 - 2;
   const effectiveGranularity: CadenceGranularity = showMonths ? "month" : granularity;
@@ -120,6 +122,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
       <div>
         <div
+          key={activityCadence.length}
           ref={chartRef}
           className={`flex gap-[2px] items-end h-[80px] w-full ${isChartSkeleton ? "" : "animate-content-enter"}`}
           role={isClickable ? "group" : "img"}
@@ -137,8 +140,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
             Array.from({ length: rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-none select-none motion-hover cursor-default bg-[#1C1C1A]"
-                style={{ height: "4%" }}
+                className="flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-default bg-[#1C1C1A]"
+                style={{ transform: "scaleY(0.04)" }}
               />
             ))
           ) : (
@@ -159,7 +162,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                   ? formatBucketTooltip(item, effectiveGranularity, tz)
                   : `${item.date} — ${item.count} plays`;
 
-              const barHeight = `${heightPercent}%`;
+              // Height as a scale from the baseline, so a range step morphs on the compositor.
+              const barScale = `scaleY(${heightPercent / 100})`;
               const barColor = isHot
                 ? "bg-music-accent hover:bg-music-accent-hover"
                 : isMarkerBar
@@ -177,9 +181,9 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                     onClick={() => {
                       onSelectBucket?.(item, effectiveGranularity);
                     }}
-                    className={`p-0 border-0 flex-1 rounded-none select-none motion-hover cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
+                    className={`p-0 border-0 flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
                     style={{
-                      height: barHeight,
+                      transform: barScale,
                     }}
                   />
                 );
@@ -189,9 +193,9 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <div
                   key={i}
                   title={tooltipText}
-                  className={`flex-1 rounded-none select-none motion-hover cursor-default ${barColor}`}
+                  className={`flex-1 h-full origin-bottom rounded-none select-none bar-morph cursor-default ${barColor}`}
                   style={{
-                    height: barHeight,
+                    transform: barScale,
                   }}
                 />
               );
