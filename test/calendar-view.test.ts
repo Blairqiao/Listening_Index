@@ -394,6 +394,8 @@ function createReactHookHarness() {
     },
     memo: (comp: unknown) => comp,
   };
+  // Layout effects run in the same queue; the mock has no paint to order against.
+  Object.assign(reactMock, { useLayoutEffect: reactMock.useEffect });
 
   function runRender<T>(renderFn: () => T, rerenderAfterEffects = false): T {
     stateIndex = 0;

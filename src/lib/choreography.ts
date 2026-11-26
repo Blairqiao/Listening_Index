@@ -20,3 +20,27 @@ export const METRIC_SWAP_TIMING: KeyframeAnimationOptions = {
   duration: 150,
   easing: EASE_OUT_STRONG,
 };
+
+/**
+ * Delays from 0 to `spreadMs` with an ease-out spacing: the first items step
+ * apart the most and later ones bunch up, which reads as a wave rather than a
+ * metronome.
+ */
+export function staggerDelays(count: number, spreadMs: number): number[] {
+  if (count <= 1) return count === 1 ? [0] : [];
+  return Array.from({ length: count }, (_, i) => {
+    const t = i / (count - 1);
+    return Math.round(spreadMs * (1 - (1 - t) * (1 - t)));
+  });
+}
+
+/** Cells of a picked range light up from the dimmed level (opacity-40) in date order. */
+export const RANGE_SWEEP_SPREAD_MS = 200;
+
+export const RANGE_SWEEP_KEYFRAMES: Keyframe[] = [{ opacity: 0.4 }, { opacity: 1 }];
+
+export const RANGE_SWEEP_TIMING: KeyframeAnimationOptions = {
+  duration: 160,
+  easing: EASE_OUT_STRONG,
+  fill: "backwards",
+};
