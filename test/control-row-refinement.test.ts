@@ -348,3 +348,27 @@ test("ControlRow in mode 5 names the calendar selection in the muted scope label
   );
   assert.ok(empty.includes(`Since ${compactDate("2022-01-29")}`), "Mode 5 without a selection falls back to Since");
 });
+
+test("ControlRow in mode 0 passes Random to the ruler and holds it until calendar days arrive", () => {
+  const base = {
+    mode: 0 as const,
+    range: unitWindow("2026-11-24", "week"),
+    onSelectRange: () => {},
+    firstKey: "2026-09-04",
+    todayKey: "2026-11-24",
+    logStartDate: "2026-09-04",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+  const ready = renderToStaticMarkup(
+    React.createElement(ControlRow, { ...base, onRandomRange: () => {}, randomRangeReady: true }),
+  );
+  const btn = ready.match(/<button[^>]*aria-label="Random week"[^>]*>/)?.[0];
+  assert.ok(btn, "Overview control row renders Random");
+  assert.doesNotMatch(btn, /\sdisabled(?=[>\s=])/);
+
+  const loading = renderToStaticMarkup(
+    React.createElement(ControlRow, { ...base, onRandomRange: () => {}, randomRangeReady: false }),
+  );
+  assert.match(loading.match(/<button[^>]*aria-label="Random week"[^>]*>/)?.[0] ?? "", /\sdisabled(?=[>\s=])/);
+});

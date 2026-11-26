@@ -48,6 +48,9 @@ export interface ZoomRulerProps {
   todayKey: string;
   disabled?: boolean;
   label?: React.ReactNode;
+  /** Overview only: jump to a random period of the unit the ruler shows. */
+  onRandom?: (unit: CalendarUnit) => void;
+  randomDisabled?: boolean;
 }
 
 const LEVEL_LABELS: Record<RulerLevel, string> = {
@@ -261,6 +264,8 @@ export function ZoomRuler({
   todayKey,
   disabled = false,
   label,
+  onRandom,
+  randomDisabled = false,
 }: ZoomRulerProps) {
   const isDisabled = Boolean(disabled);
   const hasLabel = label !== undefined && label !== null;
@@ -1084,6 +1089,12 @@ export function ZoomRuler({
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
+  const shownWord = ui.activeLayer === 0 ? ui.layer0 : ui.layer1;
+  const shownLevel = LEVELS.find((level) => LEVEL_LABELS[level] === shownWord);
+  const randomUnit: CalendarUnit | null =
+    shownLevel && shownLevel !== "all" ? shownLevel : null;
+  const randomLabel = randomUnit ? `Random ${randomUnit}` : "Random";
+
   const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border motion-hover press hover:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
@@ -1105,6 +1116,26 @@ export function ZoomRuler({
 
         <div className="inline-flex items-center gap-1.5 shrink-0 sm:contents">
           <div className="inline-flex items-center gap-1.5 shrink-0 sm:order-2">
+            {onRandom && (
+              <>
+                <button
+                  type="button"
+                  aria-label={randomLabel}
+                  title={randomLabel}
+                  disabled={isDisabled || randomDisabled || randomUnit === null}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (randomUnit) onRandom(randomUnit);
+                  }}
+                  className={`font-mono text-[12px] h-[24px] sm:h-[28px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center select-none whitespace-nowrap box-border motion-hover press hover:enabled:text-[#EDEDE8] focus-ring disabled:opacity-30 disabled:cursor-default ${
+                    isDisabled ? "cursor-wait" : "cursor-pointer"
+                  }`}
+                >
+                  Random
+                </button>
+                <span aria-hidden="true" className="w-px h-3 bg-[#26261F] mx-1" />
+              </>
+            )}
             <button
               type="button"
               aria-label="Zoom out"

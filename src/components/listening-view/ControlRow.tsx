@@ -5,6 +5,7 @@ import { Mode } from "@/lib/types";
 import {
   formatRangeLabel,
   normalizeLegacyRange,
+  type CalendarUnit,
   type RangeSelection,
 } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
@@ -41,6 +42,8 @@ interface ControlRowProps {
   playerStatus?: "idle" | "checking" | "unlinked" | "connecting" | "ready" | "error";
   onTransferPlayback?: () => void;
   calendarSelection?: CalendarSelection | null;
+  onRandomRange?: (unit: CalendarUnit) => void;
+  randomRangeReady?: boolean;
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -73,6 +76,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   playerStatus,
   onTransferPlayback,
   calendarSelection,
+  onRandomRange,
+  randomRangeReady = false,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
@@ -265,6 +270,8 @@ export const ControlRow: React.FC<ControlRowProps> = ({
           todayKey={todayKey}
           disabled={isSyncing}
           label={overviewLabel}
+          onRandom={onRandomRange}
+          randomDisabled={!randomRangeReady}
         />
       </div>
     );

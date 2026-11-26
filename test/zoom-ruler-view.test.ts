@@ -157,3 +157,49 @@ test("nextOnToday keeps the Today icon state unchanged while the ruler is zoomin
     "the All level hides the icon",
   );
 });
+
+test("ZoomRuler renders Random beside the stepper, named for the current unit", () => {
+  const picked: string[] = [];
+  const week = renderToStaticMarkup(
+    React.createElement(ZoomRuler, {
+      ...BASE_PROPS,
+      range: unitWindow("2026-11-22", "week"),
+      onRandom: (unit: string) => picked.push(unit),
+    }),
+  );
+  const btn = week.match(/<button[^>]*aria-label="Random week"[^>]*>Random<\/button>/)?.[0];
+  assert.ok(btn, "Random button is labelled with the unit");
+  assert.match(btn, /title="Random week"/);
+  assert.doesNotMatch(btn, /\sdisabled(?=[>\s=])/);
+  assert.ok(week.indexOf("Random</button>") < week.indexOf('aria-label="Zoom out"'), "Random sits before the stepper");
+
+  const month = renderToStaticMarkup(
+    React.createElement(ZoomRuler, {
+      ...BASE_PROPS,
+      range: unitWindow("2026-11-22", "month"),
+      onRandom: () => {},
+    }),
+  );
+  assert.ok(month.includes('aria-label="Random month"'));
+
+  const all = renderToStaticMarkup(
+    React.createElement(ZoomRuler, { ...BASE_PROPS, range: presetRange("all"), onRandom: () => {} }),
+  );
+  const allBtn = all.match(/<button[^>]*>Random<\/button>/)?.[0] ?? "";
+  assert.match(allBtn, /\sdisabled(?=[>\s=])/, "All has no unit to pick from");
+
+  const notReady = renderToStaticMarkup(
+    React.createElement(ZoomRuler, {
+      ...BASE_PROPS,
+      range: unitWindow("2026-11-22", "week"),
+      onRandom: () => {},
+      randomDisabled: true,
+    }),
+  );
+  assert.match(notReady.match(/<button[^>]*>Random<\/button>/)?.[0] ?? "", /\sdisabled(?=[>\s=])/);
+
+  const without = renderToStaticMarkup(
+    React.createElement(ZoomRuler, { ...BASE_PROPS, range: unitWindow("2026-11-22", "week") }),
+  );
+  assert.ok(!without.includes("Random"), "profile rulers have no Random");
+});

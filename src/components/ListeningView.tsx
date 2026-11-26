@@ -70,8 +70,10 @@ import {
   PRESET_GRANULARITY,
   todayDateKey,
   type CadenceGranularity,
+  type CalendarUnit,
   type RangeSelection,
 } from "@/lib/range";
+import { pickRandomRange } from "@/lib/random-range";
 import {
   formatOverviewMetrics,
   formatStreamLogMetrics,
@@ -336,8 +338,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     },
   });
 
+  // Overview loads the day counts too: Random picks its period from them.
   const calendar = useCalendarData({
-    enabled: activeMode === 5,
+    enabled: activeMode === 5 || activeMode === 0,
     timezone: visitorTimezone,
     refreshKey: lastSyncedAt?.getTime() ?? 0,
   });
@@ -649,6 +652,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     [isSyncing, handleSelectRange]
   );
 
+  const calendarDays = calendar.data?.days;
+  const handleRandomRange = useCallback(
+    (unit: CalendarUnit) => {
+      if (isSyncing || !calendarDays) return;
+      const next = pickRandomRange(calendarDays, unit, { current: activeRangeRef.current });
+      if (next) handleSelectRange(next, { push: true });
+    },
+    [isSyncing, calendarDays, handleSelectRange, activeRangeRef]
+  );
+
   const handleRulerSelectRange = useCallback(
     (next: RangeSelection) => {
       if (activeMode === 4) {
@@ -930,6 +943,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               sessionNumber={selectedSessionNumber}
               totalSessions={totalSessions}
               calendarSelection={calendarSelection}
+              onRandomRange={handleRandomRange}
+              randomRangeReady={Boolean(calendarDays?.length)}
               onProfileBack={() => {
                 shouldPushHistoryRef.current = true;
                 handleProfileBack();
