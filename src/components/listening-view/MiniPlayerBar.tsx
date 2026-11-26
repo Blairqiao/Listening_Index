@@ -36,10 +36,10 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
 
   return (
     <div data-bottom-inset className={`fixed inset-x-0 bottom-0 z-30 h-[56px] border-t border-[#1C1C1A] bg-[#080808] ${className}`}>
-      {/* 2px Progress line along top edge */}
+      {/* Progress line along the top edge. Linear steps match the 250ms position tick. */}
       <div
-        className="absolute top-0 left-0 h-[2px] bg-music-accent pointer-events-none transition-all duration-150"
-        style={{ width: `${clampedProgress * 100}%` }}
+        className="absolute top-0 left-0 w-full h-px origin-left bg-music-accent/60 pointer-events-none transition-transform duration-250 ease-linear"
+        style={{ transform: `scaleX(${clampedProgress})` }}
         aria-hidden="true"
       />
 
