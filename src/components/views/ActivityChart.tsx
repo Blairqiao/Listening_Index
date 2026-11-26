@@ -85,6 +85,17 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
   const emptyBarCount = rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0;
 
+  // Same-count steps morph in place. A count change (the current week is only
+  // partly over) remounts the bars, so they grow from the baseline instead.
+  // Not on the first load: the skeleton had no real bars to grow from.
+  const barCount = activityCadence.length;
+  const [prevBarCount, setPrevBarCount] = useState(barCount);
+  const [regrow, setRegrow] = useState(false);
+  if (barCount !== prevBarCount) {
+    setPrevBarCount(barCount);
+    setRegrow(prevBarCount > 0);
+  }
+
   const maxCadence = useMemo(() => {
     if (activityCadence.length === 0) return 1;
     return Math.max(...activityCadence.map((d) => d.count), 1);
@@ -125,9 +136,9 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
 
       <div>
         <div
-          key={activityCadence.length}
+          key={barCount}
           ref={chartRef}
-          className="flex gap-[2px] items-end h-[80px] w-full"
+          className={`flex gap-[2px] items-end h-[80px] w-full ${regrow ? "bar-regrow" : ""}`}
           role={isClickable ? "group" : "img"}
           aria-label="Activity cadence histogram"
         >

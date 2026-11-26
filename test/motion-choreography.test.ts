@@ -109,15 +109,30 @@ test("activity bars size with scaleY from the baseline so a range step can morph
   }
 });
 
-test("bar-morph eases bar heights over 180ms and keeps the fast hover color", () => {
-  const block = cssBlock(readSrc("src/app/globals.css"), "@utility bar-morph");
-  assert.match(block, /transform 180ms var\(--ease-out-strong\)/);
+test("bar-morph eases bar heights over 280ms with an ease-in-out and keeps the fast hover color", () => {
+  const css = readSrc("src/app/globals.css");
+  assert.match(css, /--ease-in-out:\s*cubic-bezier\(0\.65, 0, 0\.35, 1\)/);
+  const block = cssBlock(css, "@utility bar-morph");
+  assert.match(block, /transform 280ms var\(--ease-in-out\)/, "a strong ease-out spent the change in ~50ms and read as rushed");
   assert.match(block, /background-color var\(--motion-hover\)/);
+});
+
+test("when the bar count changes (this week has fewer bars), the new bars grow from the baseline", () => {
+  const css = readSrc("src/app/globals.css");
+  assert.match(cssBlock(css, "@keyframes bar-regrow"), /scale:\s*1 0/);
+  assert.match(cssBlock(css, "@utility bar-regrow"), /animation: bar-regrow 280ms var\(--ease-out-strong\) both/);
+  const reduced = css.slice(css.indexOf("/* Reduced motion: bars swap"));
+  assert.match(reduced.slice(0, 300), /\.bar-regrow[\s\S]*animation: none/);
+
+  const src = readSrc("src/components/views/ActivityChart.tsx");
+  assert.match(src, /barCount !== prevBarCount/);
+  assert.match(src, /prevBarCount > 0/, "no regrow on the first load: the skeleton has no real bars");
+  assert.match(src, /regrow \? "bar-regrow" : ""/);
 });
 
 test("the bar container remounts when the bar count changes, so only same-count steps morph", () => {
   const src = readSrc("src/components/views/ActivityChart.tsx");
-  assert.match(src, /key=\{activityCadence\.length\}[\s\S]{0,80}ref=\{chartRef\}|ref=\{chartRef\}[\s\S]{0,80}key=\{activityCadence\.length\}/);
+  assert.match(src, /key=\{barCount\}[\s\S]{0,80}ref=\{chartRef\}/);
 });
 
 // Calendar range sweep (removed: it didn't read well)

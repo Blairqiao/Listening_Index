@@ -14,6 +14,7 @@
   --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 :root {
@@ -66,11 +67,31 @@
     opacity 180ms ease;
 }
 
-/* Histogram bars: hover color stays fast, height (a scaleY) eases to its new value. */
+/* Histogram bars: hover color stays fast, height (a scaleY) eases to its new
+   value. In-out, because the bars move on screen rather than enter. */
 @utility bar-morph {
   transition:
     background-color var(--motion-hover) linear,
-    transform 180ms var(--ease-out-strong);
+    transform 280ms var(--ease-in-out);
+}
+
+/* A bar container that remounts with a new bar count grows from the baseline. */
+@keyframes bar-regrow {
+  from {
+    scale: 1 0;
+  }
+}
+
+@utility bar-regrow {
+  transform-origin: bottom;
+  animation: bar-regrow 280ms var(--ease-out-strong) both;
+}
+
+/* Reduced motion: bars swap without growing. */
+@media (prefers-reduced-motion: reduce) {
+  .bar-regrow {
+    animation: none;
+  }
 }
 
 /* First-load entrance. ListeningView sets data-intro on the page root for
