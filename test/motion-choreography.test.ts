@@ -60,3 +60,26 @@ test("ListeningView keeps the mini player mounted through its exit", () => {
   assert.match(src, /miniPlayerBarClass\(miniPlayer\.phase\)/);
   assert.match(readSrc("src/components/listening-view/MiniPlayerBar.tsx"), /className\?: string/);
 });
+
+// Metric value swap
+
+test("changedIndexes lists only the metrics whose text changed", async () => {
+  const { changedIndexes } = await import("../src/lib/choreography");
+  assert.deepEqual(changedIndexes(["233", "54", "30", "1.0h"], ["233", "61", "30", "1.2h"]), [1, 3]);
+  assert.deepEqual(changedIndexes(["1", "2"], ["1", "2"]), []);
+});
+
+test("metric swap is a 150ms fade with a 2px blur clearing, and no movement", async () => {
+  const { METRIC_SWAP_KEYFRAMES, METRIC_SWAP_TIMING } = await import("../src/lib/choreography");
+  assert.deepEqual(METRIC_SWAP_KEYFRAMES[0], { opacity: 0, filter: "blur(2px)" });
+  assert.deepEqual(METRIC_SWAP_KEYFRAMES[1], { opacity: 1, filter: "blur(0px)" });
+  assert.equal(METRIC_SWAP_TIMING.duration, 150);
+  assert.equal(METRIC_SWAP_TIMING.easing, "cubic-bezier(0.23, 1, 0.32, 1)");
+  assert.ok(!JSON.stringify(METRIC_SWAP_KEYFRAMES).includes("translate"));
+});
+
+test("MetricRibbon plays the swap on values that change, not on mount", () => {
+  const src = readSrc("src/components/listening-view/MetricRibbon.tsx");
+  assert.match(src, /changedIndexes\(/);
+  assert.match(src, /\.animate\(METRIC_SWAP_KEYFRAMES, METRIC_SWAP_TIMING\)/);
+});
