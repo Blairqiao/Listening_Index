@@ -117,12 +117,10 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
                 aria-pressed={isSelected}
                 data-taste-phase={phase.id}
                 onClick={() => onSelectPhase(phase)}
-                className={`flex-none w-[210px] snap-center border px-3 py-2.5 text-left cursor-pointer transition-[border-color,background-color,opacity] ${
+                className={`flex-none w-[210px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer transition-colors ${
                   isSelected
-                    ? "border-music-accent bg-music-accent/[0.06]"
-                    : selectedPhaseId !== null
-                      ? "border-[#1C1C1A] bg-[#0B0B0A] opacity-55 hover:opacity-90 hover:border-[#383830]"
-                      : "border-[#1C1C1A] bg-[#0B0B0A] hover:border-[#383830]"
+                    ? "border-music-accent"
+                    : "border-[#1C1C1A] hover:border-[#383830]"
                 }`}
               >
                 <div className="font-mono text-[11px] text-[#5A5A55] leading-snug">

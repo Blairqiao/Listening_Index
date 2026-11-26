@@ -206,10 +206,6 @@ const YearBlock = React.memo<YearBlockProps>(
                       : piece.tone === "b"
                         ? "taste-tone-b"
                         : "taste-tone-a";
-                    const ribbonDimClass =
-                      selectedPhaseId !== null && !isSelected
-                        ? "opacity-45 hover:opacity-80"
-                        : "";
                     return (
                       <button
                         key={`m-phase-${piece.phaseId}-${idx}`}
@@ -219,7 +215,7 @@ const YearBlock = React.memo<YearBlockProps>(
                         style={posStyle}
                         title={label}
                         aria-label={label}
-                        className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-[background-color,opacity] ${toneClass} ${ribbonDimClass}`}
+                        className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
                       />
                     );
                   }
@@ -334,9 +330,7 @@ const YearBlock = React.memo<YearBlockProps>(
                       dateKey === selectionStart || dateKey === selectionEnd;
 
                     const opacityClass =
-                      hasActiveSelection && !isSelected
-                        ? "calendar-out-of-range"
-                        : "opacity-100";
+                      hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                     const inRangeClass =
                       hasActiveSelection && isSelected ? "calendar-in-range" : "";
                     const ringClass = isStartOrEnd
@@ -348,7 +342,7 @@ const YearBlock = React.memo<YearBlockProps>(
                         key={dateKey}
                         data-date={dateKey}
                         title={`${dateKey} · ${count} plays`}
-                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,filter,box-shadow] duration-75`}
+                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
                         style={{ touchAction: "pan-y" }}
                       />
                     );
@@ -385,10 +379,6 @@ const YearBlock = React.memo<YearBlockProps>(
                     : piece.tone === "b"
                       ? "taste-tone-b"
                       : "taste-tone-a";
-                  const ribbonDimClass =
-                    selectedPhaseId !== null && !isSelected
-                      ? "opacity-45 hover:opacity-80"
-                      : "";
                   return (
                     <button
                       key={`d-phase-${piece.phaseId}-${idx}`}
@@ -398,7 +388,7 @@ const YearBlock = React.memo<YearBlockProps>(
                       style={gridStyle}
                       title={label}
                       aria-label={label}
-                      className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-[background-color,opacity] ${toneClass} ${ribbonDimClass}`}
+                      className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
                     />
                   );
                 }
@@ -537,9 +527,7 @@ const YearBlock = React.memo<YearBlockProps>(
                   dateKey === selectionStart || dateKey === selectionEnd;
 
                 const opacityClass =
-                  hasActiveSelection && !isSelected
-                    ? "calendar-out-of-range"
-                    : "opacity-100";
+                  hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                 const inRangeClass =
                   hasActiveSelection && isSelected ? "calendar-in-range" : "";
                 const ringClass = isStartOrEnd
@@ -552,7 +540,7 @@ const YearBlock = React.memo<YearBlockProps>(
                     data-date={dateKey}
                     style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
                     title={`${dateKey} · ${count} plays`}
-                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,filter,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
+                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
                   />
                 );
               })

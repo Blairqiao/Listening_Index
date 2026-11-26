@@ -90,18 +90,11 @@ body::-webkit-scrollbar,
 
 /* Empty days inside a calendar selection, lifted so the range reads against dimmed days outside it */
 .calendar-level-0.calendar-in-range {
-  background-color: #3E3E38;
+  background-color: #383838;
 }
 
-/* Subtle accent inner frame on days inside a calendar selection (edge days keep their white ring) */
-.calendar-in-range:not(.ring-1) {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--music-accent) 26%, transparent);
-}
-
-/* Days outside an active calendar selection: dimmed and desaturated so the selected span stands out */
-.calendar-out-of-range {
-  opacity: 0.22;
-  filter: saturate(0.18);
+.calendar-in-range {
+  filter: brightness(1.2);
 }
 
 .calendar-level-1 {
