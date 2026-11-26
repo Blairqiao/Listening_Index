@@ -53,7 +53,7 @@ export function SegmentedShareBar({ heading, segments, total, activeId, onActive
               type="button"
               title={label}
               aria-label={`${label}: ${formatShare(artistShare(plays, total))}`}
-              className={`${color} h-full border-0 p-0 min-w-0 cursor-pointer focus-ring`}
+              className={`${color} h-full border-0 p-0 min-w-0 cursor-pointer focus-ring motion-hover`}
               style={{ flexGrow: plays }}
               onClick={() => onActiveChange(activeId === id ? null : id)}
               onPointerEnter={(e) => {

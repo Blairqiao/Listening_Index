@@ -249,7 +249,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       onClick={() => onOpenProfile({ kind: "track", key: track.id })}
       onMouseEnter={() => setActiveSegmentId(track.id)}
       onMouseLeave={() => setActiveSegmentId(null)}
-      className={`group flex items-center gap-3 px-1 ${PROFILE_ROW_HEIGHT_CLASS[rowSize]} w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
+      className={`group flex items-center gap-3 px-1 ${PROFILE_ROW_HEIGHT_CLASS[rowSize]} w-full text-left cursor-pointer hover:bg-[#111110] focus-ring motion-hover border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
     >
       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
         {String(idx + 1).padStart(2, "0")}
@@ -261,7 +261,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           size={38}
         />
       )}
-      <span className={`font-sans ${rowSize === "compact" ? "text-[13px]" : "text-[14px]"} tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent transition-none leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
+      <span className={`font-sans ${rowSize === "compact" ? "text-[13px]" : "text-[14px]"} tracking-[-0.01em] flex-1 truncate group-hover:text-music-accent motion-hover leading-snug ${activeSegmentId === track.id ? "text-music-accent" : "text-[#EDEDE8]"}`}>
         {track.name}
       </span>
       <span className="font-mono text-[12px] text-[#5A5A55] w-[34px] shrink-0 text-right tabular-nums">
@@ -282,7 +282,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         type={key ? "button" : undefined}
         onClick={key ? () => onOpenProfile({ kind: "album", key }) : undefined}
         className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] border-b border-[#191917]${
-          key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none" : ""
+          key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-ring motion-hover" : ""
         }`}
       >
         <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -293,7 +293,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           alt={album.name}
           size={38}
         />
-        <span className={`font-sans text-[13px] text-[#EDEDE8] flex-1 truncate leading-snug${key ? " group-hover:text-music-accent transition-none" : ""}`}>
+        <span className={`font-sans text-[13px] text-[#EDEDE8] flex-1 truncate leading-snug${key ? " group-hover:text-music-accent motion-hover" : ""}`}>
           {album.name}
         </span>
         <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
@@ -387,7 +387,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
                     onMouseEnter={() => setActiveSegmentId(segmentId)}
                     onMouseLeave={() => setActiveSegmentId(null)}
-                    className={`flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-ring ${isActive ? "bg-[#111110]" : ""}`}
+                    className={`flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-ring motion-hover ${isActive ? "bg-[#111110]" : ""}`}
                   >
                     <div className="flex w-[56px] flex-none flex-col justify-center font-mono select-none">
                       {play.dayGroup && (
@@ -405,7 +405,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       size={38}
                     />
                     <div className="min-w-0 flex-1 pl-1">
-                      <span className={`block font-sans text-[14px] tracking-[-0.01em] truncate leading-snug select-none ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
+                      <span className={`block font-sans text-[14px] tracking-[-0.01em] truncate leading-snug select-none motion-hover ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                         {play.title}
                       </span>
                       {play.album && (
@@ -441,7 +441,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
                     onMouseEnter={() => setActiveSegmentId(segmentId)}
                     onMouseLeave={() => setActiveSegmentId(null)}
-                    className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-ring ${isActive ? "bg-[#111110]" : ""}`}
+                    className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-ring motion-hover ${isActive ? "bg-[#111110]" : ""}`}
                   >
                     <span className="font-mono text-[12.5px] text-[#5A5A55] select-none">
                       {play.dayGroup ?? null}
@@ -449,7 +449,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     <span className="font-mono text-[12.5px] text-[#8A8A83] tabular-nums select-none">
                       {play.timeStr}
                     </span>
-                    <span className={`min-w-0 font-sans text-[13px] tracking-[-0.01em] truncate leading-snug select-none ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
+                    <span className={`min-w-0 font-sans text-[13px] tracking-[-0.01em] truncate leading-snug select-none motion-hover ${isActive ? "text-music-accent" : "text-[#EDEDE8]"}`}>
                       {play.title}
                     </span>
                     <span className="pl-2 font-mono text-[12px] text-[#6A6A64] text-right tabular-nums select-none">
@@ -560,7 +560,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
                         {String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className={`font-sans text-[13px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent"}`}>
+                      <span className={`font-sans text-[13px] tracking-[-0.01em] flex-1 truncate leading-snug ${track.isCurrent ? "text-music-accent" : "text-[#EDEDE8] group-hover:text-music-accent motion-hover"}`}>
                         {track.name}
                       </span>
                       <span className="font-mono text-[12px] text-[#8A8A83] flex-none tabular-nums">
@@ -576,7 +576,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       key={track.id}
                       type="button"
                       onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-ring transition-none`}
+                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-ring motion-hover`}
                     >
                       {row}
                     </button>
@@ -598,7 +598,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     key={track.id}
                     type="button"
                     onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                    className="group flex items-center gap-2.5 px-1 h-8 w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none border-b border-[#191917]"
+                    className="group flex items-center gap-2.5 px-1 h-8 w-full text-left cursor-pointer hover:bg-[#111110] focus-ring motion-hover border-b border-[#191917]"
                   >
                     <Artwork
                       src={track.albumImageUrl}
@@ -606,7 +606,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       size={24}
                     />
                     <span className="min-w-0 flex-1 truncate leading-snug">
-                      <span className="font-sans text-[13px] tracking-[-0.01em] text-[#EDEDE8] group-hover:text-music-accent transition-none">
+                      <span className="font-sans text-[13px] tracking-[-0.01em] text-[#EDEDE8] group-hover:text-music-accent motion-hover">
                         {track.name}
                       </span>
                       <span className="font-mono text-[12px] text-[#6A6A64]">

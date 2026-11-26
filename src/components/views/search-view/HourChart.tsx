@@ -56,7 +56,7 @@ export function HourChart({
               <div
                 key={hour}
                 title={`${hourLabel(hour)} · ${count} plays`}
-                className={`flex-1 rounded-none select-none transition-none cursor-default ${isHot ? "bg-music-accent hover:bg-music-accent-hover" : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"}`}
+                className={`flex-1 rounded-none select-none motion-hover cursor-default ${isHot ? "bg-music-accent hover:bg-music-accent-hover" : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"}`}
                 style={{ height: `${Math.max(Math.round(ratio * 100), 4)}%` }}
               />
             );

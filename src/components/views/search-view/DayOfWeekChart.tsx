@@ -51,7 +51,7 @@ export function DayOfWeekChart({
               <div
                 key={dayLabel}
                 title={`${dayLabel} · ${count} plays`}
-                className={`flex-1 rounded-none select-none transition-none cursor-default ${
+                className={`flex-1 rounded-none select-none motion-hover cursor-default ${
                   isHot ? "bg-music-accent hover:bg-music-accent-hover" : "bg-[#1C1C1A] hover:bg-[#2E2E2A]"
                 }`}
                 style={{ height: `${Math.max(Math.round(ratio * 100), 4)}%` }}

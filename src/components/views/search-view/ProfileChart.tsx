@@ -14,7 +14,7 @@ type ChartView = "time" | "hour" | "day";
 
 // Combined label + toggle button on the left, styled like the live player's Synthetic toggle.
 const toggleHeadingClass =
-  "relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-ring press hit-area transition-colors select-none mb-2 block text-left";
+  "relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-ring press hit-area motion-hover select-none mb-2 block text-left";
 const staticHeadingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {

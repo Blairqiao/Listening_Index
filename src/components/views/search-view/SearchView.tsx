@@ -66,11 +66,11 @@ function ResultRow({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="w-full text-left group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] focus:bg-[#111110] focus:outline-none focus-visible:ring-1 focus-visible:ring-music-accent border-b border-[#191917] disabled:cursor-default"
+      className="w-full text-left group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer motion-hover hover:bg-[#111110] focus:bg-[#111110] focus:outline-none focus-visible:ring-1 focus-visible:ring-music-accent border-b border-[#191917] disabled:cursor-default"
     >
       <Artwork src={imageUrl} alt="" size={38} swatchColor={getFallbackSwatchColor(swatchName)} />
       <div className="min-w-0 flex-1 pl-1">
-        <span className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent group-focus:text-music-accent transition-none leading-snug">
+        <span className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent group-focus:text-music-accent motion-hover leading-snug">
           {name}
         </span>
         {subtitle != null && (
@@ -408,7 +408,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => onFilterChange?.(opt.value)}
-                className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none transition-none border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
+                className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none motion-hover border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
                   isActive
                     ? "border-music-accent text-music-accent bg-transparent"
                     : "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent"
@@ -436,7 +436,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               type="button"
               onClick={onRandomProfile}
               aria-label="Open random profile"
-              className="relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-ring focus-visible:text-music-accent press hit-area transition-none whitespace-nowrap"
+              className="relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-ring focus-visible:text-music-accent press hit-area motion-hover whitespace-nowrap"
             >
               Random
             </button>
@@ -463,7 +463,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
             }}
             placeholder={placeholder}
             aria-label={inputAriaLabel}
-            className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 pl-1 pr-10 outline-none transition-none rounded-none [&::-webkit-search-cancel-button]:hidden"
+            className="w-full bg-transparent border-0 border-b border-[#1C1C1A] focus:border-music-accent font-mono text-[14px] md:text-[15px] text-[#EDEDE8] placeholder:text-[#5A5A55] py-2 pl-1 pr-10 outline-none motion-hover rounded-none [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
@@ -473,7 +473,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 onQueryChange("");
                 internalInputRef.current?.focus();
               }}
-              className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-ring"
+              className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-ring motion-hover"
             >
               <X size={16} aria-hidden="true" />
             </button>

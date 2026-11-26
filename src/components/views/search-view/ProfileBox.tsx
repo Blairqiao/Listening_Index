@@ -100,7 +100,7 @@ export const ProfileBox: React.FC<ProfileBoxProps> = ({
           type="button"
           aria-expanded={expanded}
           onClick={() => setExpanded((prev) => !prev)}
-          className="md:hidden w-full py-2 font-mono text-[11px] text-[#8A8A83] hover:text-[#EDEDE8] focus-ring cursor-pointer"
+          className="md:hidden w-full py-2 font-mono text-[11px] text-[#8A8A83] hover:text-[#EDEDE8] focus-ring motion-hover cursor-pointer"
         >
           {expanded ? "Show fewer ⌃" : `Show all ${itemCount} ⌄`}
         </button>
