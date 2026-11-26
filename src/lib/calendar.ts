@@ -327,3 +327,136 @@ export function formatCalendarMetrics(
 
   return [playsStr, activeDaysStr, dailyAvgStr, peakStr];
 }
+
+export interface ContourGridOptions {
+  cols: number;
+  rows: number;
+  cellWidth: number;
+  cellHeight: number;
+  gap: number;
+  radius?: number;
+  isSelected: (col: number, row: number) => boolean;
+}
+
+/**
+ * Builds a closed SVG path tracing the outer perimeter of selected cells in a
+ * rectangular grid, centered down the cell gaps with rounded corners.
+ */
+export function selectionContourPath({
+  cols,
+  rows,
+  cellWidth,
+  cellHeight,
+  gap,
+  radius = 3,
+  isSelected,
+}: ContourGridOptions): string {
+  type Edge = { x0: number; y0: number; x1: number; y1: number; dx: number; dy: number };
+  const edges: Edge[] = [];
+  const selected = (c: number, r: number) =>
+    c >= 0 && c < cols && r >= 0 && r < rows && isSelected(c, r);
+
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      if (!selected(c, r)) continue;
+      if (!selected(c, r - 1)) edges.push({ x0: c, y0: r, x1: c + 1, y1: r, dx: 1, dy: 0 });
+      if (!selected(c + 1, r)) edges.push({ x0: c + 1, y0: r, x1: c + 1, y1: r + 1, dx: 0, dy: 1 });
+      if (!selected(c, r + 1)) edges.push({ x0: c + 1, y0: r + 1, x1: c, y1: r + 1, dx: -1, dy: 0 });
+      if (!selected(c - 1, r)) edges.push({ x0: c, y0: r + 1, x1: c, y1: r, dx: 0, dy: -1 });
+    }
+  }
+
+  if (edges.length === 0) return "";
+
+  const byStart = new Map<string, Edge[]>();
+  for (const e of edges) {
+    const key = `${e.x0},${e.y0}`;
+    const list = byStart.get(key);
+    if (list) list.push(e);
+    else byStart.set(key, [e]);
+  }
+
+  const used = new Set<Edge>();
+  const loops: Array<Array<[number, number]>> = [];
+
+  for (const startEdge of edges) {
+    if (used.has(startEdge)) continue;
+    const pts: Array<[number, number]> = [[startEdge.x0, startEdge.y0]];
+    let cur: Edge | undefined = startEdge;
+
+    while (cur) {
+      const current: Edge = cur;
+      used.add(current);
+      const nx = current.x1;
+      const ny = current.y1;
+      if (nx === startEdge.x0 && ny === startEdge.y0) break;
+      pts.push([nx, ny]);
+
+      const cands = (byStart.get(`${nx},${ny}`) ?? []).filter((e) => !used.has(e));
+      if (cands.length <= 1) {
+        cur = cands[0];
+      } else {
+        // At a diagonal pinch (degree-4 vertex), prefer turning clockwise (right)
+        // to keep each connected component a non-crossing simple loop.
+        const rightDx = -current.dy;
+        const rightDy = current.dx;
+        cur = cands.find((e) => e.dx === rightDx && e.dy === rightDy) ?? cands[0];
+      }
+    }
+
+    // Drop collinear midpoints so rounded corners only appear at actual turns
+    const simplified: Array<[number, number]> = [];
+    for (let i = 0; i < pts.length; i++) {
+      const prev = pts[(i - 1 + pts.length) % pts.length];
+      const curr = pts[i];
+      const next = pts[(i + 1) % pts.length];
+      const dx1 = curr[0] - prev[0];
+      const dy1 = curr[1] - prev[1];
+      const dx2 = next[0] - curr[0];
+      const dy2 = next[1] - curr[1];
+      if (dx1 * dy2 - dy1 * dx2 !== 0) {
+        simplified.push(curr);
+      }
+    }
+    if (simplified.length >= 3) {
+      loops.push(simplified);
+    }
+  }
+
+  const stepX = cellWidth + gap;
+  const stepY = cellHeight + gap;
+  const halfGap = gap / 2;
+  const toPx = (p: [number, number]): [number, number] => [
+    p[0] * stepX - halfGap,
+    p[1] * stepY - halfGap,
+  ];
+
+  const parts: string[] = [];
+  for (const loop of loops) {
+    const n = loop.length;
+    for (let i = 0; i < n; i++) {
+      const prev = toPx(loop[(i - 1 + n) % n]);
+      const curr = toPx(loop[i]);
+      const next = toPx(loop[(i + 1) % n]);
+
+      const v1x = curr[0] - prev[0];
+      const v1y = curr[1] - prev[1];
+      const len1 = Math.hypot(v1x, v1y);
+      const v2x = next[0] - curr[0];
+      const v2y = next[1] - curr[1];
+      const len2 = Math.hypot(v2x, v2y);
+
+      const r = Math.min(radius, len1 / 2, len2 / 2);
+      const bx = curr[0] - (v1x / len1) * r;
+      const by = curr[1] - (v1y / len1) * r;
+      const ax = curr[0] + (v2x / len2) * r;
+      const ay = curr[1] + (v2y / len2) * r;
+
+      parts.push(`${i === 0 ? "M" : "L"} ${bx.toFixed(2)} ${by.toFixed(2)}`);
+      parts.push(`Q ${curr[0].toFixed(2)} ${curr[1].toFixed(2)} ${ax.toFixed(2)} ${ay.toFixed(2)}`);
+    }
+    parts.push("Z");
+  }
+
+  return parts.join(" ");
+}

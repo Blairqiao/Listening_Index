@@ -4,7 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { shouldRefetchCalendar } from "../src/components/listening-view/useCalendarData";
 import { CalendarView, CalendarLegend } from "../src/components/views/CalendarView";
-import type { CalendarData, CalendarSelection } from "../src/lib/calendar";
+import { selectionContourPath, type CalendarData, type CalendarSelection } from "../src/lib/calendar";
 import { loadTs } from "./helpers/load-ts";
 
 test("shouldRefetchCalendar logic", () => {
@@ -166,17 +166,16 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   const sec2025 = html.match(/<section\b[^>]*\bdata-year="2025"[^>]*>/)?.[0] ?? "";
   assert.match(sec2025, /border-\[#1C1C1A\]/);
 
-  // 2024-11-15 has ring-1
+  // 2024-11-15 is inside selection -> opacity-100, calendar-in-range
   const cellStart = html.match(/<div[^>]*data-date="2024-11-15"[^>]*class="[^"]*"/);
   assert.ok(cellStart, "should find 2024-11-15 cell");
-  assert.match(cellStart[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
   assert.match(cellStart[0], /opacity-100/);
+  assert.match(cellStart[0], /calendar-in-range/);
 
-  // 2024-12-20 is inside the selection but not an edge -> no ring
+  // 2024-12-20 is inside the selection -> opacity-100
   const cellMid = html.match(/<div[^>]*data-date="2024-12-20"[^>]*class="[^"]*"/);
   assert.ok(cellMid, "should find 2024-12-20 cell");
   assert.match(cellMid[0], /opacity-100/);
-  assert.doesNotMatch(cellMid[0], /ring-1/);
 
   // Empty days inside the selection are lifted so they stand apart from empty days outside it
   const emptyIn = html.match(/<div[^>]*data-date="2024-11-20"[^>]*class="[^"]*"/)?.[0] ?? "";
@@ -190,11 +189,62 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   const cellOut = html.match(/<div[^>]*data-date="2025-01-10"[^>]*class="[^"]*"/);
   assert.ok(cellOut, "should find 2025-01-10 cell");
   assert.match(cellOut[0], /opacity-40/);
-  assert.doesNotMatch(cellOut[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
-  assert.doesNotMatch(cellOut[0], /calendar-edge-/);
 });
 
-test("CalendarView marks outer perimeter edges of a selected range on desktop and mobile", () => {
+test("selectionContourPath builds closed rounded SVG loops for single, stepped, and diagonal ranges", () => {
+  // Empty selection -> empty path
+  assert.equal(
+    selectionContourPath({
+      cols: 4,
+      rows: 4,
+      cellWidth: 14,
+      cellHeight: 14,
+      gap: 3,
+      isSelected: () => false,
+    }),
+    ""
+  );
+
+  // Single cell at (1, 1) -> 1 closed loop with 4 rounded corners (4 Q commands)
+  const single = selectionContourPath({
+    cols: 4,
+    rows: 4,
+    cellWidth: 14,
+    cellHeight: 14,
+    gap: 3,
+    radius: 3,
+    isSelected: (c, r) => c === 1 && r === 1,
+  });
+  assert.equal((single.match(/Z/g) ?? []).length, 1);
+  assert.equal((single.match(/Q /g) ?? []).length, 4);
+
+  // Stepped mid-week range (2 columns: col 0 rows 2..3, col 1 rows 0..2) -> 1 loop with 8 corners
+  const stepped = selectionContourPath({
+    cols: 3,
+    rows: 4,
+    cellWidth: 14,
+    cellHeight: 14,
+    gap: 3,
+    radius: 3,
+    isSelected: (c, r) => (c === 0 && r >= 2) || (c === 1 && r <= 2),
+  });
+  assert.equal((stepped.match(/Z/g) ?? []).length, 1);
+  assert.equal((stepped.match(/Q /g) ?? []).length, 8);
+
+  // Diagonal-only pinch at (0, 1) and (1, 0) -> 2 separate closed loops (no self-crossing)
+  const diagonal = selectionContourPath({
+    cols: 2,
+    rows: 2,
+    cellWidth: 14,
+    cellHeight: 14,
+    gap: 3,
+    radius: 2,
+    isSelected: (c, r) => (c === 0 && r === 1) || (c === 1 && r === 0),
+  });
+  assert.equal((diagonal.match(/Z/g) ?? []).length, 2);
+});
+
+test("CalendarView renders connected SVG selection contour only for years intersecting selection", () => {
   const data: CalendarData = {
     firstDate: "2024-06-01",
     today: "2025-06-01",
@@ -202,11 +252,24 @@ test("CalendarView marks outer perimeter edges of a selected range on desktop an
     days: [
       { date: "2024-11-15", count: 10 },
       { date: "2024-12-11", count: 20 },
+      { date: "2025-02-10", count: 15 },
     ],
   };
 
-  // Selection from Fri 2024-11-15 through Tue 2024-12-31
-  const html = renderToStaticMarkup(
+  // No selection -> no contour SVG
+  const htmlNone = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data,
+      isLoading: false,
+      selection: null,
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+    })
+  );
+  assert.ok(!htmlNone.includes("data-selection-contour"), "no contour SVG when selection is null");
+
+  // Selection in 2024 only -> exactly 2 contour SVGs (1 mobile + 1 desktop for 2024; 0 for 2025)
+  const htmlSelected = renderToStaticMarkup(
     React.createElement(CalendarView, {
       data,
       isLoading: false,
@@ -215,48 +278,12 @@ test("CalendarView marks outer perimeter edges of a selected range on desktop an
       onOpenInOverview: () => {},
     })
   );
-
-  const cellsFor = (date: string) => {
-    const matches = html.match(new RegExp(`<div[^>]*data-date="${date}"[^>]*>`, "g")) ?? [];
-    assert.equal(matches.length, 2, `expected mobile and desktop cells for ${date}`);
-    return { mobile: matches[0], desktop: matches[1] };
-  };
-
-  // Start cell (Fri 2024-11-15): desktop has top (Thu Nov 14 unselected) and left (Fri Nov 8 unselected) edges, plus endpoint
-  const start = cellsFor("2024-11-15");
-  assert.match(start.desktop, /calendar-range-edge/);
-  assert.match(start.desktop, /calendar-edge-t/);
-  assert.match(start.desktop, /calendar-edge-l/);
-  assert.doesNotMatch(start.desktop, /calendar-edge-b/);
-  assert.doesNotMatch(start.desktop, /calendar-edge-r/);
-  assert.match(start.desktop, /calendar-edge-endpoint/);
-
-  // Mobile start cell (Nov 15): top (Nov 14 unselected) and left (Oct 15 unselected) edges
-  assert.match(start.mobile, /calendar-range-edge/);
-  assert.match(start.mobile, /calendar-edge-t/);
-  assert.match(start.mobile, /calendar-edge-l/);
-  assert.doesNotMatch(start.mobile, /calendar-edge-b/);
-  assert.doesNotMatch(start.mobile, /calendar-edge-r/);
-
-  // Desktop interior cell (Wed 2024-12-11): surrounded on all 4 sides by selected days -> no edge classes
-  const dec11 = cellsFor("2024-12-11");
-  assert.doesNotMatch(dec11.desktop, /calendar-range-edge/);
-  assert.doesNotMatch(dec11.desktop, /calendar-edge-/);
-  // Mobile Dec 11: Nov 11 is unselected (left edge) and month 13 doesn't exist (right edge)
-  assert.match(dec11.mobile, /calendar-edge-l/);
-  assert.match(dec11.mobile, /calendar-edge-r/);
-  assert.doesNotMatch(dec11.mobile, /calendar-edge-t/);
-  assert.doesNotMatch(dec11.mobile, /calendar-edge-b/);
-
-  // Desktop top-row cell (Sun 2024-12-01) and bottom-row cell (Sat 2024-12-07)
-  const dec01 = cellsFor("2024-12-01");
-  assert.match(dec01.desktop, /calendar-edge-t/);
-  assert.doesNotMatch(dec01.desktop, /calendar-edge-b/);
-  assert.match(dec01.mobile, /calendar-edge-t/);
-
-  const dec07 = cellsFor("2024-12-07");
-  assert.match(dec07.desktop, /calendar-edge-b/);
-  assert.doesNotMatch(dec07.desktop, /calendar-edge-t/);
+  const contours = htmlSelected.match(/<svg[^>]*data-selection-contour="true"[^>]*>.*?<\/svg>/g) ?? [];
+  assert.equal(contours.length, 2, "must render one mobile and one desktop contour SVG for 2024");
+  for (const svg of contours) {
+    assert.match(svg, /pointer-events-none/);
+    assert.match(svg, /<path\b[^>]*d="M [^"]*Z"/);
+  }
 });
 
 test("CalendarView renders 'No Plays yet.' when data has no plays or null firstDate", () => {

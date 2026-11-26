@@ -10,6 +10,7 @@ import {
   monthSelection,
   yearSelection,
   normalizeSelection,
+  selectionContourPath,
   selectionToRange,
   summarizeCalendar,
   weekColumns,
@@ -91,22 +92,11 @@ function rampEndColor(
   return meta.tone === "b" ? "var(--taste-tone-b)" : "var(--taste-tone-a)";
 }
 
-function rangeEdgeClasses(
-  top: boolean,
-  right: boolean,
-  bottom: boolean,
-  left: boolean,
-  isEndpoint: boolean,
-): string {
-  if (!top && !right && !bottom && !left) return "";
-  let cls = "calendar-range-edge";
-  if (top) cls += " calendar-edge-t";
-  if (right) cls += " calendar-edge-r";
-  if (bottom) cls += " calendar-edge-b";
-  if (left) cls += " calendar-edge-l";
-  if (isEndpoint) cls += " calendar-edge-endpoint";
-  return cls;
-}
+const DESKTOP_CONTOUR_CELL = 14;
+const DESKTOP_CONTOUR_GAP = 3;
+const MOBILE_CONTOUR_CELL_W = 25;
+const MOBILE_CONTOUR_CELL_H = 10;
+const MOBILE_CONTOUR_GAP = 2;
 
 interface YearBlockProps {
   year: number;
@@ -115,8 +105,6 @@ interface YearBlockProps {
   clippedSelection: CalendarSelection | null;
   hasActiveSelection: boolean;
   isAnchorYear: boolean;
-  selectionStart: string | null;
-  selectionEnd: string | null;
   dayCounts: Map<string, number>;
   thresholds: [number, number, number];
   ribbon: YearRibbonData | null;
@@ -134,8 +122,6 @@ const YearBlock = React.memo<YearBlockProps>(
     clippedSelection,
     hasActiveSelection,
     isAnchorYear,
-    selectionStart,
-    selectionEnd,
     dayCounts,
     thresholds,
     ribbon,
@@ -163,30 +149,51 @@ const YearBlock = React.memo<YearBlockProps>(
     const numCols = cols.length;
     const yearStr = String(year).padStart(4, "0");
 
-    const isMobileCellSelected = (mIdx: number, dNum: number): boolean => {
-      if (clippedSelection === null) return false;
-      if (mIdx < 0 || mIdx >= months.length) return false;
-      const m = months[mIdx];
-      if (dNum < 1 || dNum > m.maxDays) return false;
-      const key = `${yearStr}-${String(m.monthNum).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
-      return (
-        isSelectableDate(key, firstDate, today) &&
-        key >= clippedSelection.from &&
-        key <= clippedSelection.to
-      );
-    };
+    const desktopContourPath = useMemo(() => {
+      if (!hasActiveSelection || clippedSelection === null) return "";
+      return selectionContourPath({
+        cols: numCols,
+        rows: 7,
+        cellWidth: DESKTOP_CONTOUR_CELL,
+        cellHeight: DESKTOP_CONTOUR_CELL,
+        gap: DESKTOP_CONTOUR_GAP,
+        radius: 3,
+        isSelected: (cIdx, rIdx) => {
+          if (cIdx < 0 || cIdx >= numCols || rIdx < 0 || rIdx >= 7) return false;
+          const key = cols[cIdx][rIdx];
+          if (!key) return false;
+          return (
+            isSelectableDate(key, firstDate, today) &&
+            key >= clippedSelection.from &&
+            key <= clippedSelection.to
+          );
+        },
+      });
+    }, [hasActiveSelection, clippedSelection, numCols, cols, firstDate, today]);
 
-    const isDesktopCellSelected = (cIdx: number, rIdx: number): boolean => {
-      if (clippedSelection === null) return false;
-      if (cIdx < 0 || cIdx >= cols.length || rIdx < 0 || rIdx >= 7) return false;
-      const key = cols[cIdx][rIdx];
-      if (!key) return false;
-      return (
-        isSelectableDate(key, firstDate, today) &&
-        key >= clippedSelection.from &&
-        key <= clippedSelection.to
-      );
-    };
+    const mobileContourPath = useMemo(() => {
+      if (!hasActiveSelection || clippedSelection === null) return "";
+      return selectionContourPath({
+        cols: months.length,
+        rows: 31,
+        cellWidth: MOBILE_CONTOUR_CELL_W,
+        cellHeight: MOBILE_CONTOUR_CELL_H,
+        gap: MOBILE_CONTOUR_GAP,
+        radius: 2,
+        isSelected: (mIdx, dayIdx) => {
+          if (mIdx < 0 || mIdx >= months.length) return false;
+          const dNum = dayIdx + 1;
+          const m = months[mIdx];
+          if (dNum < 1 || dNum > m.maxDays) return false;
+          const key = `${yearStr}-${String(m.monthNum).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+          return (
+            isSelectableDate(key, firstDate, today) &&
+            key >= clippedSelection.from &&
+            key <= clippedSelection.to
+          );
+        },
+      });
+    }, [hasActiveSelection, clippedSelection, months, yearStr, firstDate, today]);
 
     // Calculate total plays in this year
     const yearPlays = useMemo(() => {
@@ -300,11 +307,11 @@ const YearBlock = React.memo<YearBlockProps>(
               </div>
             </div>
           )}
+          {/* Top row: spacer + 12 month buttons */}
           <div
-            className="grid gap-[2px] items-center w-full"
+            className="grid gap-[2px] items-center w-full mb-[2px]"
             style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
           >
-            {/* Top row: spacer + 12 month buttons */}
             <div />
             {months.map((month) => {
               const isDisabled =
@@ -328,8 +335,13 @@ const YearBlock = React.memo<YearBlockProps>(
                 </button>
               );
             })}
+          </div>
 
-            {/* 31 Day rows */}
+          {/* 31 Day rows + SVG contour overlay */}
+          <div
+            className="relative grid gap-[2px] items-center w-full"
+            style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
+          >
             {Array.from({ length: 31 }, (_, dayIdx) => {
               const dayNum = dayIdx + 1;
               const isLabelDay =
@@ -340,7 +352,7 @@ const YearBlock = React.memo<YearBlockProps>(
                   <div className="h-[10px] leading-[10px] text-[10px] text-[#5A5A55] text-right pr-[3px] select-none font-mono">
                     {isLabelDay ? dayNum : ""}
                   </div>
-                  {months.map((month, monthIdx) => {
+                  {months.map((month) => {
                     if (dayNum > month.maxDays) {
                       return (
                         <div
@@ -368,33 +380,18 @@ const YearBlock = React.memo<YearBlockProps>(
                       clippedSelection !== null &&
                       dateKey >= clippedSelection.from &&
                       dateKey <= clippedSelection.to;
-                    const isStartOrEnd =
-                      dateKey === selectionStart || dateKey === selectionEnd;
 
                     const opacityClass =
                       hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                     const inRangeClass =
                       hasActiveSelection && isSelected ? "calendar-in-range" : "";
-                    const edgeClass =
-                      hasActiveSelection && isSelected
-                        ? rangeEdgeClasses(
-                            !isMobileCellSelected(monthIdx, dayNum - 1),
-                            !isMobileCellSelected(monthIdx + 1, dayNum),
-                            !isMobileCellSelected(monthIdx, dayNum + 1),
-                            !isMobileCellSelected(monthIdx - 1, dayNum),
-                            isStartOrEnd,
-                          )
-                        : "";
-                    const ringClass = isStartOrEnd
-                      ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
-                      : "";
 
                     return (
                       <div
                         key={dateKey}
                         data-date={dateKey}
                         title={`${dateKey} · ${count} plays`}
-                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${edgeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
+                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
                         style={{ touchAction: "pan-y" }}
                       />
                     );
@@ -402,6 +399,25 @@ const YearBlock = React.memo<YearBlockProps>(
                 </React.Fragment>
               );
             })}
+            {mobileContourPath && (
+              <svg
+                data-selection-contour="true"
+                aria-hidden="true"
+                viewBox={`0 0 ${months.length * (MOBILE_CONTOUR_CELL_W + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP} ${31 * (MOBILE_CONTOUR_CELL_H + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP}`}
+                preserveAspectRatio="none"
+                className="pointer-events-none absolute top-0 right-0 bottom-0 z-10 overflow-visible"
+                style={{ left: "20px", width: "calc(100% - 20px)", height: "100%" }}
+              >
+                <path
+                  d={mobileContourPath}
+                  fill="none"
+                  stroke="rgba(237, 237, 232, 0.82)"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
           </div>
         </div>
 
@@ -575,26 +591,11 @@ const YearBlock = React.memo<YearBlockProps>(
                   clippedSelection !== null &&
                   dateKey >= clippedSelection.from &&
                   dateKey <= clippedSelection.to;
-                const isStartOrEnd =
-                  dateKey === selectionStart || dateKey === selectionEnd;
 
                 const opacityClass =
                   hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                 const inRangeClass =
                   hasActiveSelection && isSelected ? "calendar-in-range" : "";
-                const edgeClass =
-                  hasActiveSelection && isSelected
-                    ? rangeEdgeClasses(
-                        !isDesktopCellSelected(colIdx, rowIdx - 1),
-                        !isDesktopCellSelected(colIdx + 1, rowIdx),
-                        !isDesktopCellSelected(colIdx, rowIdx + 1),
-                        !isDesktopCellSelected(colIdx - 1, rowIdx),
-                        isStartOrEnd,
-                      )
-                    : "";
-                const ringClass = isStartOrEnd
-                  ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
-                  : "";
 
                 return (
                   <div
@@ -602,10 +603,29 @@ const YearBlock = React.memo<YearBlockProps>(
                     data-date={dateKey}
                     style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
                     title={`${dateKey} · ${count} plays`}
-                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${edgeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
+                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
                   />
                 );
               })
+            )}
+            {desktopContourPath && (
+              <svg
+                data-selection-contour="true"
+                aria-hidden="true"
+                viewBox={`0 0 ${numCols * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP} ${7 * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP}`}
+                preserveAspectRatio="none"
+                className="pointer-events-none w-full h-full z-10 overflow-visible"
+                style={{ gridColumn: `2 / ${numCols + 2}`, gridRow: "1 / 8" }}
+              >
+                <path
+                  d={desktopContourPath}
+                  fill="none"
+                  stroke="rgba(237, 237, 232, 0.82)"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
             )}
           </div>
         </div>
@@ -618,8 +638,6 @@ const YearBlock = React.memo<YearBlockProps>(
     if (prev.today !== next.today) return false;
     if (prev.hasActiveSelection !== next.hasActiveSelection) return false;
     if (prev.isAnchorYear !== next.isAnchorYear) return false;
-    if (prev.selectionStart !== next.selectionStart) return false;
-    if (prev.selectionEnd !== next.selectionEnd) return false;
     if (prev.dayCounts !== next.dayCounts) return false;
     if (prev.ribbon !== next.ribbon) return false;
     if (prev.selectedPhaseId !== next.selectedPhaseId) return false;
@@ -1064,7 +1082,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   }
 
   const draftFrom = draft?.from ?? null;
-  const draftTo = draft?.to ?? null;
   const hasActiveSelection = Boolean(draft);
   const showSlider =
     activeTaste !== null &&
@@ -1087,14 +1104,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         const clipped = clipSelectionToYear(draft, year);
         const isAnchorYear =
           draftFrom !== null && draftFrom.slice(0, 4) === String(year);
-        const selectionStart =
-          draftFrom !== null && draftFrom.slice(0, 4) === String(year)
-            ? draftFrom
-            : null;
-        const selectionEnd =
-          draftTo !== null && draftTo.slice(0, 4) === String(year)
-            ? draftTo
-            : null;
 
         return (
           <YearBlock
@@ -1105,8 +1114,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             clippedSelection={clipped}
             hasActiveSelection={hasActiveSelection}
             isAnchorYear={isAnchorYear}
-            selectionStart={selectionStart}
-            selectionEnd={selectionEnd}
             dayCounts={dayCounts}
             thresholds={thresholds}
             ribbon={ribbonsByYear?.get(year) ?? null}
