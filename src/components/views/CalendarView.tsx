@@ -36,6 +36,8 @@ import {
   type TasteTone,
 } from "@/lib/taste/view";
 import { TastePhaseCards } from "@/components/views/TastePhaseCards";
+import { phaseScrollTarget } from "@/lib/phase-scroll";
+import { scrollBehavior } from "@/lib/motion";
 
 const SHORT_MONTHS = [
   "Jan",
@@ -1192,6 +1194,48 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     [handleClear, onSelectionChange],
   );
 
+  // Phase cards sit above the heatmaps, so picking one scrolls its range into view.
+  // Ribbon clicks don't: the user is already looking at that spot.
+  const pendingPhaseScrollRef = useRef(false);
+
+  const handleSelectPhaseFromCards = useCallback(
+    (phase: TastePhase) => {
+      pendingPhaseScrollRef.current = activePhaseIdRef.current !== phase.id;
+      handleSelectPhase(phase);
+    },
+    [handleSelectPhase],
+  );
+
+  useEffect(() => {
+    if (!pendingPhaseScrollRef.current || !draft) return;
+    pendingPhaseScrollRef.current = false;
+    const raf = window.requestAnimationFrame(() => {
+      const container = heatmapsContainerRef.current;
+      if (!container) return;
+      let top = Infinity;
+      let bottom = -Infinity;
+      container.querySelectorAll<HTMLElement>(".calendar-in-range").forEach((cell) => {
+        const rect = cell.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return; // cell in the hidden layout
+        top = Math.min(top, rect.top);
+        bottom = Math.max(bottom, rect.bottom);
+      });
+      if (!Number.isFinite(top)) return;
+      const playerHeight =
+        document.querySelector<HTMLElement>("[data-bottom-inset]")?.getBoundingClientRect().height ?? 0;
+      const target = phaseScrollTarget({
+        rangeTop: top,
+        rangeBottom: bottom,
+        viewportHeight: window.innerHeight,
+        scrollY: window.scrollY,
+        topInset: 12, // the selection bar never sticks: <body> is its own scroll container
+        bottomInset: playerHeight + 12,
+      });
+      if (target !== null) window.scrollTo({ top: target, behavior: scrollBehavior() });
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [draft]);
+
   const ribbonsByYear = useMemo(() => {
     if (!activeTaste || activeTasteLevel === null) return null;
     const phaseById = new Map<string, { phase: TastePhase; tone: TasteTone }>();
@@ -1357,7 +1401,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <TastePhaseCards
             items={phaseRowItems}
             selectedPhaseId={activePhaseId}
-            onSelectPhase={handleSelectPhase}
+            onSelectPhase={handleSelectPhaseFromCards}
           />
           {heatmapsContainer}
         </>

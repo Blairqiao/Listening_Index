@@ -32,7 +32,7 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
   const clampedProgress = Math.min(1, Math.max(0, progress));
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 h-[56px] border-t border-[#1C1C1A] bg-[#080808]">
+    <div data-bottom-inset className="fixed inset-x-0 bottom-0 z-30 h-[56px] border-t border-[#1C1C1A] bg-[#080808]">
       {/* 2px Progress line along top edge */}
       <div
         className="absolute top-0 left-0 h-[2px] bg-music-accent pointer-events-none transition-all duration-150"
