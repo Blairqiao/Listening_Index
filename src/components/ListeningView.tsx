@@ -63,7 +63,7 @@ import {
   parseSearchPage,
   parseSearchSort,
 } from "@/lib/search-utils";
-import { clearSearchCache } from "@/components/views/search-view/useSearch";
+import { clearSearchCache, prefetchSearch } from "@/components/views/search-view/useSearch";
 import type { OverviewData, StreamLogData, SessionData } from "@/lib/db/queries";
 import { presentSession } from "@/lib/listening-presentation";
 import { useDeferredEnrichment } from "@/lib/hooks/useDeferredEnrichment";
@@ -95,8 +95,8 @@ import { usePersistedToggle } from "./listening-view/usePersistedToggle";
 import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import { useSearchProfile } from "./listening-view/useSearchProfile";
-import { useCalendarData } from "./listening-view/useCalendarData";
-import { useTasteData } from "./listening-view/useTasteData";
+import { useCalendarData, prefetchCalendar } from "./listening-view/useCalendarData";
+import { useTasteData, prefetchTaste } from "./listening-view/useTasteData";
 import { gateCalendarOnTaste } from "./listening-view/calendarGate";
 import {
   CalendarSelection,
@@ -115,6 +115,7 @@ import {
   readHistoryState,
   resolveActiveEntity,
   sanitizeActiveMode,
+  prefetchKindsForMode,
   EMPTY_OVERVIEW,
   EMPTY_STREAM_LOG,
 } from "./listening-view/listening-helpers";
@@ -332,6 +333,21 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   const calendarGate = gateCalendarOnTaste(calendar, taste);
 
+  // Warm a tab's requests before it opens, so switching shows data instead of a skeleton.
+  // Hover gives a few hundred milliseconds; Taste takes about a second, so the idle pass
+  // after the first-load entrance does most of the work.
+  const prefetchMode = useCallback(
+    (mode: Mode) => {
+      const refreshKey = lastSyncedAt?.getTime() ?? 0;
+      for (const kind of prefetchKindsForMode(mode, { activeMode, hasProfile: profileTarget !== null })) {
+        if (kind === "calendar") prefetchCalendar(visitorTimezone, refreshKey);
+        else if (kind === "taste") prefetchTaste(visitorTimezone, refreshKey);
+        else prefetchSearch(searchQuery, searchSort, searchPage, searchFilter);
+      }
+    },
+    [lastSyncedAt, activeMode, profileTarget, visitorTimezone, searchQuery, searchSort, searchPage, searchFilter],
+  );
+
   // The first reveal plays a staged entrance once (globals.css, [data-intro]).
   // It waits for hydration, fonts and the open tab's own data (each capped) so
   // a slow load doesn't eat it, then two frames so the held start state is
@@ -379,6 +395,25 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     const timer = setTimeout(() => setIntroPhase("done"), introDurationMs(introSettle));
     return () => clearTimeout(timer);
   }, [introPhase, introSettle]);
+
+  const prefetchModeRef = useRef(prefetchMode);
+  useEffect(() => {
+    prefetchModeRef.current = prefetchMode;
+  }, [prefetchMode]);
+  const idleRefreshKey = lastSyncedAt?.getTime() ?? 0;
+  useEffect(() => {
+    if (introPhase !== "done") return;
+    const warm = () => {
+      prefetchModeRef.current(5);
+      prefetchModeRef.current(4);
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(warm, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(warm, 1000);
+    return () => clearTimeout(timer);
+  }, [introPhase, idleRefreshKey, visitorTimezone]);
 
   const handleSyncWithCacheClear = useCallback(async () => {
     await handleTriggerSync();
@@ -947,6 +982,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           <ModeTabs
             activeMode={activeMode}
             onSelectMode={handleSelectMode}
+            onPrefetchMode={prefetchMode}
             onOpenUpload={() => setIsUploadModalOpen(true)}
             onOpenSpotifyModal={openAdminSpotifyModal}
             spotifyStatus={spotifyStatus}

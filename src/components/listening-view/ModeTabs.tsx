@@ -8,6 +8,8 @@ import { Menu, Upload, Lock, Unlock, Music2 } from "lucide-react";
 interface ModeTabsProps {
   activeMode: Mode;
   onSelectMode: (mode: Mode) => void;
+  /** Called on hover or focus so a tab can load its data before the click. */
+  onPrefetchMode?: (mode: Mode) => void;
   onOpenUpload?: () => void;
   onOpenSpotifyModal?: () => void;
   spotifyStatus?: SpotifyTabStatusProp | null;
@@ -84,6 +86,7 @@ export function getSpotifyTabState(
 export const ModeTabs: React.FC<ModeTabsProps> = ({
   activeMode,
   onSelectMode,
+  onPrefetchMode,
   onOpenUpload,
   onOpenSpotifyModal,
   spotifyStatus,
@@ -111,6 +114,8 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
               role="tab"
               aria-selected={isActive}
               disabled={isSyncing}
+              onPointerEnter={() => onPrefetchMode?.(m.id)}
+              onFocus={() => onPrefetchMode?.(m.id)}
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.currentTarget.blur();

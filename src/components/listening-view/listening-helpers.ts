@@ -53,6 +53,22 @@ export function parseModeParam(raw: string | null | undefined): Mode | null {
   return null;
 }
 
+export type TabPrefetchKind = "calendar" | "taste" | "search";
+
+/**
+ * The requests worth starting before a tab opens. Overview, Stream Log and Sessions come
+ * with the page. Search with a profile open reopens on that profile, not the browse.
+ */
+export function prefetchKindsForMode(
+  mode: Mode,
+  { activeMode, hasProfile }: { activeMode: Mode; hasProfile: boolean },
+): TabPrefetchKind[] {
+  if (mode === activeMode) return [];
+  if (mode === 5) return ["calendar", "taste"];
+  if (mode === 4 && !hasProfile) return ["search"];
+  return [];
+}
+
 export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
   return mode === 3 && !isAuthenticated ? 0 : mode;
 }

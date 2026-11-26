@@ -12,11 +12,47 @@ export type SearchStatus = "idle" | "loading" | "ready" | "error";
 
 const SEARCH_CACHE_MAX = 50;
 const searchCache = new Map<string, SearchResponse>();
+const searchInFlight = new Map<string, Promise<SearchResponse>>();
 let cacheGeneration = 0;
 
 export function clearSearchCache(): void {
   searchCache.clear();
+  searchInFlight.clear();
   cacheGeneration++;
+}
+
+function searchRequestUrl(query: string, sort: SearchSort, page: number, filter: SearchFilter): string | null {
+  const check = checkSearchQuery(query);
+  return check.ok
+    ? "/api/listening/search?" +
+      new URLSearchParams({ q: check.query, sort, page: String(page), type: filter })
+    : null;
+}
+
+/** Warms the Search tab before it opens. `useSearch` waits on a request this starts instead of repeating it. */
+export function prefetchSearch(
+  query: string,
+  sort: SearchSort = DEFAULT_SEARCH_SORT,
+  page = 1,
+  filter: SearchFilter = DEFAULT_SEARCH_FILTER,
+): void {
+  const url = searchRequestUrl(query, sort, page, filter);
+  if (!url || searchCache.has(url) || searchInFlight.has(url)) return;
+  const generation = cacheGeneration;
+  const request = fetch(url, { cache: "no-store" })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<SearchResponse>;
+    })
+    .then((json) => {
+      if (generation === cacheGeneration) setInCache(url, json);
+      return json;
+    })
+    .finally(() => {
+      if (searchInFlight.get(url) === request) searchInFlight.delete(url);
+    });
+  searchInFlight.set(url, request);
+  request.catch(() => {});
 }
 
 function setInCache(key: string, value: SearchResponse): void {
@@ -43,15 +79,7 @@ export function useSearch(
   check: SearchQueryCheck;
 } {
   const check = checkSearchQuery(query);
-  const requestUrl = check.ok
-    ? "/api/listening/search?" +
-      new URLSearchParams({
-        q: check.query,
-        sort,
-        page: String(page),
-        type: filter,
-      })
-    : null;
+  const requestUrl = searchRequestUrl(query, sort, page, filter);
 
   const [lastReady, setLastReady] = useState<{
     data: SearchResponse | null;
@@ -89,6 +117,26 @@ export function useSearch(
 
     if (searchCache.has(requestUrl)) {
       return;
+    }
+
+    const prefetch = searchInFlight.get(requestUrl);
+    if (prefetch) {
+      let cancelled = false;
+      prefetch.then(
+        (json) => {
+          if (cancelled || currentGeneration !== cacheGeneration) return;
+          setLastReady({ data: json, filter });
+          setErrorUrl(null);
+        },
+        () => {
+          if (cancelled || currentGeneration !== cacheGeneration) return;
+          setErrorUrl(requestUrl);
+          setErrorGeneration(currentGeneration);
+        },
+      );
+      return () => {
+        cancelled = true;
+      };
     }
 
     const controller = new AbortController();

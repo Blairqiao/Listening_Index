@@ -1,7 +1,13 @@
 "use client";
 
 import type { TastePhasesData } from "@/lib/taste/types";
-import { useEpochJson, type CalendarStatus } from "./useEpochJson";
+import { useEpochJson, prefetchEpochJson, type CalendarStatus } from "./useEpochJson";
+
+const TASTE_PATH = "/api/listening/taste";
+
+export function prefetchTaste(timezone: string, refreshKey: number): void {
+  prefetchEpochJson(TASTE_PATH, timezone, refreshKey);
+}
 
 export function useTasteData(opts: {
   enabled: boolean;
@@ -9,7 +15,7 @@ export function useTasteData(opts: {
   refreshKey: number;
 }): { data: TastePhasesData | null; status: CalendarStatus } {
   return useEpochJson<TastePhasesData>(
-    "/api/listening/taste",
+    TASTE_PATH,
     opts,
     "[TASTE DATA FETCH]",
   );
