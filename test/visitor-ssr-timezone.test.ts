@@ -5,7 +5,7 @@ import ts from 'typescript';
 import * as timezoneUtils from '../src/lib/timezone-utils';
 import * as searchUtils from '../src/lib/search-utils';
 import * as range from '../src/lib/range';
-import { parseModeParam } from '../src/components/listening-view/listening-helpers';
+import { resolveInitialMode } from '../src/components/listening-view/listening-helpers';
 
 test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all initial queries', async () => {
   for (const [cookie, expected] of [['Asia/Tokyo', 'Asia/Tokyo'], ['Invalid/Zone', 'UTC'], ['', 'UTC']]) {
@@ -13,7 +13,7 @@ test('SSR explicitly passes a valid detected cookie zone or UTC fallback to all 
     const deps: Record<string, unknown> = {
       'next/headers': { cookies: async () => ({ get: (key: string) => key === 'listening_timezone' && cookie ? { value: encodeURIComponent(cookie) } : undefined }) },
       '@/components/ListeningView': { ListeningView: 'view' }, '@/lib/mock/overview-data': { getMockOverview: () => ({}) },
-      '@/components/listening-view/listening-helpers': { parseModeParam },
+      '@/components/listening-view/listening-helpers': { resolveInitialMode },
       '@/lib/config-utils': { DEFAULT_SITE_CONFIG: {} },
       '@/lib/types': { RANGE_KEYS: ['1d', '1w', '1m', '6m', '1y', 'all'] },
       '@/lib/range': range,
@@ -43,7 +43,7 @@ test('SSR passes full fixed selection to queries and forwards fixed selection an
   const makeDeps = (configured: boolean): Record<string, unknown> => ({
     'next/headers': { cookies: async () => ({ get: () => undefined }) },
     '@/components/ListeningView': { ListeningView: 'view' },
-    '@/components/listening-view/listening-helpers': { parseModeParam },
+    '@/components/listening-view/listening-helpers': { resolveInitialMode },
     '@/lib/mock/overview-data': {
       MOCK_DATA: { streamLog: [], session: {} },
       getMockOverview: (...args: unknown[]) => {

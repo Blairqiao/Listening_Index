@@ -13,7 +13,7 @@ import {
   buildListeningUrlSearch,
   formatProfileRibbonMetrics,
   getProfileCacheKey,
-  parseModeParam,
+  resolveInitialMode,
   readHistoryState,
   resolveDisplayedProfileData,
 } from "../src/components/listening-view/listening-helpers";
@@ -1061,7 +1061,7 @@ test("src/app/page.tsx passes initialProfile and initialProfileRange only when i
   const deps: Record<string, unknown> = {
     "next/headers": { cookies: async () => ({ get: () => undefined }) },
     "@/components/ListeningView": { ListeningView: "view" },
-    "@/components/listening-view/listening-helpers": { parseModeParam },
+    "@/components/listening-view/listening-helpers": { resolveInitialMode },
     "@/lib/mock/overview-data": {
       MOCK_DATA: { overview: { "1w": {}, all: {} }, streamLog: {}, session: {} },
       getMockOverview: () => ({ range: "1w", granularity: "block6h" }),
