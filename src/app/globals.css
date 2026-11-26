@@ -75,7 +75,8 @@
     opacity var(--motion-hover) linear,
     box-shadow var(--motion-hover) linear,
     filter var(--motion-hover) linear,
-    transform var(--motion-press) var(--ease-snappy);
+    transform var(--motion-press) var(--ease-snappy),
+    scale var(--motion-press) var(--ease-snappy);
 }
 
 @utility press {
