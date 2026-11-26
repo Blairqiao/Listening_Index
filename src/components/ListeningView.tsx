@@ -15,7 +15,13 @@ import { ProfileView } from "@/components/views/search-view/ProfileView";
 import { CalendarView } from "@/components/views/CalendarView";
 import { ListeningFooter } from "@/components/listening-view/ListeningFooter";
 import { MiniPlayerBar } from "@/components/listening-view/MiniPlayerBar";
-import { shouldShowMiniPlayer, miniPlayerProgress } from "@/components/listening-view/mini-player";
+import {
+  shouldShowMiniPlayer,
+  miniPlayerProgress,
+  miniPlayerBarClass,
+  MINI_PLAYER_EXIT_MS,
+} from "@/components/listening-view/mini-player";
+import { usePresence } from "@/lib/usePresence";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
@@ -805,6 +811,27 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     hasTrack: Boolean(currentTrack),
   });
 
+  // The bar slides out after playback stops or the Live Player opens, so it
+  // keeps showing the last track until the exit finishes.
+  const isMiniPlayerOpen = showMiniPlayer && Boolean(currentTrack);
+  const miniPlayer = usePresence(isMiniPlayerOpen, MINI_PLAYER_EXIT_MS);
+  const currentMiniTrack = useMemo(
+    () =>
+      currentTrack
+        ? {
+            name: currentTrack.name,
+            artist: currentTrack.artists.map((a) => a.name).join(", "),
+            imageUrl: currentTrack.album.images?.[0]?.url ?? null,
+            id: currentTrack.id,
+          }
+        : null,
+    [currentTrack],
+  );
+  const [miniPlayerTrack, setMiniPlayerTrack] = useState(currentMiniTrack);
+  if (currentMiniTrack !== null && currentMiniTrack !== miniPlayerTrack) {
+    setMiniPlayerTrack(currentMiniTrack);
+  }
+
   return (
     <div
       id="music-page-root"
@@ -1058,14 +1085,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
         )}
       </main>
 
-      {showMiniPlayer && currentTrack && (
+      {miniPlayer.shouldRender && miniPlayerTrack && (
         <MiniPlayerBar
-          track={{
-            name: currentTrack.name,
-            artist: currentTrack.artists.map((a) => a.name).join(", "),
-            imageUrl: currentTrack.album.images?.[0]?.url ?? null,
-            id: currentTrack.id,
-          }}
+          className={miniPlayerBarClass(miniPlayer.phase)}
+          track={miniPlayerTrack}
           isPlaying={isPlaying}
           progress={miniPlayerProgress(position, duration)}
           controlsDisabled={playerStatus !== "ready"}

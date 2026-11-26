@@ -13,6 +13,7 @@
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
   --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --animate-view-enter: view-enter var(--motion-fast) var(--ease-snappy) both;
   --animate-content-enter: content-enter var(--motion-fast) var(--ease-snappy) both;
 
@@ -65,6 +66,19 @@
     opacity var(--motion-exit) ease,
     scale var(--motion-exit) var(--ease-out-strong),
     translate var(--motion-exit) var(--ease-out-strong);
+}
+
+/* Bars docked to the viewport edge (mini player). Exit matches MINI_PLAYER_EXIT_MS. */
+@utility drawer-enter {
+  transition:
+    translate 240ms var(--ease-drawer),
+    opacity 240ms var(--ease-drawer);
+}
+
+@utility drawer-exit {
+  transition:
+    translate 180ms var(--ease-out-strong),
+    opacity 180ms ease;
 }
 
 @utility motion-hover {
