@@ -55,10 +55,52 @@ test("drawer transitions use the drawer curve to enter and a shorter ease-out to
 
 test("ListeningView keeps the mini player mounted through its exit", () => {
   const src = readSrc("src/components/ListeningView.tsx");
-  assert.match(src, /usePresence\(\s*isMiniPlayerOpen,\s*MINI_PLAYER_EXIT_MS\s*\)/);
+  assert.match(src, /usePresence\(\s*isMiniPlayerOpen,\s*MINI_PLAYER_EXIT_MS,\s*miniPlayerEnterDelay\s*\)/);
   assert.match(src, /miniPlayer\.shouldRender && miniPlayerTrack/);
   assert.match(src, /miniPlayerBarClass\(miniPlayer\.phase\)/);
   assert.match(readSrc("src/components/listening-view/MiniPlayerBar.tsx"), /className\?: string/);
+});
+
+test("on first load the mini player slide-up ends when the entrance settles", async () => {
+  const c = await import("../src/lib/choreography");
+  assert.equal(c.INTRO_SETTLE_MS, 940, "the last bar finishes at 440ms + 500ms");
+  assert.equal(c.MINI_PLAYER_ENTER_MS, 240, "matches drawer-enter");
+  assert.ok(c.INTRO_MS >= c.INTRO_SETTLE_MS);
+  assert.equal(c.miniPlayerIntroDelay(0), 700);
+  assert.equal(c.miniPlayerIntroDelay(500), 200);
+  assert.equal(c.miniPlayerIntroDelay(900), 0, "a late player state slides up right away");
+
+  const src = readSrc("src/components/ListeningView.tsx");
+  assert.match(src, /introPhase !== "pending"/, "the bar waits for the entrance to start");
+  assert.match(src, /introStartRef\.current = performance\.now\(\)/);
+  assert.match(src, /miniPlayerIntroDelay\(performance\.now\(\) - introStartRef\.current\)/);
+
+  const presence = readSrc("src/lib/usePresence.ts");
+  assert.match(presence, /getEnterDelay\?: \(\) => number/);
+  assert.match(presence, /setTimeout\(reveal, delay\)/);
+});
+
+test("the mini player progress line keeps its 2px accent look but no longer animates its width", async () => {
+  const React = (await import("react")).default;
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { MiniPlayerBar } = await import("../src/components/listening-view/MiniPlayerBar");
+  const html = renderToStaticMarkup(
+    React.createElement(MiniPlayerBar, {
+      track: { name: "A", artist: "B", imageUrl: null, id: "t" },
+      isPlaying: true,
+      progress: 0.5,
+      controlsDisabled: false,
+      onTogglePlay: () => {},
+      onPrevious: () => {},
+      onNext: () => {},
+      onOpenPlayer: () => {},
+    }),
+  );
+  const line = html.match(/<div[^>]*aria-hidden="true"[^>]*>/)?.[0] ?? "";
+  assert.match(line, /h-\[2px\]/);
+  assert.match(line, /\bbg-music-accent\b/);
+  assert.match(line, /width:50%/);
+  assert.doesNotMatch(line, /transition|duration-/, "it swept in from the left when the bar appeared");
 });
 
 // Metric value swap (removed: numbers change with no animation)

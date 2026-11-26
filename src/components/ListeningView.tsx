@@ -22,7 +22,7 @@ import {
   MINI_PLAYER_EXIT_MS,
 } from "@/components/listening-view/mini-player";
 import { usePresence } from "@/lib/usePresence";
-import { INTRO_MS, type IntroPhase } from "@/lib/choreography";
+import { INTRO_MS, miniPlayerIntroDelay, type IntroPhase } from "@/lib/choreography";
 import { withRevealCap } from "@/lib/motion";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -269,6 +269,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // It waits for hydration and fonts so a slow load doesn't eat it, then two
   // frames so the held start state is painted before it plays.
   const [introPhase, setIntroPhase] = useState<IntroPhase>("pending");
+  const introStartRef = useRef<number | null>(null);
   useEffect(() => {
     if (!isDataReady || introPhase !== "pending") return;
     let cancelled = false;
@@ -277,7 +278,10 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     void withRevealCap(document.fonts.ready, INTRO_FONT_WAIT_MS).then(() => {
       if (cancelled) return;
       raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => setIntroPhase("playing"));
+        raf2 = window.requestAnimationFrame(() => {
+          introStartRef.current = performance.now();
+          setIntroPhase("playing");
+        });
       });
     });
     return () => {
@@ -845,8 +849,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
   // The bar slides out after playback stops or the Live Player opens, so it
   // keeps showing the last track until the exit finishes.
-  const isMiniPlayerOpen = showMiniPlayer && Boolean(currentTrack);
-  const miniPlayer = usePresence(isMiniPlayerOpen, MINI_PLAYER_EXIT_MS);
+  // On first load it waits for the entrance and lands as the rest settles.
+  const isMiniPlayerOpen = showMiniPlayer && Boolean(currentTrack) && introPhase !== "pending";
+  const miniPlayerEnterDelay = useCallback(
+    () =>
+      introStartRef.current === null
+        ? 0
+        : miniPlayerIntroDelay(performance.now() - introStartRef.current),
+    [],
+  );
+  const miniPlayer = usePresence(isMiniPlayerOpen, MINI_PLAYER_EXIT_MS, miniPlayerEnterDelay);
   const currentMiniTrack = useMemo(
     () =>
       currentTrack

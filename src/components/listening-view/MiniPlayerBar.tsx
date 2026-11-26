@@ -38,7 +38,7 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
     <div data-bottom-inset className={`fixed inset-x-0 bottom-0 z-30 h-[56px] border-t border-[#1C1C1A] bg-[#080808] ${className}`}>
       {/* 2px Progress line along top edge */}
       <div
-        className="absolute top-0 left-0 h-[2px] bg-music-accent pointer-events-none transition-all duration-150"
+        className="absolute top-0 left-0 h-[2px] bg-music-accent pointer-events-none"
         style={{ width: `${clampedProgress * 100}%` }}
         aria-hidden="true"
       />

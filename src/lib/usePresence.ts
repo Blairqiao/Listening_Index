@@ -7,8 +7,13 @@ import { modalPhase, type ModalPhase } from "@/lib/modal-motion";
  * Keeps an element mounted through its exit transition. The element mounts in
  * its "entering" state, switches to "open" two frames later so the browser
  * paints the start state first, and unmounts `exitMs` after closing.
+ * `getEnterDelay`, read when the element opens, holds the entering state longer.
  */
-export function usePresence(isOpen: boolean, exitMs: number): { shouldRender: boolean; phase: ModalPhase } {
+export function usePresence(
+  isOpen: boolean,
+  exitMs: number,
+  getEnterDelay?: () => number,
+): { shouldRender: boolean; phase: ModalPhase } {
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -18,9 +23,14 @@ export function usePresence(isOpen: boolean, exitMs: number): { shouldRender: bo
     let raf2: number | undefined;
     if (isOpen) {
       setShouldRender(true);
-      raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => setIsVisible(true));
-      });
+      const reveal = () => {
+        raf1 = window.requestAnimationFrame(() => {
+          raf2 = window.requestAnimationFrame(() => setIsVisible(true));
+        });
+      };
+      const delay = getEnterDelay?.() ?? 0;
+      if (delay > 0) timer = setTimeout(reveal, delay);
+      else reveal();
     } else {
       setIsVisible(false);
       timer = setTimeout(() => setShouldRender(false), exitMs);
@@ -30,7 +40,7 @@ export function usePresence(isOpen: boolean, exitMs: number): { shouldRender: bo
       if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
       if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
     };
-  }, [isOpen, exitMs]);
+  }, [isOpen, exitMs, getEnterDelay]);
 
   return { shouldRender, phase: modalPhase(isOpen, isVisible) };
 }
