@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import { scrollBehavior } from "@/lib/motion";
 import type { TastePhase } from "@/lib/taste/types";
 import {
   formatTasteDateSpan,
@@ -30,7 +31,7 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
       if (row && card) {
         const target =
           card.offsetLeft - (row.clientWidth - card.offsetWidth) / 2;
-        row.scrollLeft = Math.max(0, target);
+        row.scrollTo({ left: Math.max(0, target), behavior: scrollBehavior() });
       }
     }
     prevSelectedRef.current = selectedPhaseId;
@@ -47,7 +48,7 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
     <div className="w-full mb-4">
       <div
         ref={rowRef}
-        className="relative flex items-stretch gap-0 overflow-x-auto pb-2 snap-x snap-mandatory md:snap-none"
+        className="relative flex items-stretch gap-0 overflow-x-auto pt-1 px-1 -mt-1 -mx-1 pb-2 snap-x snap-mandatory md:snap-none"
       >
         {items.map((item, idx) => {
           const showConnector = idx > 0;
@@ -117,7 +118,7 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
                 aria-pressed={isSelected}
                 data-taste-phase={phase.id}
                 onClick={() => onSelectPhase(phase)}
-                className={`flex-none w-[210px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer transition-colors ${
+                className={`flex-none w-[210px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer transition-colors focus-ring active:scale-[0.99] ${
                   isSelected
                     ? "border-music-accent"
                     : "border-[#1C1C1A] hover:border-[#383830]"

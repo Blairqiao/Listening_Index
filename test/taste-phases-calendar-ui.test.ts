@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CalendarView } from "../src/components/views/CalendarView";
+import { CalendarView, areYearDayGridPropsEqual } from "../src/components/views/CalendarView";
 import type { CalendarData } from "../src/lib/calendar";
 import type { TastePhase, TastePhasesData } from "../src/lib/taste/types";
-import { phaseSelection } from "../src/lib/taste/view";
+import { phaseSelection, tasteRow } from "../src/lib/taste/view";
 import { loadTs } from "./helpers/load-ts";
 
 const CALENDAR_FIXTURE: CalendarData = {
@@ -394,5 +394,281 @@ test("useTasteData fetches /api/listening/taste?tz= and resolves TastePhasesData
     assert.deepEqual(res.data, TASTE_FIXTURE);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("CalendarView keeps Clear mounted (disabled + invisible when empty) and stabilizes bar metrics", () => {
+  const htmlNoSelection = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data: CALENDAR_FIXTURE,
+      isLoading: false,
+      selection: null,
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+      taste: TASTE_FIXTURE,
+      tasteLevel: 2,
+      onTasteLevelChange: () => {},
+    }),
+  );
+
+  const clearNoSel = htmlNoSelection.match(/<button\b[^>]*>Clear<\/button>/);
+  assert.ok(clearNoSel, "Clear button must stay mounted when selection is null");
+  assert.match(clearNoSel[0], /\sdisabled(?=[>\s=])/, "Clear must be disabled without selection");
+  assert.match(clearNoSel[0], /\binvisible\b/, "Clear must be invisible without selection");
+  assert.match(clearNoSel[0], /\bfocus-ring\b/, "Clear must carry focus-ring");
+
+  const labelSpan = htmlNoSelection.match(/<span\b[^>]*>2 Taste Eras<\/span>/);
+  assert.ok(labelSpan, "must render levelLabel span");
+  assert.match(labelSpan[0], /\btabular-nums\b/, "levelLabel must use tabular-nums");
+  assert.match(labelSpan[0], /\bmin-w-/, "levelLabel must reserve a fixed minimum width");
+
+  const statusSlot = htmlNoSelection.match(
+    /<div\b[^>]*class="[^"]*min-h-\[36px\][^"]*"[^>]*>[^]*?Drag across days, pick a month, or pick a phase/,
+  );
+  assert.ok(statusSlot, "status slot must reserve min-h-[36px] for the two-line mobile hint");
+  assert.ok(!statusSlot[0].includes("truncate"), "hint must never be truncated");
+
+  const htmlNoTaste = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data: CALENDAR_FIXTURE,
+      isLoading: false,
+      selection: null,
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+      taste: null,
+      tasteLevel: null,
+    }),
+  );
+  const clearNoTaste = htmlNoTaste.match(/<button\b[^>]*>Clear<\/button>/);
+  assert.ok(clearNoTaste, "Clear button must stay mounted when taste is null");
+  assert.match(clearNoTaste[0], /\sdisabled(?=[>\s=])/);
+  assert.match(clearNoTaste[0], /\binvisible\b/);
+
+  const era1 = TASTE_FIXTURE.phases.find((p) => p.id === "2024-06-02_2025-02-08")!;
+  const htmlSelected = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data: CALENDAR_FIXTURE,
+      isLoading: false,
+      selection: phaseSelection(era1),
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+      taste: TASTE_FIXTURE,
+      tasteLevel: 2,
+      onTasteLevelChange: () => {},
+    }),
+  );
+  const clearSelected = htmlSelected.match(/<button\b[^>]*>Clear<\/button>/);
+  assert.ok(clearSelected, "Clear button must render when selection exists");
+  assert.doesNotMatch(clearSelected[0], /\sdisabled(?=[>\s=])/, "Clear must be enabled with selection");
+  assert.doesNotMatch(clearSelected[0], /\binvisible\b/, "Clear must be visible with selection");
+});
+
+test("CalendarView and TastePhaseCards apply focus-ring, press, mobile hit-area-y, and drag group suppression", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data: CALENDAR_FIXTURE,
+      isLoading: false,
+      selection: null,
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+      taste: TASTE_FIXTURE,
+      tasteLevel: 2,
+      onTasteLevelChange: () => {},
+    }),
+  );
+
+  const ribbonButtons = html.match(/<button\b[^>]*data-taste-ribbon="phase"[^>]*>/g) ?? [];
+  assert.ok(ribbonButtons.length >= 4, "must render mobile and desktop ribbon phase buttons");
+  const mobileRibbons = ribbonButtons.filter((btn) => btn.includes("h-[8px]"));
+  const desktopRibbons = ribbonButtons.filter((btn) => btn.includes("h-[10px]"));
+  assert.ok(mobileRibbons.length >= 2, "must render mobile ribbon phase buttons");
+  assert.ok(desktopRibbons.length >= 2, "must render desktop ribbon phase buttons");
+
+  for (const btn of mobileRibbons) {
+    assert.match(btn, /\bhit-area-y\b/, "mobile ribbon buttons must include hit-area-y");
+    assert.match(btn, /\bfocus-ring\b/, "mobile ribbon buttons must include focus-ring");
+    assert.match(btn, /\bhover:brightness-125\b/, "mobile ribbon buttons must brighten on hover");
+    assert.ok(!btn.includes("data-date="), "ribbon buttons must never carry data-date");
+  }
+  for (const btn of desktopRibbons) {
+    assert.match(btn, /\bfocus-ring\b/, "desktop ribbon buttons must include focus-ring");
+    assert.match(btn, /\bhover:brightness-125\b/, "desktop ribbon buttons must brighten on hover");
+    assert.ok(!btn.includes("data-date="), "ribbon buttons must never carry data-date");
+  }
+
+  const yearButtons = html.match(/<button\b[^>]*title="Select year \d+"[^>]*>/g) ?? [];
+  assert.equal(yearButtons.length, 2, "must render year buttons for 2024 and 2025");
+  for (const btn of yearButtons) {
+    assert.match(btn, /\bfocus-ring\b/, "year buttons must include focus-ring");
+  }
+
+  const monthButtons = html.match(/<button\b[^>]*title="(?:Select|No data for) [A-Z][a-z]{2} \d+"[^>]*>/g) ?? [];
+  assert.equal(monthButtons.length, 48, "must render 12 mobile + 12 desktop month buttons per year");
+  for (const btn of monthButtons) {
+    assert.match(btn, /\bfocus-ring\b/, "month buttons must include focus-ring");
+  }
+
+  const slider = html.match(/<input\b[^>]*aria-label="Taste detail"[^>]*>/);
+  assert.ok(slider);
+  assert.match(slider[0], /\bfocus-ring\b/, "slider must include focus-ring");
+
+  const overviewBtn = html.match(/<button\b[^>]*>Open in Overview[^<]*<\/button>/);
+  assert.ok(overviewBtn);
+  assert.match(overviewBtn[0], /\bfocus-ring\b/, "Open in Overview button must include focus-ring");
+
+  const cardButtons = html.match(/<button\b[^>]*data-taste-phase="[^"]+"[^>]*>/g) ?? [];
+  assert.equal(cardButtons.length, 2);
+  for (const card of cardButtons) {
+    assert.match(card, /\bfocus-ring\b/, "phase cards must include focus-ring");
+    assert.match(card, /\bactive:scale-\[0\.99\]/, "phase cards must use active:scale-[0.99]");
+    assert.ok(!card.includes("data-date="), "phase cards must never carry data-date");
+  }
+
+  assert.match(
+    html,
+    /<div\b[^>]*class="[^"]*\bgroup\b[^"]*"[^>]*><section\b/,
+    "heatmaps container must carry group class for drag transition suppression",
+  );
+
+  const dayCells = html.match(/<div\b[^>]*data-date="[^"]+"[^>]*>/g) ?? [];
+  assert.ok(dayCells.length > 0, "must render day cells");
+  for (const cell of dayCells) {
+    assert.match(cell, /\btransition-\[opacity,box-shadow\]/);
+    assert.match(cell, /\bduration-75\b/);
+    assert.match(cell, /\bgroup-data-\[dragging=true\]:transition-none\b/);
+    assert.ok(!cell.includes("will-change"), "day cells must not use will-change");
+    assert.ok(!cell.includes("transition-transform"), "day cells must not animate transform");
+  }
+});
+
+test("areYearDayGridPropsEqual compares day-grid props independently of ribbon state", () => {
+  assert.equal(typeof areYearDayGridPropsEqual, "function", "areYearDayGridPropsEqual must be exported");
+
+  const dayCounts = new Map<string, number>([["2024-06-15", 14]]);
+  const base = {
+    year: 2024,
+    firstDate: "2024-06-02",
+    today: "2025-12-27",
+    clippedSelection: { from: "2024-06-02", to: "2024-12-31" },
+    hasActiveSelection: true,
+    dayCounts,
+    thresholds: [5, 15, 30] as [number, number, number],
+  };
+
+  assert.equal(
+    areYearDayGridPropsEqual(base, {
+      ...base,
+      clippedSelection: { from: "2024-06-02", to: "2024-12-31" },
+      thresholds: [5, 15, 30],
+    }),
+    true,
+  );
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, year: 2025 }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, firstDate: "2024-06-03" }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, today: "2025-12-28" }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, hasActiveSelection: false }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, dayCounts: new Map(dayCounts) }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, thresholds: [5, 16, 30] }), false);
+  assert.equal(areYearDayGridPropsEqual(base, { ...base, clippedSelection: null }), false);
+  assert.equal(
+    areYearDayGridPropsEqual(base, { ...base, clippedSelection: { from: "2024-06-02", to: "2024-12-30" } }),
+    false,
+  );
+});
+
+function visitReactElements(node: unknown, visit: (el: React.ReactElement<Record<string, unknown>>) => void): void {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) {
+    for (const child of node) visitReactElements(child, visit);
+    return;
+  }
+  if (React.isValidElement(node)) {
+    const el = node as React.ReactElement<Record<string, unknown>>;
+    visit(el);
+    visitReactElements(el.props.children, visit);
+  }
+}
+
+test("TastePhaseCards uses scrollTo with scrollBehavior() and respects prefers-reduced-motion", () => {
+  const { reactMock, runRender } = createReactHookHarness();
+  const { TastePhaseCards: TastePhaseCardsUnderTest } = loadTs(
+    "src/components/views/TastePhaseCards.tsx",
+    { react: reactMock },
+  );
+
+  const items = tasteRow(TASTE_FIXTURE, 2);
+  const phaseItems = items.filter((item) => item.kind === "phase");
+  assert.equal(phaseItems.length, 2);
+  const phase1Id = phaseItems[0].phase.id;
+  const phase2Id = phaseItems[1].phase.id;
+
+  const scrollCalls: Array<{ left?: number; behavior?: ScrollBehavior }> = [];
+  let reduceMotion = false;
+  const originalWindow = globalThis.window;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).window = {
+    matchMedia: () => ({ matches: reduceMotion }),
+  };
+
+  try {
+    const initialTree = runRender(
+      () =>
+        TastePhaseCardsUnderTest({
+          items,
+          selectedPhaseId: null,
+          onSelectPhase: () => {},
+        }),
+      true,
+    );
+
+    let attachedRowRef = false;
+    visitReactElements(initialTree, (el) => {
+      const refProp = el.props.ref;
+      if (!attachedRowRef && refProp && typeof refProp === "object" && "current" in refProp) {
+        (refProp as { current: unknown }).current = {
+          clientWidth: 300,
+          scrollTo: (opts: { left?: number; behavior?: ScrollBehavior }) => {
+            scrollCalls.push(opts);
+          },
+        };
+        attachedRowRef = true;
+      }
+      if (el.props["data-taste-phase"] === phase1Id && typeof refProp === "function") {
+        (refProp as (val: unknown) => void)({ offsetLeft: 0, offsetWidth: 210 });
+      }
+      if (el.props["data-taste-phase"] === phase2Id && typeof refProp === "function") {
+        (refProp as (val: unknown) => void)({ offsetLeft: 250, offsetWidth: 210 });
+      }
+    });
+    assert.equal(attachedRowRef, true, "must find row ref on TastePhaseCards");
+
+    runRender(
+      () =>
+        TastePhaseCardsUnderTest({
+          items,
+          selectedPhaseId: phase2Id,
+          onSelectPhase: () => {},
+        }),
+      true,
+    );
+    assert.deepEqual(scrollCalls, [{ left: 205, behavior: "smooth" }]);
+
+    reduceMotion = true;
+    runRender(
+      () =>
+        TastePhaseCardsUnderTest({
+          items,
+          selectedPhaseId: phase1Id,
+          onSelectPhase: () => {},
+        }),
+      true,
+    );
+    assert.deepEqual(scrollCalls, [
+      { left: 205, behavior: "smooth" },
+      { left: 0, behavior: "auto" },
+    ]);
+  } finally {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = originalWindow;
   }
 });

@@ -98,6 +98,575 @@ const MOBILE_CONTOUR_CELL_W = 25;
 const MOBILE_CONTOUR_CELL_H = 10;
 const MOBILE_CONTOUR_GAP = 2;
 
+interface YearMonthMeta {
+  monthNum: number;
+  label: string;
+  selection: CalendarSelection;
+  maxDays: number;
+}
+
+export interface YearDayGridComparisonProps {
+  year: number;
+  firstDate: string | null;
+  today: string;
+  clippedSelection: CalendarSelection | null;
+  hasActiveSelection: boolean;
+  dayCounts: Map<string, number>;
+  thresholds: [number, number, number];
+}
+
+export function areYearDayGridPropsEqual(
+  prev: YearDayGridComparisonProps,
+  next: YearDayGridComparisonProps,
+): boolean {
+  if (prev.year !== next.year) return false;
+  if (prev.firstDate !== next.firstDate) return false;
+  if (prev.today !== next.today) return false;
+  if (prev.hasActiveSelection !== next.hasActiveSelection) return false;
+  if (prev.dayCounts !== next.dayCounts) return false;
+  if (
+    prev.thresholds[0] !== next.thresholds[0] ||
+    prev.thresholds[1] !== next.thresholds[1] ||
+    prev.thresholds[2] !== next.thresholds[2]
+  ) {
+    return false;
+  }
+
+  const pSel = prev.clippedSelection;
+  const nSel = next.clippedSelection;
+  if (pSel === null && nSel === null) return true;
+  if (pSel === null || nSel === null) return false;
+  return pSel.from === nSel.from && pSel.to === nSel.to;
+}
+
+interface YearMobileRibbonProps {
+  ribbon: YearRibbonData | null;
+  selectedPhaseId: string | null;
+  onSelectPhase: (phase: TastePhase) => void;
+}
+
+const YearMobileRibbon = React.memo<YearMobileRibbonProps>(
+  function YearMobileRibbon({ ribbon, selectedPhaseId, onSelectPhase }) {
+    if (ribbon === null) return null;
+
+    return (
+      <div
+        className="grid gap-[2px] items-center w-full mb-1"
+        style={{ gridTemplateColumns: "18px 1fr" }}
+      >
+        <div />
+        <div className="relative h-[8px] w-full">
+          {ribbon.mobile.map((piece, idx) => {
+            const posStyle: React.CSSProperties = {
+              left: `${piece.leftPct}%`,
+              width: `calc(${piece.widthPct}% - 1.5px)`,
+            };
+            if (piece.kind === "phase" && piece.phaseId) {
+              const meta = ribbon.phaseById.get(piece.phaseId);
+              const isSelected = piece.phaseId === selectedPhaseId;
+              const label = meta
+                ? formatRibbonPhaseLabel(meta.phase)
+                : "Select Taste Phase";
+              const toneClass = isSelected
+                ? "bg-music-accent"
+                : piece.tone === "b"
+                  ? "taste-tone-b"
+                  : "taste-tone-a";
+              return (
+                <button
+                  key={`m-phase-${piece.phaseId}-${idx}`}
+                  type="button"
+                  data-taste-ribbon="phase"
+                  onClick={() => meta && onSelectPhase(meta.phase)}
+                  style={posStyle}
+                  title={label}
+                  aria-label={label}
+                  className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-colors hover:brightness-125 focus-ring hit-area-y ${toneClass}`}
+                />
+              );
+            }
+            if (piece.kind === "gap") {
+              return (
+                <div
+                  key={`m-gap-${idx}`}
+                  aria-hidden="true"
+                  style={posStyle}
+                  className="absolute top-0 h-[8px] rounded-[2px] taste-gap"
+                />
+              );
+            }
+            if (piece.kind === "ramp") {
+              const fromColor = rampEndColor(
+                piece.from,
+                ribbon.phaseById,
+                selectedPhaseId,
+              );
+              const toColor = rampEndColor(
+                piece.to,
+                ribbon.phaseById,
+                selectedPhaseId,
+              );
+              return (
+                <div
+                  key={`m-ramp-${idx}`}
+                  aria-hidden="true"
+                  style={{
+                    ...posStyle,
+                    background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
+                  }}
+                  className="absolute top-0 h-[8px] rounded-[2px] pointer-events-none"
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.ribbon === next.ribbon && prev.selectedPhaseId === next.selectedPhaseId,
+);
+
+interface YearDesktopRibbonProps {
+  numCols: number;
+  ribbon: YearRibbonData | null;
+  selectedPhaseId: string | null;
+  onSelectPhase: (phase: TastePhase) => void;
+}
+
+const YearDesktopRibbon = React.memo<YearDesktopRibbonProps>(
+  function YearDesktopRibbon({ numCols, ribbon, selectedPhaseId, onSelectPhase }) {
+    if (ribbon === null) return null;
+
+    return (
+      <div
+        className="grid h-[10px] mb-1 select-none"
+        style={{
+          gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
+          gap: "3px",
+        }}
+      >
+        {ribbon.desktop.map((piece, idx) => {
+          const gridStyle: React.CSSProperties = {
+            gridRow: 1,
+            gridColumn: `${piece.colStart + 2} / ${piece.colEnd + 3}`,
+          };
+          if (piece.kind === "phase" && piece.phaseId) {
+            const meta = ribbon.phaseById.get(piece.phaseId);
+            const isSelected = piece.phaseId === selectedPhaseId;
+            const label = meta
+              ? formatRibbonPhaseLabel(meta.phase)
+              : "Select Taste Phase";
+            const toneClass = isSelected
+              ? "bg-music-accent"
+              : piece.tone === "b"
+                ? "taste-tone-b"
+                : "taste-tone-a";
+            return (
+              <button
+                key={`d-phase-${piece.phaseId}-${idx}`}
+                type="button"
+                data-taste-ribbon="phase"
+                onClick={() => meta && onSelectPhase(meta.phase)}
+                style={gridStyle}
+                title={label}
+                aria-label={label}
+                className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-colors hover:brightness-125 focus-ring ${toneClass}`}
+              />
+            );
+          }
+          if (piece.kind === "gap") {
+            return (
+              <div
+                key={`d-gap-${piece.colStart}-${idx}`}
+                aria-hidden="true"
+                style={gridStyle}
+                className="h-[10px] w-full rounded-[2px] taste-gap"
+              />
+            );
+          }
+          if (piece.kind === "ramp") {
+            const fromColor = rampEndColor(
+              piece.from,
+              ribbon.phaseById,
+              selectedPhaseId,
+            );
+            const toColor = rampEndColor(
+              piece.to,
+              ribbon.phaseById,
+              selectedPhaseId,
+            );
+            return (
+              <div
+                key={`d-ramp-${piece.colStart}-${idx}`}
+                aria-hidden="true"
+                style={{
+                  ...gridStyle,
+                  background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
+                }}
+                className="h-[10px] w-full rounded-[2px] pointer-events-none"
+              />
+            );
+          }
+          return null;
+        })}
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.numCols === next.numCols &&
+    prev.ribbon === next.ribbon &&
+    prev.selectedPhaseId === next.selectedPhaseId,
+);
+
+interface YearMobileDayGridProps extends YearDayGridComparisonProps {
+  months: YearMonthMeta[];
+  onSelectMonth: (year: number, month: number) => void;
+}
+
+const YearMobileDayGrid = React.memo<YearMobileDayGridProps>(
+  function YearMobileDayGrid({
+    year,
+    firstDate,
+    today,
+    clippedSelection,
+    hasActiveSelection,
+    dayCounts,
+    thresholds,
+    months,
+    onSelectMonth,
+  }) {
+    const yearStr = String(year).padStart(4, "0");
+
+    const mobileContourPath = useMemo(() => {
+      if (!hasActiveSelection || clippedSelection === null) return "";
+      return selectionContourPath({
+        cols: months.length,
+        rows: 31,
+        cellWidth: MOBILE_CONTOUR_CELL_W,
+        cellHeight: MOBILE_CONTOUR_CELL_H,
+        gap: MOBILE_CONTOUR_GAP,
+        radius: 2,
+        isSelected: (mIdx, dayIdx) => {
+          if (mIdx < 0 || mIdx >= months.length) return false;
+          const dNum = dayIdx + 1;
+          const m = months[mIdx];
+          if (dNum < 1 || dNum > m.maxDays) return false;
+          const key = `${yearStr}-${String(m.monthNum).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+          return (
+            isSelectableDate(key, firstDate, today) &&
+            key >= clippedSelection.from &&
+            key <= clippedSelection.to
+          );
+        },
+      });
+    }, [hasActiveSelection, clippedSelection, months, yearStr, firstDate, today]);
+
+    return (
+      <>
+        {/* Top row: spacer + 12 month buttons */}
+        <div
+          className="grid gap-[2px] items-center w-full mb-[2px]"
+          style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
+        >
+          <div />
+          {months.map((month) => {
+            const isDisabled =
+              firstDate === null ||
+              month.selection.to < firstDate ||
+              month.selection.from > today;
+            return (
+              <button
+                key={month.monthNum}
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onSelectMonth(year, month.monthNum)}
+                className="font-display text-[10px] text-[#5A5A55] font-medium py-1 text-center hover:text-music-accent focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
+                title={
+                  isDisabled
+                    ? `No data for ${month.label} ${year}`
+                    : `Select ${month.label} ${year}`
+                }
+              >
+                {month.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 31 Day rows + SVG contour overlay */}
+        <div
+          className="relative grid gap-[2px] items-center w-full"
+          style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
+        >
+          {Array.from({ length: 31 }, (_, dayIdx) => {
+            const dayNum = dayIdx + 1;
+            const isLabelDay =
+              dayNum === 1 || dayNum === 10 || dayNum === 20 || dayNum === 30;
+
+            return (
+              <React.Fragment key={dayNum}>
+                <div className="h-[10px] leading-[10px] text-[10px] text-[#5A5A55] text-right pr-[3px] select-none font-mono">
+                  {isLabelDay ? dayNum : ""}
+                </div>
+                {months.map((month) => {
+                  if (dayNum > month.maxDays) {
+                    return (
+                      <div
+                        key={`empty-${month.monthNum}-${dayNum}`}
+                        className="h-[10px] w-full rounded-[1px] opacity-[0.12] pointer-events-none"
+                      />
+                    );
+                  }
+                  const mStr = String(month.monthNum).padStart(2, "0");
+                  const dStr = String(dayNum).padStart(2, "0");
+                  const dateKey = `${yearStr}-${mStr}-${dStr}`;
+                  const selectable = isSelectableDate(dateKey, firstDate, today);
+                  if (!selectable) {
+                    return (
+                      <div
+                        key={dateKey}
+                        className="h-[10px] w-full rounded-[1px] opacity-[0.12] pointer-events-none"
+                      />
+                    );
+                  }
+
+                  const count = dayCounts.get(dateKey) ?? 0;
+                  const level = calendarLevel(count, thresholds);
+                  const isSelected =
+                    clippedSelection !== null &&
+                    dateKey >= clippedSelection.from &&
+                    dateKey <= clippedSelection.to;
+
+                  const opacityClass =
+                    hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
+                  const inRangeClass =
+                    hasActiveSelection && isSelected ? "calendar-in-range" : "";
+
+                  return (
+                    <div
+                      key={dateKey}
+                      data-date={dateKey}
+                      title={`${dateKey} · ${count} plays`}
+                      className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75 group-data-[dragging=true]:transition-none`}
+                      style={{ touchAction: "pan-y" }}
+                    />
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+          {mobileContourPath && (
+            <svg
+              data-selection-contour="true"
+              aria-hidden="true"
+              viewBox={`0 0 ${months.length * (MOBILE_CONTOUR_CELL_W + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP} ${31 * (MOBILE_CONTOUR_CELL_H + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP}`}
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute top-0 right-0 bottom-0 z-10 overflow-visible"
+              style={{ left: "20px", width: "calc(100% - 20px)", height: "100%" }}
+            >
+              <path
+                d={mobileContourPath}
+                fill="none"
+                stroke="rgba(237, 237, 232, 0.82)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          )}
+        </div>
+      </>
+    );
+  },
+  areYearDayGridPropsEqual,
+);
+
+interface YearDesktopDayGridProps extends YearDayGridComparisonProps {
+  cols: (string | null)[][];
+  monthCols: number[];
+  months: YearMonthMeta[];
+  onSelectMonth: (year: number, month: number) => void;
+}
+
+const YearDesktopDayGrid = React.memo<YearDesktopDayGridProps>(
+  function YearDesktopDayGrid({
+    year,
+    firstDate,
+    today,
+    clippedSelection,
+    hasActiveSelection,
+    dayCounts,
+    thresholds,
+    cols,
+    monthCols,
+    months,
+    onSelectMonth,
+  }) {
+    const numCols = cols.length;
+
+    const desktopContourPath = useMemo(() => {
+      if (!hasActiveSelection || clippedSelection === null) return "";
+      return selectionContourPath({
+        cols: numCols,
+        rows: 7,
+        cellWidth: DESKTOP_CONTOUR_CELL,
+        cellHeight: DESKTOP_CONTOUR_CELL,
+        gap: DESKTOP_CONTOUR_GAP,
+        radius: 3,
+        isSelected: (cIdx, rIdx) => {
+          if (cIdx < 0 || cIdx >= numCols || rIdx < 0 || rIdx >= 7) return false;
+          const key = cols[cIdx][rIdx];
+          if (!key) return false;
+          return (
+            isSelectableDate(key, firstDate, today) &&
+            key >= clippedSelection.from &&
+            key <= clippedSelection.to
+          );
+        },
+      });
+    }, [hasActiveSelection, clippedSelection, numCols, cols, firstDate, today]);
+
+    return (
+      <>
+        {/* Desktop Month Header Row */}
+        <div
+          className="grid items-center mb-1 text-[10px] text-[#5A5A55] font-mono select-none"
+          style={{
+            gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
+            gap: "3px",
+          }}
+        >
+          <div />
+          {months.map((month, m) => {
+            const colIndex = monthCols[m];
+            const isDisabled =
+              firstDate === null ||
+              month.selection.to < firstDate ||
+              month.selection.from > today;
+            return (
+              <button
+                key={month.monthNum}
+                type="button"
+                disabled={isDisabled}
+                onClick={() => onSelectMonth(year, month.monthNum)}
+                style={{ gridColumnStart: colIndex + 2 }}
+                className="font-display text-[10px] text-[#5A5A55] hover:text-music-accent focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed whitespace-nowrap overflow-visible text-left p-0 bg-transparent border-0 cursor-pointer"
+                title={
+                  isDisabled
+                    ? `No data for ${month.label} ${year}`
+                    : `Select ${month.label} ${year}`
+                }
+              >
+                {month.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Desktop Grid (Weekdays M/W/F + Cells sharing the same row tracks) */}
+        <div
+          className="grid select-none"
+          style={{
+            gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(7, minmax(0, 1fr))`,
+            gap: "3px",
+          }}
+        >
+          {/* Weekday labels in column 1 aligned to rows 2, 4, 6 (M, W, F) */}
+          <div
+            style={{ gridColumn: 1, gridRow: 2 }}
+            className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
+          >
+            M
+          </div>
+          <div
+            style={{ gridColumn: 1, gridRow: 4 }}
+            className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
+          >
+            W
+          </div>
+          <div
+            style={{ gridColumn: 1, gridRow: 6 }}
+            className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
+          >
+            F
+          </div>
+
+          {/* Week grid cells */}
+          {cols.map((colDays, colIdx) =>
+            colDays.map((dateKey, rowIdx) => {
+              const colNum = colIdx + 2;
+              const rowNum = rowIdx + 1;
+              if (!dateKey) {
+                return (
+                  <div
+                    key={`empty-${colIdx}-${rowIdx}`}
+                    style={{ gridColumn: colNum, gridRow: rowNum }}
+                    className="aspect-square rounded-[1.5px] opacity-[0.12] pointer-events-none"
+                  />
+                );
+              }
+              const selectable = isSelectableDate(dateKey, firstDate, today);
+              if (!selectable) {
+                return (
+                  <div
+                    key={dateKey}
+                    style={{ gridColumn: colNum, gridRow: rowNum }}
+                    className="aspect-square rounded-[1.5px] opacity-[0.12] pointer-events-none"
+                  />
+                );
+              }
+              const count = dayCounts.get(dateKey) ?? 0;
+              const level = calendarLevel(count, thresholds);
+              const isSelected =
+                clippedSelection !== null &&
+                dateKey >= clippedSelection.from &&
+                dateKey <= clippedSelection.to;
+
+              const opacityClass =
+                hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
+              const inRangeClass =
+                hasActiveSelection && isSelected ? "calendar-in-range" : "";
+
+              return (
+                <div
+                  key={dateKey}
+                  data-date={dateKey}
+                  style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
+                  title={`${dateKey} · ${count} plays`}
+                  className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75 group-data-[dragging=true]:transition-none hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
+                />
+              );
+            })
+          )}
+          {desktopContourPath && (
+            <svg
+              data-selection-contour="true"
+              aria-hidden="true"
+              viewBox={`0 0 ${numCols * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP} ${7 * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP}`}
+              preserveAspectRatio="none"
+              className="pointer-events-none w-full h-full z-10 overflow-visible"
+              style={{ gridColumn: `2 / ${numCols + 2}`, gridRow: "1 / 8" }}
+            >
+              <path
+                d={desktopContourPath}
+                fill="none"
+                stroke="rgba(237, 237, 232, 0.82)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          )}
+        </div>
+      </>
+    );
+  },
+  areYearDayGridPropsEqual,
+);
+
 interface YearBlockProps {
   year: number;
   firstDate: string | null;
@@ -132,7 +701,7 @@ const YearBlock = React.memo<YearBlockProps>(
   }) {
     const cols = useMemo(() => weekColumns(year), [year]);
     const monthCols = useMemo(() => monthStartColumns(year), [year]);
-    const months = useMemo(
+    const months = useMemo<YearMonthMeta[]>(
       () =>
         Array.from({ length: 12 }, (_, m) => {
           const monthNum = m + 1;
@@ -147,53 +716,6 @@ const YearBlock = React.memo<YearBlockProps>(
       [year]
     );
     const numCols = cols.length;
-    const yearStr = String(year).padStart(4, "0");
-
-    const desktopContourPath = useMemo(() => {
-      if (!hasActiveSelection || clippedSelection === null) return "";
-      return selectionContourPath({
-        cols: numCols,
-        rows: 7,
-        cellWidth: DESKTOP_CONTOUR_CELL,
-        cellHeight: DESKTOP_CONTOUR_CELL,
-        gap: DESKTOP_CONTOUR_GAP,
-        radius: 3,
-        isSelected: (cIdx, rIdx) => {
-          if (cIdx < 0 || cIdx >= numCols || rIdx < 0 || rIdx >= 7) return false;
-          const key = cols[cIdx][rIdx];
-          if (!key) return false;
-          return (
-            isSelectableDate(key, firstDate, today) &&
-            key >= clippedSelection.from &&
-            key <= clippedSelection.to
-          );
-        },
-      });
-    }, [hasActiveSelection, clippedSelection, numCols, cols, firstDate, today]);
-
-    const mobileContourPath = useMemo(() => {
-      if (!hasActiveSelection || clippedSelection === null) return "";
-      return selectionContourPath({
-        cols: months.length,
-        rows: 31,
-        cellWidth: MOBILE_CONTOUR_CELL_W,
-        cellHeight: MOBILE_CONTOUR_CELL_H,
-        gap: MOBILE_CONTOUR_GAP,
-        radius: 2,
-        isSelected: (mIdx, dayIdx) => {
-          if (mIdx < 0 || mIdx >= months.length) return false;
-          const dNum = dayIdx + 1;
-          const m = months[mIdx];
-          if (dNum < 1 || dNum > m.maxDays) return false;
-          const key = `${yearStr}-${String(m.monthNum).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
-          return (
-            isSelectableDate(key, firstDate, today) &&
-            key >= clippedSelection.from &&
-            key <= clippedSelection.to
-          );
-        },
-      });
-    }, [hasActiveSelection, clippedSelection, months, yearStr, firstDate, today]);
 
     // Calculate total plays in this year
     const yearPlays = useMemo(() => {
@@ -220,7 +742,7 @@ const YearBlock = React.memo<YearBlockProps>(
             <button
               type="button"
               onClick={() => onSelectYear(year)}
-              className="font-display text-[15px] font-medium text-[#EDEDE8] hover:text-music-accent transition-colors bg-transparent border-0 p-0 cursor-pointer text-left"
+              className="font-display text-[15px] font-medium text-[#EDEDE8] hover:text-music-accent transition-colors focus-ring bg-transparent border-0 p-0 cursor-pointer text-left"
               title={`Select year ${year}`}
             >
               {year}
@@ -233,427 +755,54 @@ const YearBlock = React.memo<YearBlockProps>(
 
         {/* 1. Mobile Heatmap (md:hidden) */}
         <div className="md:hidden w-full select-none">
-          {ribbon !== null && (
-            <div
-              className="grid gap-[2px] items-center w-full mb-1"
-              style={{ gridTemplateColumns: "18px 1fr" }}
-            >
-              <div />
-              <div className="relative h-[8px] w-full">
-                {ribbon.mobile.map((piece, idx) => {
-                  const posStyle: React.CSSProperties = {
-                    left: `${piece.leftPct}%`,
-                    width: `calc(${piece.widthPct}% - 1.5px)`,
-                  };
-                  if (piece.kind === "phase" && piece.phaseId) {
-                    const meta = ribbon.phaseById.get(piece.phaseId);
-                    const isSelected = piece.phaseId === selectedPhaseId;
-                    const label = meta
-                      ? formatRibbonPhaseLabel(meta.phase)
-                      : "Select Taste Phase";
-                    const toneClass = isSelected
-                      ? "bg-music-accent"
-                      : piece.tone === "b"
-                        ? "taste-tone-b"
-                        : "taste-tone-a";
-                    return (
-                      <button
-                        key={`m-phase-${piece.phaseId}-${idx}`}
-                        type="button"
-                        data-taste-ribbon="phase"
-                        onClick={() => meta && onSelectPhase(meta.phase)}
-                        style={posStyle}
-                        title={label}
-                        aria-label={label}
-                        className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
-                      />
-                    );
-                  }
-                  if (piece.kind === "gap") {
-                    return (
-                      <div
-                        key={`m-gap-${idx}`}
-                        aria-hidden="true"
-                        style={posStyle}
-                        className="absolute top-0 h-[8px] rounded-[2px] taste-gap"
-                      />
-                    );
-                  }
-                  if (piece.kind === "ramp") {
-                    const fromColor = rampEndColor(
-                      piece.from,
-                      ribbon.phaseById,
-                      selectedPhaseId,
-                    );
-                    const toColor = rampEndColor(
-                      piece.to,
-                      ribbon.phaseById,
-                      selectedPhaseId,
-                    );
-                    return (
-                      <div
-                        key={`m-ramp-${idx}`}
-                        aria-hidden="true"
-                        style={{
-                          ...posStyle,
-                          background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
-                        }}
-                        className="absolute top-0 h-[8px] rounded-[2px] pointer-events-none"
-                      />
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            </div>
-          )}
-          {/* Top row: spacer + 12 month buttons */}
-          <div
-            className="grid gap-[2px] items-center w-full mb-[2px]"
-            style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
-          >
-            <div />
-            {months.map((month) => {
-              const isDisabled =
-                firstDate === null ||
-                month.selection.to < firstDate ||
-                month.selection.from > today;
-              return (
-                <button
-                  key={month.monthNum}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => onSelectMonth(year, month.monthNum)}
-                  className="font-display text-[10px] text-[#5A5A55] font-medium py-1 text-center hover:text-music-accent disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
-                  title={
-                    isDisabled
-                      ? `No data for ${month.label} ${year}`
-                      : `Select ${month.label} ${year}`
-                  }
-                >
-                  {month.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 31 Day rows + SVG contour overlay */}
-          <div
-            className="relative grid gap-[2px] items-center w-full"
-            style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
-          >
-            {Array.from({ length: 31 }, (_, dayIdx) => {
-              const dayNum = dayIdx + 1;
-              const isLabelDay =
-                dayNum === 1 || dayNum === 10 || dayNum === 20 || dayNum === 30;
-
-              return (
-                <React.Fragment key={dayNum}>
-                  <div className="h-[10px] leading-[10px] text-[10px] text-[#5A5A55] text-right pr-[3px] select-none font-mono">
-                    {isLabelDay ? dayNum : ""}
-                  </div>
-                  {months.map((month) => {
-                    if (dayNum > month.maxDays) {
-                      return (
-                        <div
-                          key={`empty-${month.monthNum}-${dayNum}`}
-                          className="h-[10px] w-full rounded-[1px] opacity-[0.12] pointer-events-none"
-                        />
-                      );
-                    }
-                    const mStr = String(month.monthNum).padStart(2, "0");
-                    const dStr = String(dayNum).padStart(2, "0");
-                    const dateKey = `${yearStr}-${mStr}-${dStr}`;
-                    const selectable = isSelectableDate(dateKey, firstDate, today);
-                    if (!selectable) {
-                      return (
-                        <div
-                          key={dateKey}
-                          className="h-[10px] w-full rounded-[1px] opacity-[0.12] pointer-events-none"
-                        />
-                      );
-                    }
-
-                    const count = dayCounts.get(dateKey) ?? 0;
-                    const level = calendarLevel(count, thresholds);
-                    const isSelected =
-                      clippedSelection !== null &&
-                      dateKey >= clippedSelection.from &&
-                      dateKey <= clippedSelection.to;
-
-                    const opacityClass =
-                      hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
-                    const inRangeClass =
-                      hasActiveSelection && isSelected ? "calendar-in-range" : "";
-
-                    return (
-                      <div
-                        key={dateKey}
-                        data-date={dateKey}
-                        title={`${dateKey} · ${count} plays`}
-                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
-                        style={{ touchAction: "pan-y" }}
-                      />
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
-            {mobileContourPath && (
-              <svg
-                data-selection-contour="true"
-                aria-hidden="true"
-                viewBox={`0 0 ${months.length * (MOBILE_CONTOUR_CELL_W + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP} ${31 * (MOBILE_CONTOUR_CELL_H + MOBILE_CONTOUR_GAP) - MOBILE_CONTOUR_GAP}`}
-                preserveAspectRatio="none"
-                className="pointer-events-none absolute top-0 right-0 bottom-0 z-10 overflow-visible"
-                style={{ left: "20px", width: "calc(100% - 20px)", height: "100%" }}
-              >
-                <path
-                  d={mobileContourPath}
-                  fill="none"
-                  stroke="rgba(237, 237, 232, 0.82)"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </svg>
-            )}
-          </div>
+          <YearMobileRibbon
+            ribbon={ribbon}
+            selectedPhaseId={selectedPhaseId}
+            onSelectPhase={onSelectPhase}
+          />
+          <YearMobileDayGrid
+            year={year}
+            firstDate={firstDate}
+            today={today}
+            clippedSelection={clippedSelection}
+            hasActiveSelection={hasActiveSelection}
+            dayCounts={dayCounts}
+            thresholds={thresholds}
+            months={months}
+            onSelectMonth={onSelectMonth}
+          />
         </div>
 
         {/* 2. Desktop Heatmap (hidden md:block) */}
         <div className="hidden md:block w-full select-none">
-          {ribbon !== null && (
-            <div
-              className="grid h-[10px] mb-1 select-none"
-              style={{
-                gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
-                gap: "3px",
-              }}
-            >
-              {ribbon.desktop.map((piece, idx) => {
-                const gridStyle: React.CSSProperties = {
-                  gridRow: 1,
-                  gridColumn: `${piece.colStart + 2} / ${piece.colEnd + 3}`,
-                };
-                if (piece.kind === "phase" && piece.phaseId) {
-                  const meta = ribbon.phaseById.get(piece.phaseId);
-                  const isSelected = piece.phaseId === selectedPhaseId;
-                  const label = meta
-                    ? formatRibbonPhaseLabel(meta.phase)
-                    : "Select Taste Phase";
-                  const toneClass = isSelected
-                    ? "bg-music-accent"
-                    : piece.tone === "b"
-                      ? "taste-tone-b"
-                      : "taste-tone-a";
-                  return (
-                    <button
-                      key={`d-phase-${piece.phaseId}-${idx}`}
-                      type="button"
-                      data-taste-ribbon="phase"
-                      onClick={() => meta && onSelectPhase(meta.phase)}
-                      style={gridStyle}
-                      title={label}
-                      aria-label={label}
-                      className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
-                    />
-                  );
-                }
-                if (piece.kind === "gap") {
-                  return (
-                    <div
-                      key={`d-gap-${piece.colStart}-${idx}`}
-                      aria-hidden="true"
-                      style={gridStyle}
-                      className="h-[10px] w-full rounded-[2px] taste-gap"
-                    />
-                  );
-                }
-                if (piece.kind === "ramp") {
-                  const fromColor = rampEndColor(
-                    piece.from,
-                    ribbon.phaseById,
-                    selectedPhaseId,
-                  );
-                  const toColor = rampEndColor(
-                    piece.to,
-                    ribbon.phaseById,
-                    selectedPhaseId,
-                  );
-                  return (
-                    <div
-                      key={`d-ramp-${piece.colStart}-${idx}`}
-                      aria-hidden="true"
-                      style={{
-                        ...gridStyle,
-                        background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
-                      }}
-                      className="h-[10px] w-full rounded-[2px] pointer-events-none"
-                    />
-                  );
-                }
-                return null;
-              })}
-            </div>
-          )}
-          {/* Desktop Month Header Row */}
-          <div
-            className="grid items-center mb-1 text-[10px] text-[#5A5A55] font-mono select-none"
-            style={{
-              gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
-              gap: "3px",
-            }}
-          >
-            <div />
-            {months.map((month, m) => {
-              const colIndex = monthCols[m];
-              const isDisabled =
-                firstDate === null ||
-                month.selection.to < firstDate ||
-                month.selection.from > today;
-              return (
-                <button
-                  key={month.monthNum}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => onSelectMonth(year, month.monthNum)}
-                  style={{ gridColumnStart: colIndex + 2 }}
-                  className="font-display text-[10px] text-[#5A5A55] hover:text-music-accent disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed whitespace-nowrap overflow-visible text-left p-0 bg-transparent border-0 cursor-pointer"
-                  title={
-                    isDisabled
-                      ? `No data for ${month.label} ${year}`
-                      : `Select ${month.label} ${year}`
-                  }
-                >
-                  {month.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Desktop Grid (Weekdays M/W/F + Cells sharing the same row tracks) */}
-          <div
-            className="grid select-none"
-            style={{
-              gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(7, minmax(0, 1fr))`,
-              gap: "3px",
-            }}
-          >
-            {/* Weekday labels in column 1 aligned to rows 2, 4, 6 (M, W, F) */}
-            <div
-              style={{ gridColumn: 1, gridRow: 2 }}
-              className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
-            >
-              M
-            </div>
-            <div
-              style={{ gridColumn: 1, gridRow: 4 }}
-              className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
-            >
-              W
-            </div>
-            <div
-              style={{ gridColumn: 1, gridRow: 6 }}
-              className="text-[10px] text-[#5A5A55] text-right font-mono select-none flex items-center justify-end leading-none pr-[3px]"
-            >
-              F
-            </div>
-
-            {/* Week grid cells */}
-            {cols.map((colDays, colIdx) =>
-              colDays.map((dateKey, rowIdx) => {
-                const colNum = colIdx + 2;
-                const rowNum = rowIdx + 1;
-                if (!dateKey) {
-                  return (
-                    <div
-                      key={`empty-${colIdx}-${rowIdx}`}
-                      style={{ gridColumn: colNum, gridRow: rowNum }}
-                      className="aspect-square rounded-[1.5px] opacity-[0.12] pointer-events-none"
-                    />
-                  );
-                }
-                const selectable = isSelectableDate(dateKey, firstDate, today);
-                if (!selectable) {
-                  return (
-                    <div
-                      key={dateKey}
-                      style={{ gridColumn: colNum, gridRow: rowNum }}
-                      className="aspect-square rounded-[1.5px] opacity-[0.12] pointer-events-none"
-                    />
-                  );
-                }
-                const count = dayCounts.get(dateKey) ?? 0;
-                const level = calendarLevel(count, thresholds);
-                const isSelected =
-                  clippedSelection !== null &&
-                  dateKey >= clippedSelection.from &&
-                  dateKey <= clippedSelection.to;
-
-                const opacityClass =
-                  hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
-                const inRangeClass =
-                  hasActiveSelection && isSelected ? "calendar-in-range" : "";
-
-                return (
-                  <div
-                    key={dateKey}
-                    data-date={dateKey}
-                    style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
-                    title={`${dateKey} · ${count} plays`}
-                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
-                  />
-                );
-              })
-            )}
-            {desktopContourPath && (
-              <svg
-                data-selection-contour="true"
-                aria-hidden="true"
-                viewBox={`0 0 ${numCols * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP} ${7 * (DESKTOP_CONTOUR_CELL + DESKTOP_CONTOUR_GAP) - DESKTOP_CONTOUR_GAP}`}
-                preserveAspectRatio="none"
-                className="pointer-events-none w-full h-full z-10 overflow-visible"
-                style={{ gridColumn: `2 / ${numCols + 2}`, gridRow: "1 / 8" }}
-              >
-                <path
-                  d={desktopContourPath}
-                  fill="none"
-                  stroke="rgba(237, 237, 232, 0.82)"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </svg>
-            )}
-          </div>
+          <YearDesktopRibbon
+            numCols={numCols}
+            ribbon={ribbon}
+            selectedPhaseId={selectedPhaseId}
+            onSelectPhase={onSelectPhase}
+          />
+          <YearDesktopDayGrid
+            year={year}
+            firstDate={firstDate}
+            today={today}
+            clippedSelection={clippedSelection}
+            hasActiveSelection={hasActiveSelection}
+            dayCounts={dayCounts}
+            thresholds={thresholds}
+            cols={cols}
+            monthCols={monthCols}
+            months={months}
+            onSelectMonth={onSelectMonth}
+          />
         </div>
       </section>
     );
   },
   (prev, next) => {
-    if (prev.year !== next.year) return false;
-    if (prev.firstDate !== next.firstDate) return false;
-    if (prev.today !== next.today) return false;
-    if (prev.hasActiveSelection !== next.hasActiveSelection) return false;
     if (prev.isAnchorYear !== next.isAnchorYear) return false;
-    if (prev.dayCounts !== next.dayCounts) return false;
     if (prev.ribbon !== next.ribbon) return false;
     if (prev.selectedPhaseId !== next.selectedPhaseId) return false;
-    if (
-      prev.thresholds[0] !== next.thresholds[0] ||
-      prev.thresholds[1] !== next.thresholds[1] ||
-      prev.thresholds[2] !== next.thresholds[2]
-    ) {
-      return false;
-    }
-
-    const pSel = prev.clippedSelection;
-    const nSel = next.clippedSelection;
-    if (pSel === null && nSel === null) return true;
-    if (pSel === null || nSel === null) return false;
-    return pSel.from === nSel.from && pSel.to === nSel.to;
+    return areYearDayGridPropsEqual(prev, next);
   }
 );
 
@@ -1099,7 +1248,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     <div
       ref={heatmapsContainerRef}
       data-dragging={isDragging ? "true" : undefined}
-      className="w-full flex flex-col gap-6"
+      className="group w-full flex flex-col gap-6"
       onPointerDown={handleContainerPointerDown}
       onPointerUp={handleContainerPointerUp}
       onPointerCancel={handleContainerPointerCancel}
@@ -1135,7 +1284,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     <div className="w-full flex flex-col">
       {/* Sticky selection bar */}
       <div className="sticky top-0 z-20 bg-[#080808] border-b border-[#26261F] py-2 px-3 sm:px-4 mb-4 flex items-center justify-between gap-3 flex-wrap font-mono text-[12px]">
-        <div className="flex items-baseline gap-2.5 flex-wrap min-h-[26px]">
+        <div className="flex items-center content-center gap-x-2.5 gap-y-0 flex-wrap leading-[18px] min-h-[36px] sm:min-h-[26px]">
           {pendingTouchAnchor ? (
             <>
               {draft && (
@@ -1175,27 +1324,28 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 onChange={(e) => onTasteLevelChange?.(Number(e.target.value))}
                 aria-label="Taste detail"
                 aria-valuetext={levelLabel}
-                className="w-[120px] sm:w-[130px] cursor-pointer"
+                className="w-[120px] sm:w-[130px] cursor-pointer focus-ring"
                 style={{ accentColor: "var(--music-accent)" }}
               />
               <span>Phases</span>
-              <span className="text-[#EDEDE8] whitespace-nowrap">{levelLabel}</span>
+              <span className="text-[#EDEDE8] whitespace-nowrap tabular-nums min-w-[15ch]">{levelLabel}</span>
             </div>
-          )}
-          {draft && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="text-[#5A5A55] hover:text-[#EDEDE8] transition-colors cursor-pointer bg-transparent border-0 p-0 text-[12px] font-mono"
-            >
-              Clear
-            </button>
           )}
           <button
             type="button"
             disabled={!draft}
+            onClick={handleClear}
+            className={`text-[#5A5A55] hover:text-[#EDEDE8] transition-colors focus-ring bg-transparent border-0 p-0 text-[12px] font-mono ${
+              draft ? "cursor-pointer" : "invisible pointer-events-none"
+            }`}
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            disabled={!draft}
             onClick={handleOpenInOverview}
-            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none transition-colors border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
+            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none transition-colors focus-ring border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
           >
             Open in Overview &rarr;
           </button>
