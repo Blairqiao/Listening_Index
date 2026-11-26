@@ -85,7 +85,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (status === "not_found" || status === "error") {
     return (
-      <div className="mt-4 md:mt-6 select-none">
+      <div className="mt-4 md:mt-6 select-none animate-view-enter">
         <div role="status" className="mt-6 font-mono text-[12px] text-[#5A5A55]">
           {status === "not_found" ? "Not in archive" : "Couldn't load profile"}
         </div>
@@ -99,7 +99,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     const loadingScrollKey = `loading-${pendingKind}`;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none animate-view-enter">
         <div className="min-w-0 md:col-span-full">
           <div className="flex items-center gap-3 md:gap-4">
             <div className="w-[88px] h-[88px] bg-[#141413] animate-pulse flex-none" />
@@ -111,17 +111,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               )}
             </div>
           </div>
-          <div className="mt-3 md:mt-4 flex flex-wrap md:justify-between gap-x-6 gap-y-2.5 border-t border-[#191917] pt-2.5 md:pt-3">
-            {Array.from({ length: 8 }).map((_, idx) => (
-              <div key={idx} className="flex flex-col gap-1">
-                <div className="h-2.5 w-12 bg-[#141413] rounded animate-pulse" />
-                <div className="h-3.5 w-10 bg-[#191917] rounded animate-pulse" />
-              </div>
-            ))}
+          <div className="mt-3 md:mt-4 border-t border-[#191917] pt-2.5 md:pt-3 min-h-[168px] md:min-h-[80px]">
+            <div className="flex flex-wrap md:justify-between gap-x-6 gap-y-2.5">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={idx} className="flex flex-col gap-1.5 py-0.5">
+                  <div className="h-2.5 w-12 bg-[#141413] rounded animate-pulse" />
+                  <div className="h-3.5 w-10 bg-[#191917] rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 h-[18px] w-56 max-w-[75%] bg-[#141413] rounded animate-pulse" />
           </div>
         </div>
 
-        <div className="md:col-span-full">
+        <div className="min-w-0 md:col-span-full">
           <ActivityChart
             granularity="day"
             rangeKey="1m"
@@ -130,6 +133,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             label="Plays"
             visitorTimezone={visitorTimezone}
           />
+          <div aria-hidden="true" className="mt-1 h-4" />
+        </div>
+
+        <div aria-hidden="true" className="min-w-0 md:col-span-full">
+          <div className="mb-2 h-[18px] w-24 bg-[#141413] rounded animate-pulse" />
+          <div className="h-[10px] w-full bg-[#191917] animate-pulse" />
+          <div className="mt-2 flex justify-between gap-2">
+            <div className="h-[18px] w-32 bg-[#141413] rounded animate-pulse" />
+            <div className="h-[18px] w-16 bg-[#141413] rounded animate-pulse" />
+          </div>
         </div>
 
         <ProfileBox
@@ -236,7 +249,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       onClick={() => onOpenProfile({ kind: "track", key: track.id })}
       onMouseEnter={() => setActiveSegmentId(track.id)}
       onMouseLeave={() => setActiveSegmentId(null)}
-      className={`group flex items-center gap-3 px-1 ${PROFILE_ROW_HEIGHT_CLASS[rowSize]} w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
+      className={`group flex items-center gap-3 px-1 ${PROFILE_ROW_HEIGHT_CLASS[rowSize]} w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none border-b border-[#191917] ${activeSegmentId === track.id ? "bg-[#111110]" : ""}`}
     >
       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
         {String(idx + 1).padStart(2, "0")}
@@ -269,7 +282,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         type={key ? "button" : undefined}
         onClick={key ? () => onOpenProfile({ kind: "album", key }) : undefined}
         className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] border-b border-[#191917]${
-          key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none" : ""
+          key ? " w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none" : ""
         }`}
       >
         <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -293,7 +306,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   return (
     <div
       aria-busy={status === "loading" || undefined}
-      className={`grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none ${
+      className={`grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none animate-view-enter ${
         status === "loading" ? "opacity-60 pointer-events-none" : ""
       }`}
     >
@@ -374,7 +387,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
                     onMouseEnter={() => setActiveSegmentId(segmentId)}
                     onMouseLeave={() => setActiveSegmentId(null)}
-                    className={`flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent ${isActive ? "bg-[#111110]" : ""}`}
+                    className={`flex w-full items-center gap-3 border-b border-[#191917] px-1 h-[54px] md:h-[55px] text-left cursor-pointer hover:bg-[#111110] focus-ring ${isActive ? "bg-[#111110]" : ""}`}
                   >
                     <div className="flex w-[56px] flex-none flex-col justify-center font-mono select-none">
                       {play.dayGroup && (
@@ -428,7 +441,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onOpenProfile({ kind: "track", key: play.trackId })}
                     onMouseEnter={() => setActiveSegmentId(segmentId)}
                     onMouseLeave={() => setActiveSegmentId(null)}
-                    className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-visible:outline-music-accent ${isActive ? "bg-[#111110]" : ""}`}
+                    className={`grid grid-cols-[72px_56px_1fr_auto] items-center h-8 w-full px-1 border-b border-[#191917] text-left cursor-pointer hover:bg-[#111110] focus-ring ${isActive ? "bg-[#111110]" : ""}`}
                   >
                     <span className="font-mono text-[12.5px] text-[#5A5A55] select-none">
                       {play.dayGroup ?? null}
@@ -563,7 +576,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       key={track.id}
                       type="button"
                       onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none`}
+                      className={`${rowClass} cursor-pointer hover:bg-[#111110] focus-ring transition-none`}
                     >
                       {row}
                     </button>
@@ -585,7 +598,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     key={track.id}
                     type="button"
                     onClick={() => onOpenProfile({ kind: "track", key: track.id })}
-                    className="group flex items-center gap-2.5 px-1 h-8 w-full text-left cursor-pointer hover:bg-[#111110] focus-visible:bg-[#111110] transition-none border-b border-[#191917]"
+                    className="group flex items-center gap-2.5 px-1 h-8 w-full text-left cursor-pointer hover:bg-[#111110] focus-ring transition-none border-b border-[#191917]"
                   >
                     <Artwork
                       src={track.albumImageUrl}

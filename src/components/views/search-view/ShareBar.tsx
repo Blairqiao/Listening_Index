@@ -42,16 +42,18 @@ export function SegmentedShareBar({ heading, segments, total, activeId, onActive
   return (
     <div>
       <div className={headingClass}>{heading}</div>
-      <div aria-hidden="true" className="flex h-[10px] gap-[2px]">
+      <div className="flex h-[10px] gap-[2px]">
         {segments.map(({ id, label, plays }, index) => {
           let color = index % 2 === 0 ? "bg-[#2A2A25]" : "bg-[#3A3A32]";
           if (id === OTHER_SEGMENT_ID) color = "bg-[#141413]";
           if (id === activeId) color = "bg-music-accent";
           return (
-            <div
+            <button
               key={id}
+              type="button"
               title={label}
-              className={`${color} cursor-pointer`}
+              aria-label={`${label}: ${formatShare(artistShare(plays, total))}`}
+              className={`${color} h-full border-0 p-0 min-w-0 cursor-pointer focus-ring`}
               style={{ flexGrow: plays }}
               onClick={() => onActiveChange(activeId === id ? null : id)}
               onPointerEnter={(e) => {

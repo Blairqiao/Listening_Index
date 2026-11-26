@@ -88,7 +88,7 @@ test("SegmentedShareBar formats numbers with toLocaleString and reports shares",
   assert.match(track, /Track name · 28%/);
   assert.match(track, /1,400 of 5,000/);
   assert.match(track, /cursor-pointer/);
-  assert.equal(track.match(/class="bg-music-accent cursor-pointer"/g)?.length, 1);
+  assert.equal(track.match(/<button type="button"[^>]*class="[^"]*\bbg-music-accent\b[^"]*\bcursor-pointer\b[^"]*\bfocus-ring\b[^"]*"/g)?.length, 1);
   assert.match(track, /Track name: 28%/);
   assert.match(render(OTHER_SEGMENT_ID), /Other tracks · 72%/);
 });

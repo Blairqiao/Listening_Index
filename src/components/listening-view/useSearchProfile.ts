@@ -52,9 +52,11 @@ export function useSearchProfile({
   const [rawProfileData, setRawProfileData] = useState<ProfileData | null>(null);
   const [profileStatus, setProfileStatus] = useState<ProfileStatus>("loading");
   const [cacheVersion, setCacheVersion] = useState(0);
+  const [searchScrollY, setSearchScrollY] = useState<number | null>(null);
 
   const profileCacheRef = useRef<Map<string, ProfileData>>(new Map());
   const requestGenerationRef = useRef(0);
+  const rememberedScrollRef = useRef(false);
 
   const profileData = resolveDisplayedProfileData(rawProfileData, profileTarget);
 
@@ -95,8 +97,23 @@ export function useSearchProfile({
     setProfileStatus("loading");
   }, []);
 
+  const rememberSearchScroll = useCallback(() => {
+    rememberedScrollRef.current = true;
+    setSearchScrollY(typeof window !== "undefined" ? window.scrollY : null);
+  }, []);
+
+  const clearSearchScroll = useCallback(() => {
+    rememberedScrollRef.current = false;
+    setSearchScrollY(null);
+  }, []);
+
   const handleOpenProfile = useCallback(
     (target: ProfileTarget) => {
+      if (rememberedScrollRef.current) {
+        rememberedScrollRef.current = false;
+      } else {
+        setSearchScrollY(null);
+      }
       setProfileHistory([]);
       openProfileAt(target, DEFAULT_PROFILE_RANGE);
     },
@@ -361,5 +378,8 @@ export function useSearchProfile({
     clearProfileCache,
     returnsTo: profileHistory.at(-1)?.target.kind ?? null,
     handleSelectProfileRange,
+    searchScrollY,
+    rememberSearchScroll,
+    clearSearchScroll,
   };
 }

@@ -106,6 +106,8 @@ export interface SearchViewProps {
   onFilterChange?: (filter: SearchFilter) => void;
   onRandomProfile?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  restoreScrollY?: number | null;
+  onScrollRestored?: () => void;
 }
 
 export const SearchView: React.FC<SearchViewProps> = ({
@@ -121,11 +123,22 @@ export const SearchView: React.FC<SearchViewProps> = ({
   onFilterChange,
   onRandomProfile,
   inputRef,
+  restoreScrollY,
+  onScrollRestored,
 }) => {
   const internalInputRef = useRef<HTMLInputElement | null>(null);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const { status, data, dataFilter } = useSearch(query, sort, page, filter);
   const displayFilter = resolveDisplayFilter(status, filter, dataFilter);
+
+  useEffect(() => {
+    if (restoreScrollY == null || status !== "ready") return;
+    const rafId = requestAnimationFrame(() => {
+      window.scrollTo(0, restoreScrollY);
+      onScrollRestored?.();
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [restoreScrollY, status, onScrollRestored]);
 
   const setMergedRef = useCallback(
     (element: HTMLInputElement | null) => {
@@ -377,7 +390,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col select-none">
+    <div className="w-full flex flex-col select-none animate-view-enter">
       {/* Top control strip */}
       <div className="my-3.5 sm:my-4 md:my-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
@@ -412,7 +425,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
           })}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <SortMenu
             value={sort}
             onChange={(nextSort) => onSortChange?.(nextSort)}
@@ -423,7 +436,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
               type="button"
               onClick={onRandomProfile}
               aria-label="Open random profile"
-              className="font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus:outline-none focus-visible:text-music-accent transition-none whitespace-nowrap"
+              className="relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-ring focus-visible:text-music-accent press hit-area transition-none whitespace-nowrap"
             >
               Random
             </button>
@@ -432,7 +445,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       </div>
 
       {/* Search Input */}
-      <div className="flex-none mb-3">
+      <div className="flex-none">
         <div className="relative">
           <input
             ref={setMergedRef}
@@ -460,13 +473,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 onQueryChange("");
                 internalInputRef.current?.focus();
               }}
-              className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-visible:outline-music-accent"
+              className="absolute right-0 top-0 flex h-full w-10 cursor-pointer items-center justify-center text-[#8A8A83] hover:text-[#EDEDE8] focus-ring"
             >
               <X size={16} aria-hidden="true" />
             </button>
           )}
         </div>
-        <div className="px-1 font-mono text-[12px] text-[#8A8A83] empty:hidden mt-2" role="status">
+        <div className="px-1 font-mono text-[12px] leading-[18px] text-[#8A8A83] min-h-[18px] mt-1.5" role="status">
           {statusText}
         </div>
       </div>
@@ -475,7 +488,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       <div
         key={page}
         aria-busy={status === "loading" ? "true" : undefined}
-        className={`transition-opacity duration-150 ${status === "loading" ? "opacity-60 pointer-events-none" : "opacity-100"}`}
+        className={`animate-content-enter transition-opacity duration-150 ${status === "loading" ? "opacity-60 pointer-events-none" : "opacity-100"}`}
       >
         {renderResults()}
       </div>

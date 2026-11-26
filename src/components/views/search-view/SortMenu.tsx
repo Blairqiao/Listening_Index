@@ -4,7 +4,7 @@ import React, { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent
 import { ChevronDown } from "lucide-react";
 import { SEARCH_SORT_OPTIONS, type SearchSort } from "@/lib/search-types";
 
-const chipBaseClass = "font-mono text-[12px] whitespace-nowrap px-2.5 py-[3px] rounded-none border bg-transparent cursor-pointer transition-none focus:outline-none focus-visible:border-music-accent focus-visible:text-music-accent";
+const chipBaseClass = "font-mono text-[12px] whitespace-nowrap px-2.5 py-[3px] rounded-none border bg-transparent cursor-pointer transition-none focus-ring focus-visible:border-music-accent focus-visible:text-music-accent";
 const idleChipColors = "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32]";
 export const searchChipClass = `${chipBaseClass} ${idleChipColors}`;
 
@@ -104,7 +104,7 @@ export function SortMenu({
         aria-label="Sort by"
         onClick={() => setHighlightedIndex(open ? null : selectedIndex)}
         onKeyDown={handleTriggerKeyDown}
-        className={`inline-flex items-center gap-1 font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 transition-none focus:outline-none focus-visible:text-music-accent whitespace-nowrap ${
+        className={`relative inline-flex items-center gap-1 font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 transition-none focus-ring focus-visible:text-music-accent press hit-area whitespace-nowrap ${
           open ? "text-music-accent" : "text-[#6A6A64] hover:text-[#EDEDE8]"
         }`}
       >
@@ -121,7 +121,7 @@ export function SortMenu({
           aria-activedescendant={`${listboxId}-${highlightedIndex}`}
           tabIndex={-1}
           onKeyDown={handleListboxKeyDown}
-          className="absolute right-0 top-full z-20 mt-1 min-w-full border border-[#26261F] bg-[#080808] py-1 focus:outline-none"
+          className="absolute right-0 top-full z-20 mt-1 min-w-full border border-[#26261F] bg-[#080808] py-1 focus-ring"
         >
           {SEARCH_SORT_OPTIONS.map(({ value: optionValue, label }, index) => {
             const selected = optionValue === value;
@@ -136,7 +136,7 @@ export function SortMenu({
                 role="option"
                 aria-selected={selected}
                 onClick={() => select(optionValue)}
-                className={`block w-full px-2.5 py-1.5 text-left font-mono text-[12px] whitespace-nowrap cursor-pointer hover:bg-[#111110] hover:text-[#EDEDE8] ${colorClass}`}
+                className={`block w-full px-2.5 py-1.5 text-left font-mono text-[12px] whitespace-nowrap cursor-pointer hover:bg-[#111110] hover:text-[#EDEDE8] focus-ring ${colorClass}`}
               >
                 {label}
               </li>

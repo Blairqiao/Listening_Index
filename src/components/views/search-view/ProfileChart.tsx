@@ -14,7 +14,7 @@ type ChartView = "time" | "hour" | "day";
 
 // Combined label + toggle button on the left, styled like the live player's Synthetic toggle.
 const toggleHeadingClass =
-  "font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent transition-colors select-none mb-2 block text-left";
+  "relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-music-accent hover:text-[#EDEDE8] focus-ring press hit-area transition-colors select-none mb-2 block text-left";
 const staticHeadingClass = "font-mono text-[12px] text-[#5A5A55] mb-2 select-none";
 
 export interface ProfileChartProps {
@@ -120,25 +120,27 @@ export function ProfileChart({
 
   return (
     <div>
-      {currentView === "hour" && hourOfDay ? (
-        <HourChart counts={hourOfDay} heading={heading} />
-      ) : currentView === "day" && dayOfWeek ? (
-        <DayOfWeekChart counts={dayOfWeek} heading={heading} />
-      ) : (
-        <ActivityChart
-          label="Plays"
-          granularity={granularity}
-          rangeKey={rangeKey}
-          rangeLabel={rangeLabel}
-          activityCadence={activityCadence}
-          monthlyCadence={monthlyCadence}
-          isLoading={isLoading}
-          visitorTimezone={visitorTimezone}
-          heading={heading}
-          showRange={false}
-          onSelectBucket={onSelectBucket}
-        />
-      )}
+      <div key={currentView} className="animate-content-enter">
+        {currentView === "hour" && hourOfDay ? (
+          <HourChart counts={hourOfDay} heading={heading} />
+        ) : currentView === "day" && dayOfWeek ? (
+          <DayOfWeekChart counts={dayOfWeek} heading={heading} />
+        ) : (
+          <ActivityChart
+            label="Plays"
+            granularity={granularity}
+            rangeKey={rangeKey}
+            rangeLabel={rangeLabel}
+            activityCadence={activityCadence}
+            monthlyCadence={monthlyCadence}
+            isLoading={isLoading}
+            visitorTimezone={visitorTimezone}
+            heading={heading}
+            showRange={false}
+            onSelectBucket={onSelectBucket}
+          />
+        )}
+      </div>
       {(hasHour || hasDay) && (
         <div className="mt-1 h-4 text-right font-mono text-[12px] leading-4 text-[#8A8A83] tabular-nums">
           {readout(currentView, hourOfDay, dayOfWeek, streakDays)}

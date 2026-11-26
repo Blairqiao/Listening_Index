@@ -1538,3 +1538,55 @@ test("useSearchProfile: handleSelectProfileRange with push flag triggers onReque
     globalThis.fetch = origFetch;
   }
 });
+
+test("useSearchProfile manages searchScrollY via rememberSearchScroll, clearSearchScroll, and non-search opens", async () => {
+  const origFetch = globalThis.fetch;
+  const origWindow = (globalThis as unknown as { window?: unknown }).window;
+
+  try {
+    let mockScrollY = 325;
+    (globalThis as unknown as { window: unknown }).window = {
+      get scrollY() {
+        return mockScrollY;
+      },
+    };
+    globalThis.fetch = (async () =>
+      Response.json(makeProfile({ kind: "artist", key: "radiohead", range: "all" }))) as typeof fetch;
+
+    await withHookReact(async (harness) => {
+      const args = { activeMode: 4 as const, visitorTimezone: "UTC" };
+
+      let state = harness.renderOnce(args);
+      assert.equal(state.searchScrollY, null, "Initial searchScrollY must be null");
+
+      // Opening from Search calls rememberSearchScroll() before handleOpenProfile()
+      state.rememberSearchScroll();
+      state.handleOpenProfile({ kind: "artist", key: "radiohead" });
+      state = harness.renderOnce(args);
+      assert.equal(state.searchScrollY, 325, "handleOpenProfile after rememberSearchScroll must keep stored Y");
+
+      // clearSearchScroll resets stored Y
+      state.clearSearchScroll();
+      state = harness.renderOnce(args);
+      assert.equal(state.searchScrollY, null, "clearSearchScroll must reset searchScrollY to null");
+
+      // Opening from Overview/Live Player calls handleOpenProfile without rememberSearchScroll -> clears stale scrollY
+      mockScrollY = 180;
+      state.rememberSearchScroll();
+      state.handleOpenProfile({ kind: "artist", key: "radiohead" });
+      state = harness.renderOnce(args);
+      assert.equal(state.searchScrollY, 180);
+
+      state.handleOpenProfile({ kind: "track", key: "track-1" });
+      state = harness.renderOnce(args);
+      assert.equal(state.searchScrollY, null, "Direct handleOpenProfile without rememberSearchScroll must clear stale scrollY");
+    });
+  } finally {
+    globalThis.fetch = origFetch;
+    if (origWindow === undefined) {
+      delete (globalThis as unknown as { window?: unknown }).window;
+    } else {
+      (globalThis as unknown as { window: unknown }).window = origWindow;
+    }
+  }
+});

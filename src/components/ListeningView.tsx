@@ -278,6 +278,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     clearProfileCache,
     returnsTo,
     handleSelectProfileRange,
+    searchScrollY,
+    rememberSearchScroll,
+    clearSearchScroll,
   } = useSearchProfile({
     activeMode,
     visitorTimezone,
@@ -1006,8 +1009,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   }}
                   onPageChange={setSearchPage}
                   onRandomProfile={handleRandomProfile}
+                  restoreScrollY={searchScrollY}
+                  onScrollRestored={clearSearchScroll}
                   onOpenProfile={(target) => {
                     shouldPushHistoryRef.current = true;
+                    rememberSearchScroll();
                     handleOpenProfile(target);
                     window.scrollTo(0, 0);
                   }}
