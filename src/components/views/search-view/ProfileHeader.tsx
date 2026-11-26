@@ -94,10 +94,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={data.name}
-                className="group inline-flex max-w-full items-baseline hover:text-music-accent focus-visible:outline-music-accent"
+                className="group inline-flex max-w-full items-baseline hover:text-music-accent focus-ring motion-hover"
               >
                 <span className="line-clamp-2">{data.name}</span>
-                <span className="inline-flex h-6 w-6 items-center justify-center flex-none ml-1 text-[#6A6A64] group-hover:text-music-accent">
+                <span className="inline-flex h-6 w-6 items-center justify-center flex-none ml-1 text-[#6A6A64] group-hover:text-music-accent motion-hover">
                   <ArrowUpRight size={16} aria-hidden="true" />
                 </span>
                 <span className="sr-only">(opens in Spotify)</span>
@@ -110,13 +110,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           </div>
 
           {(isTrack || isAlbum) && data.artistName && (
-            <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+            <div className={`font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 ${isTrack && data.albumName ? "py-[3px] -my-[3px]" : "py-2 -my-2"} select-none`}>
               <span className="text-[#5A5A55]">Artist · </span>
               {artistKey ? (
                 <button
                   type="button"
                   onClick={() => onOpenProfile({ kind: "artist", key: artistKey })}
-                  className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
+                  className="relative cursor-pointer text-[#A0A099] hover:text-music-accent focus-ring hit-area motion-hover"
                 >
                   {data.artistName}
                 </button>
@@ -127,13 +127,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           )}
 
           {isTrack && data.albumName && (
-            <div className="mt-0.5 truncate font-mono text-[12.5px] leading-tight text-[#6A6A64] select-none">
+            <div className="mt-1 py-[3px] -my-[3px] truncate font-mono text-[12.5px] leading-tight text-[#6A6A64] select-none">
               <span className="text-[#5A5A55]">Album · </span>
               {albumKey ? (
                 <button
                   type="button"
                   onClick={() => onOpenProfile({ kind: "album", key: albumKey })}
-                  className="cursor-pointer text-[#A0A099] hover:text-music-accent focus-visible:outline-music-accent"
+                  className="relative cursor-pointer text-[#A0A099] hover:text-music-accent focus-ring hit-area motion-hover"
                 >
                   {data.albumName}
                 </button>
@@ -158,10 +158,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             onClick={onToggleRankFormat}
             aria-label={`Rank ${rankValue}. Toggle between rank position and percentile`}
             title="Click to toggle between rank and percentile"
-            className="flex flex-col text-left cursor-pointer group focus-visible:outline-music-accent"
+            className="flex flex-col text-left cursor-pointer group focus-ring"
           >
             <span className={STAT_LABEL_CLASS}>Rank</span>
-            <span className={`${STAT_VALUE_CLASS} text-[#EDEDE8] group-hover:text-music-accent`}>
+            <span className={`${STAT_VALUE_CLASS} text-[#EDEDE8] group-hover:text-music-accent motion-hover`}>
               {rankValue}
             </span>
           </button>

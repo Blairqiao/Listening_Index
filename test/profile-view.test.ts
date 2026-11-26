@@ -1002,3 +1002,62 @@ test("ProfileView keeps a reloading profile visible, dimmed, busy and blocked to
   const readyRoot = ready.slice(0, ready.indexOf(">") + 1);
   assert.doesNotMatch(readyRoot, /pointer-events-none|aria-busy="true"|opacity-60/);
 });
+
+test("ProfileView loading skeleton includes entry animation, share-bar placeholder, and reserved stats height", () => {
+  const skeleton = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: null,
+      status: "loading",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+      pendingKind: "artist",
+    })
+  );
+
+  const rootTag = skeleton.slice(0, skeleton.indexOf(">") + 1);
+  assert.match(rootTag, /\banimate-view-enter\b/, "Skeleton root must include animate-view-enter");
+  assert.match(skeleton, /\bmin-h-\[168px\]/, "Stats/streak skeleton block must reserve mobile min-h");
+  assert.match(skeleton, /\bmd:min-h-\[80px\]/, "Stats/streak skeleton block must reserve desktop min-h");
+  assert.match(skeleton, /h-\[10px\] w-full bg-\[#191917\] animate-pulse/, "Skeleton must include 10px share-bar placeholder");
+});
+
+test("ProfileView ready markup applies view/content enter, focus-ring, press, and hit-area classes", () => {
+  const artistMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: mockArtistProfile,
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+
+  const rootTag = artistMarkup.slice(0, artistMarkup.indexOf(">") + 1);
+  assert.match(rootTag, /\banimate-view-enter\b/, "ProfileView root must include animate-view-enter");
+  assert.match(artistMarkup, /\banimate-content-enter\b/, "ProfileChart body must include animate-content-enter");
+  assert.doesNotMatch(artistMarkup, /focus-visible:bg-\[#111110\]/, "Profile rows must use focus-ring instead of bare focus-visible:bg");
+
+  const toggleBtn = artistMarkup.match(/<button\b[^>]*title="Click to switch chart view"[^>]*>/)?.[0] ?? "";
+  assert.ok(toggleBtn, "ProfileChart toggle button must render");
+  assert.match(toggleBtn, /\bfocus-ring\b/);
+  assert.match(toggleBtn, /\bpress\b/);
+  assert.match(toggleBtn, /\bhit-area\b/);
+  assert.doesNotMatch(toggleBtn, /\bfocus-visible:outline-none\b/);
+
+  const trackMarkup = renderToStaticMarkup(
+    React.createElement(ProfileView, {
+      data: { ...mockTrackProfile, albumKey: "radiohead::in rainbows" },
+      status: "ready",
+      visitorTimezone: "UTC",
+      onOpenProfile: () => {},
+    })
+  );
+  const artistLinkBtn = trackMarkup.match(/Artist · <\/span>(<button\b[^>]*>)/)?.[1] ?? "";
+  assert.ok(artistLinkBtn, "ProfileHeader Artist button must render");
+  assert.match(artistLinkBtn, /\bfocus-ring\b/);
+  assert.match(artistLinkBtn, /\bhit-area\b/);
+
+  const albumLinkBtn = trackMarkup.match(/Album · <\/span>(<button\b[^>]*>)/)?.[1] ?? "";
+  assert.ok(albumLinkBtn, "ProfileHeader Album button must render");
+  assert.match(albumLinkBtn, /\bfocus-ring\b/);
+  assert.match(albumLinkBtn, /\bhit-area\b/);
+});

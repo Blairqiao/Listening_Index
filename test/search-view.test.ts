@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { useSearch, clearSearchCache } from "../src/components/views/search-view/useSearch";
-import { SearchView } from "../src/components/views/search-view/SearchView";
+import { SearchView, type SearchViewProps } from "../src/components/views/search-view/SearchView";
+import { SegmentedShareBar } from "../src/components/views/search-view/ShareBar";
+import { buildShareSegments } from "../src/lib/profile-stats";
 import type { SearchFilter, SearchResponse, SearchSort } from "../src/lib/search-types";
 
 function createHookHarness() {
@@ -1084,4 +1086,230 @@ test("SearchView first load renders 8 skeleton rows when uncached and data is nu
 
   const skeletonRowMatches = html.match(/h-\[54px\] md:h-\[55px\] border-b border-\[#191917\] animate-pulse/g);
   assert.equal(skeletonRowMatches?.length, 8, "Must render 8 skeleton rows");
+});
+
+test("SegmentedShareBar renders segments as <button type=\"button\"> with focus-ring", () => {
+  const segments = buildShareSegments([{ id: "t1", name: "Track 1", plays: 30 }], 50);
+  const markup = renderToStaticMarkup(
+    React.createElement(SegmentedShareBar, {
+      heading: "Share of plays",
+      segments,
+      total: 50,
+      activeId: null,
+      onActiveChange: () => {},
+    })
+  );
+
+  const trackBtn = markup.match(/<button\b[^>]*title="Track 1"[^>]*>/)?.[0] ?? "";
+  assert.ok(trackBtn, "Track segment must render as a <button>");
+  assert.match(trackBtn, /type="button"/);
+  assert.match(trackBtn, /\bfocus-ring\b/);
+
+  const otherBtn = markup.match(/<button\b[^>]*title="Other tracks"[^>]*>/)?.[0] ?? "";
+  assert.ok(otherBtn, "Other tracks segment must render as a <button>");
+  assert.match(otherBtn, /type="button"/);
+  assert.match(otherBtn, /\bfocus-ring\b/);
+
+  const barContainer = markup.match(/<div\b[^>]*class="flex h-\[10px\] gap-\[2px\]"[^>]*>/)?.[0] ?? "";
+  assert.ok(barContainer, "Share bar flex container must exist");
+  assert.doesNotMatch(barContainer, /aria-hidden="true"/);
+});
+
+test("SearchView UX polish: entry animation, reserved status height, and focus/press/hit-area controls", async () => {
+  clearSearchCache();
+  await primeSearch("polish", {
+    query: "polish",
+    hasMore: false,
+    artists: [{ key: "a1", name: "Radiohead", plays: 20, imageUrl: null }],
+    albums: [],
+    tracks: [],
+  });
+
+  const html = renderToStaticMarkup(
+    React.createElement(SearchView, {
+      query: "polish",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      onRandomProfile: () => {},
+    })
+  );
+
+  const rootTag = html.slice(0, html.indexOf(">") + 1);
+  assert.match(rootTag, /\banimate-view-enter\b/, "SearchView root must include animate-view-enter");
+  assert.match(html, /\banimate-content-enter\b/, "Results wrapper must include animate-content-enter");
+
+  const statusTag = html.match(/<div\b[^>]*role="status"[^>]*>/)?.[0] ?? "";
+  assert.ok(statusTag, "Status container must render");
+  assert.doesNotMatch(statusTag, /\bempty:hidden\b/, "Status container must reserve height without empty:hidden");
+  assert.match(statusTag, /\bmin-h-/, "Status container must reserve explicit min-h");
+
+  const sortBtn = html.match(/<button\b[^>]*aria-label="Sort by"[^>]*>/)?.[0] ?? "";
+  assert.ok(sortBtn, "Sort trigger must render");
+  assert.match(sortBtn, /\bfocus-ring\b/);
+  assert.match(sortBtn, /\bpress\b/);
+  assert.match(sortBtn, /\bhit-area\b/);
+  assert.doesNotMatch(sortBtn, /\bfocus:outline-none\b/);
+
+  const randomBtn = html.match(/<button\b[^>]*aria-label="Open random profile"[^>]*>/)?.[0] ?? "";
+  assert.ok(randomBtn, "Random button must render");
+  assert.match(randomBtn, /\bfocus-ring\b/);
+  assert.match(randomBtn, /\bpress\b/);
+  assert.match(randomBtn, /\bhit-area\b/);
+  assert.doesNotMatch(randomBtn, /\bfocus:outline-none\b/);
+});
+
+test("SearchView restores scroll position via requestAnimationFrame when ready with restoreScrollY", async () => {
+  clearSearchCache();
+  await primeSearch("restore-test", {
+    query: "restore-test",
+    hasMore: false,
+    artists: [{ key: "a1", name: "Restore Artist", plays: 15, imageUrl: null }],
+    albums: [],
+    tracks: [],
+  });
+
+  const origUseState = React.useState;
+  const origUseRef = React.useRef;
+  const origUseCallback = React.useCallback;
+  const origUseEffect = React.useEffect;
+  const origWindow = (globalThis as unknown as { window?: unknown }).window;
+  const origRaf = globalThis.requestAnimationFrame;
+  const origCancelRaf = globalThis.cancelAnimationFrame;
+
+  const stateValues: unknown[] = [];
+  const stateSetters: Array<(v: unknown) => void> = [];
+  const refValues: Array<{ current: unknown }> = [];
+  const callbackValues: Array<{ fn: unknown; deps: unknown[] }> = [];
+  const effectDeps: unknown[][] = [];
+  const effectCleanups: Array<(() => void) | void> = [];
+  let effectPending: Array<{ idx: number; effect: () => (() => void) | void }> = [];
+  let stateCursor = 0;
+  let refCursor = 0;
+  let callbackCursor = 0;
+  let effectCursor = 0;
+
+  (React as unknown as { useState: unknown }).useState = <T>(initial: T | (() => T)) => {
+    const idx = stateCursor++;
+    if (!(idx in stateValues)) {
+      stateValues[idx] = typeof initial === "function" ? (initial as () => T)() : initial;
+    }
+    if (!stateSetters[idx]) {
+      stateSetters[idx] = (value: unknown) => {
+        stateValues[idx] = typeof value === "function" ? (value as (p: unknown) => unknown)(stateValues[idx]) : value;
+      };
+    }
+    return [stateValues[idx] as T, stateSetters[idx]];
+  };
+  (React as unknown as { useRef: unknown }).useRef = <T>(initial: T) => {
+    const idx = refCursor++;
+    if (!(idx in refValues)) refValues[idx] = { current: initial };
+    return refValues[idx] as { current: T };
+  };
+  (React as unknown as { useCallback: unknown }).useCallback = <T>(fn: T, deps: unknown[]) => {
+    const idx = callbackCursor++;
+    const prev = callbackValues[idx];
+    if (!prev || deps.some((d, i) => !Object.is(d, prev.deps[i]))) {
+      callbackValues[idx] = { fn, deps };
+    }
+    return callbackValues[idx].fn as T;
+  };
+  (React as unknown as { useEffect: unknown }).useEffect = (effect: () => (() => void) | void, deps: unknown[] = []) => {
+    const idx = effectCursor++;
+    const prev = effectDeps[idx];
+    if (!prev || deps.some((d, i) => !Object.is(d, prev[i]))) {
+      effectDeps[idx] = deps;
+      effectPending.push({ idx, effect });
+    }
+  };
+
+  const scrollCalls: Array<[number, number]> = [];
+  const rafQueue: Array<{ id: number; cb: FrameRequestCallback }> = [];
+  let nextRafId = 1;
+
+  (globalThis as unknown as { window: unknown }).window = {
+    scrollTo: (x: number, y: number) => {
+      scrollCalls.push([x, y]);
+    },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  globalThis.requestAnimationFrame = (cb: FrameRequestCallback): number => {
+    const id = nextRafId++;
+    rafQueue.push({ id, cb });
+    return id;
+  };
+  globalThis.cancelAnimationFrame = () => {};
+
+  const renderComponent = (props: SearchViewProps) => {
+    stateCursor = 0;
+    refCursor = 0;
+    callbackCursor = 0;
+    effectCursor = 0;
+    (SearchView as React.FC<SearchViewProps>)(props);
+    const pending = [...effectPending];
+    effectPending = [];
+    for (const item of pending) {
+      const cleanup = effectCleanups[item.idx];
+      if (typeof cleanup === "function") cleanup();
+      effectCleanups[item.idx] = item.effect();
+    }
+  };
+
+  try {
+    let restoredCount = 0;
+    const onScrollRestored = () => {
+      restoredCount++;
+    };
+
+    // Uncached loading state must not trigger scroll restore yet
+    renderComponent({
+      query: "restore-uncached",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      restoreScrollY: 420,
+      onScrollRestored,
+    });
+    assert.equal(rafQueue.length, 0, "Must not schedule scroll restore while loading");
+
+    // Ready state with restoreScrollY schedules RAF and calls scrollTo + onScrollRestored inside RAF
+    renderComponent({
+      query: "restore-test",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      restoreScrollY: 420,
+      onScrollRestored,
+    });
+    assert.equal(rafQueue.length, 1, "Must schedule requestAnimationFrame when ready with restoreScrollY");
+    assert.equal(scrollCalls.length, 0, "Must not call window.scrollTo synchronously before RAF");
+    assert.equal(restoredCount, 0, "Must not call onScrollRestored before RAF");
+
+    rafQueue[0].cb(16);
+    assert.deepEqual(scrollCalls, [[0, 420]], "Must scroll to (0, restoreScrollY) inside RAF");
+    assert.equal(restoredCount, 1, "Must call onScrollRestored once after scrolling");
+
+    // Null restoreScrollY must not schedule RAF
+    renderComponent({
+      query: "restore-test",
+      onQueryChange: () => {},
+      onOpenProfile: () => {},
+      restoreScrollY: null,
+      onScrollRestored,
+    });
+    assert.equal(rafQueue.length, 1, "Must not schedule RAF when restoreScrollY is null");
+  } finally {
+    for (const c of effectCleanups) {
+      if (typeof c === "function") c();
+    }
+    (React as unknown as { useState: unknown }).useState = origUseState;
+    (React as unknown as { useRef: unknown }).useRef = origUseRef;
+    (React as unknown as { useCallback: unknown }).useCallback = origUseCallback;
+    (React as unknown as { useEffect: unknown }).useEffect = origUseEffect;
+    if (origWindow === undefined) {
+      delete (globalThis as unknown as { window?: unknown }).window;
+    } else {
+      (globalThis as unknown as { window: unknown }).window = origWindow;
+    }
+    globalThis.requestAnimationFrame = origRaf;
+    globalThis.cancelAnimationFrame = origCancelRaf;
+  }
 });
