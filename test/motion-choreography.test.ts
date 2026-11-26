@@ -147,34 +147,43 @@ test("CalendarView picks highlight their range at once, with no sweep", () => {
 
 test("intro delays: metrics lead, track rows follow with shrinking gaps, bars grow left to right", async () => {
   const c = await import("../src/lib/choreography");
-  assert.deepEqual([0, 1, 2, 3].map(c.metricIntroDelay), [0, 40, 70, 90]);
-  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 9].map(c.trackRowIntroDelay), [100, 130, 155, 175, 190, 200, 200, 200]);
-  assert.equal(c.INDEX_INTRO_DELAY_MS, 140);
-  assert.equal(c.barIntroDelay(0, 28), 120);
-  assert.equal(c.barIntroDelay(27, 28), 220);
-  assert.ok(c.INTRO_MS >= 220 + 280, "the intro gate outlasts the last bar");
-  assert.ok(c.INTRO_MS <= 650);
+  assert.deepEqual([0, 1, 2, 3].map(c.metricIntroDelay), [0, 70, 120, 160]);
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 9].map(c.trackRowIntroDelay), [200, 250, 290, 320, 345, 365, 365, 365]);
+  assert.equal(c.INDEX_INTRO_DELAY_MS, 260);
+  assert.equal(c.barIntroDelay(0, 28), 240);
+  assert.equal(c.barIntroDelay(27, 28), 440);
+  assert.ok(c.INTRO_MS >= 440 + 500, "the intro gate outlasts the last bar");
+  assert.ok(c.INTRO_MS <= 1200);
 });
 
-test("intro CSS only runs under [data-intro] and collapses to a plain fade for reduced motion", () => {
+test("intro CSS holds elements while pending, plays under data-intro=playing, and fades plainly for reduced motion", () => {
   const css = readSrc("src/app/globals.css");
   assert.match(cssBlock(css, "@keyframes intro-rise"), /opacity:\s*0[\s\S]*translate:\s*0 var\(--intro-rise/);
   assert.match(cssBlock(css, "@keyframes intro-grow"), /scale:\s*1 0/);
   assert.match(cssBlock(css, "@keyframes intro-fade"), /opacity:\s*0/);
-  for (const cls of ["intro-rise", "intro-row", "intro-fade", "intro-grow"]) {
-    const block = cssBlock(css, `[data-intro] .${cls} {`);
+  const durations: Record<string, string> = { "intro-rise": "450ms", "intro-row": "420ms", "intro-fade": "450ms", "intro-grow": "500ms" };
+  for (const [cls, ms] of Object.entries(durations)) {
+    const block = cssBlock(css, `[data-intro="playing"] .${cls} {`);
+    assert.match(block, new RegExp(`\\s${ms}\\s`), `${cls} runs ${ms}`);
     assert.match(block, /var\(--intro-delay, 0ms\)/, `${cls} must read --intro-delay`);
     assert.match(block, /\bboth\b/, `${cls} must hold its start state while delayed`);
   }
+  // Server HTML arrives pending: elements wait hidden for hydration, and show
+  // on their own after 2.5s if the script never runs.
+  const pending = css.slice(css.indexOf('[data-intro="pending"] .intro-rise'));
+  assert.match(pending.slice(0, 400), /animation: intro-fade 300ms ease 2\.5s both/);
   const reduced = css.slice(css.indexOf("/* Reduced motion: the intro"));
   assert.match(reduced.slice(0, 600), /animation-name:\s*intro-fade/);
   assert.match(reduced.slice(0, 600), /animation-delay:\s*0ms/);
 });
 
-test("ListeningView flags the first reveal with data-intro and lifts the veil in 200ms", () => {
+test("ListeningView starts the intro after hydration and fonts, then clears it, and lifts the veil in 200ms", () => {
   const src = readSrc("src/components/ListeningView.tsx");
-  assert.match(src, /data-intro=\{isIntroPlaying \? "" : undefined\}/);
-  assert.match(src, /INTRO_MS/);
+  assert.match(src, /useState<IntroPhase>\("pending"\)/);
+  assert.match(src, /data-intro=\{introPhase === "done" \? undefined : introPhase\}/);
+  assert.match(src, /withRevealCap\(document\.fonts\.ready/);
+  assert.match(src, /setIntroPhase\("playing"\)/);
+  assert.match(src, /setTimeout\(\(\) => setIntroPhase\("done"\), INTRO_MS\)/);
   assert.match(src, /fixed inset-0 z-40[^`]*duration-\[var\(--motion-medium\)\]/);
   assert.doesNotMatch(readSrc("src/app/globals.css"), /--motion-showpiece/);
 });
@@ -193,5 +202,5 @@ test("intro roles: metric contents rise, track rows rise, indexes fade, bars gro
     React.createElement(ActivityChart, { granularity: "day", activityCadence: cadence, visitorTimezone: "UTC" }),
   );
   assert.match(html, /\bintro-grow\b/);
-  assert.match(html, /--intro-delay:120ms/);
+  assert.match(html, /--intro-delay:240ms/);
 });

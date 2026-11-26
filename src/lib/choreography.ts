@@ -23,15 +23,19 @@ export const METRIC_SWAP_TIMING: KeyframeAnimationOptions = {
   easing: EASE_OUT_STRONG,
 };
 
-// First-load entrance. ListeningView sets data-intro on the page root for
-// INTRO_MS once data is ready; components carry a role class (intro-rise,
-// intro-row, intro-fade, intro-grow in globals.css) and an --intro-delay.
+// First-load entrance. The page root arrives with data-intro="pending", which
+// holds the intro elements hidden. Once the page has hydrated and its fonts
+// are in, ListeningView switches it to "playing" for INTRO_MS. Components
+// carry a role class (intro-rise, intro-row, intro-fade, intro-grow in
+// globals.css) and an --intro-delay.
 
-/** How long data-intro stays on: past the last bar settling (220ms + 280ms). */
-export const INTRO_MS = 600;
+export type IntroPhase = "pending" | "playing" | "done";
 
-const METRIC_INTRO_DELAYS_MS = [0, 40, 70, 90];
-const TRACK_ROW_INTRO_DELAYS_MS = [100, 130, 155, 175, 190, 200];
+/** How long "playing" lasts: past the last bar settling (440ms + 500ms). */
+export const INTRO_MS = 1050;
+
+const METRIC_INTRO_DELAYS_MS = [0, 70, 120, 160];
+const TRACK_ROW_INTRO_DELAYS_MS = [200, 250, 290, 320, 345, 365];
 
 /** The four metric cells lead the entrance. */
 export function metricIntroDelay(index: number): number {
@@ -44,12 +48,12 @@ export function trackRowIntroDelay(index: number): number {
 }
 
 /** Artist and album indexes fade in as one beat. */
-export const INDEX_INTRO_DELAY_MS = 140;
+export const INDEX_INTRO_DELAY_MS = 260;
 
-/** Activity bars grow left to right over 100ms, starting at 120ms. */
+/** Activity bars grow left to right over 200ms, starting at 240ms. */
 export function barIntroDelay(index: number, count: number): number {
   const t = count <= 1 ? 0 : index / (count - 1);
-  return 120 + Math.round(100 * (1 - (1 - t) * (1 - t)));
+  return 240 + Math.round(200 * (1 - (1 - t) * (1 - t)));
 }
 
 export function introDelayStyle(ms: number): CSSProperties {

@@ -94,14 +94,15 @@
   }
 }
 
-/* First-load entrance. ListeningView sets data-intro on the page root for
-   INTRO_MS once data is ready. Components carry a role class and an
-   --intro-delay (src/lib/choreography.ts). Outside that window these rules
-   match nothing, so tab switches and reloads of a region never replay them. */
+/* First-load entrance (src/lib/choreography.ts). The server HTML arrives with
+   data-intro="pending", which holds the intro elements hidden; if the script
+   never runs they fade in on their own after 2.5s. ListeningView switches to
+   "playing" once the page has hydrated and its fonts are in, then removes the
+   attribute, so tab switches and reloads of a region never replay it. */
 @keyframes intro-rise {
   from {
     opacity: 0;
-    translate: 0 var(--intro-rise, 8px);
+    translate: 0 var(--intro-rise, 10px);
   }
 }
 
@@ -118,29 +119,36 @@
   }
 }
 
-[data-intro] .intro-rise {
-  animation: intro-rise 300ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+[data-intro="pending"] .intro-rise,
+[data-intro="pending"] .intro-row,
+[data-intro="pending"] .intro-fade,
+[data-intro="pending"] .intro-grow {
+  animation: intro-fade 300ms ease 2.5s both;
 }
 
-[data-intro] .intro-row {
-  --intro-rise: 4px;
-  animation: intro-rise 260ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+[data-intro="playing"] .intro-rise {
+  animation: intro-rise 450ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
 }
 
-[data-intro] .intro-fade {
-  animation: intro-fade 260ms ease var(--intro-delay, 0ms) both;
+[data-intro="playing"] .intro-row {
+  --intro-rise: 6px;
+  animation: intro-rise 420ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
 }
 
-[data-intro] .intro-grow {
-  animation: intro-grow 280ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
+[data-intro="playing"] .intro-fade {
+  animation: intro-fade 450ms ease var(--intro-delay, 0ms) both;
+}
+
+[data-intro="playing"] .intro-grow {
+  animation: intro-grow 500ms var(--ease-out-strong) var(--intro-delay, 0ms) both;
 }
 
 /* Reduced motion: the intro collapses to one fade, everything together. */
 @media (prefers-reduced-motion: reduce) {
-  [data-intro] .intro-rise,
-  [data-intro] .intro-row,
-  [data-intro] .intro-fade,
-  [data-intro] .intro-grow {
+  [data-intro="playing"] .intro-rise,
+  [data-intro="playing"] .intro-row,
+  [data-intro="playing"] .intro-fade,
+  [data-intro="playing"] .intro-grow {
     animation-name: intro-fade;
     animation-delay: 0ms;
   }

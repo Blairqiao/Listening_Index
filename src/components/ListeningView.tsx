@@ -22,7 +22,8 @@ import {
   MINI_PLAYER_EXIT_MS,
 } from "@/components/listening-view/mini-player";
 import { usePresence } from "@/lib/usePresence";
-import { INTRO_MS } from "@/lib/choreography";
+import { INTRO_MS, type IntroPhase } from "@/lib/choreography";
+import { withRevealCap } from "@/lib/motion";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
   { ssr: false }
@@ -106,6 +107,9 @@ import {
   EMPTY_OVERVIEW,
   EMPTY_STREAM_LOG,
 } from "./listening-view/listening-helpers";
+
+/** Longest the first-load entrance waits for web fonts before it plays anyway. */
+const INTRO_FONT_WAIT_MS = 500;
 
 interface ListeningViewProps {
   initialOverview?: OverviewData | Record<RangeKey, OverviewData> | null;
@@ -261,14 +265,32 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Track whether real overview data is ready
   const isDataReady = Boolean(displayedOverview || initialOverview);
 
-  // The first reveal plays a staged entrance (globals.css, [data-intro]) once.
-  const [hasIntroPlayed, setHasIntroPlayed] = useState(false);
+  // The first reveal plays a staged entrance once (globals.css, [data-intro]).
+  // It waits for hydration and fonts so a slow load doesn't eat it, then two
+  // frames so the held start state is painted before it plays.
+  const [introPhase, setIntroPhase] = useState<IntroPhase>("pending");
   useEffect(() => {
-    if (!isDataReady || hasIntroPlayed) return;
-    const timer = setTimeout(() => setHasIntroPlayed(true), INTRO_MS);
+    if (!isDataReady || introPhase !== "pending") return;
+    let cancelled = false;
+    let raf1: number | undefined;
+    let raf2: number | undefined;
+    void withRevealCap(document.fonts.ready, INTRO_FONT_WAIT_MS).then(() => {
+      if (cancelled) return;
+      raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => setIntroPhase("playing"));
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
+      if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
+    };
+  }, [isDataReady, introPhase]);
+  useEffect(() => {
+    if (introPhase !== "playing") return;
+    const timer = setTimeout(() => setIntroPhase("done"), INTRO_MS);
     return () => clearTimeout(timer);
-  }, [isDataReady, hasIntroPlayed]);
-  const isIntroPlaying = isDataReady && !hasIntroPlayed;
+  }, [introPhase]);
 
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
@@ -845,7 +867,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   return (
     <div
       id="music-page-root"
-      data-intro={isIntroPlaying ? "" : undefined}
+      data-intro={introPhase === "done" ? undefined : introPhase}
       className={`min-h-[100dvh] bg-[#080808] text-[#EDEDE8] font-sans antialiased relative ${
         activeMode === 5 ? "overflow-x-clip" : "overflow-x-hidden"
       }`}
