@@ -98,8 +98,8 @@ export const SessionHistogram: React.FC<SessionHistogramProps> = ({
                   isSelected
                     ? "transition-colors duration-[var(--motion-fast)] ease-snappy bg-music-accent group-hover:bg-music-accent-hover"
                     : isHovered
-                    ? "transition-none bg-[#2E2E2A]"
-                    : "transition-none bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"
+                    ? "motion-hover bg-[#2E2E2A]"
+                    : "motion-hover bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"
                 }`}
               />
             </div>

@@ -289,7 +289,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessingRef.current}
-              className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed focus-ring"
+              className="text-[#6A6A64] hover:text-[#EDEDE8] motion-hover p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed focus-ring"
               title="Close modal (Esc)"
             >
               <X className="w-4 h-4" />
@@ -423,7 +423,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors cursor-pointer focus-ring"
+                    className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent motion-hover cursor-pointer focus-ring"
                   >
                     Try Again
                   </button>

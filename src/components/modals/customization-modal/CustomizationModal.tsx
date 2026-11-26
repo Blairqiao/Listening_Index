@@ -248,7 +248,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
               type="button"
               onClick={handleCancel}
               title="Close (Esc)"
-              className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus-ring"
+              className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer motion-hover focus-ring"
             >
               <X className="w-4 h-4" />
             </button>
@@ -376,7 +376,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleResetColor}
                   title={`Reset color to deployed default (${deployedConfig.accentColor})`}
-                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 focus-ring"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer motion-hover whitespace-nowrap flex-shrink-0 focus-ring"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Reset Color</span>
@@ -387,7 +387,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="font-mono text-[12px] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 focus-ring"
+                  className="font-mono text-[12px] px-3.5 py-1.5 border border-music-accent bg-music-accent/10 text-music-accent hover:bg-music-accent/20 cursor-pointer shadow-[0_0_10px_rgba(var(--color-music-accent),0.15)] motion-hover font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 focus-ring"
                 >
                   <span>Save Locally</span>
                 </button>
@@ -400,7 +400,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleReset}
                   title="Revert all settings to defaults from src/config.ts"
-                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 focus-ring"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer motion-hover whitespace-nowrap flex-shrink-0 focus-ring"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span className="sm:hidden">Reset</span>
@@ -411,7 +411,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleCopyCode}
                   title="Copy code snippet to paste into src/config.ts"
-                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 focus-ring"
+                  className="inline-flex items-center gap-1.5 font-mono text-[12px] px-2 sm:px-2.5 py-1.5 border border-[#26261F] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent cursor-pointer motion-hover whitespace-nowrap flex-shrink-0 focus-ring"
                 >
                   {copiedCode ? (
                     <>
@@ -433,7 +433,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = () => {
                   type="button"
                   onClick={handleSave}
                   disabled={isSaving || !canSave}
-                  className={`font-mono text-[12px] px-3 sm:px-3.5 py-1.5 border transition-colors font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 focus-ring ${isSaving
+                  className={`font-mono text-[12px] px-3 sm:px-3.5 py-1.5 border motion-hover font-medium inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 focus-ring ${isSaving
                       ? "border-music-accent/50 bg-music-accent/10 text-music-accent cursor-wait"
                       : saveError
                         ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"

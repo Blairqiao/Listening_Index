@@ -48,7 +48,7 @@ export const HistoryDropzone: React.FC<HistoryDropzoneProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed p-8 sm:p-10 text-center transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 select-none ${
+        className={`border-2 border-dashed p-8 sm:p-10 text-center motion-hover cursor-pointer flex flex-col items-center justify-center gap-3 select-none ${
           isDragOver
             ? "border-music-accent bg-music-accent/5 text-music-accent"
             : "border-[#26261F] hover:border-[#3A3A32] bg-[#0F0F0E]"

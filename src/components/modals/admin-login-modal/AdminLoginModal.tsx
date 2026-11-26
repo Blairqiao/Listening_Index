@@ -130,7 +130,7 @@ export const AdminLoginModal: React.FC = () => {
             onClick={closeAdminLoginModal}
             disabled={isAuthenticating}
             title="Close (Esc)"
-            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus-ring disabled:opacity-40"
+            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer motion-hover focus-ring disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
@@ -145,7 +145,7 @@ export const AdminLoginModal: React.FC = () => {
             >
               Master Password
             </label>
-            <div className="relative flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent transition-colors">
+            <div className="relative flex items-center bg-[#141413] border border-[#26261F] focus-within:border-music-accent motion-hover">
               <input
                 ref={inputRef}
                 id="admin-login-password"

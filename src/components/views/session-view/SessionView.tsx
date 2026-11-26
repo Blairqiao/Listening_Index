@@ -153,7 +153,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                       onClick={() => {
                         window.open(trackHref, "_blank", "noopener,noreferrer");
                       }}
-                      className="group flex items-center gap-2.5 px-1 h-[54px] md:h-[55px] border-b border-[#191917] hover:bg-[#111110] transition-none cursor-pointer"
+                      className="group flex items-center gap-2.5 px-1 h-[54px] md:h-[55px] border-b border-[#191917] hover:bg-[#111110] motion-hover cursor-pointer"
                     >
                       {/* 1. Timestamp (44px, mono 11px, #5A5A55) */}
                       <span className="font-mono text-[12px] text-[#5A5A55] tabular-nums select-none truncate w-[44px] flex-none">
@@ -180,7 +180,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug no-underline select-none"
+                          className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent motion-hover leading-snug no-underline select-none"
                         >
                           {track.title}
                         </a>
@@ -239,7 +239,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
             <button
               type="button"
               onClick={() => setIsTracksExpanded((prev) => !prev)}
-              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none focus-ring"
+              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] motion-hover cursor-pointer select-none focus-ring"
             >
               {isTracksExpanded ? "Show less ⌃" : `Show all ${activeTracks.length} tracks ⌄`}
             </button>
@@ -282,7 +282,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
                     }}
                     className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer select-none focus-ring ${isSelected
                         ? "bg-[#181614] border-l-2 border-l-music-accent pl-2 -ml-[2px] transition-colors duration-[var(--motion-fast)] ease-snappy"
-                        : "hover:bg-[#111110] transition-none"
+                        : "hover:bg-[#111110] motion-hover"
                       }`}
                   >
                     {/* Date (mono 11px, #4A4A46) */}
@@ -311,7 +311,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSessionsExpanded((prev) => !prev)}
-                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none focus-ring"
+                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] motion-hover cursor-pointer select-none focus-ring"
               >
                 {isSessionsExpanded ? "Show less ⌃" : `Show all ${sessionList.length} sessions ⌄`}
               </button>

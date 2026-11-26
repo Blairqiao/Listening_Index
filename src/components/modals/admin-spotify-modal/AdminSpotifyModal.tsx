@@ -410,7 +410,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
             onClick={effectiveOnClose}
             disabled={isBusy}
             title="Close (Esc)"
-            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus-ring disabled:opacity-40"
+            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer motion-hover focus-ring disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
@@ -462,7 +462,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCopyUri(redirectDisplay.productionUri, "production")}
-                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus-ring"
+                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] motion-hover cursor-pointer flex items-center gap-1.5 shrink-0 focus-ring"
                           title="Copy Production Redirect URI"
                         >
                           {copiedTarget === "production" ? (
@@ -494,7 +494,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCopyUri(redirectDisplay.localUri, "local")}
-                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 focus-ring"
+                          className="px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] hover:text-music-accent hover:bg-[#1A1A18] motion-hover cursor-pointer flex items-center gap-1.5 shrink-0 focus-ring"
                           title="Copy Local Redirect URI"
                         >
                           {copiedTarget === "local" ? (
@@ -554,13 +554,13 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         href={profileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/profile inline-flex items-center gap-1.5 text-[12px] text-[#EDEDE8] hover:text-music-accent font-semibold truncate transition-colors cursor-pointer focus-ring"
+                        className="group/profile inline-flex items-center gap-1.5 text-[12px] text-[#EDEDE8] hover:text-music-accent font-semibold truncate motion-hover cursor-pointer focus-ring"
                         title={`Open ${displayName}'s Spotify Profile`}
                       >
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-music-accent underline-offset-4 truncate">
                           {displayName}
                         </span>
-                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-music-accent shrink-0 transition-colors" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-music-accent shrink-0 motion-hover" />
                       </a>
                     </div>
 
@@ -600,7 +600,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleDisconnect}
                       disabled={isBusy}
-                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[11px] transition-colors cursor-pointer disabled:opacity-50 focus-ring"
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[11px] motion-hover cursor-pointer disabled:opacity-50 focus-ring"
                       title="Disconnect Spotify account"
                     >
                       Disconnect
@@ -634,13 +634,13 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                         href={profileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group/profile inline-flex items-center gap-1.5 text-[12px] text-[#EDEDE8] hover:text-amber-400 font-semibold truncate transition-colors cursor-pointer focus-ring"
+                        className="group/profile inline-flex items-center gap-1.5 text-[12px] text-[#EDEDE8] hover:text-amber-400 font-semibold truncate motion-hover cursor-pointer focus-ring"
                         title={`Open ${displayName}'s Spotify Profile`}
                       >
                         <span className="underline decoration-[#3A3A32] group-hover/profile:decoration-amber-400 underline-offset-4 truncate">
                           {displayName}
                         </span>
-                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-amber-400 shrink-0 transition-colors" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#6A6A64] group-hover/profile:text-amber-400 shrink-0 motion-hover" />
                       </a>
                     </div>
 
@@ -680,7 +680,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
                       type="button"
                       onClick={handleDisconnect}
                       disabled={isBusy}
-                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[11px] transition-colors cursor-pointer disabled:opacity-50 focus-ring"
+                      className="py-2 px-3 border border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] font-mono text-[11px] motion-hover cursor-pointer disabled:opacity-50 focus-ring"
                       title="Disconnect Spotify account"
                     >
                       Disconnect

@@ -36,7 +36,7 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
           type="button"
           onClick={onRegenerateSyncKey}
           disabled={isBusy || isRegeneratingKey}
-          className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 focus-ring"
+          className="text-[#6A6A64] hover:text-[#EDEDE8] motion-hover cursor-pointer flex items-center gap-1 disabled:opacity-50 focus-ring"
           title="Regenerate scheduled sync key"
         >
           {isRegeneratingKey ? (
@@ -58,7 +58,7 @@ export const ScheduledSyncCard: React.FC<ScheduledSyncCardProps> = ({
           type="button"
           onClick={onCopySyncUrl}
           disabled={!hasValidSyncKey || isBusy || isRegeneratingKey}
-          className={`px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] ${hoverColorClass} hover:bg-[#1A1A18] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40 focus-ring`}
+          className={`px-3 py-2 border-l border-[#26261F] font-mono text-[11px] text-[#EDEDE8] ${hoverColorClass} hover:bg-[#1A1A18] motion-hover cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-40 focus-ring`}
           title="Copy Scheduled Sync URL"
         >
           {copiedSyncUrl ? (

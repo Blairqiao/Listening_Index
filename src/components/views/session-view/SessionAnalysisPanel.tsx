@@ -52,13 +52,13 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
       <div
         onClick={() => topTrackHref && window.open(topTrackHref, "_blank", "noopener,noreferrer")}
         className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-          topTrackHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
+          topTrackHref ? "group cursor-pointer hover:bg-[#111110] motion-hover" : ""
         }`}
       >
         <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
           Top track
         </span>
-        <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
+        <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent motion-hover">
           {activeTopTrack ? (
             <>
               <a
@@ -85,13 +85,13 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
         <div
           onClick={() => topAlbumHref && window.open(topAlbumHref, "_blank", "noopener,noreferrer")}
           className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-            topAlbumHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
+            topAlbumHref ? "group cursor-pointer hover:bg-[#111110] motion-hover" : ""
           }`}
         >
           <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
             Top album
           </span>
-          <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
+          <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent motion-hover">
             {topAlbumHref ? (
               <a
                 href={topAlbumHref}
@@ -117,13 +117,13 @@ export const SessionAnalysisPanel: React.FC<SessionAnalysisPanelProps> = ({ anal
         <div
           onClick={() => topArtistHref && window.open(topArtistHref, "_blank", "noopener,noreferrer")}
           className={`flex justify-between items-baseline gap-3 py-2 px-1 border-b border-[#191917] select-none ${
-            topArtistHref ? "group cursor-pointer hover:bg-[#111110] transition-none" : ""
+            topArtistHref ? "group cursor-pointer hover:bg-[#111110] motion-hover" : ""
           }`}
         >
           <span className="font-mono text-[12px] text-[#5A5A55] flex-none">
             Top artist
           </span>
-          <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent transition-none">
+          <span className="font-sans text-[13px] text-right truncate min-w-0 text-[#EDEDE8] group-hover:text-music-accent motion-hover">
             {topArtistHref ? (
               <a
                 href={topArtistHref}
