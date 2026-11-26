@@ -141,14 +141,13 @@ test("ActivityChart omits animate-content-enter on skeleton and keeps it on load
 
 test("StreamLogView renders centered empty state, skeleton without empty text, and press/focus/hit-area on buttons", () => {
   const emptyMarkup = renderToStaticMarkup(
-    React.createElement(
-      ConfigProvider,
-      { initialVisitorTimezone: "UTC" },
-      React.createElement(StreamLogView, {
+    React.createElement(ConfigProvider, {
+      initialVisitorTimezone: "UTC",
+      children: React.createElement(StreamLogView, {
         entries: [],
         isLoading: false,
-      })
-    )
+      }),
+    })
   );
   assert.ok(emptyMarkup.includes("No plays"), "Empty stream log must render centered 'No plays'");
   assert.ok(
@@ -158,29 +157,27 @@ test("StreamLogView renders centered empty state, skeleton without empty text, a
   assert.ok(emptyMarkup.includes("animate-content-enter"));
 
   const loadingMarkup = renderToStaticMarkup(
-    React.createElement(
-      ConfigProvider,
-      { initialVisitorTimezone: "UTC" },
-      React.createElement(StreamLogView, {
+    React.createElement(ConfigProvider, {
+      initialVisitorTimezone: "UTC",
+      children: React.createElement(StreamLogView, {
         entries: [],
         isLoading: true,
-      })
-    )
+      }),
+    })
   );
   assert.ok(!loadingMarkup.includes("No plays"), "Loading skeleton must not render empty-state label");
   assert.ok(!loadingMarkup.includes("animate-content-enter"), "Loading skeleton must not get animate-content-enter");
   assert.equal((loadingMarkup.match(/animate-pulse/g) ?? []).length, 9);
 
   const loadedHasMoreMarkup = renderToStaticMarkup(
-    React.createElement(
-      ConfigProvider,
-      { initialVisitorTimezone: "UTC" },
-      React.createElement(StreamLogView, {
+    React.createElement(ConfigProvider, {
+      initialVisitorTimezone: "UTC",
+      children: React.createElement(StreamLogView, {
         entries: sampleEntries,
         hasMore: true,
         isLoading: false,
-      })
-    )
+      }),
+    })
   );
   assert.ok(!loadedHasMoreMarkup.includes("No plays"));
   assert.ok(loadedHasMoreMarkup.includes("animate-content-enter"));
@@ -194,15 +191,14 @@ test("StreamLogView renders centered empty state, skeleton without empty text, a
   }
 
   const loadedArchivedMarkup = renderToStaticMarkup(
-    React.createElement(
-      ConfigProvider,
-      { initialVisitorTimezone: "UTC" },
-      React.createElement(StreamLogView, {
+    React.createElement(ConfigProvider, {
+      initialVisitorTimezone: "UTC",
+      children: React.createElement(StreamLogView, {
         entries: sampleEntries,
         hasMore: false,
         isLoading: false,
-      })
-    )
+      }),
+    })
   );
   const archivedButtons = loadedArchivedMarkup.match(/<button\b[^>]*>/g) ?? [];
   assert.equal(archivedButtons.length, 1);
