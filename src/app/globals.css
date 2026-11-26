@@ -90,11 +90,45 @@ body::-webkit-scrollbar,
 
 /* Empty days inside a calendar selection, lifted so the range reads against dimmed days outside it */
 .calendar-level-0.calendar-in-range {
-  background-color: #383838;
+  background-color: #353535;
 }
 
-.calendar-in-range {
-  filter: brightness(1.2);
+/* Outer perimeter boundary for selected calendar ranges (sits inside the cell gap) */
+.calendar-range-edge {
+  --edge-size: 1px;
+  --edge-color: rgba(237, 237, 232, 0.78);
+  --edge-t: 0 0 0 0 transparent;
+  --edge-r: 0 0 0 0 transparent;
+  --edge-b: 0 0 0 0 transparent;
+  --edge-l: 0 0 0 0 transparent;
+  --edge-ring: 0 0 0 0 transparent;
+  box-shadow: var(--edge-t), var(--edge-r), var(--edge-b), var(--edge-l), var(--edge-ring);
+}
+
+@media (min-width: 768px) {
+  .calendar-range-edge {
+    --edge-size: 1.5px;
+  }
+}
+
+.calendar-edge-t {
+  --edge-t: 0 calc(var(--edge-size) * -1) 0 0 var(--edge-color);
+}
+
+.calendar-edge-r {
+  --edge-r: var(--edge-size) 0 0 0 var(--edge-color);
+}
+
+.calendar-edge-b {
+  --edge-b: 0 var(--edge-size) 0 0 var(--edge-color);
+}
+
+.calendar-edge-l {
+  --edge-l: calc(var(--edge-size) * -1) 0 0 0 var(--edge-color);
+}
+
+.calendar-edge-endpoint {
+  --edge-ring: inset 0 0 0 1px #EDEDE8;
 }
 
 .calendar-level-1 {

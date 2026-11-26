@@ -91,6 +91,23 @@ function rampEndColor(
   return meta.tone === "b" ? "var(--taste-tone-b)" : "var(--taste-tone-a)";
 }
 
+function rangeEdgeClasses(
+  top: boolean,
+  right: boolean,
+  bottom: boolean,
+  left: boolean,
+  isEndpoint: boolean,
+): string {
+  if (!top && !right && !bottom && !left) return "";
+  let cls = "calendar-range-edge";
+  if (top) cls += " calendar-edge-t";
+  if (right) cls += " calendar-edge-r";
+  if (bottom) cls += " calendar-edge-b";
+  if (left) cls += " calendar-edge-l";
+  if (isEndpoint) cls += " calendar-edge-endpoint";
+  return cls;
+}
+
 interface YearBlockProps {
   year: number;
   firstDate: string | null;
@@ -144,6 +161,32 @@ const YearBlock = React.memo<YearBlockProps>(
       [year]
     );
     const numCols = cols.length;
+    const yearStr = String(year).padStart(4, "0");
+
+    const isMobileCellSelected = (mIdx: number, dNum: number): boolean => {
+      if (clippedSelection === null) return false;
+      if (mIdx < 0 || mIdx >= months.length) return false;
+      const m = months[mIdx];
+      if (dNum < 1 || dNum > m.maxDays) return false;
+      const key = `${yearStr}-${String(m.monthNum).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+      return (
+        isSelectableDate(key, firstDate, today) &&
+        key >= clippedSelection.from &&
+        key <= clippedSelection.to
+      );
+    };
+
+    const isDesktopCellSelected = (cIdx: number, rIdx: number): boolean => {
+      if (clippedSelection === null) return false;
+      if (cIdx < 0 || cIdx >= cols.length || rIdx < 0 || rIdx >= 7) return false;
+      const key = cols[cIdx][rIdx];
+      if (!key) return false;
+      return (
+        isSelectableDate(key, firstDate, today) &&
+        key >= clippedSelection.from &&
+        key <= clippedSelection.to
+      );
+    };
 
     // Calculate total plays in this year
     const yearPlays = useMemo(() => {
@@ -297,7 +340,7 @@ const YearBlock = React.memo<YearBlockProps>(
                   <div className="h-[10px] leading-[10px] text-[10px] text-[#5A5A55] text-right pr-[3px] select-none font-mono">
                     {isLabelDay ? dayNum : ""}
                   </div>
-                  {months.map((month) => {
+                  {months.map((month, monthIdx) => {
                     if (dayNum > month.maxDays) {
                       return (
                         <div
@@ -306,10 +349,9 @@ const YearBlock = React.memo<YearBlockProps>(
                         />
                       );
                     }
-                    const yStr = String(year).padStart(4, "0");
                     const mStr = String(month.monthNum).padStart(2, "0");
                     const dStr = String(dayNum).padStart(2, "0");
-                    const dateKey = `${yStr}-${mStr}-${dStr}`;
+                    const dateKey = `${yearStr}-${mStr}-${dStr}`;
                     const selectable = isSelectableDate(dateKey, firstDate, today);
                     if (!selectable) {
                       return (
@@ -333,6 +375,16 @@ const YearBlock = React.memo<YearBlockProps>(
                       hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                     const inRangeClass =
                       hasActiveSelection && isSelected ? "calendar-in-range" : "";
+                    const edgeClass =
+                      hasActiveSelection && isSelected
+                        ? rangeEdgeClasses(
+                            !isMobileCellSelected(monthIdx, dayNum - 1),
+                            !isMobileCellSelected(monthIdx + 1, dayNum),
+                            !isMobileCellSelected(monthIdx, dayNum + 1),
+                            !isMobileCellSelected(monthIdx - 1, dayNum),
+                            isStartOrEnd,
+                          )
+                        : "";
                     const ringClass = isStartOrEnd
                       ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                       : "";
@@ -342,7 +394,7 @@ const YearBlock = React.memo<YearBlockProps>(
                         key={dateKey}
                         data-date={dateKey}
                         title={`${dateKey} · ${count} plays`}
-                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
+                        className={`h-[10px] w-full rounded-[1px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${edgeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75`}
                         style={{ touchAction: "pan-y" }}
                       />
                     );
@@ -530,6 +582,16 @@ const YearBlock = React.memo<YearBlockProps>(
                   hasActiveSelection && !isSelected ? "opacity-40" : "opacity-100";
                 const inRangeClass =
                   hasActiveSelection && isSelected ? "calendar-in-range" : "";
+                const edgeClass =
+                  hasActiveSelection && isSelected
+                    ? rangeEdgeClasses(
+                        !isDesktopCellSelected(colIdx, rowIdx - 1),
+                        !isDesktopCellSelected(colIdx + 1, rowIdx),
+                        !isDesktopCellSelected(colIdx, rowIdx + 1),
+                        !isDesktopCellSelected(colIdx - 1, rowIdx),
+                        isStartOrEnd,
+                      )
+                    : "";
                 const ringClass = isStartOrEnd
                   ? "ring-1 ring-inset ring-[#EDEDE8] z-10"
                   : "";
@@ -540,7 +602,7 @@ const YearBlock = React.memo<YearBlockProps>(
                     data-date={dateKey}
                     style={{ gridColumn: colNum, gridRow: rowNum, touchAction: "pan-y" }}
                     title={`${dateKey} · ${count} plays`}
-                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
+                    className={`aspect-square rounded-[1.5px] calendar-level-${level} ${opacityClass} ${inRangeClass} ${edgeClass} ${ringClass} cursor-pointer transition-[opacity,box-shadow] duration-75 hover:outline hover:outline-1.5 hover:outline-[#EDEDE8] hover:z-20`}
                   />
                 );
               })

@@ -191,6 +191,72 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   assert.ok(cellOut, "should find 2025-01-10 cell");
   assert.match(cellOut[0], /opacity-40/);
   assert.doesNotMatch(cellOut[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
+  assert.doesNotMatch(cellOut[0], /calendar-edge-/);
+});
+
+test("CalendarView marks outer perimeter edges of a selected range on desktop and mobile", () => {
+  const data: CalendarData = {
+    firstDate: "2024-06-01",
+    today: "2025-06-01",
+    timezone: "UTC",
+    days: [
+      { date: "2024-11-15", count: 10 },
+      { date: "2024-12-11", count: 20 },
+    ],
+  };
+
+  // Selection from Fri 2024-11-15 through Tue 2024-12-31
+  const html = renderToStaticMarkup(
+    React.createElement(CalendarView, {
+      data,
+      isLoading: false,
+      selection: { from: "2024-11-15", to: "2024-12-31" },
+      onSelectionChange: () => {},
+      onOpenInOverview: () => {},
+    })
+  );
+
+  const cellsFor = (date: string) => {
+    const matches = html.match(new RegExp(`<div[^>]*data-date="${date}"[^>]*>`, "g")) ?? [];
+    assert.equal(matches.length, 2, `expected mobile and desktop cells for ${date}`);
+    return { mobile: matches[0], desktop: matches[1] };
+  };
+
+  // Start cell (Fri 2024-11-15): desktop has top (Thu Nov 14 unselected) and left (Fri Nov 8 unselected) edges, plus endpoint
+  const start = cellsFor("2024-11-15");
+  assert.match(start.desktop, /calendar-range-edge/);
+  assert.match(start.desktop, /calendar-edge-t/);
+  assert.match(start.desktop, /calendar-edge-l/);
+  assert.doesNotMatch(start.desktop, /calendar-edge-b/);
+  assert.doesNotMatch(start.desktop, /calendar-edge-r/);
+  assert.match(start.desktop, /calendar-edge-endpoint/);
+
+  // Mobile start cell (Nov 15): top (Nov 14 unselected) and left (Oct 15 unselected) edges
+  assert.match(start.mobile, /calendar-range-edge/);
+  assert.match(start.mobile, /calendar-edge-t/);
+  assert.match(start.mobile, /calendar-edge-l/);
+  assert.doesNotMatch(start.mobile, /calendar-edge-b/);
+  assert.doesNotMatch(start.mobile, /calendar-edge-r/);
+
+  // Desktop interior cell (Wed 2024-12-11): surrounded on all 4 sides by selected days -> no edge classes
+  const dec11 = cellsFor("2024-12-11");
+  assert.doesNotMatch(dec11.desktop, /calendar-range-edge/);
+  assert.doesNotMatch(dec11.desktop, /calendar-edge-/);
+  // Mobile Dec 11: Nov 11 is unselected (left edge) and month 13 doesn't exist (right edge)
+  assert.match(dec11.mobile, /calendar-edge-l/);
+  assert.match(dec11.mobile, /calendar-edge-r/);
+  assert.doesNotMatch(dec11.mobile, /calendar-edge-t/);
+  assert.doesNotMatch(dec11.mobile, /calendar-edge-b/);
+
+  // Desktop top-row cell (Sun 2024-12-01) and bottom-row cell (Sat 2024-12-07)
+  const dec01 = cellsFor("2024-12-01");
+  assert.match(dec01.desktop, /calendar-edge-t/);
+  assert.doesNotMatch(dec01.desktop, /calendar-edge-b/);
+  assert.match(dec01.mobile, /calendar-edge-t/);
+
+  const dec07 = cellsFor("2024-12-07");
+  assert.match(dec07.desktop, /calendar-edge-b/);
+  assert.doesNotMatch(dec07.desktop, /calendar-edge-t/);
 });
 
 test("CalendarView renders 'No Plays yet.' when data has no plays or null firstDate", () => {
