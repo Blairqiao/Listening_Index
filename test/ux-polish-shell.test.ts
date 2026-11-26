@@ -71,7 +71,7 @@ const sampleEntries: StreamLogItem[] = [
   },
 ];
 
-test("OverviewView renders 10 track skeleton rows while loading and animate-content-enter once loaded", () => {
+test("OverviewView renders 10 track skeleton rows while loading and swaps to content with no fade", () => {
   const loadingMarkup = renderToStaticMarkup(
     React.createElement(OverviewView, {
       granularity: "day",
@@ -99,11 +99,10 @@ test("OverviewView renders 10 track skeleton rows while loading and animate-cont
     })
   );
 
-  const enterMatches = loadedMarkup.match(/animate-content-enter/g) ?? [];
-  assert.equal(enterMatches.length, 4, "Loaded tracks, artists, albums, and chart must get animate-content-enter");
+  assert.ok(!loadedMarkup.includes("animate-content-enter"), "Loaded content appears without a fade");
 });
 
-test("ActivityChart omits animate-content-enter on skeleton and keeps it on loaded and dimmed states", () => {
+test("ActivityChart never fades its bars in, loading, loaded or refreshing", () => {
   const loadingMarkup = renderToStaticMarkup(
     React.createElement(ActivityChart, {
       granularity: "day",
@@ -123,7 +122,7 @@ test("ActivityChart omits animate-content-enter on skeleton and keeps it on load
       visitorTimezone: "UTC",
     })
   );
-  assert.ok(loadedMarkup.includes("animate-content-enter"));
+  assert.ok(!loadedMarkup.includes("animate-content-enter"));
 
   const refreshingMarkup = renderToStaticMarkup(
     React.createElement(ActivityChart, {
@@ -133,10 +132,8 @@ test("ActivityChart omits animate-content-enter on skeleton and keeps it on load
       visitorTimezone: "UTC",
     })
   );
-  assert.ok(
-    refreshingMarkup.includes("animate-content-enter"),
-    "Refreshing with existing buckets keeps animate-content-enter mounted without flipping back to skeleton"
-  );
+  assert.ok(!refreshingMarkup.includes("animate-pulse"), "Refreshing with existing buckets keeps the bars, not the skeleton");
+  assert.ok(!refreshingMarkup.includes("animate-content-enter"));
 });
 
 test("StreamLogView renders centered empty state, skeleton without empty text, and press/focus/hit-area on buttons", () => {
@@ -154,7 +151,7 @@ test("StreamLogView renders centered empty state, skeleton without empty text, a
     !emptyMarkup.includes('class="h-[54px] border-b border-[#191917]"'),
     "Empty stream log must not render 9 blank rows"
   );
-  assert.ok(emptyMarkup.includes("animate-content-enter"));
+  assert.ok(!emptyMarkup.includes("animate-content-enter"));
 
   const loadingMarkup = renderToStaticMarkup(
     React.createElement(ConfigProvider, {
@@ -180,7 +177,7 @@ test("StreamLogView renders centered empty state, skeleton without empty text, a
     })
   );
   assert.ok(!loadedHasMoreMarkup.includes("No plays"));
-  assert.ok(loadedHasMoreMarkup.includes("animate-content-enter"));
+  assert.ok(!loadedHasMoreMarkup.includes("animate-content-enter"));
   const hasMoreButtons = loadedHasMoreMarkup.match(/<button\b[^>]*>/g) ?? [];
   assert.equal(hasMoreButtons.length, 2);
   for (const btn of hasMoreButtons) {
@@ -287,7 +284,7 @@ test("MiniPlayerBar transport buttons include press and focus-ring", () => {
   }
 });
 
-test("ListeningView fades the black veil and keys animate-view-enter on the view wrapper", () => {
+test("ListeningView fades the black veil and swaps views with no fade", () => {
   const src = fs.readFileSync(
     path.resolve(__dirname, "../src/components/ListeningView.tsx"),
     "utf8"
@@ -303,8 +300,8 @@ test("ListeningView fades the black veil and keys animate-view-enter on the view
   );
   assert.match(
     src,
-    /<div\s+key=\{activeMode\}\s+aria-busy=\{isViewDimmed\}\s+className=\{`animate-view-enter /,
-    "View wrapper must be keyed by activeMode and apply animate-view-enter"
+    /<div\s+key=\{activeMode\}\s+aria-busy=\{isViewDimmed\}\s+className=\{`h-auto /,
+    "View wrapper stays keyed by activeMode and no longer fades in"
   );
   assert.ok(
     src.includes("transition-opacity duration-150") && src.includes("opacity-60 pointer-events-none"),

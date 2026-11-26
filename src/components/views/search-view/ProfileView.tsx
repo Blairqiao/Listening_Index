@@ -85,7 +85,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   if (status === "not_found" || status === "error") {
     return (
-      <div className="mt-4 md:mt-6 select-none animate-view-enter">
+      <div className="mt-4 md:mt-6 select-none">
         <div role="status" className="mt-6 font-mono text-[12px] text-[#5A5A55]">
           {status === "not_found" ? "Not in archive" : "Couldn't load profile"}
         </div>
@@ -99,7 +99,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     const loadingScrollKey = `loading-${pendingKind}`;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none animate-view-enter">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none">
         <div className="min-w-0 md:col-span-full">
           <div className="flex items-center gap-3 md:gap-4">
             <div className="w-[88px] h-[88px] bg-[#141413] animate-pulse flex-none" />
@@ -306,7 +306,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   return (
     <div
       aria-busy={status === "loading" || undefined}
-      className={`grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none animate-view-enter ${
+      className={`grid grid-cols-1 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 md:gap-[26px] mt-4 md:mt-6 select-none ${
         status === "loading" ? "opacity-60 pointer-events-none" : ""
       }`}
     >

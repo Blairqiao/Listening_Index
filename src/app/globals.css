@@ -14,20 +14,6 @@
   --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-view-enter: view-enter var(--motion-fast) var(--ease-snappy) both;
-  --animate-content-enter: content-enter var(--motion-fast) var(--ease-snappy) both;
-
-  @keyframes view-enter {
-    from {
-      opacity: 0;
-    }
-  }
-
-  @keyframes content-enter {
-    from {
-      opacity: 0;
-    }
-  }
 }
 
 :root {
@@ -35,7 +21,7 @@
   --foreground: #EDEDE8;
   --motion-hover: 70ms;      /* set to 0ms to revert every hover to instant */
   --motion-press: 60ms;
-  --motion-fast: 120ms;      /* tab enter, content enter, selection, menus */
+  --motion-fast: 120ms;      /* selection, menus */
   --motion-medium: 200ms;    /* modals, card-row scroll; matches ZOOM_ANIM_DURATION_MS */
   --motion-exit: 150ms;      /* modal close; matches MODAL_EXIT_MS */
 }

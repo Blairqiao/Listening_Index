@@ -82,7 +82,6 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       onLoadMore?.();
     }
   };
-  const isStreamSkeleton = entries.length === 0 && isLoading;
 
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
@@ -99,7 +98,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       {/* 2. Scrollable Body Container (h-auto on mobile, fixed h-[544px] on desktop) */}
       <div
         ref={scrollContainerRef}
-        className={`w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden ${isStreamSkeleton ? "" : "animate-content-enter"}`}
+        className="w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden"
         role="list"
       >
         {entries.length === 0 ? (

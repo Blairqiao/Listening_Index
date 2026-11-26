@@ -1015,7 +1015,7 @@ test("ProfileView loading skeleton includes entry animation, share-bar placehold
   );
 
   const rootTag = skeleton.slice(0, skeleton.indexOf(">") + 1);
-  assert.match(rootTag, /\banimate-view-enter\b/, "Skeleton root must include animate-view-enter");
+  assert.doesNotMatch(rootTag, /animate-view-enter/, "views and their content appear without a fade");
   assert.match(skeleton, /\bmin-h-\[168px\]/, "Stats/streak skeleton block must reserve mobile min-h");
   assert.match(skeleton, /\bmd:min-h-\[80px\]/, "Stats/streak skeleton block must reserve desktop min-h");
   assert.match(skeleton, /h-\[10px\] w-full bg-\[#191917\] animate-pulse/, "Skeleton must include 10px share-bar placeholder");
@@ -1032,8 +1032,8 @@ test("ProfileView ready markup applies view/content enter, focus-ring, press, an
   );
 
   const rootTag = artistMarkup.slice(0, artistMarkup.indexOf(">") + 1);
-  assert.match(rootTag, /\banimate-view-enter\b/, "ProfileView root must include animate-view-enter");
-  assert.match(artistMarkup, /\banimate-content-enter\b/, "ProfileChart body must include animate-content-enter");
+  assert.doesNotMatch(rootTag, /animate-view-enter/, "views and their content appear without a fade");
+  assert.doesNotMatch(artistMarkup, /animate-content-enter/, "views and their content appear without a fade");
   assert.doesNotMatch(artistMarkup, /focus-visible:bg-\[#111110\]/, "Profile rows must use focus-ring instead of bare focus-visible:bg");
 
   const toggleBtn = artistMarkup.match(/<button\b[^>]*title="Click to switch chart view"[^>]*>/)?.[0] ?? "";

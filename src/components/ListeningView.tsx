@@ -935,7 +935,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
           <div
             key={activeMode}
             aria-busy={isViewDimmed}
-            className={`animate-view-enter h-auto ${activeMode === 3 || activeMode === 4 || activeMode === 5 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+            className={`h-auto ${activeMode === 3 || activeMode === 4 || activeMode === 5 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
               } transition-opacity duration-150 ${isViewDimmed
                 ? "opacity-60 pointer-events-none"
                 : "opacity-100"

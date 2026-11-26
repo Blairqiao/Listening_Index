@@ -83,7 +83,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </span>
         </div>
 
-        <div className={`flex flex-col ${isTracksSkeleton ? "" : "animate-content-enter"}`} role="list">
+        <div className="flex flex-col" role="list">
           {isTracksSkeleton ? (
             Array.from({ length: 10 }).map((_, idx) => (
               <div
@@ -213,7 +213,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             Artist index
           </div>
           <div
-            className={`flex flex-col ${isArtistsSkeleton ? "" : "animate-content-enter intro-fade"}`}
+            className={`flex flex-col ${isArtistsSkeleton ? "" : "intro-fade"}`}
             style={introDelayStyle(INDEX_INTRO_DELAY_MS)}
             role="list"
           >
@@ -281,7 +281,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             Album index
           </div>
           <div
-            className={`flex flex-col ${isAlbumsSkeleton ? "" : "animate-content-enter intro-fade"}`}
+            className={`flex flex-col ${isAlbumsSkeleton ? "" : "intro-fade"}`}
             style={introDelayStyle(INDEX_INTRO_DELAY_MS)}
             role="list"
           >

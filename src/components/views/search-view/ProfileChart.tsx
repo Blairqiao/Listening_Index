@@ -120,7 +120,7 @@ export function ProfileChart({
 
   return (
     <div>
-      <div key={currentView} className="animate-content-enter">
+      <div key={currentView}>
         {currentView === "hour" && hourOfDay ? (
           <HourChart counts={hourOfDay} heading={heading} />
         ) : currentView === "day" && dayOfWeek ? (

@@ -92,11 +92,9 @@ test("all four modals use the shared modal motion and unmount after MODAL_EXIT_M
 
 // View switch
 
-test("view-enter is a plain fade with no vertical movement", () => {
+test("view switches have no enter animation at all", () => {
   const css = readSrc("src/app/globals.css");
-  const keyframes = cssBlock(css, "@keyframes view-enter");
-  assert.match(keyframes, /opacity:\s*0/);
-  assert.doesNotMatch(keyframes, /transform|translate/);
+  assert.doesNotMatch(css, /view-enter|content-enter/);
 });
 
 // Reduced motion

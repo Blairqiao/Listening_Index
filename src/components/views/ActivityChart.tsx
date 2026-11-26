@@ -127,7 +127,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         <div
           key={activityCadence.length}
           ref={chartRef}
-          className={`flex gap-[2px] items-end h-[80px] w-full ${isChartSkeleton ? "" : "animate-content-enter"}`}
+          className="flex gap-[2px] items-end h-[80px] w-full"
           role={isClickable ? "group" : "img"}
           aria-label="Activity cadence histogram"
         >

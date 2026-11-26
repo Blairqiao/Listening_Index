@@ -390,7 +390,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col select-none animate-view-enter">
+    <div className="w-full flex flex-col select-none">
       {/* Top control strip */}
       <div className="my-3.5 sm:my-4 md:my-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div
@@ -488,7 +488,7 @@ export const SearchView: React.FC<SearchViewProps> = ({
       <div
         key={page}
         aria-busy={status === "loading" ? "true" : undefined}
-        className={`animate-content-enter transition-opacity duration-150 ${status === "loading" ? "opacity-60 pointer-events-none" : "opacity-100"}`}
+        className={`transition-opacity duration-150 ${status === "loading" ? "opacity-60 pointer-events-none" : "opacity-100"}`}
       >
         {renderResults()}
       </div>

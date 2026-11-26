@@ -1135,8 +1135,8 @@ test("SearchView UX polish: entry animation, reserved status height, and focus/p
   );
 
   const rootTag = html.slice(0, html.indexOf(">") + 1);
-  assert.match(rootTag, /\banimate-view-enter\b/, "SearchView root must include animate-view-enter");
-  assert.match(html, /\banimate-content-enter\b/, "Results wrapper must include animate-content-enter");
+  assert.doesNotMatch(rootTag, /animate-view-enter/, "views and their content appear without a fade");
+  assert.doesNotMatch(html, /animate-content-enter/, "views and their content appear without a fade");
 
   const statusTag = html.match(/<div\b[^>]*role="status"[^>]*>/)?.[0] ?? "";
   assert.ok(statusTag, "Status container must render");
