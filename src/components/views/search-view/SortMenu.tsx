@@ -94,7 +94,7 @@ export function SortMenu({
   }
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="relative flex items-center">
       <button
         ref={triggerRef}
         type="button"

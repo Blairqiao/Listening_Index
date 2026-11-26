@@ -392,11 +392,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
   return (
     <div className="w-full flex flex-col select-none">
       {/* Top control strip */}
-      <div className="my-3.5 sm:my-4 md:my-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="my-3.5 sm:my-4 md:my-5 flex flex-col gap-1 sm:gap-2 sm:flex-row sm:items-center sm:justify-between sm:h-[28px]">
         <div
           role="group"
           aria-label="Filter by type"
-          className="grid grid-cols-4 gap-1.5 w-full sm:flex sm:w-auto"
+          className="flex items-center gap-5 sm:gap-6 h-[28px]"
         >
           {SEARCH_FILTER_OPTIONS.map((opt) => {
             const isActive = filter === opt.value;
@@ -408,16 +408,18 @@ export const SearchView: React.FC<SearchViewProps> = ({
                 type="button"
                 aria-pressed={isActive}
                 onClick={() => onFilterChange?.(opt.value)}
-                className={`font-mono text-[12px] whitespace-nowrap px-1 sm:px-2.5 py-1 sm:py-[3px] rounded-none motion-hover border focus:outline-none focus-visible:outline-solid focus-visible:outline-music-accent flex items-center justify-center text-center cursor-pointer ${
-                  isActive
-                    ? "border-music-accent text-music-accent bg-transparent"
-                    : "border-[#26261F] text-[#6A6A64] hover:text-[#EDEDE8] hover:border-[#3A3A32] bg-transparent"
+                className={`relative inline-flex items-baseline gap-1.5 font-mono text-[12px] whitespace-nowrap bg-transparent border-0 p-0 cursor-pointer motion-hover focus-ring press hit-area ${
+                  isActive ? "text-music-accent" : "text-[#6A6A64] hover:text-[#EDEDE8]"
                 }`}
               >
                 <span>{opt.label}</span>
                 {count !== undefined && (
-                  <span className="hidden sm:inline ml-1 font-mono text-[11px] text-[#5A5A55] tabular-nums">
-                    {count}
+                  <span
+                    className={`hidden sm:inline text-[11px] tabular-nums ${
+                      isActive ? "text-music-accent/60" : "text-[#4A4A45]"
+                    }`}
+                  >
+                    {count.toLocaleString("en-US")}
                   </span>
                 )}
               </button>
@@ -425,13 +427,13 @@ export const SearchView: React.FC<SearchViewProps> = ({
           })}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 h-[28px]">
           {onRandomProfile && (
             <button
               type="button"
               onClick={onRandomProfile}
               aria-label="Open random profile"
-              className="relative font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-ring focus-visible:text-music-accent press hit-area motion-hover whitespace-nowrap"
+              className="relative inline-flex items-center font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-[#EDEDE8] focus-ring focus-visible:text-music-accent press hit-area motion-hover whitespace-nowrap"
             >
               Random
             </button>

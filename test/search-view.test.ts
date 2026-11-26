@@ -733,26 +733,27 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   assert.match(html, />Artists<\/span>/);
   assert.match(html, />Albums<\/span>/);
 
-  // Pill totals counts with hidden sm:inline markup
-  assert.match(
-    html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">42<\/span>/
-  );
-  assert.match(
-    html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">12<\/span>/
-  );
-  assert.match(
-    html,
-    /<span class="hidden sm:inline ml-1 font-mono text-\[11px\] text-\[#5A5A55\] tabular-nums">5<\/span>/
-  );
+  // Filters are text tabs like the rest of the control rows: no boxes, accent for the active one
+  const filterBtns = html.match(/<button\b[^>]*aria-pressed="(?:true|false)"[^>]*>/g) ?? [];
+  assert.equal(filterBtns.length, 4, "four filter buttons");
+  for (const btn of filterBtns) {
+    assert.doesNotMatch(btn, /\bborder-(?:music-accent|\[#26261F\])\b|\bpx-1\b|\bpy-1\b/, "filters drop the boxed pill");
+    assert.match(btn, /\bfocus-ring\b/);
+    assert.match(btn, /\bpress\b/);
+    assert.match(btn, /\bhit-area\b/);
+  }
+  assert.match(html, /aria-pressed="true"[^>]*text-music-accent[^>]*>[^<]*<span>Tracks<\/span>/, "active filter is accent text");
+  assert.match(html, /aria-pressed="false"[^>]*text-\[#6A6A64\][^>]*>[^<]*<span>All<\/span>/, "inactive filters are muted text");
+  assert.doesNotMatch(html, /grid-cols-4/, "filters no longer stretch into a boxed grid");
 
-  // Filter pill styling: ControlRow padding and visible focus-visible outline
-  assert.match(html, /px-1 sm:px-2\.5/);
-  assert.match(html, /focus-visible:outline-music-accent/);
+  // Counts sit beside their label, muted, hidden on phones
+  assert.match(html, /<span>Tracks<\/span><span class="hidden sm:inline text-\[11px\] tabular-nums text-music-accent\/60">42<\/span>/);
+  assert.match(html, /<span>Artists<\/span><span class="hidden sm:inline text-\[11px\] tabular-nums text-\[#4A4A45\]">12<\/span>/);
+  assert.match(html, /<span>Albums<\/span><span class="hidden sm:inline text-\[11px\] tabular-nums text-\[#4A4A45\]">5<\/span>/);
 
-  // Active filter styling: tracks is active -> border-music-accent text-music-accent
-  assert.match(html, /border-music-accent text-music-accent[^>]*>[^<]*<span>Tracks<\/span>/);
+  // Random and the Sort trigger share one centre line
+  assert.match(html, /<div class="relative flex items-center"><button\b[^>]*aria-label="Sort by"/, "Sort's wrapper is a flex box, so no line-box strut pushes the trigger down");
+  assert.match(html, /<button\b[^>]*aria-label="Open random profile"[^>]*class="[^"]*\binline-flex items-center\b/);
 
   // Bracketed sort trigger with a chevron icon
   assert.match(html, /Sort:<\/span><span>Most plays<\/span><svg\b[^>]*lucide-chevron-down[^>]*>.*?<\/svg>/);
