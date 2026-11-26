@@ -120,42 +120,12 @@ test("the bar container remounts when the bar count changes, so only same-count 
   assert.match(src, /key=\{activityCadence\.length\}[\s\S]{0,80}ref=\{chartRef\}|ref=\{chartRef\}[\s\S]{0,80}key=\{activityCadence\.length\}/);
 });
 
-// Calendar range sweep
+// Calendar range sweep (removed: it didn't read well)
 
-test("staggerDelays spreads delays from 0 to the spread with gaps that shrink", async () => {
-  const { staggerDelays } = await import("../src/lib/choreography");
-  assert.deepEqual(staggerDelays(1, 200), [0]);
-  assert.deepEqual(staggerDelays(0, 200), []);
-  const d = staggerDelays(6, 200);
-  assert.equal(d[0], 0);
-  assert.equal(d[d.length - 1], 200);
-  const gaps = d.slice(1).map((v, i) => v - d[i]);
-  gaps.forEach((g, i) => {
-    assert.ok(g > 0, "delays increase");
-    if (i > 0) assert.ok(g < gaps[i - 1], "each gap is shorter than the last");
-  });
-});
-
-test("range sweep lifts cells from the dimmed opacity over 160ms across 200ms", async () => {
-  const { RANGE_SWEEP_KEYFRAMES, RANGE_SWEEP_TIMING, RANGE_SWEEP_SPREAD_MS } = await import("../src/lib/choreography");
-  assert.deepEqual(RANGE_SWEEP_KEYFRAMES, [{ opacity: 0.4 }, { opacity: 1 }]);
-  assert.equal(RANGE_SWEEP_TIMING.duration, 160);
-  assert.equal(RANGE_SWEEP_TIMING.fill, "backwards", "cells hold the dim value until their turn");
-  assert.equal(RANGE_SWEEP_SPREAD_MS, 200);
-});
-
-test("CalendarView sweeps the range on phase, ribbon, month and year picks, never on drag", () => {
+test("CalendarView picks highlight their range at once, with no sweep", () => {
   const src = readSrc("src/components/views/CalendarView.tsx");
-  for (const handler of ["handleSelectMonth", "handleSelectYear", "handleSelectPhaseAndCenter"]) {
-    const start = src.indexOf(`const ${handler} = useCallback(`);
-    assert.notEqual(start, -1, handler);
-    assert.match(src.slice(start, start + 500), /pendingSweepRef\.current = /, `${handler} must queue a sweep`);
-  }
-  assert.match(src, /staggerDelays\(/);
-  assert.match(src, /\.animate\(RANGE_SWEEP_KEYFRAMES/);
-  assert.match(src, /prefersReducedMotion\(\)/);
-  const move = src.slice(src.indexOf("const handleWindowPointerMove"), src.indexOf("const handleWindowPointerUp"));
-  assert.doesNotMatch(move, /pendingSweepRef/);
+  assert.doesNotMatch(src, /pendingSweepRef|RANGE_SWEEP|staggerDelays/);
+  assert.doesNotMatch(readSrc("src/lib/choreography.ts"), /RANGE_SWEEP|staggerDelays/);
 });
 
 // First-load entrance

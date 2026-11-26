@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calendarYears,
   clipSelectionToYear,
@@ -37,13 +37,7 @@ import {
 } from "@/lib/taste/view";
 import { TastePhaseCards } from "@/components/views/TastePhaseCards";
 import { phaseScrollTarget } from "@/lib/phase-scroll";
-import { prefersReducedMotion, scrollBehavior } from "@/lib/motion";
-import {
-  RANGE_SWEEP_KEYFRAMES,
-  RANGE_SWEEP_SPREAD_MS,
-  RANGE_SWEEP_TIMING,
-  staggerDelays,
-} from "@/lib/choreography";
+import { scrollBehavior } from "@/lib/motion";
 
 const SHORT_MONTHS = [
   "Jan",
@@ -1100,12 +1094,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   }, []);
 
-  // Picks (not drags) light the new range up in date order once it renders.
-  const pendingSweepRef = useRef(false);
-
   const handleSelectMonth = useCallback(
     (year: number, month: number) => {
-      pendingSweepRef.current = true;
       const next = monthSelection(year, month);
       draftRef.current = next;
       setDraft(next);
@@ -1117,7 +1107,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleSelectYear = useCallback(
     (year: number) => {
-      pendingSweepRef.current = true;
       const next = yearSelection(year);
       draftRef.current = next;
       setDraft(next);
@@ -1210,9 +1199,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const handleSelectPhaseAndCenter = useCallback(
     (phase: TastePhase) => {
-      const isPick = activePhaseIdRef.current !== phase.id;
-      pendingPhaseScrollRef.current = isPick;
-      pendingSweepRef.current = isPick;
+      pendingPhaseScrollRef.current = activePhaseIdRef.current !== phase.id;
       handleSelectPhase(phase);
     },
     [handleSelectPhase],
@@ -1246,24 +1233,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       if (target !== null) window.scrollTo({ top: target, behavior: scrollBehavior() });
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [draft]);
-
-  // Layout effect: start the wave before the browser paints the range fully lit.
-  useLayoutEffect(() => {
-    if (!pendingSweepRef.current || !draft) return;
-    pendingSweepRef.current = false;
-    const container = heatmapsContainerRef.current;
-    if (!container) return;
-    const cells = [...container.querySelectorAll<HTMLElement>(".calendar-in-range")]
-      .filter((cell) => cell.offsetParent !== null) // skip the hidden layout
-      .sort((a, b) => (a.dataset.date ?? "").localeCompare(b.dataset.date ?? ""));
-    // Reduced motion keeps the fade but drops the wave.
-    const delays = prefersReducedMotion()
-      ? cells.map(() => 0)
-      : staggerDelays(cells.length, RANGE_SWEEP_SPREAD_MS);
-    cells.forEach((cell, i) => {
-      cell.animate(RANGE_SWEEP_KEYFRAMES, { ...RANGE_SWEEP_TIMING, delay: delays[i] });
-    });
   }, [draft]);
 
   const ribbonsByYear = useMemo(() => {
