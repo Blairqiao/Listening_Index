@@ -181,7 +181,7 @@ const YearMobileRibbon = React.memo<YearMobileRibbonProps>(
                   style={posStyle}
                   title={label}
                   aria-label={label}
-                  className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-colors hover:brightness-125 focus-ring hit-area-y ${toneClass}`}
+                  className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer motion-hover hover:brightness-125 focus-ring hit-area-y ${toneClass}`}
                 />
               );
             }
@@ -272,7 +272,7 @@ const YearDesktopRibbon = React.memo<YearDesktopRibbonProps>(
                 style={gridStyle}
                 title={label}
                 aria-label={label}
-                className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-colors hover:brightness-125 focus-ring ${toneClass}`}
+                className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer motion-hover hover:brightness-125 focus-ring ${toneClass}`}
               />
             );
           }
@@ -382,7 +382,7 @@ const YearMobileDayGrid = React.memo<YearMobileDayGridProps>(
                 type="button"
                 disabled={isDisabled}
                 onClick={() => onSelectMonth(year, month.monthNum)}
-                className="font-display text-[10px] text-[#5A5A55] font-medium py-1 text-center hover:text-music-accent focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
+                className="font-display text-[10px] text-[#5A5A55] font-medium py-1 text-center hover:text-music-accent motion-hover focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed bg-transparent border-0 cursor-pointer"
                 title={
                   isDisabled
                     ? `No data for ${month.label} ${year}`
@@ -552,7 +552,7 @@ const YearDesktopDayGrid = React.memo<YearDesktopDayGridProps>(
                 disabled={isDisabled}
                 onClick={() => onSelectMonth(year, month.monthNum)}
                 style={{ gridColumnStart: colIndex + 2 }}
-                className="font-display text-[10px] text-[#5A5A55] hover:text-music-accent focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed whitespace-nowrap overflow-visible text-left p-0 bg-transparent border-0 cursor-pointer"
+                className="font-display text-[10px] text-[#5A5A55] hover:text-music-accent motion-hover focus-ring disabled:opacity-20 disabled:pointer-events-none disabled:cursor-not-allowed whitespace-nowrap overflow-visible text-left p-0 bg-transparent border-0 cursor-pointer"
                 title={
                   isDisabled
                     ? `No data for ${month.label} ${year}`
@@ -742,7 +742,7 @@ const YearBlock = React.memo<YearBlockProps>(
             <button
               type="button"
               onClick={() => onSelectYear(year)}
-              className="font-display text-[15px] font-medium text-[#EDEDE8] hover:text-music-accent transition-colors focus-ring bg-transparent border-0 p-0 cursor-pointer text-left"
+              className="font-display text-[15px] font-medium text-[#EDEDE8] hover:text-music-accent motion-hover focus-ring bg-transparent border-0 p-0 cursor-pointer text-left"
               title={`Select year ${year}`}
             >
               {year}
@@ -1335,7 +1335,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             type="button"
             disabled={!draft}
             onClick={handleClear}
-            className={`text-[#5A5A55] hover:text-[#EDEDE8] transition-colors focus-ring bg-transparent border-0 p-0 text-[12px] font-mono ${
+            className={`text-[#5A5A55] hover:text-[#EDEDE8] motion-hover focus-ring bg-transparent border-0 p-0 text-[12px] font-mono ${
               draft ? "cursor-pointer" : "invisible pointer-events-none"
             }`}
           >
@@ -1345,7 +1345,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             type="button"
             disabled={!draft}
             onClick={handleOpenInOverview}
-            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none transition-colors focus-ring border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
+            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none motion-hover focus-ring border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
           >
             Open in Overview &rarr;
           </button>

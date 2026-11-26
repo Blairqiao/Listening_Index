@@ -118,7 +118,7 @@ export const TastePhaseCards: React.FC<TastePhaseCardsProps> = ({
                 aria-pressed={isSelected}
                 data-taste-phase={phase.id}
                 onClick={() => onSelectPhase(phase)}
-                className={`flex-none w-[210px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer transition-colors focus-ring active:scale-[0.99] ${
+                className={`flex-none w-[210px] snap-center border bg-[#0B0B0A] px-3 py-2.5 text-left cursor-pointer motion-hover focus-ring active:scale-[0.99] ${
                   isSelected
                     ? "border-music-accent"
                     : "border-[#1C1C1A] hover:border-[#383830]"
