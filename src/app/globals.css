@@ -93,6 +93,11 @@ body::-webkit-scrollbar,
   background-color: #353535;
 }
 
+/* Pointer capture locks :hover on the anchor cell during drag; suppress its hover outline until release */
+[data-dragging="true"] [data-date]:hover {
+  outline: none;
+}
+
 .calendar-level-1 {
   background-color: color-mix(in srgb, var(--music-accent) 22%, #1C1C1A);
 }

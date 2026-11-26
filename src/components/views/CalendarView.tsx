@@ -697,6 +697,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const heatmapsContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Pointer drag state
+  const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
   const capturedTargetRef = useRef<HTMLElement | null>(null);
@@ -734,6 +735,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const endDrag = useCallback(() => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
+    setIsDragging(false);
 
     cleanupCaptureLoss();
 
@@ -845,6 +847,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       anchorRef.current = d;
       capturedTargetRef.current = cell;
       isDraggingRef.current = true;
+      setIsDragging(true);
 
       let hasCapture = false;
       try {
@@ -1095,6 +1098,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const heatmapsContainer = (
     <div
       ref={heatmapsContainerRef}
+      data-dragging={isDragging ? "true" : undefined}
       className="w-full flex flex-col gap-6"
       onPointerDown={handleContainerPointerDown}
       onPointerUp={handleContainerPointerUp}

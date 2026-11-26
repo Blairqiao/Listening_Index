@@ -556,6 +556,86 @@ test("CalendarView shows 'Tap an end day' hint during pending second tap on touc
   assert.ok(markup.includes("Sep 4 – Oct 15, 2026"));
 });
 
+test("CalendarView sets data-dragging during mouse drag to suppress stuck hover outline and clears it on release", () => {
+  const fixtureData: CalendarData = {
+    firstDate: "2026-09-04",
+    today: "2026-11-23",
+    timezone: "America/Chicago",
+    days: [
+      { date: "2026-09-04", count: 12 },
+      { date: "2026-10-15", count: 35 },
+    ],
+  };
+
+  const { reactMock, runRender } = createReactHookHarness();
+  const { CalendarView: CalendarViewUnderTest } = loadTs("src/components/views/CalendarView.tsx", {
+    react: reactMock,
+  });
+
+  const windowListeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  const originalWindow = globalThis.window;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).window = {
+    addEventListener(type: string, fn: (...args: unknown[]) => void) {
+      if (!windowListeners.has(type)) windowListeners.set(type, new Set());
+      windowListeners.get(type)!.add(fn);
+    },
+    removeEventListener(type: string, fn: (...args: unknown[]) => void) {
+      windowListeners.get(type)?.delete(fn);
+    },
+  };
+
+  let currentSelection: CalendarSelection | null = null;
+  function renderView() {
+    return runRender(() =>
+      CalendarViewUnderTest({
+        data: fixtureData,
+        isLoading: false,
+        selection: currentSelection,
+        onSelectionChange: (sel: CalendarSelection | null) => {
+          currentSelection = sel;
+        },
+        onOpenInOverview: () => {},
+      })
+    );
+  }
+
+  try {
+    let tree = renderView();
+    let container = tree.props.children[1];
+    assert.equal(container.props["data-dragging"], undefined);
+
+    const mockCell = {
+      closest: (selector: string) =>
+        selector === "[data-date]" ? { dataset: { date: "2026-09-04" } } : null,
+    };
+
+    container.props.onPointerDown({
+      isPrimary: true,
+      pointerId: 1,
+      pointerType: "mouse",
+      button: 0,
+      target: mockCell,
+      preventDefault: () => {},
+    });
+
+    tree = renderView();
+    container = tree.props.children[1];
+    assert.equal(container.props["data-dragging"], "true", "data-dragging must be true while dragging");
+
+    for (const fn of windowListeners.get("pointerup") ?? []) {
+      fn({ pointerId: 1 });
+    }
+
+    tree = renderView();
+    container = tree.props.children[1];
+    assert.equal(container.props["data-dragging"], undefined, "data-dragging must clear after pointerup");
+  } finally {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).window = originalWindow;
+  }
+});
+
 test("useCalendarData avoids A -> B -> A race condition and restores status", async () => {
   const { pendingRequests, renderHook, restore } = createCalendarDataHarness();
 
