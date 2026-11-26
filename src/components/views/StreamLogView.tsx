@@ -4,6 +4,7 @@ import React from "react";
 import { StreamLogItem } from "@/lib/types";
 import { useConfig } from "@/context/ConfigContext";
 import { presentStreamLog } from "@/lib/listening-presentation";
+import { scrollBehavior } from "@/lib/motion";
 import { Artwork } from "../Artwork";
 
 interface StreamLogViewProps {
@@ -66,10 +67,11 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   }, [renderedEntries.length, onVisibleCountChange]);
 
   const handleScrollToTop = () => {
+    const behavior = scrollBehavior();
     if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      scrollContainerRef.current.scrollTo({ top: 0, behavior });
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior });
   };
 
   const handleLoadMore = () => {
@@ -80,6 +82,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       onLoadMore?.();
     }
   };
+  const isStreamSkeleton = entries.length === 0 && isLoading;
+
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}
@@ -95,7 +99,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       {/* 2. Scrollable Body Container (h-auto on mobile, fixed h-[544px] on desktop) */}
       <div
         ref={scrollContainerRef}
-        className="w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden"
+        className={`w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden ${isStreamSkeleton ? "" : "animate-content-enter"}`}
         role="list"
       >
         {entries.length === 0 ? (
@@ -114,12 +118,9 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
               </div>
             ))
           ) : (
-            Array.from({ length: 9 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="h-[54px] border-b border-[#191917]"
-              />
-            ))
+            <div className="flex items-center justify-center min-h-[240px] md:h-full font-mono text-[12px] text-[#5A5A55] select-none">
+              No plays
+            </div>
           )
         ) : (
           <>
@@ -246,7 +247,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     disabled={isLoadingMore}
                     onClick={handleLoadMore}
-                    className={`group font-mono text-[12px] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
+                    className={`group relative hit-area press focus-ring font-mono text-[12px] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
                       }`}
                   >
                     <span className="md:hidden">
@@ -260,7 +261,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
-                    className="group font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
+                    className="group relative hit-area press focus-ring font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
                   >
                     ↑
                   </button>
@@ -278,7 +279,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
-                    className="group font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
+                    className="group relative hit-area press focus-ring font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
                   >
                     ↑
                   </button>

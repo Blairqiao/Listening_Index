@@ -809,7 +809,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       {/* Black veil holding the screen as long as needed until real data is ready */}
       <div
         aria-hidden="true"
-        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-300 ease-in-out ${isDataReady ? "opacity-0" : "opacity-100"
+        className={`fixed inset-0 z-40 bg-[#080808] pointer-events-none select-none transition-opacity duration-[var(--motion-showpiece)] ease-expressive ${isDataReady ? "opacity-0" : "opacity-100"
           }`}
       />
       <main
@@ -889,8 +889,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
 
           {/* 5. Mode Views (h-auto on mobile; locked h-[584px] for Modes 0-2, adaptive min-h-[584px] for Live Player and Search) */}
           <div
+            key={activeMode}
             aria-busy={isViewDimmed}
-            className={`h-auto ${activeMode === 3 || activeMode === 4 || activeMode === 5 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
+            className={`animate-view-enter h-auto ${activeMode === 3 || activeMode === 4 || activeMode === 5 ? "md:min-h-[584px] md:h-auto" : "md:h-[584px]"
               } transition-opacity duration-150 ${isViewDimmed
                 ? "opacity-60 pointer-events-none"
                 : "opacity-100"

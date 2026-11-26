@@ -96,6 +96,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   const defaultHeadingText = showRange
     ? headingSuffix ? `${label} / ${headingSuffix}` : label
     : label;
+  const isChartSkeleton = isLoading && activityCadence.length === 0;
 
   return (
     <div>
@@ -120,11 +121,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       <div>
         <div
           ref={chartRef}
-          className="flex gap-[2px] items-end h-[80px] w-full"
+          className={`flex gap-[2px] items-end h-[80px] w-full ${isChartSkeleton ? "" : "animate-content-enter"}`}
           role={isClickable ? "group" : "img"}
           aria-label="Activity cadence histogram"
         >
-          {isLoading && activityCadence.length === 0 ? (
+          {isChartSkeleton ? (
             Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}

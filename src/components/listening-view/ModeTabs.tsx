@@ -116,7 +116,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
                 e.currentTarget.blur();
                 if (!isSyncing) onSelectMode(m.id);
               }}
-              className={`font-mono text-[11px] sm:text-[13px] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b focus:outline-none focus-visible:outline-none whitespace-nowrap ${isSyncing ? "cursor-wait" : "cursor-pointer"
+              className={`relative hit-area focus-ring font-mono text-[11px] sm:text-[13px] pb-2 sm:pb-2.5 bg-transparent transition-none select-none border-0 border-b whitespace-nowrap ${isSyncing ? "cursor-wait" : "cursor-pointer"
                 } ${isActive
                   ? "text-music-accent border-music-accent"
                   : "text-[#5A5A55] border-transparent hover:text-[#EDEDE8]"
@@ -137,7 +137,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={onOpenUpload}
             title="Import Spotify Extended Streaming History (.zip / .json)"
             aria-label="Import Spotify Extended Streaming History"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="relative hit-area focus-ring inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent whitespace-nowrap"
           >
             <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
@@ -149,7 +149,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={handleOpenSpotify}
             title={spotifyTab.title}
             aria-label="Manage Spotify connection"
-            className={`inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap ${
+            className={`relative hit-area focus-ring inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent whitespace-nowrap ${
               spotifyTab.variant === "setup"
                 ? "text-music-accent hover:text-[#EDEDE8] animate-slow-blink"
                 : spotifyTab.variant === "expiring"
@@ -167,7 +167,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
           onClick={openModal}
           title={isAuthenticated ? "Open configuration settings" : "Open appearance settings"}
           aria-label="Appearance and configuration settings"
-          className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+          className="relative hit-area focus-ring inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent whitespace-nowrap"
         >
           <Menu className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
@@ -178,7 +178,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={logout}
             title="Admin session active · click to lock"
             aria-label="Lock admin session"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="relative hit-area focus-ring inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-music-accent hover:text-[#EDEDE8] transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent whitespace-nowrap"
           >
             <Unlock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-music-accent" />
           </button>
@@ -188,7 +188,7 @@ export const ModeTabs: React.FC<ModeTabsProps> = ({
             onClick={openAdminLoginModal}
             title="Admin login"
             aria-label="Admin login"
-            className="inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent focus:outline-none focus-visible:outline-none whitespace-nowrap"
+            className="relative hit-area focus-ring inline-flex items-center gap-0.5 sm:gap-1 font-mono text-[11px] sm:text-[12px] pb-2 sm:pb-2.5 text-[#5A5A55] hover:text-music-accent transition-colors cursor-pointer bg-transparent border-0 border-b border-transparent hover:border-music-accent whitespace-nowrap"
           >
             <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>

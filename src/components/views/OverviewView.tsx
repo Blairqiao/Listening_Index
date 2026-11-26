@@ -61,6 +61,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSelectBucket,
 }) => {
   const displayTracks = topTracks;
+  const isTracksSkeleton = isLoading && topTracks.length === 0;
+  const isArtistsSkeleton = isLoading && topArtists.length === 0;
+  const isAlbumsSkeleton = isLoading && topAlbums.length === 0;
 
   const trackPlaceholderCount = Math.max(0, 10 - displayTracks.length);
   const artistPlaceholderCount = Math.max(0, 5 - topArtists.length);
@@ -79,12 +82,12 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </span>
         </div>
 
-        <div className="flex flex-col" role="list">
-          {isLoading && topTracks.length === 0 ? (
-            Array.from({ length: 5 }).map((_, idx) => (
+        <div className={`flex flex-col ${isTracksSkeleton ? "" : "animate-content-enter"}`} role="list">
+          {isTracksSkeleton ? (
+            Array.from({ length: 10 }).map((_, idx) => (
               <div
                 key={idx}
-                className={`flex items-center gap-3 px-1 h-[54px] md:h-[55px] animate-pulse ${idx === 4 ? "border-b-0" : "border-b border-[#191917]"
+                className={`flex items-center gap-3 px-1 h-[54px] md:h-[55px] animate-pulse ${idx === 9 ? "border-b-0" : "border-b border-[#191917]"
                   }`}
               >
                 <span className="font-mono text-[12px] text-[#2E2E2A] w-[18px] flex-none">
@@ -207,8 +210,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Artist index
           </div>
-          <div className="flex flex-col" role="list">
-            {isLoading && topArtists.length === 0 ? (
+          <div className={`flex flex-col ${isArtistsSkeleton ? "" : "animate-content-enter"}`} role="list">
+            {isArtistsSkeleton ? (
               Array.from({ length: 5 }).map((_, idx) => (
                 <div
                   key={idx}
@@ -271,8 +274,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div className="font-mono text-[12px] text-[#5A5A55] mb-2 select-none">
             Album index
           </div>
-          <div className="flex flex-col" role="list">
-            {isLoading && topAlbums.length === 0 ? (
+          <div className={`flex flex-col ${isAlbumsSkeleton ? "" : "animate-content-enter"}`} role="list">
+            {isAlbumsSkeleton ? (
               Array.from({ length: 5 }).map((_, idx) => (
                 <div
                   key={idx}

@@ -89,7 +89,7 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
             disabled={controlsDisabled}
             aria-label="Previous"
             title="Previous"
-            className="p-2 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[#8A8A82] disabled:hover:border-[#22221E] bg-transparent cursor-pointer select-none transition-colors"
+            className="press focus-ring p-2 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[#8A8A82] disabled:hover:border-[#22221E] bg-transparent cursor-pointer select-none transition-colors"
           >
             <SkipBack className="w-4 h-4" />
           </button>
@@ -100,7 +100,7 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
             disabled={controlsDisabled}
             aria-label={isPlaying ? "Pause" : "Play"}
             title={isPlaying ? "Pause" : "Play"}
-            className={`p-2 border transition-colors cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#22221E] disabled:hover:text-[#8A8A82] ${
+            className={`press focus-ring p-2 border transition-colors cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[#22221E] disabled:hover:text-[#8A8A82] ${
               isPlaying
                 ? "border-music-accent text-music-accent hover:bg-music-accent/10"
                 : "border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32]"
@@ -115,7 +115,7 @@ export const MiniPlayerBar: React.FC<MiniPlayerBarProps> = ({
             disabled={controlsDisabled}
             aria-label="Next"
             title="Next"
-            className="p-2 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[#8A8A82] disabled:hover:border-[#22221E] bg-transparent cursor-pointer select-none transition-colors"
+            className="press focus-ring p-2 border border-[#22221E] text-[#8A8A82] hover:text-[#EDEDE8] hover:border-[#3A3A32] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[#8A8A82] disabled:hover:border-[#22221E] bg-transparent cursor-pointer select-none transition-colors"
           >
             <SkipForward className="w-4 h-4" />
           </button>
