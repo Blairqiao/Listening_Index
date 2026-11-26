@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useConfig } from "@/context/ConfigContext";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { prefersReducedMotion } from "@/lib/motion";
 
 export const AdminLoginModal: React.FC = () => {
   const { isAdminLoginModalOpen, closeAdminLoginModal, login } = useConfig();
@@ -16,30 +18,44 @@ export const AdminLoginModal: React.FC = () => {
   // Lock document body scroll while modal is open
   useBodyScrollLock(isAdminLoginModalOpen);
 
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Transition animations
   const [shouldRender, setShouldRender] = useState(isAdminLoginModalOpen);
-  const [isVisible, setIsVisible] = useState(isAdminLoginModalOpen);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useDialogFocus(isAdminLoginModalOpen && shouldRender, panelRef, {
+    initialFocusRef: inputRef,
+  });
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let raf1: number | undefined;
+    let raf2: number | undefined;
     if (isAdminLoginModalOpen) {
       setShouldRender(true);
-      setIsVisible(true);
       setPassword("");
       setAuthError(null);
       setShowPassword(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+      });
     } else {
       setIsVisible(false);
       timer = setTimeout(() => {
         setShouldRender(false);
         setPassword("");
         setAuthError(null);
-      }, 200);
+      }, prefersReducedMotion() ? 0 : 200);
     }
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+      if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
+      if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
+    };
   }, [isAdminLoginModalOpen]);
 
   // Handle Escape key
@@ -81,7 +97,7 @@ export const AdminLoginModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-login-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-200 ease-out ${
+      className={`fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-[var(--motion-medium)] ease-expressive ${
         isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       }`}
       onClick={(e) => {
@@ -92,7 +108,9 @@ export const AdminLoginModal: React.FC = () => {
       }}
     >
       <div
-        className={`w-full max-w-[420px] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] transform will-change-[transform,opacity] ${
+        ref={panelRef}
+        tabIndex={-1}
+        className={`w-full max-w-[420px] max-h-[90dvh] overflow-y-auto bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col font-sans transition-[transform,opacity] duration-[var(--motion-medium)] ease-expressive transform will-change-[transform,opacity] focus:outline-none ${
           isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.97] translate-y-2"
         }`}
       >
@@ -112,7 +130,7 @@ export const AdminLoginModal: React.FC = () => {
             onClick={closeAdminLoginModal}
             disabled={isAuthenticating}
             title="Close (Esc)"
-            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus:outline-none disabled:opacity-40"
+            className="text-[#6A6A64] hover:text-[#EDEDE8] p-1 cursor-pointer transition-colors focus-ring disabled:opacity-40"
           >
             <X className="w-4 h-4" />
           </button>
@@ -144,8 +162,9 @@ export const AdminLoginModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
-                className="px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer focus:outline-none"
+                className="relative px-2.5 text-[#6A6A64] hover:text-[#EDEDE8] cursor-pointer hit-area focus-ring"
                 title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -162,7 +181,7 @@ export const AdminLoginModal: React.FC = () => {
             <button
               type="submit"
               disabled={isAuthenticating || !password.trim()}
-              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[12px] font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none"
+              className="w-full py-2 px-4 bg-music-accent text-black font-mono text-[12px] font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-2 select-none focus-ring"
             >
               {isAuthenticating ? (
                 <>

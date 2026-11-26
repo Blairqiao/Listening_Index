@@ -16,6 +16,8 @@ import {
 } from "./CatalogEnrichmentCard";
 import { HistoryDropzone } from "./HistoryDropzone";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
+import { prefersReducedMotion } from "@/lib/motion";
 import { classifyHistoryFile, resolveImportOutcome, stepOnOpen, type UploadStep } from "./upload-outcome";
 
 interface UploadModalProps {
@@ -79,21 +81,34 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   });
 
   const isProcessingRef = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Animation transition states
   const [shouldRender, setShouldRender] = useState(isOpen);
-  const [isVisible, setIsVisible] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useDialogFocus(isOpen && shouldRender, panelRef);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let raf1: number | undefined;
+    let raf2: number | undefined;
     if (isOpen) {
       setShouldRender(true);
-      setIsVisible(true);
+      raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => {
+          setIsVisible(true);
+        });
+      });
     } else {
       setIsVisible(false);
-      timer = setTimeout(() => setShouldRender(false), 200);
+      timer = setTimeout(() => setShouldRender(false), prefersReducedMotion() ? 0 : 200);
     }
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+      if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
+      if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
+    };
   }, [isOpen]);
 
   // Reopening after a finished import shows the dropzone again
@@ -235,10 +250,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overscroll-contain transition-opacity duration-200 ${
-        isVisible ? "opacity-100" : "opacity-0"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overscroll-contain transition-opacity duration-[var(--motion-medium)] ease-expressive ${
+        isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
       }`}
       aria-modal="true"
+      aria-labelledby="upload-modal-title"
       role="dialog"
     >
       {/* Dimmed backdrop */}
@@ -254,15 +270,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
       {/* Main Modal Window */}
       <div
-        className={`relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl transition-transform duration-200 ${
-          isVisible ? "scale-100" : "scale-95"
+        ref={panelRef}
+        tabIndex={-1}
+        className={`relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl transition-[transform,opacity] duration-[var(--motion-medium)] ease-expressive transform will-change-[transform,opacity] focus:outline-none ${
+          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.97] translate-y-2"
         }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none shrink-0">
           <div className="flex items-center gap-2">
             <Upload className="w-4 h-4 text-music-accent" />
-            <h2 className="font-mono text-[13px] text-[#EDEDE8]">
+            <h2 id="upload-modal-title" className="font-mono text-[13px] text-[#EDEDE8]">
               Import Spotify streaming history
             </h2>
           </div>
@@ -271,7 +289,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isProcessingRef.current}
-              className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="text-[#6A6A64] hover:text-[#EDEDE8] transition-colors p-1 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed focus-ring"
               title="Close modal (Esc)"
             >
               <X className="w-4 h-4" />
@@ -298,115 +316,119 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                 required to store your streaming history.
               </p>
             </div>
-          ) : step === "idle" ? (
-            /* Idle Drag & Drop Zone */
-            <HistoryDropzone
-              onFilesSelected={processFiles}
-              isProcessing={isProcessingRef.current}
-            />
-          ) : step === "inspecting" || step === "stage1" ? (
-            /* Upload & Ingestion Progress State */
-            <div className="space-y-5 py-2">
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 text-music-accent animate-spin flex-none" />
-                <div className="space-y-1 overflow-hidden">
-                  <div className="flex items-center gap-2">
-                    <span className="text-music-accent font-bold">
-                      {step === "inspecting"
-                        ? "Decompressing archive..."
-                        : "Ingesting plays into database..."}
-                    </span>
-                  </div>
-                  <p className="text-[#A8A8A2] text-[12px] truncate">{statusMessage}</p>
-                </div>
-              </div>
-
-              {/* Ingestion Progress Bar */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[11px] text-[#6A6A64]">
-                  <span>Raw ingestion (qualified &ge; 30s)</span>
-                  <span>
-                    {stage1Total > 0
-                      ? `${Math.round((stage1Current / stage1Total) * 100)}% (${stage1Current}/${stage1Total})`
-                      : "--"}
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
-                  <div
-                    className="h-full bg-music-accent transition-all duration-300 ease-out"
-                    style={{
-                      width: `${stage1Total > 0 ? Math.min(100, (stage1Current / stage1Total) * 100) : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : step === "completed" ? (
-            /* Completed State */
-            <div className="space-y-4 py-2">
-              <div className="flex items-center gap-2.5 text-music-accent font-bold">
-                <Check className="w-5 h-5" />
-                <span>Upload Successful</span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[12px]">
-                <div>
-                  <span className="text-[#6A6A64] block text-[11px]">Qualified plays</span>
-                  <span className="text-[#EDEDE8] font-bold text-[14px]">
-                    {summary.totalPlays.toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#6A6A64] block text-[11px]">New plays added</span>
-                  <span className="text-music-accent font-bold text-[14px]">
-                    {summary.newPlays.toLocaleString()}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[#6A6A64] block text-[11px]">Duplicates skipped</span>
-                  <span className="text-[#A8A8A2] font-bold text-[14px]">
-                    {Math.max(0, summary.totalPlays - summary.newPlays).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-[#A8A8A2] text-[12px] leading-relaxed">
-                All qualified stream events are saved in your database and immediately active on your dashboard.
-                Album artwork and track metadata will enrich automatically in the background and as you browse.
-              </p>
-
-              {summary.skippedNote && (
-                <p className="text-[#A8A8A2] text-[11px] leading-relaxed">{summary.skippedNote}</p>
-              )}
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>View Dashboard</span>
-                </button>
-              </div>
-            </div>
           ) : (
-            /* Error State */
-            <div className="space-y-3 py-2">
-              <div className="flex items-center gap-2 text-[#FF7A7A] font-bold">
-                <AlertTriangle className="w-5 h-5" />
-                <span>Upload Failed</span>
-              </div>
-              <div className="border border-[#3A2222] bg-[#140D0D] p-3 text-[#FFB3B3] text-[12px] break-words">
-                {errorMessage}
-              </div>
-              <button
-                type="button"
-                onClick={handleReset}
-                className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors cursor-pointer"
-              >
-                Try Again
-              </button>
+            <div className="min-h-[360px] sm:min-h-[340px] flex flex-col">
+              {step === "idle" ? (
+                /* Idle Drag & Drop Zone */
+                <HistoryDropzone
+                  onFilesSelected={processFiles}
+                  isProcessing={isProcessingRef.current}
+                />
+              ) : step === "inspecting" || step === "stage1" ? (
+                /* Upload & Ingestion Progress State */
+                <div className="space-y-5 py-2">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 text-music-accent animate-spin flex-none" />
+                    <div className="space-y-1 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="text-music-accent font-bold">
+                          {step === "inspecting"
+                            ? "Decompressing archive..."
+                            : "Ingesting plays into database..."}
+                        </span>
+                      </div>
+                      <p className="text-[#A8A8A2] text-[12px] truncate">{statusMessage}</p>
+                    </div>
+                  </div>
+
+                  {/* Ingestion Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] text-[#6A6A64]">
+                      <span>Raw ingestion (qualified &ge; 30s)</span>
+                      <span>
+                        {stage1Total > 0
+                          ? `${Math.round((stage1Current / stage1Total) * 100)}% (${stage1Current}/${stage1Total})`
+                          : "--"}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
+                      <div
+                        className="h-full bg-music-accent transition-all duration-300 ease-out"
+                        style={{
+                          width: `${stage1Total > 0 ? Math.min(100, (stage1Current / stage1Total) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : step === "completed" ? (
+                /* Completed State */
+                <div className="space-y-4 py-2">
+                  <div className="flex items-center gap-2.5 text-music-accent font-bold">
+                    <Check className="w-5 h-5" />
+                    <span>Upload Successful</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 border border-[#1C1C1A] bg-[#0E0E0D] p-3 text-[12px]">
+                    <div>
+                      <span className="text-[#6A6A64] block text-[11px]">Qualified plays</span>
+                      <span className="text-[#EDEDE8] font-bold text-[14px]">
+                        {summary.totalPlays.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#6A6A64] block text-[11px]">New plays added</span>
+                      <span className="text-music-accent font-bold text-[14px]">
+                        {summary.newPlays.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#6A6A64] block text-[11px]">Duplicates skipped</span>
+                      <span className="text-[#A8A8A2] font-bold text-[14px]">
+                        {Math.max(0, summary.totalPlays - summary.newPlays).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-[#A8A8A2] text-[12px] leading-relaxed">
+                    All qualified stream events are saved in your database and immediately active on your dashboard.
+                    Album artwork and track metadata will enrich automatically in the background and as you browse.
+                  </p>
+
+                  {summary.skippedNote && (
+                    <p className="text-[#A8A8A2] text-[11px] leading-relaxed">{summary.skippedNote}</p>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-music-accent text-black font-bold hover:opacity-90 transition-opacity cursor-pointer focus-ring"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>View Dashboard</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Error State */
+                <div className="space-y-3 py-2">
+                  <div className="flex items-center gap-2 text-[#FF7A7A] font-bold">
+                    <AlertTriangle className="w-5 h-5" />
+                    <span>Upload Failed</span>
+                  </div>
+                  <div className="border border-[#3A2222] bg-[#140D0D] p-3 text-[#FFB3B3] text-[12px] break-words">
+                    {errorMessage}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="w-full py-2 border border-[#3A3A32] bg-[#1A1A18] text-[#EDEDE8] hover:border-music-accent hover:text-music-accent transition-colors cursor-pointer focus-ring"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

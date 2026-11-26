@@ -268,7 +268,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 type="button"
                 onClick={() => handleSelectPreset(preset.hex)}
                 title={`${preset.name} (${preset.hex})`}
-                className={`h-6 w-full border cursor-pointer transition-transform hover:scale-105 focus:outline-none ${
+                className={`h-10 sm:h-6 w-full border cursor-pointer transition-transform hover:scale-105 focus-ring ${
                   isSelected
                     ? "border-white ring-1 ring-white"
                     : "border-[#26261F] hover:border-[#4A4A42]"

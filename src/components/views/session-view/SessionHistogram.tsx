@@ -78,21 +78,28 @@ export const SessionHistogram: React.FC<SessionHistogramProps> = ({
               key={`${bar.id}-${idx}`}
               role="button"
               tabIndex={0}
+              aria-pressed={isSelected}
               title={`${bar.title || bar.runtimeMinutes + "m"}`}
               onClick={() => onSelectSession?.(bar.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectSession?.(bar.id);
+                }
+              }}
               onMouseEnter={() => setHoveredSessionId(bar.id)}
               onMouseLeave={() => setHoveredSessionId(null)}
-              className="flex-1 h-full flex flex-col justify-end cursor-pointer group focus:outline-none"
+              className="flex-1 h-full flex flex-col justify-end cursor-pointer group focus-ring"
               aria-label={`Session ${bar.dateStr}: ${bar.runtimeMinutes} minutes`}
             >
               <div
                 style={{ height: `${heightPct}%` }}
-                className={`w-full rounded-none transition-none ${
+                className={`w-full rounded-none ${
                   isSelected
-                    ? "bg-music-accent group-hover:bg-music-accent-hover"
+                    ? "transition-colors duration-[var(--motion-fast)] ease-snappy bg-music-accent group-hover:bg-music-accent-hover"
                     : isHovered
-                    ? "bg-[#2E2E2A]"
-                    : "bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"
+                    ? "transition-none bg-[#2E2E2A]"
+                    : "transition-none bg-[#1C1C1A] group-hover:bg-[#2E2E2A]"
                 }`}
               />
             </div>

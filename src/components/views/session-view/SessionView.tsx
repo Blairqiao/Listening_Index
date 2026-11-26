@@ -123,115 +123,123 @@ export const SessionView: React.FC<SessionViewProps> = ({
             className="h-auto md:h-[550px] overflow-y-auto scrollbar-hidden"
             role="list"
           >
-            {/* Active Session Track Rows */}
-            {visibleTracks.map((track, idx) => {
-              const isSpotifyTrackId = track.id && !track.id.includes(":");
-              const trackHref = isSpotifyTrackId
-                ? `https://open.spotify.com/track/${track.id}`
-                : `https://open.spotify.com/search/${encodeURIComponent(`${track.title} ${track.artist}`)}`;
+            {activeTracks.length === 0 ? (
+              <div className="h-[160px] md:h-full flex items-center justify-center font-mono text-[12px] text-[#5A5A55] select-none">
+                No tracks in session
+              </div>
+            ) : (
+              <>
+                {/* Active Session Track Rows */}
+                {visibleTracks.map((track, idx) => {
+                  const isSpotifyTrackId = track.id && !track.id.includes(":");
+                  const trackHref = isSpotifyTrackId
+                    ? `https://open.spotify.com/track/${track.id}`
+                    : `https://open.spotify.com/search/${encodeURIComponent(`${track.title} ${track.artist}`)}`;
 
-              const artistHref = track.artistId
-                ? `https://open.spotify.com/artist/${track.artistId}`
-                : `https://open.spotify.com/search/${encodeURIComponent(track.artist)}`;
+                  const artistHref = track.artistId
+                    ? `https://open.spotify.com/artist/${track.artistId}`
+                    : `https://open.spotify.com/search/${encodeURIComponent(track.artist)}`;
 
-              const albumHref = track.albumId
-                ? `https://open.spotify.com/album/${track.albumId}`
-                : track.album
-                  ? `https://open.spotify.com/search/${encodeURIComponent(track.album)}`
-                  : undefined;
+                  const albumHref = track.albumId
+                    ? `https://open.spotify.com/album/${track.albumId}`
+                    : track.album
+                      ? `https://open.spotify.com/search/${encodeURIComponent(track.album)}`
+                      : undefined;
 
-              return (
-                <div
-                  key={`${track.id}-${idx}`}
-                  role="listitem"
-                  onClick={() => {
-                    window.open(trackHref, "_blank", "noopener,noreferrer");
-                  }}
-                  className="group flex items-center gap-2.5 px-1 h-[54px] md:h-[55px] border-b border-[#191917] hover:bg-[#111110] transition-none cursor-pointer"
-                >
-                  {/* 1. Timestamp (44px, mono 11px, #5A5A55) */}
-                  <span className="font-mono text-[12px] text-[#5A5A55] tabular-nums select-none truncate w-[44px] flex-none">
-                    {track.timestamp}
-                  </span>
-
-                  {/* 2. First-Play Marker (14px, text-music-accent '+', or empty) */}
-                  <span className="w-[14px] text-center font-mono text-[12px] text-music-accent select-none flex-none">
-                    {track.isFirstPlay ? "+" : ""}
-                  </span>
-
-                  {/* 3. Album Art (38px square) */}
-                  <Artwork
-                    src={track.albumImageUrl}
-                    alt={track.album || track.title}
-                    size={38}
-                    swatchColor={track.swatchColor}
-                  />
-
-                  {/* 4. Middle: Stacked Title & (Artist • Album) */}
-                  <div className="min-w-0 flex-1 pl-1">
-                    <a
-                      href={trackHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug no-underline select-none"
+                  return (
+                    <div
+                      key={`${track.id}-${idx}`}
+                      role="listitem"
+                      onClick={() => {
+                        window.open(trackHref, "_blank", "noopener,noreferrer");
+                      }}
+                      className="group flex items-center gap-2.5 px-1 h-[54px] md:h-[55px] border-b border-[#191917] hover:bg-[#111110] transition-none cursor-pointer"
                     >
-                      {track.title}
-                    </a>
-                    <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
-                      <a
-                        href={artistHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
-                      >
-                        {track.artist}
-                      </a>
-                      {track.album && (
-                        <>
-                          {" • "}
-                          {albumHref ? (
-                            <a
-                              href={albumHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
-                            >
-                              {track.album}
-                            </a>
-                          ) : (
-                            <span>{track.album}</span>
+                      {/* 1. Timestamp (44px, mono 11px, #5A5A55) */}
+                      <span className="font-mono text-[12px] text-[#5A5A55] tabular-nums select-none truncate w-[44px] flex-none">
+                        {track.timestamp}
+                      </span>
+
+                      {/* 2. First-Play Marker (14px, text-music-accent '+', or empty) */}
+                      <span className="w-[14px] text-center font-mono text-[12px] text-music-accent select-none flex-none">
+                        {track.isFirstPlay ? "+" : ""}
+                      </span>
+
+                      {/* 3. Album Art (38px square) */}
+                      <Artwork
+                        src={track.albumImageUrl}
+                        alt={track.album || track.title}
+                        size={38}
+                        swatchColor={track.swatchColor}
+                      />
+
+                      {/* 4. Middle: Stacked Title & (Artist • Album) */}
+                      <div className="min-w-0 flex-1 pl-1">
+                        <a
+                          href={trackHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug no-underline select-none"
+                        >
+                          {track.title}
+                        </a>
+                        <div className="font-mono text-[12.5px] text-[#6A6A64] truncate leading-tight mt-0.5 select-none">
+                          <a
+                            href={artistHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
+                          >
+                            {track.artist}
+                          </a>
+                          {track.album && (
+                            <>
+                              {" • "}
+                              {albumHref ? (
+                                <a
+                                  href={albumHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="hover:text-[#EDEDE8] hover:underline hover:decoration-dotted no-underline text-inherit"
+                                >
+                                  {track.album}
+                                </a>
+                              ) : (
+                                <span>{track.album}</span>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
+                        </div>
+                      </div>
+
+                      {/* 5. Duration (mono 11px #8A8A83, right-aligned) */}
+                      <span className="font-mono text-[12px] text-[#8A8A83] text-right tabular-nums select-none flex-none w-[40px]">
+                        {track.duration || "--:--"}
+                      </span>
                     </div>
-                  </div>
+                  );
+                })}
 
-                  {/* 5. Duration (mono 11px #8A8A83, right-aligned) */}
-                  <span className="font-mono text-[12px] text-[#8A8A83] text-right tabular-nums select-none flex-none w-[40px]">
-                    {track.duration || "--:--"}
-                  </span>
-                </div>
-              );
-            })}
-
-            {/* Placeholder Rows to fill remaining capacity (54px/55px height, hidden on mobile unless zero tracks) */}
-            {Array.from({ length: placeholderCount }).map((_, idx) => (
-              <div
-                key={`ph-${idx}`}
-                className={`${activeTracks.length === 0 ? "flex" : "hidden md:flex"} h-[54px] md:h-[55px] border-b border-[#191917] items-center px-1 select-none`}
-                aria-hidden="true"
-              />
-            ))}
+                {/* Placeholder Rows to fill remaining capacity (54px/55px height, hidden on mobile) */}
+                {Array.from({ length: placeholderCount }).map((_, idx) => (
+                  <div
+                    key={`ph-${idx}`}
+                    className="hidden md:flex h-[54px] md:h-[55px] border-b border-[#191917] items-center px-1 select-none"
+                    aria-hidden="true"
+                  />
+                ))}
+              </>
+            )}
           </div>
 
           {activeTracks.length > 6 && (
             <button
               type="button"
               onClick={() => setIsTracksExpanded((prev) => !prev)}
-              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+              className="md:hidden w-full py-1.5 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none focus-ring"
             >
               {isTracksExpanded ? "Show less ⌃" : `Show all ${activeTracks.length} tracks ⌄`}
             </button>
@@ -250,7 +258,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
             </span>
 
             <div
-              className="h-auto md:h-[180px] overflow-y-auto scrollbar-hidden"
+              className="h-auto md:h-[180px] overflow-y-auto scrollbar-hidden -mx-1 px-1 py-0.5"
               role="list"
             >
               {visibleSessions.map((sessionItem, idx) => {
@@ -272,9 +280,9 @@ export const SessionView: React.FC<SessionViewProps> = ({
                         handleSelectSession(sessionId);
                       }
                     }}
-                    className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer transition-none select-none focus:outline-none ${isSelected
-                        ? "bg-[#181614] border-l-2 border-l-music-accent pl-2 -ml-[2px]"
-                        : "hover:bg-[#111110]"
+                    className={`grid grid-cols-[52px_minmax(0,1fr)_28px] gap-2 items-baseline px-1 py-[7px] border-b border-[#191917] cursor-pointer select-none focus-ring ${isSelected
+                        ? "bg-[#181614] border-l-2 border-l-music-accent pl-2 -ml-[2px] transition-colors duration-[var(--motion-fast)] ease-snappy"
+                        : "hover:bg-[#111110] transition-none"
                       }`}
                   >
                     {/* Date (mono 11px, #4A4A46) */}
@@ -284,7 +292,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
 
                     {/* Runtime (Space Grotesk 13px, text-music-accent when selected) */}
                     <span
-                      className={`font-sans text-[13px] truncate select-none ${isSelected ? "text-music-accent font-medium" : "text-[#EDEDE8]"
+                      className={`font-sans text-[13px] truncate select-none transition-colors duration-[var(--motion-fast)] ease-snappy ${isSelected ? "text-music-accent font-medium" : "text-[#EDEDE8]"
                         }`}
                     >
                       {sessionItem.durationStr}
@@ -303,7 +311,7 @@ export const SessionView: React.FC<SessionViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsSessionsExpanded((prev) => !prev)}
-                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none"
+                className="md:hidden w-full py-2 flex items-center justify-center font-mono text-[11px] text-[#5A5A55] hover:text-[#8A8A83] transition-colors cursor-pointer select-none focus-ring"
               >
                 {isSessionsExpanded ? "Show less ⌃" : `Show all ${sessionList.length} sessions ⌄`}
               </button>
