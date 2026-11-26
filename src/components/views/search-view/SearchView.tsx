@@ -426,11 +426,6 @@ export const SearchView: React.FC<SearchViewProps> = ({
         </div>
 
         <div className="flex items-center gap-4">
-          <SortMenu
-            value={sort}
-            onChange={(nextSort) => onSortChange?.(nextSort)}
-            onOpenChange={setIsSortMenuOpen}
-          />
           {onRandomProfile && (
             <button
               type="button"
@@ -441,6 +436,11 @@ export const SearchView: React.FC<SearchViewProps> = ({
               Random
             </button>
           )}
+          <SortMenu
+            value={sort}
+            onChange={(nextSort) => onSortChange?.(nextSort)}
+            onOpenChange={setIsSortMenuOpen}
+          />
         </div>
       </div>
 

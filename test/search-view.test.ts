@@ -761,6 +761,10 @@ test("SearchView top control strip: filter pills with totals, bracket sort trigg
   // Random button
   assert.match(html, /Random/);
   assert.match(html, /aria-label="Open random profile"/);
+  assert.ok(
+    html.indexOf('aria-label="Open random profile"') < html.indexOf('aria-label="Sort by"'),
+    "Random sits to the left of Sort",
+  );
 
   // When onRandomProfile is omitted, [ RANDOM ] is not rendered
   const noRandomHtml = renderToStaticMarkup(
