@@ -4,6 +4,7 @@ import React from "react";
 import { StreamLogItem } from "@/lib/types";
 import { useConfig } from "@/context/ConfigContext";
 import { presentStreamLog } from "@/lib/listening-presentation";
+import { scrollBehavior } from "@/lib/motion";
 import { Artwork } from "../Artwork";
 
 interface StreamLogViewProps {
@@ -66,10 +67,11 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
   }, [renderedEntries.length, onVisibleCountChange]);
 
   const handleScrollToTop = () => {
+    const behavior = scrollBehavior();
     if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+      scrollContainerRef.current.scrollTo({ top: 0, behavior });
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior });
   };
 
   const handleLoadMore = () => {
@@ -80,6 +82,8 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       onLoadMore?.();
     }
   };
+  const isStreamSkeleton = entries.length === 0 && isLoading;
+
   return (
     <div className="w-full mt-4 md:mt-6 select-none">
       {/* 1. Header Row (Placed outside scroll container) */}
@@ -95,7 +99,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
       {/* 2. Scrollable Body Container (h-auto on mobile, fixed h-[544px] on desktop) */}
       <div
         ref={scrollContainerRef}
-        className="w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden"
+        className={`w-full h-auto md:h-[544px] overflow-y-auto overflow-x-hidden scrollbar-hidden ${isStreamSkeleton ? "" : "animate-content-enter"}`}
         role="list"
       >
         {entries.length === 0 ? (
@@ -114,12 +118,9 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
               </div>
             ))
           ) : (
-            Array.from({ length: 9 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="h-[54px] border-b border-[#191917]"
-              />
-            ))
+            <div className="flex items-center justify-center min-h-[240px] md:h-full font-mono text-[12px] text-[#5A5A55] select-none">
+              No plays
+            </div>
           )
         ) : (
           <>
@@ -161,7 +162,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                         "noopener,noreferrer"
                       )
                     }
-                    className="group grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 h-[54px] items-center hover:bg-[#111110] transition-none cursor-pointer border-b border-[#191917]"
+                    className="group grid grid-cols-[58px_38px_minmax(0,1fr)_minmax(0,0.72fr)_40px] md:grid-cols-[58px_38px_minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,1fr)_40px] gap-2.5 px-1 h-[54px] items-center hover:bg-[#111110] motion-hover cursor-pointer border-b border-[#191917]"
                   >
                     {/* TIME (58px, mono 11px, no CDT) */}
                     <span className="font-mono text-[12px] text-[#5A5A55] tabular-nums select-none truncate">
@@ -184,7 +185,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] group-hover:text-music-accent truncate leading-snug no-underline transition-none select-none"
+                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] group-hover:text-music-accent truncate leading-snug no-underline motion-hover select-none"
                       >
                         {entry.title}
                       </a>
@@ -198,7 +199,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-[12px] text-[#6A6A64] hover:text-[#EDEDE8] hover:underline hover:decoration-dotted truncate leading-tight no-underline transition-none select-none"
+                          className="font-mono text-[12px] text-[#6A6A64] hover:text-[#EDEDE8] hover:underline hover:decoration-dotted truncate leading-tight no-underline motion-hover select-none"
                         >
                           {entry.artist}
                         </a>
@@ -217,7 +218,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-[12px] text-[#6A6A64] hover:text-[#EDEDE8] hover:underline hover:decoration-dotted truncate leading-tight no-underline transition-none select-none"
+                          className="font-mono text-[12px] text-[#6A6A64] hover:text-[#EDEDE8] hover:underline hover:decoration-dotted truncate leading-tight no-underline motion-hover select-none"
                         >
                           {entry.album}
                         </a>
@@ -246,7 +247,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     disabled={isLoadingMore}
                     onClick={handleLoadMore}
-                    className={`group font-mono text-[12px] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
+                    className={`group relative hit-area press focus-ring font-mono text-[12px] px-3.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] motion-hover flex items-center gap-2 ${isLoadingMore ? "cursor-wait opacity-80" : "cursor-pointer"
                       }`}
                   >
                     <span className="md:hidden">
@@ -260,7 +261,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
-                    className="group font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
+                    className="group relative hit-area press focus-ring font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] motion-hover cursor-pointer flex items-center justify-center"
                   >
                     ↑
                   </button>
@@ -278,7 +279,7 @@ export const StreamLogView: React.FC<StreamLogViewProps> = ({
                     type="button"
                     onClick={handleScrollToTop}
                     title="Scroll to top of stream log"
-                    className="group font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] transition-none cursor-pointer flex items-center justify-center"
+                    className="group relative hit-area press focus-ring font-mono text-[12px] px-2.5 py-1.5 border border-[#26261F] hover:border-music-accent hover:text-music-accent text-[#8A8A83] bg-[#0A0A09] motion-hover cursor-pointer flex items-center justify-center"
                   >
                     ↑
                   </button>

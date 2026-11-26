@@ -96,6 +96,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   const defaultHeadingText = showRange
     ? headingSuffix ? `${label} / ${headingSuffix}` : label
     : label;
+  const isChartSkeleton = isLoading && activityCadence.length === 0;
 
   return (
     <div>
@@ -120,11 +121,11 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
       <div>
         <div
           ref={chartRef}
-          className="flex gap-[2px] items-end h-[80px] w-full"
+          className={`flex gap-[2px] items-end h-[80px] w-full ${isChartSkeleton ? "" : "animate-content-enter"}`}
           role={isClickable ? "group" : "img"}
           aria-label="Activity cadence histogram"
         >
-          {isLoading && activityCadence.length === 0 ? (
+          {isChartSkeleton ? (
             Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
@@ -136,7 +137,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
             Array.from({ length: rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-none select-none transition-none cursor-default bg-[#1C1C1A]"
+                className="flex-1 rounded-none select-none motion-hover cursor-default bg-[#1C1C1A]"
                 style={{ height: "4%" }}
               />
             ))
@@ -176,7 +177,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                     onClick={() => {
                       onSelectBucket?.(item, effectiveGranularity);
                     }}
-                    className={`p-0 border-0 flex-1 rounded-none select-none transition-none cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
+                    className={`p-0 border-0 flex-1 rounded-none select-none motion-hover cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
                     style={{
                       height: barHeight,
                     }}
@@ -188,7 +189,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <div
                   key={i}
                   title={tooltipText}
-                  className={`flex-1 rounded-none select-none transition-none cursor-default ${barColor}`}
+                  className={`flex-1 rounded-none select-none motion-hover cursor-default ${barColor}`}
                   style={{
                     height: barHeight,
                   }}
