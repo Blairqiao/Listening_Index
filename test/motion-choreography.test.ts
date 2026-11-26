@@ -73,7 +73,6 @@ test("on first load the mini player slide-up ends when the entrance settles", as
   const src = readSrc("src/components/ListeningView.tsx");
   assert.match(src, /introPhase !== "pending"/, "the bar waits for the entrance to start");
   assert.match(src, /introStartRef\.current = performance\.now\(\)/);
-  assert.match(src, /miniPlayerIntroDelay\(performance\.now\(\) - introStartRef\.current\)/);
 
   const presence = readSrc("src/lib/usePresence.ts");
   assert.match(presence, /getEnterDelay\?: \(\) => number/);
@@ -210,7 +209,7 @@ test("ListeningView starts the intro after hydration and fonts, then clears it, 
   assert.match(src, /data-intro=\{introPhase === "done" \? undefined : introPhase\}/);
   assert.match(src, /withRevealCap\(document\.fonts\.ready/);
   assert.match(src, /setIntroPhase\("playing"\)/);
-  assert.match(src, /setTimeout\(\(\) => setIntroPhase\("done"\), INTRO_MS\)/);
+  assert.match(src, /setTimeout\(\(\) => setIntroPhase\("done"\), introDurationMs\(introSettle\)\)/);
   assert.match(src, /fixed inset-0 z-40[^`]*duration-\[var\(--motion-medium\)\]/);
   assert.doesNotMatch(readSrc("src/app/globals.css"), /--motion-showpiece/);
 });
@@ -230,4 +229,46 @@ test("intro roles: metric contents rise, track rows rise, indexes fade, bars gro
   );
   assert.match(html, /\bintro-grow\b/);
   assert.match(html, /--intro-delay:240ms/);
+});
+
+test("each tab has its own entrance: the view body rises after the ribbon, first on Search", async () => {
+  const c = await import("../src/lib/choreography");
+  assert.equal(c.viewIntroDelay(0), null, "Overview keeps its own stagger");
+  for (const mode of [1, 2, 3, 5] as const) assert.equal(c.viewIntroDelay(mode), 200, `mode ${mode} follows the ribbon`);
+  assert.equal(c.viewIntroDelay(4), 0, "Search and profiles have no ribbon to follow");
+
+  assert.equal(c.introSettleMs(0), c.INTRO_SETTLE_MS);
+  assert.equal(c.introSettleMs(5), 650);
+  assert.equal(c.introSettleMs(4), 450);
+  assert.equal(c.introSettleMs(4, true), c.INTRO_SETTLE_MS, "profile bars grow like Overview's");
+  assert.ok(c.introDurationMs(650) > 650, "the gate outlasts the settle");
+  assert.equal(c.introDurationMs(c.INTRO_SETTLE_MS), c.INTRO_MS);
+
+  assert.equal(c.miniPlayerIntroDelay(0, c.introSettleMs(5)), 410, "the bar lands as Calendar settles");
+  assert.equal(c.miniPlayerIntroDelay(0, c.introSettleMs(4)), 210);
+});
+
+test("the entrance waits for the open tab's own data, so Calendar and profiles don't rise as skeletons", async () => {
+  const c = await import("../src/lib/choreography");
+  const idle = { isCalendarLoading: true, hasProfileTarget: false, isProfileLoading: true };
+  assert.equal(c.isIntroViewReady(0, idle), true);
+  assert.equal(c.isIntroViewReady(4, idle), true, "the Search page has nothing to wait for");
+  assert.equal(c.isIntroViewReady(5, idle), false);
+  assert.equal(c.isIntroViewReady(5, { ...idle, isCalendarLoading: false }), true);
+  assert.equal(c.isIntroViewReady(4, { ...idle, hasProfileTarget: true }), false);
+  assert.equal(c.isIntroViewReady(4, { ...idle, hasProfileTarget: true, isProfileLoading: false }), true);
+  assert.ok(c.VIEW_INTRO_WAIT_MS <= 1500, "a slow tab must not hold the page long");
+
+  const src = readSrc("src/components/ListeningView.tsx");
+  assert.match(src, /isIntroViewReady\(activeMode/);
+  assert.match(src, /setTimeout\(\(\) => setIsViewWaitOver\(true\), VIEW_INTRO_WAIT_MS\)/);
+});
+
+test("ListeningView gives the non-Overview view body one rise, only on the tab the entrance started on", () => {
+  const src = readSrc("src/components/ListeningView.tsx");
+  assert.match(src, /setIntroMode\(activeMode\)/);
+  assert.match(src, /viewIntroDelay\(activeMode\)/);
+  assert.match(src, /activeMode === introMode && bodyIntroDelay !== null \? "intro-rise" : ""/);
+  assert.match(src, /miniPlayerIntroDelay\(performance\.now\(\) - introStartRef\.current, introSettle\)/);
+  assert.match(src, /setIntroSettle\(introSettleMs\(activeMode, Boolean\(profileTarget\)\)\)/);
 });

@@ -22,7 +22,16 @@ import {
   MINI_PLAYER_EXIT_MS,
 } from "@/components/listening-view/mini-player";
 import { usePresence } from "@/lib/usePresence";
-import { INTRO_MS, miniPlayerIntroDelay, type IntroPhase } from "@/lib/choreography";
+import {
+  introDelayStyle,
+  introDurationMs,
+  introSettleMs,
+  isIntroViewReady,
+  miniPlayerIntroDelay,
+  viewIntroDelay,
+  VIEW_INTRO_WAIT_MS,
+  type IntroPhase,
+} from "@/lib/choreography";
 import { withRevealCap } from "@/lib/motion";
 const CustomizationModal = dynamic(
   () => import("@/components/modals/customization-modal/CustomizationModal").then((mod) => mod.CustomizationModal),
@@ -267,36 +276,6 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Track whether real overview data is ready
   const isDataReady = Boolean(displayedOverview || initialOverview);
 
-  // The first reveal plays a staged entrance once (globals.css, [data-intro]).
-  // It waits for hydration and fonts so a slow load doesn't eat it, then two
-  // frames so the held start state is painted before it plays.
-  const [introPhase, setIntroPhase] = useState<IntroPhase>("pending");
-  const introStartRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!isDataReady || introPhase !== "pending") return;
-    let cancelled = false;
-    let raf1: number | undefined;
-    let raf2: number | undefined;
-    void withRevealCap(document.fonts.ready, INTRO_FONT_WAIT_MS).then(() => {
-      if (cancelled) return;
-      raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => {
-          introStartRef.current = performance.now();
-          setIntroPhase("playing");
-        });
-      });
-    });
-    return () => {
-      cancelled = true;
-      if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
-      if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
-    };
-  }, [isDataReady, introPhase]);
-  useEffect(() => {
-    if (introPhase !== "playing") return;
-    const timer = setTimeout(() => setIntroPhase("done"), INTRO_MS);
-    return () => clearTimeout(timer);
-  }, [introPhase]);
 
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
@@ -352,6 +331,54 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   });
 
   const calendarGate = gateCalendarOnTaste(calendar, taste);
+
+  // The first reveal plays a staged entrance once (globals.css, [data-intro]).
+  // It waits for hydration, fonts and the open tab's own data (each capped) so
+  // a slow load doesn't eat it, then two frames so the held start state is
+  // painted before it plays. Its timeline belongs to the tab it starts on.
+  const [introPhase, setIntroPhase] = useState<IntroPhase>("pending");
+  const [introMode, setIntroMode] = useState<Mode>(activeMode);
+  const [introSettle, setIntroSettle] = useState(() => introSettleMs(activeMode, Boolean(initialProfile)));
+  const introStartRef = useRef<number | null>(null);
+  const [isViewWaitOver, setIsViewWaitOver] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsViewWaitOver(true), VIEW_INTRO_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  const isViewReady =
+    isViewWaitOver ||
+    isIntroViewReady(activeMode, {
+      isCalendarLoading: calendarGate.isLoading,
+      hasProfileTarget: Boolean(profileTarget),
+      isProfileLoading: !profileData && profileStatus === "loading",
+    });
+  useEffect(() => {
+    if (!isDataReady || !isViewReady || introPhase !== "pending") return;
+    let cancelled = false;
+    let raf1: number | undefined;
+    let raf2: number | undefined;
+    void withRevealCap(document.fonts.ready, INTRO_FONT_WAIT_MS).then(() => {
+      if (cancelled) return;
+      raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => {
+          introStartRef.current = performance.now();
+          setIntroMode(activeMode);
+          setIntroSettle(introSettleMs(activeMode, Boolean(profileTarget)));
+          setIntroPhase("playing");
+        });
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
+      if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
+    };
+  }, [isDataReady, isViewReady, introPhase, activeMode, profileTarget]);
+  useEffect(() => {
+    if (introPhase !== "playing") return;
+    const timer = setTimeout(() => setIntroPhase("done"), introDurationMs(introSettle));
+    return () => clearTimeout(timer);
+  }, [introPhase, introSettle]);
 
   const handleSyncWithCacheClear = useCallback(async () => {
     await handleTriggerSync();
@@ -864,13 +891,16 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // The bar slides out after playback stops or the Live Player opens, so it
   // keeps showing the last track until the exit finishes.
   // On first load it waits for the entrance and lands as the rest settles.
+  // Tabs other than Overview bring their view body in as one block.
+  const bodyIntroDelay = viewIntroDelay(activeMode);
+
   const isMiniPlayerOpen = showMiniPlayer && Boolean(currentTrack) && introPhase !== "pending";
   const miniPlayerEnterDelay = useCallback(
     () =>
       introStartRef.current === null
         ? 0
-        : miniPlayerIntroDelay(performance.now() - introStartRef.current),
-    [],
+        : miniPlayerIntroDelay(performance.now() - introStartRef.current, introSettle),
+    [introSettle],
   );
   const miniPlayer = usePresence(isMiniPlayerOpen, MINI_PLAYER_EXIT_MS, miniPlayerEnterDelay);
   const currentMiniTrack = useMemo(
@@ -990,7 +1020,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               } transition-opacity duration-150 ${isViewDimmed
                 ? "opacity-60 pointer-events-none"
                 : "opacity-100"
-              }`}
+              } ${activeMode === introMode && bodyIntroDelay !== null ? "intro-rise" : ""}`}
+            style={bodyIntroDelay === null ? undefined : introDelayStyle(bodyIntroDelay)}
           >
             {activeMode === 0 && (
               <OverviewView
