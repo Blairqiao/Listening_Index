@@ -10,10 +10,13 @@ export interface PhaseScrollInput {
   bottomInset: number;
 }
 
+/** Ranges this close to their resting spot stay put, so a re-pick doesn't jiggle. */
+const SETTLE_TOLERANCE_PX = 24;
+
 /**
- * Window scroll position that brings a highlighted range into view, or null
- * when it is already fully visible. A range that fits is centered in the
- * uncovered band; a taller one starts just under the top inset.
+ * Window scroll position that centers a highlighted range in the uncovered
+ * band, or null when it already sits there. A taller range starts just under
+ * the top inset.
  */
 export function phaseScrollTarget({
   rangeTop,
@@ -24,11 +27,10 @@ export function phaseScrollTarget({
   bottomInset,
 }: PhaseScrollInput): number | null {
   const bandTop = topInset;
-  const bandBottom = viewportHeight - bottomInset;
-  if (rangeTop >= bandTop && rangeBottom <= bandBottom) return null;
-
-  const bandHeight = bandBottom - bandTop;
+  const bandHeight = viewportHeight - bottomInset - bandTop;
   const rangeHeight = rangeBottom - rangeTop;
   const offset = rangeHeight <= bandHeight ? (bandHeight - rangeHeight) / 2 : 0;
-  return Math.max(0, Math.round(scrollY + rangeTop - bandTop - offset));
+  const delta = rangeTop - bandTop - offset;
+  if (Math.abs(delta) <= SETTLE_TOLERANCE_PX) return null;
+  return Math.max(0, Math.round(scrollY + delta));
 }

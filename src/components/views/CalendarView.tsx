@@ -1194,11 +1194,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     [handleClear, onSelectionChange],
   );
 
-  // Phase cards sit above the heatmaps, so picking one scrolls its range into view.
-  // Ribbon clicks don't: the user is already looking at that spot.
+  // Picking a phase from a card or a ribbon centers its range on screen.
   const pendingPhaseScrollRef = useRef(false);
 
-  const handleSelectPhaseFromCards = useCallback(
+  const handleSelectPhaseAndCenter = useCallback(
     (phase: TastePhase) => {
       pendingPhaseScrollRef.current = activePhaseIdRef.current !== phase.id;
       handleSelectPhase(phase);
@@ -1317,7 +1316,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             selectedPhaseId={activePhaseId}
             onSelectMonth={handleSelectMonth}
             onSelectYear={handleSelectYear}
-            onSelectPhase={handleSelectPhase}
+            onSelectPhase={handleSelectPhaseAndCenter}
           />
         );
       })}
@@ -1401,7 +1400,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <TastePhaseCards
             items={phaseRowItems}
             selectedPhaseId={activePhaseId}
-            onSelectPhase={handleSelectPhaseFromCards}
+            onSelectPhase={handleSelectPhaseAndCenter}
           />
           {heatmapsContainer}
         </>
