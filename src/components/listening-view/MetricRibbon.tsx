@@ -112,7 +112,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
             title={title}
             className={`bg-[#080808] px-3.5 sm:px-4 py-2.5 md:py-3 flex flex-col justify-between select-none ${
               isToggleable
-                ? "cursor-pointer hover:bg-[#121210] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#333330]"
+                ? "cursor-pointer hover:bg-[#121210] motion-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-[#333330]"
                 : ""
             }`}
           >

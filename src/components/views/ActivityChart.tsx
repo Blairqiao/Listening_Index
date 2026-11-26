@@ -137,7 +137,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
             Array.from({ length: rangeKey ? (EMPTY_CADENCE_BAR_COUNTS[rangeKey] ?? 24) : 0 }).map((_, i) => (
               <div
                 key={i}
-                className="flex-1 rounded-none select-none transition-none cursor-default bg-[#1C1C1A]"
+                className="flex-1 rounded-none select-none motion-hover cursor-default bg-[#1C1C1A]"
                 style={{ height: "4%" }}
               />
             ))
@@ -177,7 +177,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                     onClick={() => {
                       onSelectBucket?.(item, effectiveGranularity);
                     }}
-                    className={`p-0 border-0 flex-1 rounded-none select-none transition-none cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
+                    className={`p-0 border-0 flex-1 rounded-none select-none motion-hover cursor-pointer focus-visible:outline-music-accent disabled:cursor-wait disabled:pointer-events-none ${barColor}`}
                     style={{
                       height: barHeight,
                     }}
@@ -189,7 +189,7 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <div
                   key={i}
                   title={tooltipText}
-                  className={`flex-1 rounded-none select-none transition-none cursor-default ${barColor}`}
+                  className={`flex-1 rounded-none select-none motion-hover cursor-default ${barColor}`}
                   style={{
                     height: barHeight,
                   }}

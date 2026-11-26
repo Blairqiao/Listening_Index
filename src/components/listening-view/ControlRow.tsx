@@ -117,7 +117,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
                   <button
                     type="button"
                     onClick={onTransferPlayback}
-                    className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent transition-none shrink-0"
+                    className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 cursor-pointer p-0 text-[#6A6A64] hover:text-music-accent focus-visible:outline-none focus-visible:text-music-accent motion-hover shrink-0"
                     title="Transfer playback to this browser"
                   >
                     <span className="sm:hidden">Transfer</span>
@@ -201,7 +201,7 @@ export const ControlRow: React.FC<ControlRowProps> = ({
             onClick={onTriggerSync}
             disabled={isSyncing}
             title={syncError || "Click to trigger manual sync"}
-            className={`font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 transition-none hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
+            className={`font-mono text-[12px] bg-transparent border-0 cursor-pointer p-0 motion-hover hover:text-[#EDEDE8] focus-visible:outline-none focus-visible:text-music-accent ${
               syncError
                 ? "text-[#FF6B6B]"
                 : isSyncing

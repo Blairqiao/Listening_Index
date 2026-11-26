@@ -117,7 +117,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     role="listitem"
                     data-profile-kind="track"
                     onClick={() => onOpenProfile?.({ kind: "track", key: track.id })}
-                    className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer transition-none hover:bg-[#111110] ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                    className={`group flex items-center gap-3 px-1 h-[54px] md:h-[55px] cursor-pointer motion-hover hover:bg-[#111110] ${isLast ? "border-b-0" : "border-b border-[#191917]"
                       }`}
                   >
                     {/* Rank Index */}
@@ -150,7 +150,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     <div className="min-w-0 flex-1 pl-1">
                       <span
                         {...profileLinkProps("track", track.id, track.name, onOpenProfile)}
-                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none leading-snug select-none focus-visible:outline-music-accent"
+                        className="block font-sans text-[14px] tracking-[-0.01em] text-[#EDEDE8] truncate group-hover:text-music-accent motion-hover leading-snug select-none focus-visible:outline-music-accent"
                       >
                         {track.name}
                       </span>
@@ -236,7 +236,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       role="listitem"
                       data-profile-kind={artistKey ? "artist" : undefined}
                       onClick={artistKey ? () => onOpenProfile?.({ kind: "artist", key: artistKey }) : undefined}
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 transition-none ${artistKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 motion-hover ${artistKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
                       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -244,7 +244,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       </span>
                       <span
                         {...(artistKey ? profileLinkProps("artist", artistKey, artist.name, onOpenProfile) : {})}
-                        className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent transition-none focus-visible:outline-music-accent"
+                        className="font-sans text-[13px] text-[#EDEDE8] flex-1 truncate group-hover:text-music-accent motion-hover focus-visible:outline-music-accent"
                       >
                         {artist.name}
                       </span>
@@ -301,7 +301,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       role="listitem"
                       data-profile-kind={albumKey ? "album" : undefined}
                       onClick={albumKey ? () => onOpenProfile?.({ kind: "album", key: albumKey }) : undefined}
-                      className={`group flex items-baseline gap-2.5 py-2 px-1 transition-none ${albumKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
+                      className={`group flex items-baseline gap-2.5 py-2 px-1 motion-hover ${albumKey ? "cursor-pointer hover:bg-[#111110]" : ""} ${isLast ? "border-b-0" : "border-b border-[#191917]"
                         }`}
                     >
                       <span className="font-mono text-[12px] text-[#4A4A46] w-[18px] flex-none tabular-nums select-none">
@@ -310,7 +310,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <div className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
                         <span
                           {...(albumKey ? profileLinkProps("album", albumKey, album.name, onOpenProfile) : {})}
-                          className="font-sans text-[13px] text-[#EDEDE8] truncate group-hover:text-music-accent transition-none focus-visible:outline-music-accent"
+                          className="font-sans text-[13px] text-[#EDEDE8] truncate group-hover:text-music-accent motion-hover focus-visible:outline-music-accent"
                         >
                           {album.name}
                         </span>

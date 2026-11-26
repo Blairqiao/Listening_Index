@@ -49,7 +49,7 @@ export const SyncStatus: React.FC<SyncStatusProps> = ({
       disabled={isSyncing}
       title="Click to trigger manual Spotify sync"
       onMouseDown={(e) => e.preventDefault()}
-      className={`bg-transparent border-0 p-0 font-mono text-[12px] transition-none focus-ring hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
+      className={`bg-transparent border-0 p-0 font-mono text-[12px] motion-hover focus-ring hover:text-[#EDEDE8] shrink-0 whitespace-nowrap ${
         isSyncing
           ? "text-music-accent cursor-wait"
           : isLive

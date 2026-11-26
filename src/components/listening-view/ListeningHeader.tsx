@@ -36,7 +36,7 @@ export const ListeningHeader: React.FC<ListeningHeaderProps> = ({ syncError }) =
         href={config.siteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="group focus-ring inline-flex items-center gap-2 font-mono text-[13px] sm:text-[16px] text-[#5A5A55] hover:text-[#EDEDE8] transition-colors py-1 cursor-pointer bg-transparent border-0 no-underline"
+        className="group focus-ring inline-flex items-center gap-2 font-mono text-[13px] sm:text-[16px] text-[#5A5A55] hover:text-[#EDEDE8] motion-hover py-1 cursor-pointer bg-transparent border-0 no-underline"
       >
         <span>{config.ownerName}</span>
         <ExternalLink className="w-4 h-4 text-music-accent transition-transform mb-0.5" />
