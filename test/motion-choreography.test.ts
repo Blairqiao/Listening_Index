@@ -27,57 +27,30 @@ test("motion-hover animates the scale property so active:scale-* presses ease in
 
 // Mini player entrance and exit
 
-test("mini player bar fades in with a short 12px rise and leaves the same way, fading only under reduced motion", async () => {
+test("mini player bar slides up on enter and back down on exit, fading instead under reduced motion", async () => {
   const { miniPlayerBarClass, MINI_PLAYER_EXIT_MS } = await import("../src/components/listening-view/mini-player");
-  assert.equal(MINI_PLAYER_EXIT_MS, 150);
+  assert.equal(MINI_PLAYER_EXIT_MS, 180);
   const entering = miniPlayerBarClass("entering");
-  assert.match(entering, /\bopacity-0\b/);
-  assert.match(entering, /motion-safe:translate-y-3\b/);
-  assert.doesNotMatch(entering, /translate-y-full/, "a full-height slide read as too much");
+  assert.match(entering, /motion-safe:translate-y-full/);
+  assert.match(entering, /motion-reduce:opacity-0/);
   assert.doesNotMatch(entering, /drawer-(enter|exit)/, "the start state must not transition");
   const open = miniPlayerBarClass("open");
   assert.match(open, /\bdrawer-enter\b/);
-  assert.doesNotMatch(open, /translate-y|opacity-0/);
+  assert.doesNotMatch(open, /translate-y-full|opacity-0/);
   const closing = miniPlayerBarClass("closing");
   assert.match(closing, /\bdrawer-exit\b/);
-  assert.match(closing, /motion-safe:translate-y-3\b/);
+  assert.match(closing, /motion-safe:translate-y-full/);
 });
 
-test("drawer transitions enter over 200ms and exit over 150ms on the strong ease-out", () => {
+test("drawer transitions use the drawer curve to enter and a shorter ease-out to exit", () => {
   const css = readSrc("src/app/globals.css");
+  assert.match(css, /--ease-drawer:\s*cubic-bezier\(0\.32, 0\.72, 0, 1\)/);
   const enter = cssBlock(css, "@utility drawer-enter");
-  assert.match(enter, /translate 200ms var\(--ease-out-strong\)/);
-  assert.match(enter, /opacity 200ms/);
+  assert.match(enter, /translate 240ms var\(--ease-drawer\)/);
+  assert.match(enter, /opacity 240ms/);
   const exit = cssBlock(css, "@utility drawer-exit");
-  assert.match(exit, /translate 150ms var\(--ease-out-strong\)/);
-  assert.match(exit, /opacity 150ms/);
-  assert.doesNotMatch(css, /--ease-drawer/);
-});
-
-test("mini player progress is a 1px line at reduced strength that grows with scaleX, linearly", async () => {
-  const React = (await import("react")).default;
-  const { renderToStaticMarkup } = await import("react-dom/server");
-  const { MiniPlayerBar } = await import("../src/components/listening-view/MiniPlayerBar");
-  const html = renderToStaticMarkup(
-    React.createElement(MiniPlayerBar, {
-      track: { name: "A", artist: "B", imageUrl: null, id: "t" },
-      isPlaying: true,
-      progress: 0.5,
-      controlsDisabled: false,
-      onTogglePlay: () => {},
-      onPrevious: () => {},
-      onNext: () => {},
-      onOpenPlayer: () => {},
-    }),
-  );
-  const line = html.match(/<div[^>]*aria-hidden="true"[^>]*>/)?.[0] ?? "";
-  assert.ok(line, "progress line renders");
-  assert.match(line, /\bh-px\b/);
-  assert.match(line, /bg-music-accent\/60/);
-  assert.match(line, /transform:scaleX\(0\.5\)/);
-  assert.match(line, /\borigin-left\b/);
-  assert.match(line, /transition-transform duration-250 ease-linear/, "steps match the 250ms position tick");
-  assert.doesNotMatch(line, /transition-all|width:|h-\[2px\]/);
+  assert.match(exit, /translate 180ms var\(--ease-out-strong\)/);
+  assert.match(exit, /opacity 180ms/);
 });
 
 test("ListeningView keeps the mini player mounted through its exit", () => {

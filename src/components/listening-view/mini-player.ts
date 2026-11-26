@@ -17,14 +17,14 @@ export function miniPlayerProgress(position: number, duration: number): number {
 }
 
 /** Matches the drawer-exit transition in globals.css. */
-export const MINI_PLAYER_EXIT_MS = 150;
+export const MINI_PLAYER_EXIT_MS = 180;
 
 /**
- * The bar fades in with a short rise and leaves the same way. Under reduced
- * motion it only fades.
+ * The bar rises from below the viewport and drops back on exit. Under reduced
+ * motion it fades in place instead.
  */
 export function miniPlayerBarClass(phase: ModalPhase): string {
   if (phase === "open") return "drawer-enter";
-  const hidden = "opacity-0 motion-safe:translate-y-3";
+  const hidden = "motion-safe:translate-y-full motion-reduce:opacity-0";
   return phase === "closing" ? `${hidden} drawer-exit` : hidden;
 }

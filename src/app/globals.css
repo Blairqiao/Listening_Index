@@ -13,6 +13,7 @@
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
   --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
@@ -56,14 +57,14 @@
 /* Bars docked to the viewport edge (mini player). Exit matches MINI_PLAYER_EXIT_MS. */
 @utility drawer-enter {
   transition:
-    translate 200ms var(--ease-out-strong),
-    opacity 200ms var(--ease-out-strong);
+    translate 240ms var(--ease-drawer),
+    opacity 240ms var(--ease-drawer);
 }
 
 @utility drawer-exit {
   transition:
-    translate 150ms var(--ease-out-strong),
-    opacity 150ms ease;
+    translate 180ms var(--ease-out-strong),
+    opacity 180ms ease;
 }
 
 /* Histogram bars: hover color stays fast, height (a scaleY) eases to its new
