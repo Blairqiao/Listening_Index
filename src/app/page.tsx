@@ -22,7 +22,7 @@ import {
   parseSearchPage,
   parseSearchSort,
 } from "@/lib/search-utils";
-import { parseModeParam } from "@/components/listening-view/listening-helpers";
+import { resolveInitialMode } from "@/components/listening-view/listening-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -75,8 +75,7 @@ export default async function Page({ searchParams }: PageProps) {
     todayKey
   );
 
-  const parsed = parseModeParam(firstParam(resolvedParams?.mode));
-  const initialMode: Mode = parsed !== null && parsed !== 3 ? parsed : 0;
+  const initialMode: Mode = resolveInitialMode(firstParam(resolvedParams?.mode), initialIsAuthenticated);
 
   const initialProfile =
     initialMode === 4 && resolvedParams ? parseProfileTarget(resolvedParams) : null;

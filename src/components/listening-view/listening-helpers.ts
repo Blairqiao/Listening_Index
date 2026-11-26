@@ -57,6 +57,11 @@ export function sanitizeActiveMode(mode: Mode, isAuthenticated: boolean): Mode {
   return mode === 3 && !isAuthenticated ? 0 : mode;
 }
 
+/** The tab the server renders for a ?mode= value. Live Player needs a verified admin cookie. */
+export function resolveInitialMode(raw: string | null | undefined, isAuthenticated: boolean): Mode {
+  return sanitizeActiveMode(parseModeParam(raw) ?? 0, isAuthenticated);
+}
+
 /** The Session picked in the Sessions view, defaulting to the newest one. */
 export function findSelectedSession<T extends { id: string }>(
   sessions: readonly T[],
@@ -339,18 +344,12 @@ export function buildListeningUrlSearch(
     }
   }
 
-  if (state.activeMode === 4) {
-    params.set("mode", "4");
-  } else if (state.activeMode === 5) {
-    params.set("mode", "5");
-  } else if (state.activeMode === 0) {
-    if (state.preservePendingMode3 && params.get("mode") === "3") {
-      params.set("mode", "3");
-    } else {
-      params.delete("mode");
-    }
-  } else if (params.has("mode")) {
+  if (state.activeMode !== 0) {
     params.set("mode", String(state.activeMode));
+  } else if (state.preservePendingMode3 && params.get("mode") === "3") {
+    params.set("mode", "3");
+  } else {
+    params.delete("mode");
   }
 
   if (target) {

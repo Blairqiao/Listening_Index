@@ -273,16 +273,18 @@ test('buildListeningUrlSearch keeps explicit mode aligned with activeMode and ke
     }),
     '?mode=1',
   );
-  // Without an explicit mode param, non-Search tabs stay compact
-  assert.equal(
-    buildListeningUrlSearch('', {
-      activeMode: 1,
-      overviewRange: DEFAULT_OVERVIEW_RANGE,
-      profileTarget: null,
-      profileRange: presetRange('all'),
-    }),
-    '',
-  );
+  // Every non-Overview tab writes its mode, so a reload lands back on it
+  for (const mode of [1, 2, 3, 4, 5]) {
+    assert.equal(
+      buildListeningUrlSearch('', {
+        activeMode: mode,
+        overviewRange: DEFAULT_OVERVIEW_RANGE,
+        profileTarget: null,
+        profileRange: presetRange('all'),
+      }),
+      `?mode=${mode}`,
+    );
+  }
 
   // mode=3 in Overview is preserved only while pending admin login intent is active
   assert.equal(
@@ -316,4 +318,13 @@ test('ListeningView restores DEFAULT_OVERVIEW_RANGE on mode 0 popstate without r
     source.includes('isSameRange(activeRangeRef.current, normalized)'),
     'handleSelectRange must guard same-range selection before setting shouldPushHistoryRef',
   );
+});
+
+test('resolveInitialMode renders Live Player on the server only for a verified admin', () => {
+  const { resolveInitialMode } = loadTs('src/components/listening-view/listening-helpers.ts');
+  assert.equal(resolveInitialMode('3', true), 3);
+  assert.equal(resolveInitialMode('3', false), 0, 'visitors see Overview while the login request waits');
+  assert.equal(resolveInitialMode('5', false), 5);
+  assert.equal(resolveInitialMode(undefined, true), 0);
+  assert.equal(resolveInitialMode('9', true), 0);
 });
