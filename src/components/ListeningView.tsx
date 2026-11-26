@@ -78,6 +78,7 @@ import { useTrackStats } from "./listening-view/useTrackStats";
 import { useSearchProfile } from "./listening-view/useSearchProfile";
 import { useCalendarData } from "./listening-view/useCalendarData";
 import { useTasteData } from "./listening-view/useTasteData";
+import { gateCalendarOnTaste } from "./listening-view/calendarGate";
 import {
   CalendarSelection,
   formatCalendarMetrics,
@@ -304,6 +305,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     timezone: visitorTimezone,
     refreshKey: lastSyncedAt?.getTime() ?? 0,
   });
+
+  const calendarGate = gateCalendarOnTaste(calendar, taste);
 
   const handleSyncWithCacheClear = useCallback(async () => {
     await handleTriggerSync();
@@ -1029,8 +1032,8 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                 </div>
               ) : (
                 <CalendarView
-                  data={calendar.data}
-                  isLoading={!calendar.data && (calendar.status === "loading" || calendar.status === "idle")}
+                  data={calendarGate.data}
+                  isLoading={calendarGate.isLoading}
                   selection={calendarSelection}
                   onSelectionChange={setCalendarSelection}
                   onOpenInOverview={handleOpenCalendarSelection}

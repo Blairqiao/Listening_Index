@@ -18,7 +18,11 @@ import { HistoryDropzone } from "./HistoryDropzone";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { MODAL_EXIT_MS, modalBackdropClass, modalPanelClass, modalPhase } from "@/lib/modal-motion";
+import { withRevealCap } from "@/lib/motion";
 import { classifyHistoryFile, resolveImportOutcome, stepOnOpen, type UploadStep } from "./upload-outcome";
+
+/** Longest the first open waits for enrichment progress before showing the panel. */
+const ENRICHMENT_REVEAL_CAP_MS = 250;
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -46,9 +50,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   // Overall Database Catalog Enrichment Status
   const [enrichmentProgress, setEnrichmentProgress] = useState<EnrichmentProgress | null>(null);
+  const [isEnrichmentPending, setIsEnrichmentPending] = useState(false);
+  const enrichmentProgressRef = useRef<EnrichmentProgress | null>(null);
+  enrichmentProgressRef.current = enrichmentProgress;
 
   const fetchEnrichmentProgress = useCallback(async () => {
     if (!isDbConfigured) return;
+    setIsEnrichmentPending(true);
     try {
       const res = await fetch("/api/upload/enrich", { method: "GET" });
       if (res.ok) {
@@ -59,15 +67,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       }
     } catch {
       // Ignore network errors
+    } finally {
+      setIsEnrichmentPending(false);
     }
   }, [isDbConfigured]);
-
-  // Fetch catalog enrichment progress on modal open
-  useEffect(() => {
-    if (isOpen && isDbConfigured) {
-      fetchEnrichmentProgress();
-    }
-  }, [isOpen, isDbConfigured, fetchEnrichmentProgress]);
 
   // Summary Metrics
   const [summary, setSummary] = useState<{
@@ -93,23 +96,38 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     let timer: ReturnType<typeof setTimeout> | undefined;
     let raf1: number | undefined;
     let raf2: number | undefined;
-    if (isOpen) {
-      setShouldRender(true);
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled) return;
       raf1 = window.requestAnimationFrame(() => {
         raf2 = window.requestAnimationFrame(() => {
           setIsVisible(true);
         });
       });
+    };
+    if (isOpen) {
+      setShouldRender(true);
+      if (!isDbConfigured) {
+        reveal();
+      } else if (enrichmentProgressRef.current) {
+        // Known progress shows at once and refreshes in place
+        fetchEnrichmentProgress();
+        reveal();
+      } else {
+        // First open: hold the panel so the status card arrives with everything else
+        withRevealCap(fetchEnrichmentProgress(), ENRICHMENT_REVEAL_CAP_MS).then(reveal);
+      }
     } else {
       setIsVisible(false);
       timer = setTimeout(() => setShouldRender(false), MODAL_EXIT_MS);
     }
     return () => {
+      cancelled = true;
       if (timer !== undefined) clearTimeout(timer);
       if (raf1 !== undefined) window.cancelAnimationFrame(raf1);
       if (raf2 !== undefined) window.cancelAnimationFrame(raf2);
     };
-  }, [isOpen]);
+  }, [isOpen, isDbConfigured, fetchEnrichmentProgress]);
 
   // Reopening after a finished import shows the dropzone again
   useEffect(() => {
@@ -298,9 +316,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         {/* Content Body */}
         <div className="p-5 sm:p-6 space-y-5 font-mono text-[12px] overflow-y-auto overscroll-contain scrollbar-hidden">
           {/* Always-Visible Database Enrichment Status Bar */}
-          {isDbConfigured && enrichmentProgress && (
+          {isDbConfigured && enrichmentProgress ? (
             <CatalogEnrichmentCard progress={enrichmentProgress} />
-          )}
+          ) : isDbConfigured && isEnrichmentPending ? (
+            /* A fetch slower than the reveal cap keeps the card's space so nothing below shifts */
+            <div data-enrichment-slot aria-hidden="true" className="invisible">
+              <CatalogEnrichmentCard progress={{ total: 0, enriched: 0, pending: 0 }} />
+            </div>
+          ) : null}
 
           {!isDbConfigured ? (
             /* Locked Gate State */
