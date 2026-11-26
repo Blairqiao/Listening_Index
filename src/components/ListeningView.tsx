@@ -325,10 +325,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     refreshKey: lastSyncedAt?.getTime() ?? 0,
   });
 
+  // Taste ignores syncs (the server keeps it for a day); only a history upload reloads it.
+  const [tasteRefreshKey, setTasteRefreshKey] = useState(0);
   const taste = useTasteData({
     enabled: activeMode === 5,
     timezone: visitorTimezone,
-    refreshKey: lastSyncedAt?.getTime() ?? 0,
+    refreshKey: tasteRefreshKey,
   });
 
   const calendarGate = gateCalendarOnTaste(calendar, taste);
@@ -341,11 +343,11 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
       const refreshKey = lastSyncedAt?.getTime() ?? 0;
       for (const kind of prefetchKindsForMode(mode, { activeMode, hasProfile: profileTarget !== null })) {
         if (kind === "calendar") prefetchCalendar(visitorTimezone, refreshKey);
-        else if (kind === "taste") prefetchTaste(visitorTimezone, refreshKey);
+        else if (kind === "taste") prefetchTaste(visitorTimezone, tasteRefreshKey);
         else prefetchSearch(searchQuery, searchSort, searchPage, searchFilter);
       }
     },
-    [lastSyncedAt, activeMode, profileTarget, visitorTimezone, searchQuery, searchSort, searchPage, searchFilter],
+    [lastSyncedAt, tasteRefreshKey, activeMode, profileTarget, visitorTimezone, searchQuery, searchSort, searchPage, searchFilter],
   );
 
   // The first reveal plays a staged entrance once (globals.css, [data-intro]).
@@ -425,6 +427,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     await handleUploadComplete();
     clearSearchCache();
     clearProfileCache();
+    setTasteRefreshKey((key) => key + 1);
   }, [handleUploadComplete, clearProfileCache]);
 
   // Invalidate any in-flight random profile request when leaving Search browse

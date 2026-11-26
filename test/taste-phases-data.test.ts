@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
@@ -8,7 +8,7 @@ import { GET } from "../src/app/api/listening/taste/route";
 import { getMockTaste } from "../src/lib/mock/taste-data";
 import { CATALOG } from "../src/lib/mock/catalog";
 import { getTastePhasesData, getWeeklyArtistCounts } from "../src/lib/db/queries";
-import { clearServerCache, getOrFetchTaste } from "../src/lib/db/server-cache";
+import { clearServerCache, clearTasteCache, getOrFetchTaste, TASTE_CACHE_TTL_MS } from "../src/lib/db/server-cache";
 import { assertTasteInvariants } from "./helpers/taste-scenarios";
 import type { TastePhasesData } from "../src/lib/taste/types";
 
@@ -60,8 +60,8 @@ test("getMockTaste is deterministic and uses Catalog Artist names", () => {
   }
 });
 
-test("getOrFetchTaste caches by timezone identity and invalidates on clearServerCache", async () => {
-  clearServerCache();
+test("getOrFetchTaste caches by timezone identity, outlives a sync, and clears on clearTasteCache", async () => {
+  clearTasteCache();
   let fetchCount = 0;
 
   const makePayload = (tz: string): TastePhasesData => ({
@@ -96,7 +96,37 @@ test("getOrFetchTaste caches by timezone identity and invalidates on clearServer
     fetchCount++;
     return makePayload("America/Chicago");
   });
-  assert.equal(fetchCount, 3);
+  assert.equal(fetchCount, 2, "a sync does not recompute Taste");
+
+  clearTasteCache();
+  await getOrFetchTaste("America/Chicago", async () => {
+    fetchCount++;
+    return makePayload("America/Chicago");
+  });
+  assert.equal(fetchCount, 3, "a history upload does");
+});
+
+test("getOrFetchTaste keeps a result for a day", async () => {
+  mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  try {
+    clearTasteCache();
+    assert.equal(TASTE_CACHE_TTL_MS, 24 * 60 * 60 * 1000);
+    let fetchCount = 0;
+    const fetcher = async (): Promise<TastePhasesData> => {
+      fetchCount++;
+      return { timezone: "UTC", analyzedWeeks: 0, kFine: 1, kEra: 1, phases: [], shifts: [], gaps: [] };
+    };
+    await getOrFetchTaste("UTC", fetcher);
+    mock.timers.tick(TASTE_CACHE_TTL_MS - 1);
+    await getOrFetchTaste("UTC", fetcher);
+    assert.equal(fetchCount, 1, "still cached just under a day later");
+    mock.timers.tick(1);
+    await getOrFetchTaste("UTC", fetcher);
+    assert.equal(fetchCount, 2, "recomputed once the day is up");
+  } finally {
+    mock.timers.reset();
+    clearTasteCache();
+  }
 });
 
 test("getWeeklyArtistCounts buckets Plays by Sunday in request timezone", dbTest, async (t) => {

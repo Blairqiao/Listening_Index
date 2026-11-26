@@ -162,7 +162,7 @@ test('upload/history: caps batch at 5000 (413), skips invalid items, reports ski
         return { insertedCount: plays.length };
       },
     },
-    '@/lib/db/server-cache': { clearServerCache: () => {} },
+    '@/lib/db/server-cache': { clearServerCache: () => {}, clearTasteCache: () => {} },
   });
 
   // Batch > 5000 -> 413

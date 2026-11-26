@@ -7,7 +7,7 @@ import {
   TrackUpsertItem,
 } from "@/lib/db/queries";
 import { CompactPlayEvent, isSpotifyTrackId } from "@/lib/history-parser";
-import { clearServerCache } from "@/lib/db/server-cache";
+import { clearServerCache, clearTasteCache } from "@/lib/db/server-cache";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -108,8 +108,10 @@ export async function POST(request: NextRequest) {
       }))
     );
 
-    // Purge server cache so subsequent queries across overview, session, and stream-log fetch fresh data
+    // Purge server cache so subsequent queries across overview, session, and stream-log fetch fresh data.
+    // An upload can rewrite years of Plays, so Taste recomputes too.
     clearServerCache();
+    clearTasteCache();
 
     return NextResponse.json({
       success: true,

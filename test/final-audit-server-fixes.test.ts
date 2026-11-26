@@ -41,6 +41,7 @@ test('parseHistoryRecords drops Stream Events whose Track id is malformed', () =
 });
 
 test('upload/history counts an item with a malformed Track id as skipped', async () => {
+  let tasteClears = 0;
   let upsertedTracks: Array<{ id: string }> = [];
   let insertedPlays: Array<{ trackId: string }> = [];
   const route = loadTs('src/app/api/upload/history/route.ts', {
@@ -53,7 +54,7 @@ test('upload/history counts an item with a malformed Track id as skipped', async
         return { insertedCount: plays.length };
       },
     },
-    '@/lib/db/server-cache': { clearServerCache: () => {} },
+    '@/lib/db/server-cache': { clearServerCache: () => {}, clearTasteCache: () => { tasteClears++; } },
   });
   const item = (trackId: string) => ({
     playedAt: '2026-11-03T12:00:00Z', trackId, trackName: 'Track', artistName: 'Artist', albumName: 'Album', msPlayed: 60_000,
@@ -69,6 +70,7 @@ test('upload/history counts an item with a malformed Track id as skipped', async
   assert.equal(data.skipped, 3);
   assert.deepEqual(upsertedTracks.map((t) => t.id), [VALID_ID]);
   assert.deepEqual(insertedPlays.map((p) => p.trackId), [VALID_ID]);
+  assert.equal(tasteClears, 1, 'an upload can rewrite years of Plays, so Taste recomputes');
 });
 
 // ---------------------------------------------------------------------------

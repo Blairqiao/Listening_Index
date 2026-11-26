@@ -12,10 +12,10 @@ type ListeningData =
   | StreamLogData
   | SessionData
   | CalendarData
-  | TastePhasesData
   | SearchResponse;
 const globalForCache = globalThis as unknown as {
   __boundedListeningCache?: KeyedAsyncCache<ListeningData>;
+  __tasteCache?: KeyedAsyncCache<TastePhasesData>;
 };
 // One refresh asks for six Overview ranges, the Stream Log and Sessions, keyed by timezone,
 // so the default of 16 in-flight keys turns a few concurrent visitors into 429s.
@@ -24,6 +24,21 @@ const MAX_IN_FLIGHT_KEYS = 64;
 const cacheStore = globalForCache.__boundedListeningCache ??=
   new KeyedAsyncCache<ListeningData>(60_000, MAX_CACHE_ENTRIES, MAX_IN_FLIGHT_KEYS);
 let cacheEpoch = 0;
+
+/**
+ * Taste phases describe months of listening, so a sync's few new Plays don't move them.
+ * They keep for a day in their own cache, which syncs and enrichment leave alone.
+ * Only a history upload, which can rewrite years of Plays, clears it (`clearTasteCache`).
+ */
+export const TASTE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const tasteStore = globalForCache.__tasteCache ??=
+  new KeyedAsyncCache<TastePhasesData>(TASTE_CACHE_TTL_MS, 32, 16);
+let tasteEpoch = 0;
+
+export function clearTasteCache(): void {
+  tasteEpoch++;
+  tasteStore.clear();
+}
 const cacheClearListeners: Array<() => void> = [];
 
 function timezoneIdentity(timezone?: string): string {
@@ -95,8 +110,8 @@ export function getOrFetchTaste<T extends TastePhasesData = TastePhasesData>(
   timezone: string,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const key = JSON.stringify([cacheEpoch, "taste", timezoneIdentity(timezone)]);
-  return cacheStore.getOrFetch(key, fetcher, () => cacheEpoch) as Promise<T>;
+  const key = JSON.stringify([tasteEpoch, timezoneIdentity(timezone)]);
+  return tasteStore.getOrFetch(key, fetcher, () => tasteEpoch) as Promise<T>;
 }
 
 /** Caches the empty-query Search browse, which every visit to Search opens on. Typed queries are not cached. */
