@@ -11,6 +11,7 @@ import {
   phaseSelection,
   selectedPhaseId,
   tasteLevelLabel,
+  tasteLevelShortLabel,
   desktopRibbon,
   mobileRibbon,
 } from "../src/lib/taste/view";
@@ -322,4 +323,12 @@ test("tasteLevelLabel formats Taste Eras at kEra and Taste Phases at other level
   assert.equal(tasteLevelLabel(fiveToTwelve, 5), "5 Taste Eras");
   assert.equal(tasteLevelLabel(fiveToTwelve, 12), "12 Taste Phases");
   assert.equal(tasteLevelLabel(fiveToTwelve, 8), "8 Taste Phases");
+});
+
+test("tasteLevelShortLabel is the lowercase count the slider shows beside it", () => {
+  const oneToTwelve: TastePhasesData = { ...FIXTURE, kEra: 1, kFine: 12 };
+  const fiveToTwelve: TastePhasesData = { ...FIXTURE, kEra: 5, kFine: 12 };
+  assert.equal(tasteLevelShortLabel(fiveToTwelve, 5), "5 eras");
+  assert.equal(tasteLevelShortLabel(oneToTwelve, 1), "1 era");
+  assert.equal(tasteLevelShortLabel(fiveToTwelve, 9), "9 phases");
 });

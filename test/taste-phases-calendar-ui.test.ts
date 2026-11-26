@@ -171,8 +171,13 @@ test("CalendarView renders default Taste Era level, 2 cards, slider bounds, labe
   assert.match(sliderMatch[0], /\baria-label="Taste detail"/);
   assert.match(sliderMatch[0], /\baria-valuetext="2 Taste Eras"/);
 
-  // Level label & updated hint
-  assert.ok(html.includes("2 Taste Eras"));
+  // Short level label, ticks per level, accent fill, and no end words
+  assert.ok(html.includes(">2 eras<"), "slider shows the short level label");
+  assert.match(sliderMatch[0], /\btaste-slider\b/, "slider uses the slim taste-slider style");
+  assert.match(sliderMatch[0], /--taste-fill:0[;"]/, "fill starts empty at kEra");
+  const ticks = html.match(/data-taste-tick/g) ?? [];
+  assert.equal(ticks.length, 3, "one tick per level from kEra to kFine");
+  assert.ok(!html.includes(">Eras<") && !html.includes(">Phases<"), "end words go; the value label names the end");
   assert.ok(html.includes("Drag across days, pick a month, or pick a phase"));
 
   // Gap card, gradual connector, and legend render when present at level
@@ -449,15 +454,21 @@ test("CalendarView keeps Clear mounted (disabled + invisible when empty) and sta
   assert.match(clearNoSel[0], /\binvisible\b/, "Clear must be invisible without selection");
   assert.match(clearNoSel[0], /\bfocus-ring\b/, "Clear must carry focus-ring");
 
-  const labelSpan = htmlNoSelection.match(/<span\b[^>]*>2 Taste Eras<\/span>/);
-  assert.ok(labelSpan, "must render levelLabel span");
+  const labelSpan = htmlNoSelection.match(/<span\b[^>]*>2 eras<\/span>/);
+  assert.ok(labelSpan, "must render the short level label span");
   assert.match(labelSpan[0], /\btabular-nums\b/, "levelLabel must use tabular-nums");
   assert.match(labelSpan[0], /\bmin-w-/, "levelLabel must reserve a fixed minimum width");
 
+  // The hint and the selection actions share one grid cell so the bar never shifts
   const statusSlot = htmlNoSelection.match(
-    /<div\b[^>]*class="[^"]*min-h-\[36px\][^"]*"[^>]*>[^]*?Drag across days, pick a month, or pick a phase/,
+    /<div\b[^>]*data-calendar-status[^>]*>[^]*?<\/button><\/div><\/div>/,
   );
-  assert.ok(statusSlot, "status slot must reserve min-h-[36px] for the two-line mobile hint");
+  assert.ok(statusSlot, "status slot must render");
+  assert.match(statusSlot[0], /\bgrid\b/, "status slot stacks hint and actions in one grid cell");
+  assert.ok(statusSlot[0].includes("Drag across days, pick a month, or pick a phase"), "hint sits in the status slot");
+  assert.ok(statusSlot[0].includes("Open in Overview"), "actions sit in the status slot");
+  assert.ok(statusSlot[0].includes("Tap two days, a month, or a phase"), "phones get the shorter touch hint");
+  assert.match(statusSlot[0], /<span class="hidden sm:inline">Open in <\/span>Overview/, "phones shorten the link to Overview →");
   assert.ok(!statusSlot[0].includes("truncate"), "hint must never be truncated");
 
   const htmlNoTaste = renderToStaticMarkup(
@@ -544,7 +555,7 @@ test("CalendarView and TastePhaseCards apply focus-ring, press, mobile hit-area-
   assert.ok(slider);
   assert.match(slider[0], /\bfocus-ring\b/, "slider must include focus-ring");
 
-  const overviewBtn = html.match(/<button\b[^>]*>Open in Overview[^<]*<\/button>/);
+  const overviewBtn = html.match(/<button\b[^>]*aria-label="Open in Overview"[^>]*>/);
   assert.ok(overviewBtn);
   assert.match(overviewBtn[0], /\bfocus-ring\b/, "Open in Overview button must include focus-ring");
 

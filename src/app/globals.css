@@ -262,6 +262,60 @@ body::-webkit-scrollbar,
   }
 }
 
+/* Calendar taste-detail slider: 2px track filled with accent up to a 10px ring thumb.
+   --taste-fill (0..1) comes from the component; the stop sits under the thumb's center. */
+.taste-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  margin: 0;
+  background: transparent;
+  --taste-stop: calc(5px + (100% - 10px) * var(--taste-fill, 0));
+}
+.taste-slider::-webkit-slider-runnable-track {
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--music-accent) var(--taste-stop),
+    #26261F var(--taste-stop)
+  );
+}
+.taste-slider::-moz-range-track {
+  height: 2px;
+  background: #26261F;
+}
+.taste-slider::-moz-range-progress {
+  height: 2px;
+  background: var(--music-accent);
+}
+.taste-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #080808;
+  border: 2px solid var(--music-accent);
+  transition: scale var(--motion-hover) var(--ease-snappy);
+}
+.taste-slider::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #080808;
+  border: 2px solid var(--music-accent);
+  transition: scale var(--motion-hover) var(--ease-snappy);
+}
+@media (hover: hover) {
+  .taste-slider:hover::-webkit-slider-thumb { scale: 1.2; }
+  .taste-slider:hover::-moz-range-thumb { scale: 1.2; }
+}
+.taste-slider:active::-webkit-slider-thumb { scale: 1.2; }
+.taste-slider:active::-moz-range-thumb { scale: 1.2; }
+
 /* Calendar heatmap count shading levels following chosen accent token */
 .calendar-level-0 {
   background-color: #1C1C1A;

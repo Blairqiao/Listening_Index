@@ -283,6 +283,12 @@ export function tasteLevelLabel(data: TastePhasesData, k: number): string {
   return `${k} Taste ${k === 1 ? "Phase" : "Phases"}`;
 }
 
+/** The count the Calendar slider shows beside it: "5 eras", "1 era", "9 phases". */
+export function tasteLevelShortLabel(data: TastePhasesData, k: number): string {
+  if (k === data.kEra) return `${k} ${k === 1 ? "era" : "eras"}`;
+  return `${k} ${k === 1 ? "phase" : "phases"}`;
+}
+
 function clipSpanToDesktopCols(
   year: number,
   start: string,

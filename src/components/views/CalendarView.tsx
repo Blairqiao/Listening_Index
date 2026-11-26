@@ -27,6 +27,7 @@ import {
   phaseSelection,
   selectedPhaseId,
   tasteLevelLabel,
+  tasteLevelShortLabel,
   tasteRow,
   type DesktopRibbonPiece,
   type MobileRibbonPiece,
@@ -1306,6 +1307,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     activeTaste !== null && activeTasteLevel !== null
       ? tasteLevelLabel(activeTaste, activeTasteLevel)
       : "";
+  const levelShortLabel =
+    activeTaste !== null && activeTasteLevel !== null
+      ? tasteLevelShortLabel(activeTaste, activeTasteLevel)
+      : "";
+  const levelSteps = activeTaste ? activeTaste.kFine - activeTaste.kEra : 0;
+  const levelFill =
+    activeTaste !== null && activeTasteLevel !== null && levelSteps > 0
+      ? (activeTasteLevel - activeTaste.kEra) / levelSteps
+      : 0;
+  // One tick per level; past 8 levels the ticks crowd into a ruler, so drop them.
+  const levelTicks =
+    levelSteps > 0 && levelSteps <= 8
+      ? Array.from({ length: levelSteps + 1 }, (_, i) => i / levelSteps)
+      : [];
+  const showHint = Boolean(pendingTouchAnchor) || !draft;
+  const showActions = Boolean(draft) && !pendingTouchAnchor;
 
   const heatmapsContainer = (
     <div
@@ -1345,23 +1362,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="w-full flex flex-col">
-      {/* Sticky selection bar */}
-      <div className="sticky top-0 z-20 bg-[#080808] border-b border-[#26261F] py-2 px-3 sm:px-4 mb-4 flex items-center justify-between gap-3 flex-wrap font-mono text-[12px]">
-        <div className="flex items-center content-center gap-x-2.5 gap-y-0 flex-wrap leading-[18px] min-h-[36px] sm:min-h-[26px]">
-          {pendingTouchAnchor ? (
-            <span className="text-[#5A5A55]">Tap an end day</span>
-          ) : draft ? null : (
-            <span className="text-[#5A5A55]">
-              {activeTaste
-                ? "Drag across days, pick a month, or pick a phase"
-                : "Drag across days or pick a month"}
-            </span>
-          )}
-        </div>
-        <div className={showSlider ? "flex items-center gap-3 flex-wrap w-full sm:w-auto" : "flex items-center gap-3"}>
-          {showSlider && activeTaste && activeTasteLevel !== null && (
-            <div className="flex items-center gap-2 text-[11px] text-[#5A5A55] w-full sm:w-auto">
-              <span>Eras</span>
+      {/* Sticky selection bar: taste detail on the left, selection status and actions on the right */}
+      <div className="sticky top-0 z-20 bg-[#080808] border-b border-[#26261F] py-2 px-3 sm:px-4 mb-4 flex items-center justify-between gap-4 font-mono text-[12px]">
+        {showSlider && (
+          <div className="flex items-center gap-2.5 h-[26px] shrink-0">
+            <span className="relative inline-flex items-center w-[80px] sm:w-[130px]">
+              {levelTicks.map((at) => (
+                <span
+                  key={at}
+                  data-taste-tick
+                  aria-hidden="true"
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-px h-[6px] bg-[#3A3A36] pointer-events-none"
+                  style={{ left: `calc(5px + (100% - 10px) * ${at})` }}
+                />
+              ))}
               <input
                 type="range"
                 min={activeTaste.kEra}
@@ -1371,31 +1385,59 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 onChange={(e) => onTasteLevelChange?.(Number(e.target.value))}
                 aria-label="Taste detail"
                 aria-valuetext={levelLabel}
-                className="w-[120px] sm:w-[130px] cursor-pointer focus-ring"
-                style={{ accentColor: "var(--music-accent)" }}
+                className="taste-slider relative w-full cursor-pointer focus-ring"
+                style={{ "--taste-fill": levelFill } as React.CSSProperties}
               />
-              <span>Phases</span>
-              <span className="text-[#EDEDE8] whitespace-nowrap tabular-nums min-w-[15ch]">{levelLabel}</span>
-            </div>
-          )}
-          <button
-            type="button"
-            disabled={!draft}
-            onClick={handleClear}
-            className={`text-[#5A5A55] hover:text-[#EDEDE8] motion-hover focus-ring bg-transparent border-0 p-0 text-[12px] font-mono ${
-              draft ? "cursor-pointer" : "invisible pointer-events-none"
-            }`}
+            </span>
+            <span className="text-[#A0A099] whitespace-nowrap tabular-nums min-w-[8ch] sm:min-w-[9ch]">{levelShortLabel}</span>
+          </div>
+        )}
+        <div
+          data-calendar-status
+          className={`grid grid-cols-[minmax(0,1fr)] flex-1 min-w-0 items-center min-h-[26px] ${
+            showSlider ? "justify-items-end text-right" : "justify-items-start"
+          }`}
+        >
+          <span
+            aria-hidden={!showHint}
+            className={`col-start-1 row-start-1 text-[#5A5A55] leading-[18px] ${showHint ? "" : "invisible"}`}
           >
-            Clear
-          </button>
-          <button
-            type="button"
-            disabled={!draft}
-            onClick={handleOpenInOverview}
-            className="font-mono text-[12px] whitespace-nowrap py-[3px] px-2.5 rounded-none motion-hover focus-ring border border-music-accent text-music-accent bg-transparent hover:enabled:bg-music-accent/10 cursor-pointer flex items-center justify-center text-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-[#26261F] disabled:text-[#5A5A55]"
-          >
-            Open in Overview &rarr;
-          </button>
+            {pendingTouchAnchor ? (
+              "Tap an end day"
+            ) : (
+              <>
+                <span className="sm:hidden">
+                  {activeTaste ? "Tap two days, a month, or a phase" : "Tap two days or a month"}
+                </span>
+                <span className="hidden sm:inline">
+                  {activeTaste
+                    ? "Drag across days, pick a month, or pick a phase"
+                    : "Drag across days or pick a month"}
+                </span>
+              </>
+            )}
+          </span>
+          <div className={`col-start-1 row-start-1 flex items-center gap-4 ${showActions ? "" : "invisible"}`}>
+            <button
+              type="button"
+              disabled={!showActions}
+              onClick={handleClear}
+              className={`text-[#6A6A64] hover:text-[#EDEDE8] motion-hover focus-ring bg-transparent border-0 p-0 text-[12px] font-mono ${
+                showActions ? "cursor-pointer" : "invisible pointer-events-none"
+              }`}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              disabled={!showActions}
+              onClick={handleOpenInOverview}
+              aria-label="Open in Overview"
+              className="font-mono text-[12px] whitespace-nowrap bg-transparent border-0 p-0 text-music-accent hover:enabled:text-[#EDEDE8] motion-hover focus-ring press cursor-pointer disabled:cursor-default"
+            >
+              <span className="hidden sm:inline">Open in </span>Overview &rarr;
+            </button>
+          </div>
         </div>
       </div>
 

@@ -74,7 +74,7 @@ test("renderToStaticMarkup(CalendarView) with small fixture", () => {
   }
 
   // With selection null, Open in Overview button is disabled
-  const overviewButtonMatch = html.match(/<button[^>]*>[^<]*Open in Overview[^<]*<\/button>/i);
+  const overviewButtonMatch = html.match(/<button\b[^>]*aria-label="Open in Overview"[^>]*>/);
   assert.ok(overviewButtonMatch, "should render Open in Overview button");
   assert.match(overviewButtonMatch[0], /\sdisabled(?=[>\s=])/, "Open in Overview button must have disabled attribute when selection is null");
 });
@@ -107,10 +107,11 @@ test("CalendarView with selection contains formatted label and enabled Open in O
   assert.ok(!/\d plays</.test(bar), "bar must not repeat the ribbon's play count");
 
   // Open in Overview button is enabled
-  const overviewButtonMatch = html.match(/<button[^>]*>[^<]*Open in Overview[^<]*<\/button>/i);
+  const overviewButtonMatch = html.match(/<button\b[^>]*aria-label="Open in Overview"[^>]*>/);
   assert.ok(overviewButtonMatch, "should render Open in Overview button");
   assert.doesNotMatch(overviewButtonMatch[0], /\sdisabled(?=[>\s=])/, "Open in Overview button must not have disabled attribute with selection");
-  assert.match(overviewButtonMatch[0], /hover:enabled:bg-music-accent\/10/, "Open in Overview button must tint on hover");
+  assert.match(overviewButtonMatch[0], /\btext-music-accent\b/, "Open in Overview reads as an accent text link");
+  assert.doesNotMatch(overviewButtonMatch[0], /\bborder-music-accent\b|\bpy-\[3px\]/, "Open in Overview drops the boxed button");
 });
 
 test("CalendarView first load with no data renders animate-pulse and no loading text", () => {
