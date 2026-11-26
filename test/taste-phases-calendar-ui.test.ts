@@ -210,6 +210,8 @@ test("CalendarView highlights selected phase card and its ribbon pieces when sel
   const pressedFalse = html.match(/<button\b[^>]*\baria-pressed="false"[^>]*>/g) ?? [];
   assert.equal(pressedTrue.length, 1, "exactly one card must be pressed");
   assert.equal(pressedFalse.length, 1, "the other card must not be pressed");
+  assert.match(pressedTrue[0], /bg-music-accent\/\[0\.06\]/, "selected card gets subtle accent fill");
+  assert.match(pressedFalse[0], /opacity-55/, "unselected cards dim while a Taste Phase is selected");
 
   // Ribbon piece for selected phase has bg-music-accent
   const accentRibbonButtons =
@@ -238,7 +240,7 @@ test("CalendarView leaves all cards unpressed when selection matches no phase, w
 
   // Outside day is still dimmed
   const outDay = html.match(/<div[^>]*data-date="2025-03-10"[^>]*class="[^"]*"/)?.[0] ?? "";
-  assert.match(outDay, /opacity-40/);
+  assert.match(outDay, /calendar-out-of-range/);
 });
 
 test("CalendarView hides slider when kEra === kFine while still rendering cards and ribbon", () => {

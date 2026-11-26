@@ -186,10 +186,10 @@ test("CalendarView multi-year dimming, rings, and active year block border", () 
   assert.match(emptyOut, /calendar-level-0/);
   assert.doesNotMatch(emptyOut, /calendar-in-range/);
 
-  // 2025-01-10 is outside selection -> opacity-40
+  // 2025-01-10 is outside selection -> calendar-out-of-range
   const cellOut = html.match(/<div[^>]*data-date="2025-01-10"[^>]*class="[^"]*"/);
   assert.ok(cellOut, "should find 2025-01-10 cell");
-  assert.match(cellOut[0], /opacity-40/);
+  assert.match(cellOut[0], /calendar-out-of-range/);
   assert.doesNotMatch(cellOut[0], /ring-1 ring-inset ring-\[#EDEDE8\]/);
 });
 
