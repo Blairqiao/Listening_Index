@@ -805,16 +805,17 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
     profileTarget?.kind === "track" ? trackRankFormat : artistRankFormat,
   );
 
-  const calendarMetrics: [string, string, string, string] = calendar.data
+  // Same gate as CalendarView, so the numbers land with the heatmaps and phase cards.
+  const calendarMetrics: [string, string, string, string] = calendarGate.data
     ? formatCalendarMetrics(
-        summarizeCalendar(calendar.data.days, calendarSelection, {
-          firstDate: calendar.data.firstDate,
-          today: calendar.data.today,
+        summarizeCalendar(calendarGate.data.days, calendarSelection, {
+          firstDate: calendarGate.data.firstDate,
+          today: calendarGate.data.today,
         }),
         calendarSelection,
         {
-          firstDate: calendar.data.firstDate,
-          today: calendar.data.today,
+          firstDate: calendarGate.data.firstDate,
+          today: calendarGate.data.today,
         }
       )
     : ["--", "--", "--", "--"];

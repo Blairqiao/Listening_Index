@@ -48,6 +48,19 @@ test("ListeningView passes gated calendar data to CalendarView", () => {
   assert.match(src, /<CalendarView\s+data=\{calendarGate\.data\}\s+isLoading=\{calendarGate\.isLoading\}/);
 });
 
+test("Calendar ribbon numbers wait for the same gate as the calendar", () => {
+  const src = readSrc("src/components/ListeningView.tsx");
+  const start = src.indexOf("const calendarMetrics");
+  assert.ok(start > 0, "calendarMetrics must exist");
+  const block = src.slice(start, src.indexOf("const metricByMode", start));
+  assert.ok(block.includes("calendarGate.data"), "ribbon must read the gated calendar data");
+  assert.ok(!/\bcalendar\.data\b/.test(block), "ribbon must not read the ungated calendar data");
+  assert.ok(
+    src.indexOf("const calendarGate =") < start,
+    "the gate must be computed before the ribbon metrics",
+  );
+});
+
 test("withRevealCap resolves with the task or after the cap, whichever is first", async () => {
   const { withRevealCap } = await import("../src/lib/motion");
   const fast = await withRevealCap(Promise.resolve("done"), 50);
