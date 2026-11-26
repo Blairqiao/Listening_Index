@@ -12,13 +12,13 @@
 
   --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
   --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
   --animate-view-enter: view-enter var(--motion-fast) var(--ease-snappy) both;
   --animate-content-enter: content-enter var(--motion-fast) var(--ease-snappy) both;
 
   @keyframes view-enter {
     from {
       opacity: 0;
-      transform: translateY(4px);
     }
   }
 
@@ -36,17 +36,35 @@
   --motion-press: 60ms;
   --motion-fast: 120ms;      /* tab enter, content enter, selection, menus */
   --motion-medium: 200ms;    /* modals, card-row scroll; matches ZOOM_ANIM_DURATION_MS */
+  --motion-exit: 150ms;      /* modal close; matches MODAL_EXIT_MS */
   --motion-showpiece: 450ms; /* first reveal after page load only */
 }
 
+/* Reduced motion keeps opacity fades and drops movement. Press feedback is a
+   scale, so it goes to 0ms; modal scale and translate sit behind motion-safe:. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-hover: 0ms;
     --motion-press: 0ms;
-    --motion-fast: 0ms;
-    --motion-medium: 0ms;
-    --motion-showpiece: 0ms;
   }
+}
+
+/* Tailwind v4 scale-* and translate-* set the scale and translate properties,
+   so transitions must name those, not transform. */
+@utility modal-enter {
+  transition:
+    opacity var(--motion-medium) var(--ease-expressive),
+    scale var(--motion-medium) var(--ease-expressive),
+    translate var(--motion-medium) var(--ease-expressive);
+}
+
+/* Shorter than the open. Opacity uses plain ease so the shrink stays visible
+   instead of vanishing in the first frames of an expo curve. */
+@utility modal-exit {
+  transition:
+    opacity var(--motion-exit) ease,
+    scale var(--motion-exit) var(--ease-out-strong),
+    translate var(--motion-exit) var(--ease-out-strong);
 }
 
 @utility motion-hover {

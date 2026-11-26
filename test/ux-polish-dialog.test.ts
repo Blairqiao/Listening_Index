@@ -39,18 +39,12 @@ test("nextFocusIndex wraps forward and backward and handles edge counts", async 
   assert.equal(nextFocusIndex(5, 3, true), 2);
 });
 
-test("all four modals integrate useDialogFocus and unified motion-medium expressive transitions", () => {
+test("all four modals integrate useDialogFocus and the shared modal motion classes", () => {
   for (const relPath of MODAL_FILES) {
     const src = readSrc(relPath);
     assert.ok(src.includes("useDialogFocus"), `${relPath} must use useDialogFocus`);
-    assert.ok(
-      src.includes("duration-[var(--motion-medium)]"),
-      `${relPath} must use duration-[var(--motion-medium)]`,
-    );
-    assert.ok(
-      src.includes("ease-expressive"),
-      `${relPath} must use ease-expressive`,
-    );
+    assert.ok(src.includes("modalPanelClass(phase)"), `${relPath} must use modalPanelClass`);
+    assert.ok(src.includes("modalBackdropClass(phase)"), `${relPath} must use modalBackdropClass`);
     assert.ok(
       !src.includes("ease-[cubic-bezier(0.16,1,0.3,1)]"),
       `${relPath} must not keep inline cubic-bezier`,

@@ -17,7 +17,7 @@ import {
 import { HistoryDropzone } from "./HistoryDropzone";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
-import { prefersReducedMotion } from "@/lib/motion";
+import { MODAL_EXIT_MS, modalBackdropClass, modalPanelClass, modalPhase } from "@/lib/modal-motion";
 import { classifyHistoryFile, resolveImportOutcome, stepOnOpen, type UploadStep } from "./upload-outcome";
 
 interface UploadModalProps {
@@ -102,7 +102,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       });
     } else {
       setIsVisible(false);
-      timer = setTimeout(() => setShouldRender(false), prefersReducedMotion() ? 0 : 200);
+      timer = setTimeout(() => setShouldRender(false), MODAL_EXIT_MS);
     }
     return () => {
       if (timer !== undefined) clearTimeout(timer);
@@ -248,11 +248,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({
 
   if (!shouldRender) return null;
 
+  const phase = modalPhase(isOpen, isVisible);
+
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overscroll-contain transition-opacity duration-[var(--motion-medium)] ease-expressive ${
-        isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overscroll-contain ${modalBackdropClass(phase)}`}
       aria-modal="true"
       aria-labelledby="upload-modal-title"
       role="dialog"
@@ -272,9 +272,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl transition-[transform,opacity] duration-[var(--motion-medium)] ease-expressive transform will-change-[transform,opacity] focus:outline-none ${
-          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.97] translate-y-2"
-        }`}
+        className={`relative z-10 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden border border-[#26261F] bg-[#0A0A09] text-[#EDEDE8] shadow-2xl focus:outline-none ${modalPanelClass(phase)}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1C1C1A] px-5 py-3.5 select-none shrink-0">
@@ -353,9 +351,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     </div>
                     <div className="h-2 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
                       <div
-                        className="h-full bg-music-accent transition-all duration-300 ease-out"
+                        className="h-full w-full origin-left bg-music-accent transition-transform duration-[var(--motion-medium)] ease-out-strong"
                         style={{
-                          width: `${stage1Total > 0 ? Math.min(100, (stage1Current / stage1Total) * 100) : 0}%`,
+                          transform: `scaleX(${stage1Total > 0 ? Math.min(1, stage1Current / stage1Total) : 0})`,
                         }}
                       />
                     </div>

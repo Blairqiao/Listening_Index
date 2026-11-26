@@ -39,8 +39,8 @@ export const CatalogEnrichmentCard: React.FC<CatalogEnrichmentCardProps> = ({ pr
       {/* Progress bar */}
       <div className="h-1.5 w-full bg-[#181816] border border-[#26261F] overflow-hidden">
         <div
-          className="h-full bg-music-accent transition-all duration-500 ease-out"
-          style={{ width: `${barWidth}%` }}
+          className="h-full w-full origin-left bg-music-accent transition-transform duration-[var(--motion-medium)] ease-out-strong"
+          style={{ transform: `scaleX(${barWidth / 100})` }}
         />
       </div>
 

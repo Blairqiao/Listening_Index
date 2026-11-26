@@ -19,7 +19,7 @@ import {
 import { ScheduledSyncCard } from "./ScheduledSyncCard";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
-import { prefersReducedMotion } from "@/lib/motion";
+import { MODAL_EXIT_MS, modalBackdropClass, modalPanelClass, modalPhase } from "@/lib/modal-motion";
 
 export interface SpotifyOwnerStatus {
   connected: boolean;
@@ -208,7 +208,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       timer = setTimeout(() => {
         setShouldRender(false);
         setError(null);
-      }, prefersReducedMotion() ? 0 : 200);
+      }, MODAL_EXIT_MS);
     }
     return () => {
       if (timer !== undefined) clearTimeout(timer);
@@ -364,14 +364,14 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
 
   if (!shouldRender || !isAllowed) return null;
 
+  const phase = modalPhase(effectiveIsOpen && isAllowed, isVisible);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-spotify-modal-title"
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain transition-opacity duration-[var(--motion-medium)] ease-expressive ${
-        isVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-[#080808]/85 backdrop-blur-sm overscroll-contain ${modalBackdropClass(phase)}`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isBusy) effectiveOnClose();
       }}
@@ -382,9 +382,7 @@ export const AdminSpotifyModal: React.FC<AdminSpotifyModalProps> = ({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`w-full max-w-[480px] max-h-[90vh] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans transition-[transform,opacity] duration-[var(--motion-medium)] ease-expressive transform will-change-[transform,opacity] focus:outline-none ${
-          isVisible ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-[0.97] translate-y-2"
-        }`}
+        className={`w-full max-w-[480px] max-h-[90vh] bg-[#0E0E0D] border border-[#26261F] text-[#EDEDE8] shadow-2xl flex flex-col overflow-hidden font-sans focus:outline-none ${modalPanelClass(phase)}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#26261F] bg-[#121211] select-none">
