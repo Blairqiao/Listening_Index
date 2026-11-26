@@ -101,8 +101,10 @@ test("CalendarView with selection contains formatted label and enabled Open in O
     })
   );
 
-  // Bar contains Oct 2026
-  assert.ok(html.includes("Oct 2026"), "bar must contain 'Oct 2026'");
+  // The control row names the selection; the bar no longer repeats it or its play count
+  assert.ok(!html.includes(">Oct 2026<"), "bar must not repeat the selection label");
+  const bar = html.slice(0, html.indexOf("group w-full flex flex-col gap-6"));
+  assert.ok(!/\d plays</.test(bar), "bar must not repeat the ribbon's play count");
 
   // Open in Overview button is enabled
   const overviewButtonMatch = html.match(/<button[^>]*>[^<]*Open in Overview[^<]*<\/button>/i);
@@ -553,7 +555,7 @@ test("CalendarView shows 'Tap an end day' hint during pending second tap on touc
 
   // After second tap commits range, "Tap an end day" is cleared
   assert.ok(!markup.includes("Tap an end day"));
-  assert.ok(markup.includes("Sep 4 – Oct 15, 2026"));
+  assert.ok(!markup.includes("Sep 4 – Oct 15, 2026"), "the control row, not the bar, names the selection");
 });
 
 test("CalendarView sets data-dragging during mouse drag to suppress stuck hover outline and clears it on release", () => {

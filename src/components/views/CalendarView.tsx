@@ -11,14 +11,11 @@ import {
   yearSelection,
   normalizeSelection,
   selectionContourPath,
-  selectionToRange,
-  summarizeCalendar,
   weekColumns,
   monthStartColumns,
   type CalendarData,
   type CalendarSelection,
 } from "@/lib/calendar";
-import { formatRangeLabel } from "@/lib/range";
 import type { TastePhase, TastePhasesData } from "@/lib/taste/types";
 import {
   clampTasteLevel,
@@ -1174,14 +1171,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return calendarYears(data.firstDate, data.today);
   }, [data]);
 
-  const draftSummary = useMemo(() => {
-    if (!data || !data.firstDate || !draft) return null;
-    return summarizeCalendar(data.days, draft, {
-      firstDate: data.firstDate,
-      today: data.today,
-    });
-  }, [data, draft]);
-
   const activeTaste = hasTastePhases(taste) ? taste : null;
   const activeTasteLevel = activeTaste
     ? clampTasteLevel(activeTaste, tasteLevel)
@@ -1360,24 +1349,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="sticky top-0 z-20 bg-[#080808] border-b border-[#26261F] py-2 px-3 sm:px-4 mb-4 flex items-center justify-between gap-3 flex-wrap font-mono text-[12px]">
         <div className="flex items-center content-center gap-x-2.5 gap-y-0 flex-wrap leading-[18px] min-h-[36px] sm:min-h-[26px]">
           {pendingTouchAnchor ? (
-            <>
-              {draft && (
-                <span className="text-music-accent font-semibold">
-                  {formatRangeLabel(selectionToRange(draft))}
-                </span>
-              )}
-              <span className="text-[#5A5A55]">Tap an end day</span>
-            </>
-          ) : draft ? (
-            <>
-              <span className="text-music-accent font-semibold">
-                {formatRangeLabel(selectionToRange(draft))}
-              </span>
-              <span className="text-[#5A5A55]">
-                {draftSummary ? `${draftSummary.plays.toLocaleString("en-US")} plays` : ""}
-              </span>
-            </>
-          ) : (
+            <span className="text-[#5A5A55]">Tap an end day</span>
+          ) : draft ? null : (
             <span className="text-[#5A5A55]">
               {activeTaste
                 ? "Drag across days, pick a month, or pick a phase"

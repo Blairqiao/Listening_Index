@@ -929,6 +929,7 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
               streamLogDateSpan={streamLogDateSpan}
               sessionNumber={selectedSessionNumber}
               totalSessions={totalSessions}
+              calendarSelection={calendarSelection}
               onProfileBack={() => {
                 shouldPushHistoryRef.current = true;
                 handleProfileBack();

@@ -316,3 +316,35 @@ test("ControlRow in mode 0 renders the active range label and switches to Since 
     "Mode 0 all preset must render Since followed by compactDate(logStartDate)",
   );
 });
+
+test("ControlRow in mode 5 names the calendar selection in the muted scope label and falls back to Since", () => {
+  const base = {
+    mode: 5 as const,
+    range: presetRange("all"),
+    onSelectRange: () => {},
+    firstKey: "2022-01-29",
+    todayKey: "2026-11-25",
+    logStartDate: "2022-01-29",
+    isSessionOpen: false,
+    sessionTagTime: "",
+  };
+
+  const selected = renderToStaticMarkup(
+    React.createElement(ControlRow, {
+      ...base,
+      calendarSelection: { from: "2022-10-17", to: "2022-10-17" },
+    }),
+  );
+  assert.match(
+    selected,
+    /<span class="font-mono text-\[12px\] text-\[#5A5A55\] whitespace-nowrap sm:mr-4 ">Oct 17, 2022/,
+    "Mode 5 must name the selection in the same muted scope slot as every other page",
+  );
+  assert.ok(!selected.includes("Since "), "Mode 5 with a selection must not claim the whole history");
+  assert.ok(selected.includes("Less") && selected.includes("More"), "Mode 5 keeps the legend");
+
+  const empty = renderToStaticMarkup(
+    React.createElement(ControlRow, { ...base, calendarSelection: null }),
+  );
+  assert.ok(empty.includes(`Since ${compactDate("2022-01-29")}`), "Mode 5 without a selection falls back to Since");
+});

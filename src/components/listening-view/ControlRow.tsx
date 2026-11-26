@@ -8,6 +8,7 @@ import {
   type RangeSelection,
 } from "@/lib/range";
 import { compactDate } from "@/lib/format-utils";
+import { selectionToRange, type CalendarSelection } from "@/lib/calendar";
 import type { ProfileHistoryEntry, ProfileKind } from "@/lib/search-types";
 import { CalendarLegend } from "@/components/views/CalendarView";
 import { ZoomRuler } from "@/components/listening-view/zoom-ruler/ZoomRuler";
@@ -39,6 +40,7 @@ interface ControlRowProps {
   activeDevice?: { name?: string; isThisBrowser?: boolean } | null;
   playerStatus?: "idle" | "checking" | "unlinked" | "connecting" | "ready" | "error";
   onTransferPlayback?: () => void;
+  calendarSelection?: CalendarSelection | null;
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -70,12 +72,16 @@ export const ControlRow: React.FC<ControlRowProps> = ({
   activeDevice,
   playerStatus,
   onTransferPlayback,
+  calendarSelection,
 }) => {
   const getScopeLabel = (): React.ReactNode => {
     switch (mode) {
       case 0:
-      case 5:
         return `Since ${compactDate(logStartDate)}`;
+      case 5:
+        return calendarSelection
+          ? formatRangeLabel(selectionToRange(calendarSelection))
+          : `Since ${compactDate(logStartDate)}`;
       case 1:
         return streamLogDateSpan || "Stream log";
       case 2: {
