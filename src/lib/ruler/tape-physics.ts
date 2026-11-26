@@ -1,7 +1,75 @@
-export const FRICTION_PER_16MS = 0.93;
 export const RUBBER_BAND = 0.35;
-export const SETTLE_RATE = 0.28;
-export const MIN_VELOCITY = 0.02; // px per ms; below this momentum stops
+
+export const RULER_MOTION = {
+  frictionPer16ms: 0.952, // was 0.93: decay ~220ms -> ~325ms
+  maxReleaseVelocity: 3, // px/ms cap on fling speed
+  staleReleaseMs: 60, // let go this long after the last move: no fling
+  snapMs: 180, // release snap, wheel settle, tap on a unit
+  keyStepMs: 140, // ArrowLeft / ArrowRight
+  jumpMinMs: 320, // Today, Home/End, external goTo
+  jumpMaxMs: 900,
+  flingMinMs: 220,
+  flingMaxMs: 1000,
+  zoomMs: 280, // was 200
+} as const;
+
+export const easeOutCubic: (t: number) => number = (t) => {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return 1 - Math.pow(1 - t, 3);
+};
+
+export const easeInOutCubic: (t: number) => number = (t) => {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+};
+
+/** Offset at `elapsedMs` of a tween from `from` to `to`; equals `to` once elapsed >= durationMs. */
+export function tweenOffset(
+  from: number,
+  to: number,
+  elapsedMs: number,
+  durationMs: number,
+  ease: (t: number) => number,
+): number {
+  if (durationMs <= 0 || elapsedMs >= durationMs) return to;
+  if (elapsedMs <= 0) return from;
+  return from + (to - from) * ease(elapsedMs / durationMs);
+}
+
+/** Long-jump duration: clamp(jumpMinMs + 110 * log2(1 + distancePx / 80), jumpMinMs, jumpMaxMs). */
+export function jumpDuration(distancePx: number): number {
+  const dist = Math.max(0, Math.abs(distancePx));
+  const raw = RULER_MOTION.jumpMinMs + 110 * Math.log2(1 + dist / 80);
+  return Math.max(RULER_MOTION.jumpMinMs, Math.min(RULER_MOTION.jumpMaxMs, raw));
+}
+
+/**
+ * Project a release fling to the nearest real unit center and compute the
+ * ease-out cubic duration that matches the finger's release velocity.
+ */
+export function projectFling(
+  centers: number[],
+  offset: number,
+  velocity: number,
+  realFirst: number,
+  realLast: number,
+): { targetIdx: number; targetOffset: number; durationMs: number } {
+  const tau = -16 / Math.log(RULER_MOTION.frictionPer16ms);
+  const projectedOffset = offset + velocity * tau;
+  const targetIdx = nearestIndex(centers, projectedOffset, realFirst, realLast);
+  const targetOffset = centers[targetIdx];
+  const speed = Math.abs(velocity);
+  const distance = Math.abs(targetOffset - offset);
+  const rawDuration =
+    speed > 0 ? (3 * distance) / speed : RULER_MOTION.flingMinMs;
+  const durationMs = Math.max(
+    RULER_MOTION.flingMinMs,
+    Math.min(RULER_MOTION.flingMaxMs, rawDuration),
+  );
+  return { targetIdx, targetOffset, durationMs };
+}
 
 /**
  * Binary search over sorted `centers` within `[lo, hi]`, returning the index
@@ -63,47 +131,4 @@ export function dampOffset(raw: number, min: number, max: number): number {
     return max + (raw - max) * RUBBER_BAND;
   }
   return raw;
-}
-
-/**
- * Advance one momentum frame over `dtMs` with exponential friction and
- * boundary clamping at `[min, max]`.
- */
-export function momentumStep(
-  s: { offset: number; velocity: number },
-  dtMs: number,
-  min: number,
-  max: number,
-): { offset: number; velocity: number; done: boolean; hitEdge: "min" | "max" | null } {
-  const nextVelocity = s.velocity * FRICTION_PER_16MS ** (dtMs / 16);
-  const nextOffset = s.offset + nextVelocity * dtMs;
-
-  if (nextVelocity < 0 && nextOffset <= min) {
-    return { offset: min, velocity: 0, done: true, hitEdge: "min" };
-  }
-  if (nextVelocity > 0 && nextOffset >= max) {
-    return { offset: max, velocity: 0, done: true, hitEdge: "max" };
-  }
-
-  return {
-    offset: nextOffset,
-    velocity: nextVelocity,
-    done: Math.abs(nextVelocity) < MIN_VELOCITY,
-    hitEdge: null,
-  };
-}
-
-/**
- * Advance one settle step toward `target` by 28% (`SETTLE_RATE`) of the
- * remaining distance, snapping to `target` once within 0.5px.
- */
-export function settleStep(
-  offset: number,
-  target: number,
-): { offset: number; done: boolean } {
-  const diff = target - offset;
-  if (Math.abs(diff) <= 0.5) {
-    return { offset: target, done: true };
-  }
-  return { offset: offset + diff * SETTLE_RATE, done: false };
 }

@@ -1,9 +1,14 @@
+import { prefersReducedMotion } from "@/lib/motion";
 import {
   RUBBER_BAND,
+  RULER_MOTION,
   dampOffset,
-  momentumStep,
+  easeInOutCubic,
+  easeOutCubic,
+  jumpDuration,
   nearestIndex,
-  settleStep,
+  projectFling,
+  tweenOffset,
 } from "@/lib/ruler/tape-physics";
 
 const TAP_MAX_DISTANCE = 6;
@@ -11,9 +16,10 @@ const MOMENTUM_START_VELOCITY = 0.08;
 const WHEEL_PAN_SCALE = 0.8;
 const WHEEL_MAX_OVERSHOOT = 40;
 const WHEEL_SETTLE_DELAY_MS = 120;
-const MAX_FRAME_DT_MS = 32;
 const VELOCITY_MIN_DT_MS = 8;
 const VELOCITY_SMOOTHING = 0.65;
+
+type MoveCause = "snap" | "keyStep" | "jump";
 
 export interface TapeControllerOptions {
   el: HTMLElement;
@@ -164,10 +170,65 @@ export function createTapeController(opts: TapeControllerOptions): TapeControlle
     refreshAria();
   }
 
+  function oneUnitDistance(targetIdx: number, fromOffset: number): number {
+    const targetOffset = centers[targetIdx];
+    if (fromOffset < targetOffset && targetIdx > realFirst) {
+      return Math.abs(targetOffset - centers[targetIdx - 1]);
+    }
+    if (fromOffset > targetOffset && targetIdx < realLast) {
+      return Math.abs(centers[targetIdx + 1] - targetOffset);
+    }
+    if (targetIdx > realFirst) {
+      return Math.abs(targetOffset - centers[targetIdx - 1]);
+    }
+    if (targetIdx < realLast) {
+      return Math.abs(centers[targetIdx + 1] - targetOffset);
+    }
+    return Infinity;
+  }
+
+  function startTween(
+    targetIdx: number,
+    durationMs: number,
+    ease: (t: number) => number,
+    emitSettle: boolean,
+  ): void {
+    const fromOffset = currentOffset;
+    const targetOffset = centers[targetIdx];
+
+    if (prefersReducedMotion() || durationMs <= 0 || fromOffset === targetOffset) {
+      currentOffset = targetOffset;
+      onFrame(currentOffset);
+      finishSettle(targetIdx, emitSettle);
+      return;
+    }
+
+    const startTime = performance.now();
+
+    function tick(): void {
+      if (destroyed || (emitSettle && disabled)) {
+        animId = null;
+        return;
+      }
+      const elapsed = performance.now() - startTime;
+      currentOffset = tweenOffset(fromOffset, targetOffset, elapsed, durationMs, ease);
+      onFrame(currentOffset);
+
+      if (elapsed >= durationMs) {
+        finishSettle(targetIdx, emitSettle);
+        return;
+      }
+      animId = requestAnimationFrame(tick);
+    }
+
+    animId = requestAnimationFrame(tick);
+  }
+
   function moveToIndex(
     index: number,
     animate: boolean,
     emitSettle: boolean,
+    cause: MoveCause = "snap",
     isKeyboard = false,
   ): void {
     if (destroyed || !hasUnits()) return;
@@ -177,76 +238,48 @@ export function createTapeController(opts: TapeControllerOptions): TapeControlle
     const targetOffset = centers[targetIdx];
     pendingKeyTarget = isKeyboard ? targetIdx : null;
 
-    if (!animate) {
+    if (!animate || prefersReducedMotion()) {
       currentOffset = targetOffset;
       onFrame(currentOffset);
       finishSettle(targetIdx, emitSettle);
       return;
     }
 
-    function tick(): void {
-      if (destroyed || (emitSettle && disabled)) {
-        animId = null;
-        return;
-      }
-      const step = settleStep(currentOffset, targetOffset);
-      currentOffset = step.offset;
-      onFrame(currentOffset);
-
-      if (step.done) {
-        finishSettle(targetIdx, emitSettle);
-        return;
-      }
-      animId = requestAnimationFrame(tick);
+    const distance = Math.abs(targetOffset - currentOffset);
+    let durationMs: number;
+    let ease: (t: number) => number;
+    if (cause === "keyStep") {
+      durationMs = RULER_MOTION.keyStepMs;
+      ease = easeOutCubic;
+    } else if (cause === "jump" && distance >= oneUnitDistance(targetIdx, currentOffset)) {
+      durationMs = jumpDuration(distance);
+      ease = easeInOutCubic;
+    } else {
+      durationMs = RULER_MOTION.snapMs;
+      ease = easeOutCubic;
     }
 
-    tick();
+    startTween(targetIdx, durationMs, ease, emitSettle);
   }
 
   function settleToNearest(): void {
     if (destroyed || disabled || !hasUnits()) return;
     const targetIdx = nearestIndex(centers, currentOffset, realFirst, realLast);
-    moveToIndex(targetIdx, true, true);
+    moveToIndex(targetIdx, true, true, "snap");
   }
 
-  function startMomentum(): void {
+  function startFling(releaseVelocity: number): void {
     if (destroyed || disabled || !hasUnits()) return;
     cancelMotion();
 
-    let lastTime = performance.now();
-    const minBound = centers[realFirst];
-    const maxBound = centers[realLast];
-
-    function tick(now: number): void {
-      if (destroyed || disabled) {
-        animId = null;
-        return;
-      }
-      const dt = Math.max(0, Math.min(MAX_FRAME_DT_MS, now - lastTime));
-      lastTime = now;
-
-      const step = momentumStep({ offset: currentOffset, velocity }, dt, minBound, maxBound);
-      currentOffset = step.offset;
-      velocity = step.velocity;
-      onFrame(currentOffset);
-
-      if (step.hitEdge === "min") {
-        finishSettle(realFirst, true);
-        return;
-      }
-      if (step.hitEdge === "max") {
-        finishSettle(realLast, true);
-        return;
-      }
-      if (step.done) {
-        animId = null;
-        settleToNearest();
-        return;
-      }
-      animId = requestAnimationFrame(tick);
-    }
-
-    animId = requestAnimationFrame(tick);
+    const { targetIdx, durationMs } = projectFling(
+      centers,
+      currentOffset,
+      releaseVelocity,
+      realFirst,
+      realLast,
+    );
+    startTween(targetIdx, durationMs, easeOutCubic, true);
   }
 
   function resumeSinglePointerDrag(point: { x: number; y: number }): void {
@@ -409,23 +442,33 @@ export function createTapeController(opts: TapeControllerOptions): TapeControlle
         const clickX = e.clientX - rect.left;
         const tappedTapeX = currentOffset + (clickX - rect.width / 2);
         const targetIdx = nearestIndex(centers, tappedTapeX, realFirst, realLast);
-        moveToIndex(targetIdx, true, true);
+        moveToIndex(targetIdx, true, true, "snap");
         return;
       }
+
+      const now = performance.now();
+      let releaseVelocity =
+        prefersReducedMotion() || now - lastPointerTime > RULER_MOTION.staleReleaseMs
+          ? 0
+          : velocity;
+      releaseVelocity = Math.max(
+        -RULER_MOTION.maxReleaseVelocity,
+        Math.min(RULER_MOTION.maxReleaseVelocity, releaseVelocity),
+      );
 
       const minBound = centers[realFirst];
       const maxBound = centers[realLast];
 
       if (
-        (currentOffset <= minBound && velocity <= 0) ||
-        (currentOffset >= maxBound && velocity >= 0)
+        (currentOffset <= minBound && releaseVelocity <= 0) ||
+        (currentOffset >= maxBound && releaseVelocity >= 0)
       ) {
         settleToNearest();
         return;
       }
 
-      if (Math.abs(velocity) > MOMENTUM_START_VELOCITY) {
-        startMomentum();
+      if (Math.abs(releaseVelocity) > MOMENTUM_START_VELOCITY) {
+        startFling(releaseVelocity);
       } else {
         settleToNearest();
       }
@@ -482,17 +525,17 @@ export function createTapeController(opts: TapeControllerOptions): TapeControlle
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       const curIdx = pendingKeyTarget ?? nearestIndex(centers, currentOffset, realFirst, realLast);
-      moveToIndex(curIdx - 1, true, true, true);
+      moveToIndex(curIdx - 1, true, true, "keyStep", true);
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
       const curIdx = pendingKeyTarget ?? nearestIndex(centers, currentOffset, realFirst, realLast);
-      moveToIndex(curIdx + 1, true, true, true);
+      moveToIndex(curIdx + 1, true, true, "keyStep", true);
     } else if (e.key === "Home") {
       e.preventDefault();
-      moveToIndex(realFirst, true, true, true);
+      moveToIndex(realFirst, true, true, "jump", true);
     } else if (e.key === "End") {
       e.preventDefault();
-      moveToIndex(realLast, true, true, true);
+      moveToIndex(realLast, true, true, "jump", true);
     }
   }
 
@@ -520,7 +563,7 @@ export function createTapeController(opts: TapeControllerOptions): TapeControlle
       refreshAria();
     },
     goTo(index, animate) {
-      moveToIndex(index, animate, false);
+      moveToIndex(index, animate, false, "jump");
     },
     setDisabled(nextDisabled) {
       if (destroyed) return;

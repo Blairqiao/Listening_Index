@@ -20,7 +20,12 @@ import {
   type RulerLevel,
   type RulerUnit,
 } from "@/lib/ruler/units";
-import { nearestIndex } from "@/lib/ruler/tape-physics";
+import { prefersReducedMotion } from "@/lib/motion";
+import {
+  RULER_MOTION,
+  easeInOutCubic,
+  nearestIndex,
+} from "@/lib/ruler/tape-physics";
 import {
   FIXED_PPD,
   allBlend,
@@ -55,7 +60,6 @@ const LEVEL_LABELS: Record<RulerLevel, string> = {
 
 const ALL_FILL_RATIO = 0.7;
 const MAX_ALL_PPD = FIXED_PPD.year * 0.6;
-const ZOOM_ANIM_DURATION_MS = 200;
 const LIVE_ZOOM_SNAP_DELAY_MS = 150;
 const DEFAULT_RULER_WIDTH = 440;
 const DEFAULT_RULER_HEIGHT = 28;
@@ -558,6 +562,11 @@ export function ZoomRuler({
     function animateZoomTo(targetLevel: RulerLevel, emit: boolean): void {
       cancelZoomTimers();
 
+      if (prefersReducedMotion()) {
+        finishZoomAt(targetLevel, emit);
+        return;
+      }
+
       const startPpd = state.ppd;
       const targetPpd = getSnapPpd(targetLevel);
       const logStart = Math.log(startPpd);
@@ -579,10 +588,13 @@ export function ZoomRuler({
 
       const startTime = performance.now();
 
-      function step(now: number): void {
+      function step(): void {
         if (disposed) return;
-        const t = Math.min(1, (now - startTime) / ZOOM_ANIM_DURATION_MS);
-        const eased = 1 - Math.pow(1 - t, 3);
+        const t = Math.min(
+          1,
+          Math.max(0, (performance.now() - startTime) / RULER_MOTION.zoomMs),
+        );
+        const eased = easeInOutCubic(t);
         state.ppd = Math.exp(logStart + (logEnd - logStart) * eased);
         state.liveZoomDay = startDay + (targetDay - startDay) * eased;
 
@@ -1068,11 +1080,11 @@ export function ZoomRuler({
     controller.refreshAria();
   }, [range, firstKey, todayKey]);
 
-  const zoomBtnClass = `font-mono text-[14px] leading-none h-[24px] sm:h-[28px] min-w-[22px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border transition-none hover:enabled:text-[#EDEDE8] active:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-30 disabled:cursor-default ${
+  const zoomBtnClass = `font-mono text-[14px] leading-none h-[24px] sm:h-[28px] min-w-[22px] px-1 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none box-border transition-none press hover:enabled:text-[#EDEDE8] active:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
-  const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border transition-none hover:enabled:text-music-accent focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-1 disabled:opacity-30 disabled:cursor-default ${
+  const todayBtnClass = `font-mono w-[24px] h-[24px] sm:h-[28px] p-0 border-0 bg-transparent text-[#6A6A64] inline-flex items-center justify-center select-none flex-none sm:order-4 box-border transition-none press hover:enabled:text-music-accent focus-ring disabled:opacity-30 disabled:cursor-default ${
     isDisabled ? "cursor-wait" : "cursor-pointer"
   }`;
 
@@ -1166,7 +1178,7 @@ export function ZoomRuler({
       <div
         ref={rulerContainerRef}
         aria-label="Zoomable timeline ruler"
-        className={`w-full h-[28px] sm:order-3 sm:flex-initial sm:w-[440px] sm:min-w-[200px] sm:mx-1 relative overflow-hidden touch-none select-none box-border focus:outline-none focus-visible:outline-1 focus-visible:outline-music-accent focus-visible:outline-offset-2 ${
+        className={`w-full h-[28px] sm:order-3 sm:flex-initial sm:w-[440px] sm:min-w-[200px] sm:mx-1 relative overflow-hidden touch-none select-none box-border focus-ring ${
           isDisabled
             ? "cursor-wait"
             : ui.isAllLocked
