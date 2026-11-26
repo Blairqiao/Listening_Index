@@ -109,5 +109,22 @@ body::-webkit-scrollbar,
   background-color: color-mix(in srgb, var(--music-accent) 100%, #1C1C1A);
 }
 
+:root {
+  --taste-tone-a: #2A2A24;
+  --taste-tone-b: #47473B;
+}
+
+.taste-tone-a {
+  background: var(--taste-tone-a);
+}
+
+.taste-tone-b {
+  background: var(--taste-tone-b);
+}
+
+.taste-gap {
+  background: repeating-linear-gradient(135deg, transparent 0 3px, #2A2A24 3px 4px);
+}
+
 
 

@@ -77,6 +77,7 @@ import { useSpotifyStatus } from "./listening-view/useSpotifyStatus";
 import { useTrackStats } from "./listening-view/useTrackStats";
 import { useSearchProfile } from "./listening-view/useSearchProfile";
 import { useCalendarData } from "./listening-view/useCalendarData";
+import { useTasteData } from "./listening-view/useTasteData";
 import {
   CalendarSelection,
   formatCalendarMetrics,
@@ -255,8 +256,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   // Active session state for Mode 2
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>(undefined);
 
-  // Mode 5: Calendar selection state
+  // Mode 5: Calendar selection and Taste detail level state
   const [calendarSelection, setCalendarSelection] = useState<CalendarSelection | null>(null);
+  const [tasteLevel, setTasteLevel] = useState<number | null>(null);
 
   // Mode 4: Search & Profile state
   const {
@@ -289,6 +291,12 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
   });
 
   const calendar = useCalendarData({
+    enabled: activeMode === 5,
+    timezone: visitorTimezone,
+    refreshKey: lastSyncedAt?.getTime() ?? 0,
+  });
+
+  const taste = useTasteData({
     enabled: activeMode === 5,
     timezone: visitorTimezone,
     refreshKey: lastSyncedAt?.getTime() ?? 0,
@@ -1019,6 +1027,9 @@ const ListeningViewInner: React.FC<ListeningViewProps> = ({
                   selection={calendarSelection}
                   onSelectionChange={setCalendarSelection}
                   onOpenInOverview={handleOpenCalendarSelection}
+                  taste={taste.data}
+                  tasteLevel={tasteLevel}
+                  onTasteLevelChange={setTasteLevel}
                 />
               )
             )}

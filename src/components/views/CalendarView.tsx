@@ -18,6 +18,23 @@ import {
   type CalendarSelection,
 } from "@/lib/calendar";
 import { formatRangeLabel } from "@/lib/range";
+import type { TastePhase, TastePhasesData } from "@/lib/taste/types";
+import {
+  clampTasteLevel,
+  desktopRibbon,
+  formatTasteDateSpan,
+  hasTastePhases,
+  mobileRibbon,
+  phasesAtLevel,
+  phaseSelection,
+  selectedPhaseId,
+  tasteLevelLabel,
+  tasteRow,
+  type DesktopRibbonPiece,
+  type MobileRibbonPiece,
+  type TasteTone,
+} from "@/lib/taste/view";
+import { TastePhaseCards } from "@/components/views/TastePhaseCards";
 
 const SHORT_MONTHS = [
   "Jan",
@@ -50,6 +67,30 @@ export const CalendarLegend: React.FC = () => {
   );
 };
 
+interface YearRibbonData {
+  desktop: DesktopRibbonPiece[];
+  mobile: MobileRibbonPiece[];
+  phaseById: Map<string, { phase: TastePhase; tone: TasteTone }>;
+}
+
+function formatRibbonPhaseLabel(phase: TastePhase): string {
+  const span = formatTasteDateSpan(phase.start, phase.end);
+  const topArtist = phase.topArtists[0]?.name;
+  return topArtist ? `${span} \u00B7 ${topArtist}` : span;
+}
+
+function rampEndColor(
+  phaseId: string | undefined,
+  phaseById: Map<string, { phase: TastePhase; tone: TasteTone }>,
+  selectedId: string | null,
+): string {
+  if (!phaseId) return "transparent";
+  if (phaseId === selectedId) return "var(--music-accent)";
+  const meta = phaseById.get(phaseId);
+  if (!meta) return "transparent";
+  return meta.tone === "b" ? "var(--taste-tone-b)" : "var(--taste-tone-a)";
+}
+
 interface YearBlockProps {
   year: number;
   firstDate: string | null;
@@ -61,8 +102,11 @@ interface YearBlockProps {
   selectionEnd: string | null;
   dayCounts: Map<string, number>;
   thresholds: [number, number, number];
+  ribbon: YearRibbonData | null;
+  selectedPhaseId: string | null;
   onSelectMonth: (year: number, month: number) => void;
   onSelectYear: (year: number) => void;
+  onSelectPhase: (phase: TastePhase) => void;
 }
 
 const YearBlock = React.memo<YearBlockProps>(
@@ -77,8 +121,11 @@ const YearBlock = React.memo<YearBlockProps>(
     selectionEnd,
     dayCounts,
     thresholds,
+    ribbon,
+    selectedPhaseId,
     onSelectMonth,
     onSelectYear,
+    onSelectPhase,
   }) {
     const cols = useMemo(() => weekColumns(year), [year]);
     const monthCols = useMemo(() => monthStartColumns(year), [year]);
@@ -136,6 +183,80 @@ const YearBlock = React.memo<YearBlockProps>(
 
         {/* 1. Mobile Heatmap (md:hidden) */}
         <div className="md:hidden w-full select-none">
+          {ribbon !== null && (
+            <div
+              className="grid gap-[2px] items-center w-full mb-1"
+              style={{ gridTemplateColumns: "18px 1fr" }}
+            >
+              <div />
+              <div className="relative h-[8px] w-full">
+                {ribbon.mobile.map((piece, idx) => {
+                  const posStyle: React.CSSProperties = {
+                    left: `${piece.leftPct}%`,
+                    width: `calc(${piece.widthPct}% - 1.5px)`,
+                  };
+                  if (piece.kind === "phase" && piece.phaseId) {
+                    const meta = ribbon.phaseById.get(piece.phaseId);
+                    const isSelected = piece.phaseId === selectedPhaseId;
+                    const label = meta
+                      ? formatRibbonPhaseLabel(meta.phase)
+                      : "Select Taste Phase";
+                    const toneClass = isSelected
+                      ? "bg-music-accent"
+                      : piece.tone === "b"
+                        ? "taste-tone-b"
+                        : "taste-tone-a";
+                    return (
+                      <button
+                        key={`m-phase-${piece.phaseId}-${idx}`}
+                        type="button"
+                        data-taste-ribbon="phase"
+                        onClick={() => meta && onSelectPhase(meta.phase)}
+                        style={posStyle}
+                        title={label}
+                        aria-label={label}
+                        className={`absolute top-0 h-[8px] rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
+                      />
+                    );
+                  }
+                  if (piece.kind === "gap") {
+                    return (
+                      <div
+                        key={`m-gap-${idx}`}
+                        aria-hidden="true"
+                        style={posStyle}
+                        className="absolute top-0 h-[8px] rounded-[2px] taste-gap"
+                      />
+                    );
+                  }
+                  if (piece.kind === "ramp") {
+                    const fromColor = rampEndColor(
+                      piece.from,
+                      ribbon.phaseById,
+                      selectedPhaseId,
+                    );
+                    const toColor = rampEndColor(
+                      piece.to,
+                      ribbon.phaseById,
+                      selectedPhaseId,
+                    );
+                    return (
+                      <div
+                        key={`m-ramp-${idx}`}
+                        aria-hidden="true"
+                        style={{
+                          ...posStyle,
+                          background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
+                        }}
+                        className="absolute top-0 h-[8px] rounded-[2px] pointer-events-none"
+                      />
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            </div>
+          )}
           <div
             className="grid gap-[2px] items-center w-full"
             style={{ gridTemplateColumns: "18px repeat(12, minmax(0, 1fr))" }}
@@ -234,6 +355,80 @@ const YearBlock = React.memo<YearBlockProps>(
 
         {/* 2. Desktop Heatmap (hidden md:block) */}
         <div className="hidden md:block w-full select-none">
+          {ribbon !== null && (
+            <div
+              className="grid h-[10px] mb-1 select-none"
+              style={{
+                gridTemplateColumns: `20px repeat(${numCols}, minmax(0, 1fr))`,
+                gap: "3px",
+              }}
+            >
+              {ribbon.desktop.map((piece, idx) => {
+                const gridStyle: React.CSSProperties = {
+                  gridRow: 1,
+                  gridColumn: `${piece.colStart + 2} / ${piece.colEnd + 3}`,
+                };
+                if (piece.kind === "phase" && piece.phaseId) {
+                  const meta = ribbon.phaseById.get(piece.phaseId);
+                  const isSelected = piece.phaseId === selectedPhaseId;
+                  const label = meta
+                    ? formatRibbonPhaseLabel(meta.phase)
+                    : "Select Taste Phase";
+                  const toneClass = isSelected
+                    ? "bg-music-accent"
+                    : piece.tone === "b"
+                      ? "taste-tone-b"
+                      : "taste-tone-a";
+                  return (
+                    <button
+                      key={`d-phase-${piece.phaseId}-${idx}`}
+                      type="button"
+                      data-taste-ribbon="phase"
+                      onClick={() => meta && onSelectPhase(meta.phase)}
+                      style={gridStyle}
+                      title={label}
+                      aria-label={label}
+                      className={`h-[10px] w-full rounded-[2px] border-0 p-0 cursor-pointer transition-colors ${toneClass}`}
+                    />
+                  );
+                }
+                if (piece.kind === "gap") {
+                  return (
+                    <div
+                      key={`d-gap-${piece.colStart}-${idx}`}
+                      aria-hidden="true"
+                      style={gridStyle}
+                      className="h-[10px] w-full rounded-[2px] taste-gap"
+                    />
+                  );
+                }
+                if (piece.kind === "ramp") {
+                  const fromColor = rampEndColor(
+                    piece.from,
+                    ribbon.phaseById,
+                    selectedPhaseId,
+                  );
+                  const toColor = rampEndColor(
+                    piece.to,
+                    ribbon.phaseById,
+                    selectedPhaseId,
+                  );
+                  return (
+                    <div
+                      key={`d-ramp-${piece.colStart}-${idx}`}
+                      aria-hidden="true"
+                      style={{
+                        ...gridStyle,
+                        background: `linear-gradient(90deg, ${fromColor}, ${toColor})`,
+                      }}
+                      className="h-[10px] w-full rounded-[2px] pointer-events-none"
+                    />
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
           {/* Desktop Month Header Row */}
           <div
             className="grid items-center mb-1 text-[10px] text-[#5A5A55] font-mono select-none"
@@ -364,6 +559,8 @@ const YearBlock = React.memo<YearBlockProps>(
     if (prev.selectionStart !== next.selectionStart) return false;
     if (prev.selectionEnd !== next.selectionEnd) return false;
     if (prev.dayCounts !== next.dayCounts) return false;
+    if (prev.ribbon !== next.ribbon) return false;
+    if (prev.selectedPhaseId !== next.selectedPhaseId) return false;
     if (
       prev.thresholds[0] !== next.thresholds[0] ||
       prev.thresholds[1] !== next.thresholds[1] ||
@@ -386,6 +583,9 @@ export interface CalendarViewProps {
   selection: CalendarSelection | null; // committed selection, owned by ListeningView
   onSelectionChange: (sel: CalendarSelection | null) => void; // called on drag end, a tap pair, month/year click, Clear
   onOpenInOverview: (sel: CalendarSelection) => void;
+  taste?: TastePhasesData | null;
+  tasteLevel?: number | null;
+  onTasteLevelChange?: (k: number) => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -394,6 +594,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   selection,
   onSelectionChange,
   onOpenInOverview,
+  taste = null,
+  tasteLevel = null,
+  onTasteLevelChange,
 }) => {
   // Sync draft from selection prop
   const [draft, setDraft] = useState<CalendarSelection | null>(selection);
@@ -720,6 +923,60 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     });
   }, [data, draft]);
 
+  const activeTaste = hasTastePhases(taste) ? taste : null;
+  const activeTasteLevel = activeTaste
+    ? clampTasteLevel(activeTaste, tasteLevel)
+    : null;
+
+  const activePhases = useMemo(() => {
+    if (!activeTaste || activeTasteLevel === null) return [];
+    return phasesAtLevel(activeTaste, activeTasteLevel);
+  }, [activeTaste, activeTasteLevel]);
+
+  const phaseRowItems = useMemo(() => {
+    if (!activeTaste || activeTasteLevel === null) return [];
+    return tasteRow(activeTaste, activeTasteLevel);
+  }, [activeTaste, activeTasteLevel]);
+
+  const activePhaseId = useMemo(
+    () => selectedPhaseId(activePhases, selection),
+    [activePhases, selection],
+  );
+  const activePhaseIdRef = useRef<string | null>(activePhaseId);
+  activePhaseIdRef.current = activePhaseId;
+
+  const handleSelectPhase = useCallback(
+    (phase: TastePhase) => {
+      if (activePhaseIdRef.current === phase.id) {
+        handleClear();
+        return;
+      }
+      const next = phaseSelection(phase);
+      draftRef.current = next;
+      setDraft(next);
+      setPendingTouchAnchor(null);
+      onSelectionChange(next);
+    },
+    [handleClear, onSelectionChange],
+  );
+
+  const ribbonsByYear = useMemo(() => {
+    if (!activeTaste || activeTasteLevel === null) return null;
+    const phaseById = new Map<string, { phase: TastePhase; tone: TasteTone }>();
+    activePhases.forEach((phase, idx) => {
+      phaseById.set(phase.id, { phase, tone: idx % 2 === 0 ? "a" : "b" });
+    });
+    const map = new Map<number, YearRibbonData>();
+    for (const year of years) {
+      map.set(year, {
+        desktop: desktopRibbon(year, activeTaste, activeTasteLevel),
+        mobile: mobileRibbon(year, activeTaste, activeTasteLevel),
+        phaseById,
+      });
+    }
+    return map;
+  }, [activeTaste, activeTasteLevel, activePhases, years]);
+
   // Skeleton only when loading with no data; return no content otherwise when data is null
   if (!data) {
     if (isLoading) {
@@ -747,6 +1004,59 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const draftFrom = draft?.from ?? null;
   const draftTo = draft?.to ?? null;
   const hasActiveSelection = Boolean(draft);
+  const showSlider =
+    activeTaste !== null &&
+    activeTasteLevel !== null &&
+    activeTaste.kEra < activeTaste.kFine;
+  const levelLabel =
+    activeTaste !== null && activeTasteLevel !== null
+      ? tasteLevelLabel(activeTaste, activeTasteLevel)
+      : "";
+
+  const heatmapsContainer = (
+    <div
+      ref={heatmapsContainerRef}
+      className="w-full flex flex-col gap-6"
+      onPointerDown={handleContainerPointerDown}
+      onPointerUp={handleContainerPointerUp}
+      onPointerCancel={handleContainerPointerCancel}
+    >
+      {years.map((year) => {
+        const clipped = clipSelectionToYear(draft, year);
+        const isAnchorYear =
+          draftFrom !== null && draftFrom.slice(0, 4) === String(year);
+        const selectionStart =
+          draftFrom !== null && draftFrom.slice(0, 4) === String(year)
+            ? draftFrom
+            : null;
+        const selectionEnd =
+          draftTo !== null && draftTo.slice(0, 4) === String(year)
+            ? draftTo
+            : null;
+
+        return (
+          <YearBlock
+            key={year}
+            year={year}
+            firstDate={data.firstDate}
+            today={data.today}
+            clippedSelection={clipped}
+            hasActiveSelection={hasActiveSelection}
+            isAnchorYear={isAnchorYear}
+            selectionStart={selectionStart}
+            selectionEnd={selectionEnd}
+            dayCounts={dayCounts}
+            thresholds={thresholds}
+            ribbon={ribbonsByYear?.get(year) ?? null}
+            selectedPhaseId={activePhaseId}
+            onSelectMonth={handleSelectMonth}
+            onSelectYear={handleSelectYear}
+            onSelectPhase={handleSelectPhase}
+          />
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="w-full flex flex-col">
@@ -772,10 +1082,33 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </span>
             </>
           ) : (
-            <span className="text-[#5A5A55]">Drag across days or pick a month</span>
+            <span className="text-[#5A5A55]">
+              {activeTaste
+                ? "Drag across days, pick a month, or pick a phase"
+                : "Drag across days or pick a month"}
+            </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className={showSlider ? "flex items-center gap-3 flex-wrap w-full sm:w-auto" : "flex items-center gap-3"}>
+          {showSlider && activeTaste && activeTasteLevel !== null && (
+            <div className="flex items-center gap-2 text-[11px] text-[#5A5A55] w-full sm:w-auto">
+              <span>Eras</span>
+              <input
+                type="range"
+                min={activeTaste.kEra}
+                max={activeTaste.kFine}
+                step={1}
+                value={activeTasteLevel}
+                onChange={(e) => onTasteLevelChange?.(Number(e.target.value))}
+                aria-label="Taste detail"
+                aria-valuetext={levelLabel}
+                className="w-[120px] sm:w-[130px] cursor-pointer"
+                style={{ accentColor: "var(--music-accent)" }}
+              />
+              <span>Phases</span>
+              <span className="text-[#EDEDE8] whitespace-nowrap">{levelLabel}</span>
+            </div>
+          )}
           {draft && (
             <button
               type="button"
@@ -796,46 +1129,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </div>
 
-      {/* Year heatmaps container with delegated pointer events */}
-      <div
-        ref={heatmapsContainerRef}
-        className="w-full flex flex-col gap-6"
-        onPointerDown={handleContainerPointerDown}
-        onPointerUp={handleContainerPointerUp}
-        onPointerCancel={handleContainerPointerCancel}
-      >
-        {years.map((year) => {
-          const clipped = clipSelectionToYear(draft, year);
-          const isAnchorYear =
-            draftFrom !== null && draftFrom.slice(0, 4) === String(year);
-          const selectionStart =
-            draftFrom !== null && draftFrom.slice(0, 4) === String(year)
-              ? draftFrom
-              : null;
-          const selectionEnd =
-            draftTo !== null && draftTo.slice(0, 4) === String(year)
-              ? draftTo
-              : null;
-
-          return (
-            <YearBlock
-              key={year}
-              year={year}
-              firstDate={data.firstDate}
-              today={data.today}
-              clippedSelection={clipped}
-              hasActiveSelection={hasActiveSelection}
-              isAnchorYear={isAnchorYear}
-              selectionStart={selectionStart}
-              selectionEnd={selectionEnd}
-              dayCounts={dayCounts}
-              thresholds={thresholds}
-              onSelectMonth={handleSelectMonth}
-              onSelectYear={handleSelectYear}
-            />
-          );
-        })}
-      </div>
+      {activeTaste ? (
+        <>
+          <TastePhaseCards
+            items={phaseRowItems}
+            selectedPhaseId={activePhaseId}
+            onSelectPhase={handleSelectPhase}
+          />
+          {heatmapsContainer}
+        </>
+      ) : (
+        heatmapsContainer
+      )}
     </div>
   );
 };
