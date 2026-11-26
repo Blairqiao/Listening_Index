@@ -1,13 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
-import {
-  changedIndexes,
-  introDelayStyle,
-  metricIntroDelay,
-  METRIC_SWAP_KEYFRAMES,
-  METRIC_SWAP_TIMING,
-} from "@/lib/choreography";
+import React from "react";
+import { introDelayStyle, metricIntroDelay } from "@/lib/choreography";
 import { Mode } from "@/lib/types";
 
 interface MetricRibbonProps {
@@ -65,16 +59,6 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
   isLoading = false,
 }) => {
   const labels = getRibbonLabels(mode, overviewTimeUnit);
-
-  // Values that change in place clear from a blur. The first render keeps them still.
-  const valueRefs = useRef<(HTMLSpanElement | null)[]>([]);
-  const prevMetricsRef = useRef<readonly string[]>(metrics);
-  useEffect(() => {
-    for (const i of changedIndexes(prevMetricsRef.current, metrics)) {
-      valueRefs.current[i]?.animate(METRIC_SWAP_KEYFRAMES, METRIC_SWAP_TIMING);
-    }
-    prevMetricsRef.current = metrics;
-  }, [metrics]);
 
   return (
     <section
@@ -143,14 +127,7 @@ export const MetricRibbon: React.FC<MetricRibbonProps> = ({
                 isLoading ? "opacity-60 transition-opacity duration-150" : ""
               }`}
             >
-              <span
-                ref={(el) => {
-                  valueRefs.current[i] = el;
-                }}
-                className="inline-block"
-              >
-                {metrics[i]}
-              </span>
+              {metrics[i]}
             </div>
             </div>
           </div>
